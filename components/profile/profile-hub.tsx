@@ -622,6 +622,17 @@ function AttendanceTab({ showToast }: { showToast: (text: string, type?: 'succes
     );
   };
 
+  const isCheckedIn = (day: number | null) => {
+    if (!day) return false;
+    const date = new Date(year, month, day);
+    date.setHours(0, 0, 0, 0);
+    return history.some((entry: any) => {
+      const entryDate = new Date(entry.date);
+      entryDate.setHours(0, 0, 0, 0);
+      return entryDate.getTime() === date.getTime();
+    });
+  };
+
   const isOnLeave = (day: number | null) => {
     if (!day) return false;
     const date = new Date(year, month, day);
@@ -764,16 +775,19 @@ function AttendanceTab({ showToast }: { showToast: (text: string, type?: 'succes
                   if (day === undefined) return null;
 
                   const today = isToday(day);
+                  const checkedIn = isCheckedIn(day);
                   const leave = isOnLeave(day);
                   return (
                     <div
                       key={rowIndex}
                       className={`grid h-10 w-full place-items-center rounded-xl text-xs font-bold sm:h-14 sm:text-sm transition-all ${day
-                        ? today
-                          ? "bg-sky-100 text-rose-600 border border-sky-200 shadow-inner"
-                          : leave
-                            ? "bg-emerald-100 text-rose-600 border border-emerald-200 shadow-sm"
-                            : "bg-white shadow-sm border border-slate-100 text-slate-700"
+                        ? checkedIn && today
+                          ? "bg-sky-100 text-sky-700 border border-sky-200 shadow-inner"
+                          : today
+                            ? "bg-sky-100 text-rose-600 border border-sky-200 shadow-inner"
+                            : leave
+                              ? "bg-emerald-100 text-rose-600 border border-emerald-200 shadow-sm"
+                              : "bg-white shadow-sm border border-slate-100 text-slate-700"
                         : "opacity-0"
                         }`}
                     >
