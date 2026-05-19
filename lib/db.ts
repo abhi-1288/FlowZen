@@ -17,7 +17,7 @@ if (!global.mongooseConnection) {
 }
 
 export async function connectDb() {
-  const MONGODB_URI = process.env.MONGODB_URI;
+  const MONGODB_URI = process.env.NODE_ENV === "production" ? process.env.ATLAS_URI : process.env.MONGODB_URI;
   if (!MONGODB_URI) {
     throw new Error("Missing MONGODB_URI environment variable.");
   }
