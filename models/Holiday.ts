@@ -7,7 +7,8 @@ const HolidaySchema = new Schema(
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
     duration: { type: Number, required: true },
-    createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true }
+    createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    company: { type: Schema.Types.ObjectId, ref: "Company", required: true, index: true }
   },
   { timestamps: true }
 );

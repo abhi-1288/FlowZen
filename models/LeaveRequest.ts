@@ -3,6 +3,7 @@ import { Schema, model, models } from "mongoose";
 const LeaveRequestSchema = new Schema(
   {
     requester: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    company: { type: Schema.Types.ObjectId, ref: "Company", required: true, index: true },
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
     duration: { type: Number, required: true }, // in days

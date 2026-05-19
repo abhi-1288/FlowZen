@@ -5,6 +5,7 @@ import { Company } from "@/models/Company";
 import { JoinRequest } from "@/models/JoinRequest";
 import { Notification } from "@/models/Notification";
 import { Team } from "@/models/Team";
+import { Board } from "@/models/Board";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
 
@@ -107,6 +108,32 @@ export async function PATCH(request: Request, { params }: Params) {
           );
           await Team.deleteMany({ manager: requester._id });
         }
+
+        // Cleanup board assignment dependency when a member quits the company.
+        // 1) If the quitting user is referenced as `assignedTo` for other members, clear it.
+        await Board.updateMany(
+          { "members.assignedTo": requester._id },
+          { $set: { "members.$[m].assignedTo": null } },
+          { arrayFilters: [{ "m.assignedTo": requester._id }] },
+        );
+
+        // 2) Also remove any membership rows where the quitting user is present and was assigned.
+        //    (Keeps invited membership intact when assignedTo is already null.)
+        const assignedBoards = await Board.find({
+          "members.user": requester._id,
+          "members.assignedTo": { $ne: null },
+        });
+
+        for (const board of assignedBoards) {
+          const originalCount = board.members.length;
+          board.members = (board.members as any[]).filter(
+            (member) => !(String(member.user) === String(requester._id) && member.assignedTo != null),
+          );
+          if (board.members.length !== originalCount) {
+            await board.save();
+          }
+        }
+
 
         // Remove from team if any
         if (requester.team) {

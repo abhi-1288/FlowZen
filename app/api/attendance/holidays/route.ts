@@ -4,6 +4,16 @@ import { connectDb } from "@/lib/db";
 import { requireUserId, jsonError } from "@/lib/api";
 import { Holiday } from "@/models/Holiday";
 import { User } from "@/models/User";
+import { Company } from "@/models/Company";
+import { Notification } from "@/models/Notification";
+import { emitNotification } from "@/lib/realtime";
+
+const formatHolidayDate = (date: Date) => date.toLocaleDateString("en-GB");
+const buildHolidayNotificationBody = (companyName: string, title: string, start: Date, end: Date, duration: number) => {
+  const dateText = duration === 1 ? formatHolidayDate(start) : `${formatHolidayDate(start)} to ${formatHolidayDate(end)}`;
+  const dayText = `${duration} day${duration === 1 ? "" : "s"}`;
+  return `${companyName} has holiday ${dayText} ${dateText} ${title}`;
+};
 
 export async function POST(req: Request) {
   try {
@@ -26,6 +36,8 @@ export async function POST(req: Request) {
     if (diffDays <= 0) return jsonError("Invalid date range.");
     if (diffDays > 365) return jsonError("Holiday range cannot exceed 365 days.");
 
+    if (!user.company) return jsonError("Only company-associated admins can add holidays.", 400);
+
     const holiday = await Holiday.create({
       title: title || "Company Holiday",
       description: description || "",
@@ -33,7 +45,38 @@ export async function POST(req: Request) {
       endDate: end,
       duration: diffDays,
       createdBy: userId,
+      company: user.company,
     });
+
+    const company = user.company
+      ? await Company.findById(user.company).select("name owner members")
+      : null;
+
+    if (company) {
+      const targets = new Set<string>(
+        (company.members ?? []).map((member: any) => String(member))
+      );
+      if (company.owner) targets.add(String(company.owner));
+
+      const body = buildHolidayNotificationBody(
+        String(company.name),
+        String(holiday.title),
+        start,
+        end,
+        diffDays
+      );
+
+      await Notification.insertMany(
+        Array.from(targets).map((targetUserId) => ({
+          user: targetUserId,
+          company: company._id,
+          type: "system",
+          title: "Holiday announced",
+          body,
+        }))
+      );
+      Array.from(targets).forEach((target) => emitNotification(target));
+    }
 
     return NextResponse.json({ holiday });
   } catch (err: any) {
@@ -86,6 +129,37 @@ export async function DELETE(req: Request) {
     if (!id || !Types.ObjectId.isValid(id)) return jsonError("Invalid holiday ID.");
     const holiday = await Holiday.findByIdAndDelete(id);
     if (!holiday) return jsonError("Holiday not found.", 404);
+
+    const company = user.company
+      ? await Company.findById(user.company).select("name owner members")
+      : null;
+
+    if (company) {
+      const targets = new Set<string>(
+        (company.members ?? []).map((member: any) => String(member))
+      );
+      if (company.owner) targets.add(String(company.owner));
+
+      const body = buildHolidayNotificationBody(
+        String(company.name),
+        String(holiday.title),
+        holiday.startDate,
+        holiday.endDate,
+        holiday.duration
+      );
+
+      await Notification.insertMany(
+        Array.from(targets).map((targetUserId) => ({
+          user: targetUserId,
+          company: company._id,
+          type: "system",
+          title: "Holiday removed",
+          body,
+        }))
+      );
+      Array.from(targets).forEach((target) => emitNotification(target));
+    }
+
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error("Holiday delete error:", err);
@@ -98,6 +172,16 @@ export async function GET() {
   if (!userId) return jsonError("Unauthorized", 401);
 
   await connectDb();
-  const holidays = await Holiday.find({ endDate: { $gte: new Date() } }).sort({ startDate: 1 });
+  const user = await User.findById(userId);
+  if (!user) return jsonError("User not found.", 404);
+
+  const query: any = { endDate: { $gte: new Date() } };
+  if (user.company) {
+    query.company = user.company;
+  } else {
+    query.company = null;
+  }
+
+  const holidays = await Holiday.find(query).sort({ startDate: 1 });
   return NextResponse.json({ holidays });
 }

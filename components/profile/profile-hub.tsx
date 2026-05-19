@@ -628,6 +628,11 @@ function AttendanceTab({ profile, showToast }: { profile: AnyRecord | null; show
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showHolidayModal, setShowHolidayModal] = useState(false);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
+  const [showLeaveHistoryModal, setShowLeaveHistoryModal] = useState(false);
+  const [showEditHolidayModal, setShowEditHolidayModal] = useState(false);
+  const [showDeleteHolidayConfirm, setShowDeleteHolidayConfirm] = useState(false);
+  const [selectedHoliday, setSelectedHoliday] = useState<AnyRecord | null>(null);
+  const [holidayToDelete, setHolidayToDelete] = useState<AnyRecord | null>(null);
   const [requests, setRequests] = useState<AnyRecord[]>([]);
   const [history, setHistory] = useState<AnyRecord[]>([]);
   const [holidays, setHolidays] = useState<AnyRecord[]>([]);
@@ -635,9 +640,6 @@ function AttendanceTab({ profile, showToast }: { profile: AnyRecord | null; show
   const [serverToday, setServerToday] = useState<Date | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
-  const [showManageHolidayModal, setShowManageHolidayModal] = useState(false);
-const [editingHoliday, setEditingHoliday] = useState<AnyRecord | null>(null);
-const [deletingHoliday, setDeletingHoliday] = useState<AnyRecord | null>(null);
 
   const normalizeDate = (date: Date) => {
     const normalized = new Date(date);
@@ -680,9 +682,15 @@ const [deletingHoliday, setDeletingHoliday] = useState<AnyRecord | null>(null);
     }
   };
 
+  const isAttendanceEnabled = Boolean(
+    (profile?.companyStatus === "approved" && profile?.company) ||
+    (profile?.teamStatus === "approved" && profile?.team)
+  );
+
   useEffect(() => {
+    if (!isAttendanceEnabled) return;
     loadData();
-  }, []);
+  }, [isAttendanceEnabled]);
 
   useEffect(() => {
     if (serverToday) {
@@ -748,7 +756,6 @@ const [deletingHoliday, setDeletingHoliday] = useState<AnyRecord | null>(null);
   };
 
   const handleDeleteHoliday = async (holiday: AnyRecord) => {
-    if (!confirm(`Delete holiday "${holiday.title}"?`)) return;
     try {
       await apiFetch("/api/attendance/holidays", {
         method: "DELETE",
@@ -759,6 +766,11 @@ const [deletingHoliday, setDeletingHoliday] = useState<AnyRecord | null>(null);
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Failed to delete holiday", "error");
     }
+  };
+
+  const requestHolidayDelete = (holiday: AnyRecord) => {
+    setHolidayToDelete(holiday);
+    setShowDeleteHolidayConfirm(true);
   };
 
   const month = viewDate.getMonth();
@@ -897,44 +909,22 @@ const [deletingHoliday, setDeletingHoliday] = useState<AnyRecord | null>(null);
 
   const weekDays = ["SUN.", "Mon.", "Tue.", "Wed.", "Thr.", "Fri.", "Sat."];
 
+  if (!isAttendanceEnabled) {
+    return (
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+          <p className="text-4xl font-extrabold tracking-tight text-slate-900">{todayDate.toLocaleDateString()}</p>
+          <p className="max-w-md text-sm text-slate-500">
+            Join a company or team to access attendance, leave, and holiday features. Right now only the current date is shown.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <>
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      {/* Admin Leave History Section */}
-      {profile?.role === "admin" && (
-        <div className="mb-8">
-          <h4 className="text-lg font-semibold mb-2">Leave History (Granted)</h4>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm border">
-              <thead>
-                <tr className="bg-slate-100">
-                  <th className="px-2 py-1 border">Employee</th>
-                  <th className="px-2 py-1 border">From</th>
-                  <th className="px-2 py-1 border">To</th>
-                  <th className="px-2 py-1 border">Days</th>
-                  <th className="px-2 py-1 border">Status</th>
-                  <th className="px-2 py-1 border">Reason</th>
-                </tr>
-              </thead>
-              <tbody>
-                {requests.filter((r: any) => r.status === "approved").map((r: any) => (
-                  <tr key={r._id} className="border-b">
-                    <td className="px-2 py-1 border">{r.requester?.name || r.requesterName || "-"}</td>
-                    <td className="px-2 py-1 border">{r.startDate ? new Date(r.startDate).toLocaleDateString() : "-"}</td>
-                    <td className="px-2 py-1 border">{r.endDate ? new Date(r.endDate).toLocaleDateString() : "-"}</td>
-                    <td className="px-2 py-1 border">{r.duration || (r.startDate && r.endDate ? ((new Date(r.endDate).getTime() - new Date(r.startDate).getTime())/(1000*60*60*24)+1) : "-")}</td>
-                    <td className="px-2 py-1 border">{r.status}</td>
-                    <td className="px-2 py-1 border">{r.reason || "-"}</td>
-                  </tr>
-                ))}
-                {requests.filter((r: any) => r.status === "approved").length === 0 && (
-                  <tr><td colSpan={6} className="text-center py-2 text-slate-400">No granted leaves.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
       <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
         <div>
           <h3 className="text-xl font-semibold">Attendance Tracker</h3>
@@ -952,6 +942,14 @@ const [deletingHoliday, setDeletingHoliday] = useState<AnyRecord | null>(null);
               </span>
             )}
           </button>
+          {profile?.role === "admin" && (
+            <button
+              onClick={() => setShowLeaveHistoryModal(true)}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+            >
+              Manage Holidays
+            </button>
+          )}
           {profile?.role === "admin" ? (
             <button
               onClick={() => setShowHolidayModal(true)}
@@ -980,41 +978,65 @@ const [deletingHoliday, setDeletingHoliday] = useState<AnyRecord | null>(null);
 
       {showLeaveModal && <LeaveModal onClose={() => setShowLeaveModal(false)} onRefresh={loadData} showToast={showToast} />}
       {showHolidayModal && <HolidayModal onClose={() => setShowHolidayModal(false)} onRefresh={loadData} showToast={showToast} />}
+      {showLeaveHistoryModal && (
+        <AdminLeaveHistoryModal
+          requests={requests}
+          holidays={holidays}
+          onClose={() => setShowLeaveHistoryModal(false)}
+          onEditHoliday={(holiday) => { setSelectedHoliday(holiday); setShowEditHolidayModal(true); }}
+          onDeleteHoliday={requestHolidayDelete}
+        />
+      )}
+      {showEditHolidayModal && selectedHoliday && (
+        <EditHolidayModal
+          holiday={selectedHoliday}
+          onClose={() => { setShowEditHolidayModal(false); setSelectedHoliday(null); }}
+          onSave={async (updates) => {
+            if (!selectedHoliday) return;
+            await handleEditHoliday(selectedHoliday, updates);
+          }}
+          onDelete={async () => {
+            if (selectedHoliday) {
+              await handleDeleteHoliday(selectedHoliday);
+              setShowEditHolidayModal(false);
+              setSelectedHoliday(null);
+            }
+          }}
+          showToast={showToast}
+        />
+      )}
 
-      {/* Admin Holiday List with Edit/Delete */}
-      {profile?.role === "admin" && holidays.length > 0 && (
-        <div className="mb-8">
-          <h4 className="text-lg font-semibold mb-2">Manage Holidays</h4>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm border">
-              <thead>
-                <tr className="bg-slate-100">
-                  <th className="px-2 py-1 border">Title</th>
-                  <th className="px-2 py-1 border">From</th>
-                  <th className="px-2 py-1 border">To</th>
-                  <th className="px-2 py-1 border">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {holidays.map((h: any) => (
-                  <tr key={h._id} className="border-b">
-                    <td className="px-2 py-1 border">{h.title}</td>
-                    <td className="px-2 py-1 border">{h.startDate ? new Date(h.startDate).toLocaleDateString() : "-"}</td>
-                    <td className="px-2 py-1 border">{h.endDate ? new Date(h.endDate).toLocaleDateString() : "-"}</td>
-                    <td className="px-2 py-1 border flex gap-2">
-                      <button className="text-blue-600 hover:underline" onClick={() => {
-                        const newTitle = prompt("Edit holiday title", h.title);
-                        if (newTitle && newTitle !== h.title) handleEditHoliday(h, { title: newTitle });
-                      }}>Edit</button>
-                      <button className="text-red-600 hover:underline" onClick={() => handleDeleteHoliday(h)}>Delete</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {showDeleteHolidayConfirm && holidayToDelete && (
+        <div className="fixed inset-0 z-[90] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+            <h3 className="text-xl font-bold text-slate-900">Confirm Delete</h3>
+            <p className="mt-2 text-sm text-slate-500">
+              Delete holiday "{String(holidayToDelete.title)}"? This action cannot be undone.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteHolidayConfirm(false)}
+                className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await handleDeleteHoliday(holidayToDelete);
+                  setShowDeleteHolidayConfirm(false);
+                  setHolidayToDelete(null);
+                }}
+                className="flex-1 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700"
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       )}
+
       {showRequestsModal && (
         <RequestsListModal
           requests={requests}
@@ -1385,6 +1407,218 @@ function HolidayModal({ onClose, onRefresh, showToast }: { onClose: () => void; 
   );
 }
 
+function EditHolidayModal({
+  holiday,
+  onClose,
+  onSave,
+  onDelete,
+  showToast,
+}: {
+  holiday: AnyRecord;
+  onClose: () => void;
+  onSave: (updates: { title: string; description: string; startDate: string; endDate: string }) => Promise<void>;
+  onDelete: () => Promise<void>;
+  showToast: (text: string, type?: 'success' | 'error') => void;
+}) {
+  const [formData, setFormData] = useState({
+    title: String(holiday.title ?? ""),
+    description: String(holiday.description ?? ""),
+    startDate: holiday.startDate ? new Date(String(holiday.startDate)).toISOString().slice(0, 10) : "",
+    endDate: holiday.endDate ? new Date(String(holiday.endDate)).toISOString().slice(0, 10) : "",
+  });
+  const [loading, setLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await onSave(formData);
+      onClose();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to update holiday", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setLoading(true);
+    try {
+      await onDelete();
+      onClose();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to delete holiday", "error");
+    } finally {
+      setLoading(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200 relative">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-bold text-slate-900">Edit Holiday</h3>
+            <p className="mt-1 text-sm text-slate-500">Update holiday details or remove it entirely.</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700">Close</button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <div className="space-y-1">
+            <label className="text-xs font-bold uppercase text-slate-500">Holiday Title</label>
+            <input
+              required
+              type="text"
+              value={formData.title}
+              onChange={e => setFormData({ ...formData, title: e.target.value })}
+              placeholder="Holiday name"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-bold uppercase text-slate-500">Description</label>
+            <textarea
+              rows={3}
+              value={formData.description}
+              onChange={e => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Optional holiday note"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold uppercase text-slate-500">Start Date</label>
+              <input
+                required
+                type="date"
+                value={formData.startDate}
+                onChange={e => setFormData({ ...formData, startDate: e.target.value })}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold uppercase text-slate-500">End Date</label>
+              <input
+                required
+                type="date"
+                value={formData.endDate}
+                onChange={e => setFormData({ ...formData, endDate: e.target.value })}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-between gap-3 pt-2">
+            <button type="button" onClick={() => setShowDeleteConfirm(true)} className="rounded-lg border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50 transition disabled:opacity-50">
+              Delete
+            </button>
+            <div className="flex gap-3">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900">Cancel</button>
+              <button disabled={loading} type="submit" className="rounded-lg bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50">
+                {loading ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[90] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+            <h3 className="text-xl font-bold text-slate-900">Confirm Delete</h3>
+            <p className="mt-2 text-sm text-slate-500">Delete holiday "{String(holiday.title ?? "")}"? This action cannot be undone.</p>
+            <div className="mt-6 flex gap-3">
+              <button type="button" onClick={() => setShowDeleteConfirm(false)} className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+              <button type="button" onClick={handleDelete} disabled={loading} className="flex-1 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50">Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdminLeaveHistoryModal({
+  requests,
+  holidays,
+  onClose,
+  onEditHoliday,
+  onDeleteHoliday,
+}: {
+  requests: AnyRecord[];
+  holidays: AnyRecord[];
+  onClose: () => void;
+  onEditHoliday: (holiday: AnyRecord) => void;
+  onDeleteHoliday: (holiday: AnyRecord) => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/40 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-5xl rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200 overflow-hidden">
+        <div className="flex items-center justify-between border-b border-slate-100 p-6">
+          <div>
+            <h3 className="text-xl font-bold text-slate-900">Manage Holidays</h3>
+            <p className="text-sm text-slate-500">Create, update, or remove company holidays from one place.</p>
+          </div>
+          <button onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition">Close</button>
+        </div>
+
+        <div className="max-h-[70vh] overflow-y-auto p-6">
+          <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-slate-50">
+            <table className="min-w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-slate-100">
+                  <th className="px-3 py-2 border text-left">Title</th>
+                  <th className="px-3 py-2 border text-left">From</th>
+                  <th className="px-3 py-2 border text-left">To</th>
+                  <th className="px-3 py-2 border text-left">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {holidays.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-slate-500">No holidays available.</td>
+                  </tr>
+                ) : (
+                  holidays.map((h: any) => (
+                    <tr key={h._id} className="border-b bg-white hover:bg-slate-50 transition">
+                      <td className="px-3 py-3 border">{h.title}</td>
+                      <td className="px-3 py-3 border">{h.startDate ? new Date(h.startDate).toLocaleDateString() : "-"}</td>
+                      <td className="px-3 py-3 border">{h.endDate ? new Date(h.endDate).toLocaleDateString() : "-"}</td>
+                      <td className="px-3 py-3 border">
+                        <div className="flex gap-3">
+                          <button
+                            type="button"
+                            onClick={() => onEditHoliday(h)}
+                            className="rounded-lg px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDeleteHoliday(h)}
+                            className="rounded-lg px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RequestsListModal({
   requests,
   onClose,
@@ -1672,10 +1906,15 @@ function DayDetailsModal({ date, onClose, history, requests, holidays }: { date:
           {holiday && (
             <div className="rounded-xl border border-fuchsia-100 bg-fuchsia-50/50 p-4">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-bold text-fuchsia-800">Holiday</p>
+                <div>
+                  <p className="text-sm font-bold text-fuchsia-800">Holiday</p>
+                  <p className="mt-1 text-base font-semibold text-slate-900">{String((holiday as any).title ?? "Company holiday")}</p>
+                </div>
                 <span className="rounded-full bg-fuchsia-100 px-2 py-1 text-xs font-bold text-fuchsia-700">Holiday</span>
               </div>
-              <p className="mt-1 text-sm text-slate-700">{String((holiday as any).description ?? (holiday as any).title ?? "Company holiday")}</p>
+              {((holiday as any).description ?? "") && (
+                <p className="mt-3 text-sm text-slate-700">{String((holiday as any).description)}</p>
+              )}
               <p className="mt-2 text-xs text-slate-500">Duration: {String((holiday as any).duration ?? "")} day(s)</p>
             </div>
           )}
@@ -2198,12 +2437,16 @@ function OnboardingTab({
 
   async function joinCompany(event: FormEvent) {
     event.preventDefault();
-    await apiFetch("/api/company/join", {
-      method: "POST",
-      body: JSON.stringify({ code: companyCode }),
-    });
-    showToast("Join request sent to admin.");
-    await refresh();
+    try {
+      await apiFetch("/api/company/join", {
+        method: "POST",
+        body: JSON.stringify({ code: companyCode }),
+      });
+      showToast("Join request sent to admin.");
+      await refresh();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to send join request.", "error");
+    }
   }
 
   async function createTeam(event: FormEvent) {
@@ -2258,12 +2501,16 @@ function OnboardingTab({
 
   async function joinTeam(event: FormEvent) {
     event.preventDefault();
-    await apiFetch("/api/team/join", {
-      method: "POST",
-      body: JSON.stringify({ code: teamCode }),
-    });
-    showToast("Join request sent to manager.");
-    await refresh();
+    try {
+      await apiFetch("/api/team/join", {
+        method: "POST",
+        body: JSON.stringify({ code: teamCode }),
+      });
+      showToast("Join request sent to manager.");
+      await refresh();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to send join request.", "error");
+    }
   }
 
   return (

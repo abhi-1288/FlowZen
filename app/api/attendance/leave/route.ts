@@ -27,6 +27,7 @@ export async function POST(req: Request) {
     await connectDb();
     const user = await User.findById(userId).populate("team");
     if (!user) return jsonError("User not found.");
+    if (!user.company) return jsonError("You must belong to a company to request leave.", 400);
 
     const teamName = (user.team as any)?.name || "General Team";
     const notificationBody = `${user.name}: ${user.role}, from ${teamName} has requested a leave.`;
@@ -50,6 +51,7 @@ export async function POST(req: Request) {
 
     const leave = await LeaveRequest.create({
       requester: userId,
+      company: user.company,
       startDate: start,
       endDate: end,
       duration: halfDay ? 0.5 : diffDays,
@@ -113,14 +115,22 @@ export async function GET() {
   } else if (user.role === "project-manager" || user.role === "qa-tester") {
     const teams = await Team.find({ manager: userId });
     const teamUserIds = teams.flatMap(t => t.employees);
+    const ownQuery: any = { requester: userId };
+    if (user.company) {
+      ownQuery.company = user.company;
+    }
     requests = await LeaveRequest.find({ 
       $or: [
-        { requester: userId }, // their own
-        { requester: { $in: teamUserIds }, currentStep: "manager", status: "pending" } // their team's
+        ownQuery,
+        { requester: { $in: teamUserIds }, currentStep: "manager", status: "pending" }
       ]
     }).populate("requester", "name email role").sort({ createdAt: -1 });
   } else {
-    requests = await LeaveRequest.find({ requester: userId }).populate("requester", "name email role").sort({ createdAt: -1 });
+    const query: any = { requester: userId };
+    if (user.company) {
+      query.company = user.company;
+    }
+    requests = await LeaveRequest.find(query).populate("requester", "name email role").sort({ createdAt: -1 });
   }
 
   return NextResponse.json({ requests });
