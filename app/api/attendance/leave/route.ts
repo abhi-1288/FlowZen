@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { requireUserId, jsonError } from "@/lib/api";
 import { LeaveRequest } from "@/models/LeaveRequest";
+import { Attendance } from "@/models/Attendance";
 import { User } from "@/models/User";
 import { Team } from "@/models/Team";
 import { Notification } from "@/models/Notification";
@@ -36,11 +37,23 @@ export async function POST(req: Request) {
       firstApproverRole = "admin";
     }
 
+    // If requesting leave for today and user already checked in, treat as half-day
+    let halfDay = false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (start.getTime() === today.getTime()) {
+      const existingAttendance = await Attendance.findOne({ user: userId, date: today });
+      if (existingAttendance) {
+        halfDay = true;
+      }
+    }
+
     const leave = await LeaveRequest.create({
       requester: userId,
       startDate: start,
       endDate: end,
-      duration: diffDays,
+      duration: halfDay ? 0.5 : diffDays,
+      halfDay,
       reason,
       attachmentUrl: attachmentUrl || "",
       status: "pending",

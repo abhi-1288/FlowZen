@@ -9,6 +9,7 @@ import {
   Check,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Building2,
   Camera,
   Clipboard,
@@ -22,6 +23,7 @@ import {
   Info,
   ChevronLeft,
   ChevronRight,
+  X,
 } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 
@@ -31,7 +33,6 @@ type Tab =
   | "onboarding"
   | "approvals"
   | "notifications"
-  | "calendar"
   | "attendance";
 type AnyRecord = Record<string, unknown>;
 
@@ -54,6 +55,7 @@ export function ProfileHub() {
   const displayName = String(profile?.name ?? session?.user?.name ?? "User");
   const avatarUrl = profile?.avatarUrl ? String(profile.avatarUrl) : "";
   const unreadCount = notifications.filter((item) => !item.readAt).length;
+  const mobileTabs: Tab[] = ["profile", "timeline", "onboarding", "approvals", "notifications", "attendance"];
 
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setToast({ text, type });
@@ -274,11 +276,6 @@ export function ProfileHub() {
             onClick={() => setTab("notifications")}
           />
           <NavButton
-            active={tab === "calendar"}
-            label="Calendar"
-            onClick={() => setTab("calendar")}
-          />
-          <NavButton
             active={tab === "attendance"}
             label={`Attendance ${leaveRequests.filter(r => r.status === "pending" || r.status === "manager-approved").length ? `(${leaveRequests.filter(r => r.status === "pending" || r.status === "manager-approved").length})` : ""}`}
             onClick={() => setTab("attendance")}
@@ -310,17 +307,7 @@ export function ProfileHub() {
             </button>
           </div>
           <div className="mt-4 flex gap-2 overflow-x-auto lg:hidden">
-            {(
-              [
-                "profile",
-                "timeline",
-                "onboarding",
-                "approvals",
-                "notifications",
-                "calendar",
-                "attendance",
-              ] as Tab[]
-            ).map((item) => {
+            {mobileTabs.map((item) => {
               const label = item === "attendance" && leaveRequests.filter(r => r.status === "pending" || r.status === "manager-approved").length > 0
                 ? `attendance (${leaveRequests.filter(r => r.status === "pending" || r.status === "manager-approved").length})`
                 : item;
@@ -394,12 +381,8 @@ export function ProfileHub() {
                 />
               ) : null}
 
-              {tab === "calendar" ? (
-                <CalendarTab />
-              ) : null}
-
               {tab === "attendance" ? (
-                <AttendanceTab showToast={showToast} />
+                <AttendanceTab profile={profile} showToast={showToast} />
               ) : null}
             </>
           )}
@@ -411,6 +394,10 @@ export function ProfileHub() {
 
 function CalendarTab() {
   const [viewDate, setViewDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [history, setHistory] = useState<AnyRecord[]>([]);
+  const [requests, setRequests] = useState<AnyRecord[]>([]);
+  const [holidays, setHolidays] = useState<AnyRecord[]>([]);
 
   const month = viewDate.getMonth();
   const year = viewDate.getFullYear();
@@ -438,6 +425,74 @@ function CalendarTab() {
   for (let i = 1; i <= daysInMonth; i++) {
     days.push(i);
   }
+  const numWeeks = Math.ceil(days.length / 7);
+
+  const normalizeDate = (date: Date) => {
+    const normalized = new Date(date);
+    normalized.setHours(0, 0, 0, 0);
+    return normalized;
+  };
+
+  const getDateForDay = (day: number | null) => {
+    if (!day) return null;
+    return normalizeDate(new Date(year, month, day));
+  };
+
+  const isCheckedIn = (day: number | null) => {
+    if (!day) return false;
+    const date = getDateForDay(day);
+    if (!date) return false;
+    return history.some((entry) => normalizeDate(new Date(String(entry.date))).getTime() === date.getTime());
+  };
+
+  const isOnLeave = (day: number | null) => {
+    if (!day) return false;
+    const date = new Date(year, month, day);
+    return requests.some((req) => {
+      if (req.status !== "approved") return false;
+      const start = new Date(String(req.startDate));
+      const end = new Date(String(req.endDate));
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      return date >= start && date <= end;
+    });
+  };
+
+  const isHoliday = (day: number | null) => {
+    if (!day) return false;
+    const date = new Date(year, month, day);
+    return holidays.some((holiday) => {
+      const start = new Date(String(holiday.startDate));
+      const end = new Date(String(holiday.endDate));
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      return date >= start && date <= end;
+    });
+  };
+
+  const isPastDay = (day: number | null) => {
+    if (!day) return false;
+    const date = getDateForDay(day);
+    if (!date) return false;
+    const today = normalizeDate(new Date());
+    return date.getTime() < today.getTime();
+  };
+
+  const loadData = async () => {
+    const [historyRes, requestsRes, holidaysRes] = await Promise.all([
+      apiFetch<{ history: AnyRecord[] }>('/api/attendance/checkin').catch(() => ({ history: [] as AnyRecord[] })),
+      apiFetch<{ requests: AnyRecord[] }>('/api/attendance/leave').catch(() => ({ requests: [] as AnyRecord[] })),
+      apiFetch<{ holidays: AnyRecord[] }>('/api/attendance/holidays').catch(() => ({ holidays: [] as AnyRecord[] })),
+    ]);
+
+    setHistory(historyRes.history ?? []);
+    setRequests(requestsRes.requests ?? []);
+    setHolidays(holidaysRes.holidays ?? []);
+  };
+
+  useEffect(() => {
+    void loadData();
+  }, []);
 
   const isToday = (day: number | null) => {
     if (!day) return false;
@@ -452,7 +507,7 @@ function CalendarTab() {
   const weekDays = ["SUN.", "Mon.", "Tue.", "Wed.", "Thr.", "Fri.", "Sat."];
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-8 flex items-center justify-center gap-4">
         <button
           onClick={prevMonth}
@@ -493,23 +548,57 @@ function CalendarTab() {
               </span>
               <div className="space-y-2">
                 {/* Find days that belong to this column */}
-                {Array.from({ length: 6 }).map((_, rowIndex) => {
+                {Array.from({ length: numWeeks }).map((_, rowIndex) => {
                   const dayIndex = rowIndex * 7 + i;
                   const day = days[dayIndex];
                   if (day === undefined) return null;
 
                   const today = isToday(day);
+                  const checkedIn = isCheckedIn(day);
+                  const leave = isOnLeave(day);
+                  const holiday = isHoliday(day);
+                  const past = isPastDay(day);
                   return (
                     <div
                       key={rowIndex}
-                      className={`grid h-10 w-full place-items-center rounded-xl text-xs font-bold sm:h-14 sm:text-sm transition-all ${day
-                        ? today
-                          ? "bg-sky-100 text-rose-600 border border-sky-200 shadow-inner"
-                          : "bg-white shadow-sm border border-slate-100 text-slate-700"
+                      onClick={() => {
+                        const date = getDateForDay(day);
+                        if (date) {
+                          setSelectedDate(date);
+                        }
+                      }}
+                      role={day ? "button" : undefined}
+                      tabIndex={day ? 0 : undefined}
+                      title={day ? `View details for ${monthNames[month]} ${day}, ${year}` : undefined}
+                      className={`relative cursor-pointer grid h-10 w-full place-items-center rounded-xl text-xs font-bold sm:h-14 sm:text-sm transition-all ${day
+                        ? holiday
+                          ? "bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 shadow-sm hover:border-fuchsia-300 hover:bg-fuchsia-50"
+                          : today
+                            ? checkedIn
+                              ? "bg-sky-100 text-sky-700 border border-sky-200 shadow-inner"
+                              : "bg-white text-rose-600 border border-rose-200 shadow-sm hover:border-rose-300 hover:bg-rose-50"
+                            : checkedIn
+                              ? "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm hover:border-emerald-300 hover:bg-emerald-50"
+                              : leave
+                                ? "bg-emerald-100 text-rose-600 border border-emerald-200 shadow-sm hover:border-emerald-300 hover:bg-emerald-50"
+                                : past
+                                  ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm"
+                                  : "bg-white shadow-sm border border-slate-100 text-slate-700 hover:border-slate-200 hover:bg-slate-50"
                         : "opacity-0"
                         }`}
                     >
                       {day}
+                      {day && (holiday || checkedIn || leave || (today && !checkedIn)) && (
+                        <span className="absolute right-1 top-1 rounded-full bg-white/90 p-0.5">
+                          {holiday ? (
+                            <Calendar className="h-3.5 w-3.5 text-fuchsia-600" />
+                          ) : checkedIn || leave ? (
+                            <Check className="h-3.5 w-3.5 text-emerald-600" />
+                          ) : (
+                            <X className="h-3.5 w-3.5 text-rose-600" />
+                          )}
+                        </span>
+                      )}
                     </div>
                   );
                 })}
@@ -518,35 +607,95 @@ function CalendarTab() {
           ))}
         </div>
       </div>
+
+      {selectedDate && (
+        <DayDetailsModal
+          date={selectedDate}
+          onClose={() => setSelectedDate(null)}
+          history={history}
+          requests={requests}
+          holidays={holidays}
+        />
+      )}
     </section>
   );
 }
 
-function AttendanceTab({ showToast }: { showToast: (text: string, type?: 'success' | 'error') => void }) {
+function AttendanceTab({ profile, showToast }: { profile: AnyRecord | null; showToast: (text: string, type?: 'success' | 'error') => void }) {
   const { data: session } = useSession();
   const [viewDate, setViewDate] = useState(new Date());
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [showHolidayModal, setShowHolidayModal] = useState(false);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
   const [requests, setRequests] = useState<AnyRecord[]>([]);
   const [history, setHistory] = useState<AnyRecord[]>([]);
+  const [holidays, setHolidays] = useState<AnyRecord[]>([]);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [serverToday, setServerToday] = useState<Date | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [showManageHolidayModal, setShowManageHolidayModal] = useState(false);
+const [editingHoliday, setEditingHoliday] = useState<AnyRecord | null>(null);
+const [deletingHoliday, setDeletingHoliday] = useState<AnyRecord | null>(null);
+
+  const normalizeDate = (date: Date) => {
+    const normalized = new Date(date);
+    normalized.setHours(0, 0, 0, 0);
+    return normalized;
+  };
+
+  const attendanceStartDate = useMemo(() => {
+    const parseDate = (value: unknown) => {
+      if (!value) return null;
+      const date = new Date(String(value));
+      return Number.isNaN(date.getTime()) ? null : normalizeDate(date);
+    };
+
+    const companyJoined = parseDate(profile?.companyJoined);
+    const teamJoined = parseDate(profile?.teamJoined);
+    const createdAt = parseDate(profile?.createdAt);
+
+    if (companyJoined && teamJoined) {
+      return companyJoined.getTime() > teamJoined.getTime() ? companyJoined : teamJoined;
+    }
+
+    return companyJoined || teamJoined || createdAt || normalizeDate(new Date(0));
+  }, [profile]);
 
   const loadData = async () => {
-    const [hRes, rRes] = await Promise.all([
-      apiFetch<{ history: AnyRecord[] }>("/api/attendance/checkin").catch(() => ({ history: [] })),
-      apiFetch<{ requests: AnyRecord[] }>("/api/attendance/leave").catch(() => ({ requests: [] }))
+    const [hRes, rRes, holRes] = await Promise.all([
+      apiFetch<{ history: AnyRecord[]; today?: string }>("/api/attendance/checkin").catch(() => ({ history: [] as AnyRecord[], today: undefined })),
+      apiFetch<{ requests: AnyRecord[] }>("/api/attendance/leave").catch(() => ({ requests: [] as AnyRecord[] })),
+      apiFetch<{ holidays: AnyRecord[] }>("/api/attendance/holidays").catch(() => ({ holidays: [] as AnyRecord[] }))
     ]);
     setHistory(hRes.history);
     setRequests(rRes.requests);
+    setHolidays(holRes.holidays);
+    if (hRes.today) {
+      const today = new Date(hRes.today);
+      if (!Number.isNaN(today.getTime())) {
+        setServerToday(today);
+      }
+    }
   };
 
   useEffect(() => {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (serverToday) {
+      setViewDate(serverToday);
+    }
+  }, [serverToday]);
+
   const handleCheckIn = async () => {
+    if (todayLeave) {
+      showToast("You are on approved leave today. Check-in is disabled.", "error");
+      return;
+    }
+
     setIsCheckingIn(true);
     try {
       await apiFetch("/api/attendance/checkin", { method: "POST" });
@@ -585,6 +734,33 @@ function AttendanceTab({ showToast }: { showToast: (text: string, type?: 'succes
     }
   };
 
+  const handleEditHoliday = async (holiday: AnyRecord, updates: { title?: string; description?: string; startDate?: string; endDate?: string }) => {
+    try {
+      await apiFetch("/api/attendance/holidays", {
+        method: "PUT",
+        body: JSON.stringify({ id: holiday._id, ...updates })
+      });
+      loadData();
+      showToast("Holiday updated.");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to update holiday", "error");
+    }
+  };
+
+  const handleDeleteHoliday = async (holiday: AnyRecord) => {
+    if (!confirm(`Delete holiday "${holiday.title}"?`)) return;
+    try {
+      await apiFetch("/api/attendance/holidays", {
+        method: "DELETE",
+        body: JSON.stringify({ id: holiday._id })
+      });
+      loadData();
+      showToast("Holiday deleted.");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to delete holiday", "error");
+    }
+  };
+
   const month = viewDate.getMonth();
   const year = viewDate.getFullYear();
 
@@ -611,26 +787,53 @@ function AttendanceTab({ showToast }: { showToast: (text: string, type?: 'succes
   for (let i = 1; i <= daysInMonth; i++) {
     days.push(i);
   }
+  const numWeeks = Math.ceil(days.length / 7);
+
+  const serverTodayDate = useMemo(() => {
+    return normalizeDate(serverToday ?? new Date());
+  }, [serverToday]);
+
+  const todayDate = serverTodayDate;
+
+  const getDateForDay = (day: number | null) => {
+    if (!day) return null;
+    return normalizeDate(new Date(year, month, day));
+  };
+
+  const isBeforeAttendanceStart = (day: number | null) => {
+    const date = getDateForDay(day);
+    if (!date) return false;
+    return date.getTime() < attendanceStartDate.getTime();
+  };
 
   const isToday = (day: number | null) => {
     if (!day) return false;
-    const today = new Date();
     return (
-      day === today.getDate() &&
-      month === today.getMonth() &&
-      year === today.getFullYear()
+      day === todayDate.getDate() &&
+      month === todayDate.getMonth() &&
+      year === todayDate.getFullYear()
     );
   };
 
   const isCheckedIn = (day: number | null) => {
     if (!day) return false;
-    const date = new Date(year, month, day);
-    date.setHours(0, 0, 0, 0);
+    const date = getDateForDay(day);
+    if (!date) return false;
     return history.some((entry: any) => {
-      const entryDate = new Date(entry.date);
-      entryDate.setHours(0, 0, 0, 0);
+      const entryDate = normalizeDate(new Date(entry.date));
       return entryDate.getTime() === date.getTime();
     });
+  };
+
+  const isPastDay = (day: number | null) => {
+    const date = getDateForDay(day);
+    if (!date) return false;
+    return date.getTime() < todayDate.getTime();
+  };
+
+  const isWeekend = (day: number | null) => {
+    const date = getDateForDay(day);
+    return date ? date.getDay() === 0 || date.getDay() === 6 : false;
   };
 
   const isOnLeave = (day: number | null) => {
@@ -646,16 +849,98 @@ function AttendanceTab({ showToast }: { showToast: (text: string, type?: 'succes
     });
   };
 
+  const isPendingLeave = (day: number | null) => {
+    if (!day) return false;
+    const date = new Date(year, month, day);
+    return requests.some((req: any) => {
+      if (req.status !== "pending") return false;
+      const start = new Date(req.startDate);
+      const end = new Date(req.endDate);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      return date >= start && date <= end;
+    });
+  };
+
+  const isHoliday = (day: number | null) => {
+    if (!day) return false;
+    const date = new Date(year, month, day);
+    return holidays.some((holiday: any) => {
+      const start = new Date(holiday.startDate);
+      const end = new Date(holiday.endDate);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      return date >= start && date <= end;
+    });
+  };
+
+  const todayLeave = requests.some((req: any) => {
+    if (req.status !== "approved") return false;
+    const start = new Date(req.startDate);
+    const end = new Date(req.endDate);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    return todayDate >= start && todayDate <= end;
+  });
+
+  const currentHoliday = (day: number | null) => {
+    if (!day) return null;
+    const date = new Date(year, month, day);
+    return holidays.find((holiday: any) => {
+      const start = new Date(holiday.startDate);
+      const end = new Date(holiday.endDate);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      return date >= start && date <= end;
+    }) || null;
+  };
+
   const weekDays = ["SUN.", "Mon.", "Tue.", "Wed.", "Thr.", "Fri.", "Sat."];
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+    <>
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      {/* Admin Leave History Section */}
+      {profile?.role === "admin" && (
+        <div className="mb-8">
+          <h4 className="text-lg font-semibold mb-2">Leave History (Granted)</h4>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm border">
+              <thead>
+                <tr className="bg-slate-100">
+                  <th className="px-2 py-1 border">Employee</th>
+                  <th className="px-2 py-1 border">From</th>
+                  <th className="px-2 py-1 border">To</th>
+                  <th className="px-2 py-1 border">Days</th>
+                  <th className="px-2 py-1 border">Status</th>
+                  <th className="px-2 py-1 border">Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {requests.filter((r: any) => r.status === "approved").map((r: any) => (
+                  <tr key={r._id} className="border-b">
+                    <td className="px-2 py-1 border">{r.requester?.name || r.requesterName || "-"}</td>
+                    <td className="px-2 py-1 border">{r.startDate ? new Date(r.startDate).toLocaleDateString() : "-"}</td>
+                    <td className="px-2 py-1 border">{r.endDate ? new Date(r.endDate).toLocaleDateString() : "-"}</td>
+                    <td className="px-2 py-1 border">{r.duration || (r.startDate && r.endDate ? ((new Date(r.endDate).getTime() - new Date(r.startDate).getTime())/(1000*60*60*24)+1) : "-")}</td>
+                    <td className="px-2 py-1 border">{r.status}</td>
+                    <td className="px-2 py-1 border">{r.reason || "-"}</td>
+                  </tr>
+                ))}
+                {requests.filter((r: any) => r.status === "approved").length === 0 && (
+                  <tr><td colSpan={6} className="text-center py-2 text-slate-400">No granted leaves.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
         <div>
           <h3 className="text-xl font-semibold">Attendance Tracker</h3>
           <p className="text-sm text-slate-500">Monitor your daily presence and check-in history.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => setShowRequestsModal(true)}
             className="relative rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
@@ -667,23 +952,69 @@ function AttendanceTab({ showToast }: { showToast: (text: string, type?: 'succes
               </span>
             )}
           </button>
+          {profile?.role === "admin" ? (
+            <button
+              onClick={() => setShowHolidayModal(true)}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+            >
+              Add Holiday
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowLeaveModal(true)}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+            >
+              Ask Leave
+            </button>
+          )}
           <button
-            onClick={() => setShowLeaveModal(true)}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
-          >
-            Ask Leave
-          </button>
-          <button
-            disabled={isCheckingIn}
+            disabled={isCheckingIn || todayLeave}
             onClick={handleCheckIn}
             className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition shadow-sm disabled:opacity-50"
+            title={todayLeave ? "Today is approved leave, check-in disabled." : "Check in for today."}
           >
-            {isCheckingIn ? "Checking..." : "Check In"}
+            {isCheckingIn ? "Checking..." : todayLeave ? "On Leave" : "Check In"}
           </button>
         </div>
       </div>
 
       {showLeaveModal && <LeaveModal onClose={() => setShowLeaveModal(false)} onRefresh={loadData} showToast={showToast} />}
+      {showHolidayModal && <HolidayModal onClose={() => setShowHolidayModal(false)} onRefresh={loadData} showToast={showToast} />}
+
+      {/* Admin Holiday List with Edit/Delete */}
+      {profile?.role === "admin" && holidays.length > 0 && (
+        <div className="mb-8">
+          <h4 className="text-lg font-semibold mb-2">Manage Holidays</h4>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm border">
+              <thead>
+                <tr className="bg-slate-100">
+                  <th className="px-2 py-1 border">Title</th>
+                  <th className="px-2 py-1 border">From</th>
+                  <th className="px-2 py-1 border">To</th>
+                  <th className="px-2 py-1 border">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {holidays.map((h: any) => (
+                  <tr key={h._id} className="border-b">
+                    <td className="px-2 py-1 border">{h.title}</td>
+                    <td className="px-2 py-1 border">{h.startDate ? new Date(h.startDate).toLocaleDateString() : "-"}</td>
+                    <td className="px-2 py-1 border">{h.endDate ? new Date(h.endDate).toLocaleDateString() : "-"}</td>
+                    <td className="px-2 py-1 border flex gap-2">
+                      <button className="text-blue-600 hover:underline" onClick={() => {
+                        const newTitle = prompt("Edit holiday title", h.title);
+                        if (newTitle && newTitle !== h.title) handleEditHoliday(h, { title: newTitle });
+                      }}>Edit</button>
+                      <button className="text-red-600 hover:underline" onClick={() => handleDeleteHoliday(h)}>Delete</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       {showRequestsModal && (
         <RequestsListModal
           requests={requests}
@@ -691,6 +1022,7 @@ function AttendanceTab({ showToast }: { showToast: (text: string, type?: 'succes
           onApprove={handleApprove}
           onReject={(id) => setRejectingId(id)}
           currentUserId={session?.user?.id}
+          onViewDay={(dateStr) => { setShowRequestsModal(false); setShowLeaveModal(false); setSelectedDate(new Date(dateStr)); }}
         />
       )}
 
@@ -730,29 +1062,31 @@ function AttendanceTab({ showToast }: { showToast: (text: string, type?: 'succes
         </div>
       )}
 
-      <div className="mb-8 flex items-center justify-center gap-4">
-        <button
-          onClick={prevMonth}
-          className="grid h-10 w-12 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm"
-        >
-          <ChevronLeft size={20} />
-        </button>
+      <div className="mb-8 flex flex-col items-center justify-center gap-4">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={prevMonth}
+            className="grid h-10 w-12 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm"
+          >
+            <ChevronLeft size={20} />
+          </button>
 
-        <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 shadow-sm">
-          <div className="border-r border-slate-200 bg-slate-50 px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-600">
-            {monthNames[month]}
+          <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+            <div className="border-r border-slate-200 bg-slate-50 px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-600">
+              {monthNames[month]}
+            </div>
+            <div className="bg-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-900">
+              {year}
+            </div>
           </div>
-          <div className="bg-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-900">
-            {year}
-          </div>
+
+          <button
+            onClick={nextMonth}
+            className="grid h-10 w-12 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm"
+          >
+            <ChevronRight size={20} />
+          </button>
         </div>
-
-        <button
-          onClick={nextMonth}
-          className="grid h-10 w-12 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm"
-        >
-          <ChevronRight size={20} />
-        </button>
       </div>
 
       <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4">
@@ -769,7 +1103,7 @@ function AttendanceTab({ showToast }: { showToast: (text: string, type?: 'succes
                 {wd}
               </span>
               <div className="space-y-2">
-                {Array.from({ length: 6 }).map((_, rowIndex) => {
+                {Array.from({ length: numWeeks }).map((_, rowIndex) => {
                   const dayIndex = rowIndex * 7 + i;
                   const day = days[dayIndex];
                   if (day === undefined) return null;
@@ -777,21 +1111,69 @@ function AttendanceTab({ showToast }: { showToast: (text: string, type?: 'succes
                   const today = isToday(day);
                   const checkedIn = isCheckedIn(day);
                   const leave = isOnLeave(day);
+                  const pendingLeave = isPendingLeave(day);
+                  const holiday = isHoliday(day);
+                  const holidayDetails = currentHoliday(day);
+                  const past = isPastDay(day);
+                  const weekend = isWeekend(day);
+                  const beforeStart = isBeforeAttendanceStart(day);
+                  const missed = past && !checkedIn && !leave && !holiday && !pendingLeave && !weekend && !beforeStart;
                   return (
                     <div
                       key={rowIndex}
-                      className={`grid h-10 w-full place-items-center rounded-xl text-xs font-bold sm:h-14 sm:text-sm transition-all ${day
-                        ? checkedIn && today
-                          ? "bg-sky-100 text-sky-700 border border-sky-200 shadow-inner"
-                          : today
-                            ? "bg-sky-100 text-rose-600 border border-sky-200 shadow-inner"
-                            : leave
-                              ? "bg-emerald-100 text-rose-600 border border-emerald-200 shadow-sm"
-                              : "bg-white shadow-sm border border-slate-100 text-slate-700"
+                      onClick={() => {
+                        const date = getDateForDay(day);
+                        if (date && !isBeforeAttendanceStart(day)) {
+                          // Close other modals so the day details are visible
+                          setShowLeaveModal(false);
+                          setShowRequestsModal(false);
+                          setRejectingId(null);
+                          setSelectedDate(date);
+                        }
+                      }}
+                      role={day ? "button" : undefined}
+                      tabIndex={day ? 0 : undefined}
+                      className={`relative cursor-pointer grid h-10 w-full place-items-center rounded-xl text-xs font-bold sm:h-14 sm:text-sm transition-all ${day
+                        ? beforeStart
+                          ? "bg-slate-100 text-slate-400 border border-slate-200 shadow-sm"
+                          : pendingLeave
+                            ? "bg-amber-50 text-amber-900 border border-amber-200 shadow-sm"
+                            : holiday
+                              ? "bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 shadow-sm"
+                              : today
+                                ? checkedIn
+                                  ? "bg-sky-100 text-sky-700 border border-sky-200 shadow-inner"
+                                  : "bg-white text-rose-600 border border-rose-200 shadow-sm"
+                                : checkedIn
+                                  ? "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm"
+                                  : leave
+                                    ? "bg-emerald-100 text-rose-600 border border-emerald-200 shadow-sm"
+                                    : weekend
+                                      ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm"
+                                      : missed
+                                        ? "bg-white text-rose-600 border border-rose-200 shadow-sm"
+                                        : "bg-white shadow-sm border border-slate-100 text-slate-700"
                         : "opacity-0"
                         }`}
                     >
                       {day}
+                      {day && (pendingLeave || holiday || leave || (today && !checkedIn) || (past && checkedIn) || missed) && (
+                        <span className="absolute right-1 top-1 rounded-full bg-white/90 p-0.5">
+                          {pendingLeave ? (
+                            <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                          ) : holiday ? (
+                            <Calendar className="h-3.5 w-3.5 text-fuchsia-600" />
+                          ) : leave ? (
+                            <Check className="h-3.5 w-3.5 text-rose-600" />
+                          ) : today && !checkedIn ? (
+                            <X className="h-3.5 w-3.5 text-rose-600" />
+                          ) : missed ? (
+                            <X className="h-3.5 w-3.5 text-rose-600" />
+                          ) : (
+                            <Check className="h-3.5 w-3.5 text-emerald-600" />
+                          )}
+                        </span>
+                      )}
                     </div>
                   );
                 })}
@@ -800,7 +1182,18 @@ function AttendanceTab({ showToast }: { showToast: (text: string, type?: 'succes
           ))}
         </div>
       </div>
-    </section>
+      </section>
+
+      {selectedDate && (
+        <DayDetailsModal
+          date={selectedDate}
+          onClose={() => setSelectedDate(null)}
+          history={history}
+          requests={requests}
+          holidays={holidays}
+        />
+      )}
+    </>
   );
 }
 
@@ -908,18 +1301,104 @@ function LeaveModal({ onClose, onRefresh, showToast }: { onClose: () => void; on
   );
 }
 
+function HolidayModal({ onClose, onRefresh, showToast }: { onClose: () => void; onRefresh: () => void; showToast: (text: string, type?: 'success' | 'error') => void }) {
+  const [formData, setFormData] = useState({ title: "", description: "", startDate: "", endDate: "" });
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await apiFetch("/api/attendance/holidays", { method: "POST", body: JSON.stringify(formData) });
+      onRefresh();
+      showToast("Holiday added successfully!");
+      onClose();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to add holiday", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+        <h3 className="text-xl font-bold text-slate-900">Add Holiday</h3>
+        <p className="mt-1 text-sm text-slate-500">Create a future holiday for the organization.</p>
+
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <div className="space-y-1">
+            <label className="text-xs font-bold uppercase text-slate-500">Holiday Title</label>
+            <input
+              required
+              type="text"
+              value={formData.title}
+              onChange={e => setFormData({ ...formData, title: e.target.value })}
+              placeholder="Holiday name"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-bold uppercase text-slate-500">Description</label>
+            <textarea
+              rows={3}
+              value={formData.description}
+              onChange={e => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Optional holiday note"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold uppercase text-slate-500">Start Date</label>
+              <input
+                required
+                type="date"
+                value={formData.startDate}
+                onChange={e => setFormData({ ...formData, startDate: e.target.value })}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold uppercase text-slate-500">End Date</label>
+              <input
+                required
+                type="date"
+                value={formData.endDate}
+                onChange={e => setFormData({ ...formData, endDate: e.target.value })}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900">Cancel</button>
+            <button disabled={loading} type="submit" className="rounded-lg bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50">
+              {loading ? "Saving..." : "Save Holiday"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function RequestsListModal({
   requests,
   onClose,
   onApprove,
   onReject,
-  currentUserId
+  currentUserId,
+  onViewDay,
 }: {
   requests: AnyRecord[];
   onClose: () => void;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   currentUserId?: string;
+  onViewDay?: (dateStr: string) => void;
 }) {
   const [selectedLeave, setSelectedLeave] = useState<AnyRecord | null>(null);
 
@@ -930,6 +1409,7 @@ function RequestsListModal({
       onApprove={() => { onApprove(String(selectedLeave._id)); setSelectedLeave(null); }}
       onReject={() => { onReject(String(selectedLeave._id)); setSelectedLeave(null); }}
       currentUserId={currentUserId}
+      onViewDay={onViewDay}
     />;
   }
 
@@ -981,12 +1461,7 @@ function RequestsListModal({
                         </div>
                       </div>
 
-                      {canApprove && (
-                        <div className="flex gap-2">
-                          <button onClick={() => onReject(req._id)} className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition">Reject</button>
-                          <button onClick={() => onApprove(req._id)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition">Approve</button>
-                        </div>
-                      )}
+                      {/* Approval actions moved to the detailed modal. */}
                     </div>
                   </div>
                 );
@@ -1007,13 +1482,15 @@ function LeaveDetailsModal({
   onClose,
   onApprove,
   onReject,
-  currentUserId
+  currentUserId,
+  onViewDay,
 }: {
   leave: AnyRecord;
   onClose: () => void;
   onApprove: () => void;
   onReject: () => void;
   currentUserId?: string;
+  onViewDay?: (dateStr: string) => void;
 }) {
   const isRequester = (leave.requester as any)?._id === currentUserId || leave.requester === currentUserId;
   const canApprove = !isRequester && (leave.status === "pending" || leave.status === "manager-approved");
@@ -1114,6 +1591,94 @@ function LeaveDetailsModal({
               Back to List
             </button>
           </div>
+          {onViewDay && (
+            <div className="mt-4">
+              <button
+                onClick={() => {
+                  // close this modal and open day details for the start date
+                  onClose();
+                  try {
+                    onViewDay(String(leave.startDate));
+                  } catch (e) {
+                    /* ignore */
+                  }
+                }}
+                className="w-full mt-2 rounded-2xl bg-slate-100 py-3 text-sm font-bold text-slate-700 hover:bg-slate-200 transition"
+              >
+                View Day Details
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DayDetailsModal({ date, onClose, history, requests, holidays }: { date: Date; onClose: () => void; history: AnyRecord[]; requests: AnyRecord[]; holidays: AnyRecord[] }) {
+  const attendance = history.find((h: any) => {
+    const d = new Date(h.date);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime() === date.getTime();
+  });
+
+  const leave = requests.find((r: any) => {
+    const start = new Date(String(r.startDate));
+    const end = new Date(String(r.endDate));
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    return date >= start && date <= end;
+  });
+
+  const holiday = holidays.find((h: any) => {
+    const start = new Date(String(h.startDate));
+    const end = new Date(String(h.endDate));
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    return date >= start && date <= end;
+  });
+
+  return (
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-md">
+      <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-bold">{date.toLocaleDateString()}</h3>
+          <button onClick={onClose} className="text-sm text-slate-500">Close</button>
+        </div>
+
+        <div className="space-y-4">
+          {attendance ? (
+            <div className="rounded-xl border border-slate-100 p-4">
+              <p className="text-sm font-bold text-slate-900">Check-in</p>
+              <p className="text-sm text-slate-600">{new Date(String(attendance.checkIn)).toLocaleTimeString()}</p>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-slate-100 p-4">
+              <p className="text-sm font-bold text-slate-900">No check-in</p>
+              <p className="text-sm text-slate-600">No attendance recorded for this date.</p>
+            </div>
+          )}
+
+          {leave && (
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-bold text-emerald-800">Leave</p>
+                {Boolean((leave as any).halfDay) && <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-700">Half-day</span>}
+              </div>
+              <p className="mt-1 text-sm text-slate-700">{String((leave as any).reason ?? "")}</p>
+              <p className="mt-2 text-xs text-slate-500">Duration: {String((leave as any).duration ?? "")} day(s) • Status: {String((leave as any).status ?? "")}</p>
+            </div>
+          )}
+          {holiday && (
+            <div className="rounded-xl border border-fuchsia-100 bg-fuchsia-50/50 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-bold text-fuchsia-800">Holiday</p>
+                <span className="rounded-full bg-fuchsia-100 px-2 py-1 text-xs font-bold text-fuchsia-700">Holiday</span>
+              </div>
+              <p className="mt-1 text-sm text-slate-700">{String((holiday as any).description ?? (holiday as any).title ?? "Company holiday")}</p>
+              <p className="mt-2 text-xs text-slate-500">Duration: {String((holiday as any).duration ?? "")} day(s)</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -2533,3 +3098,11 @@ function toAdminHistoryRows(insights: AnyRecord | null) {
   });
   return rows;
 }
+function loadData() {
+  throw new Error("Function not implemented.");
+}
+
+function showToast(arg0: string, p0: string) {
+  throw new Error("Function not implemented.");
+}
+

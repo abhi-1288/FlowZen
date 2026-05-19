@@ -6,6 +6,7 @@ const LeaveRequestSchema = new Schema(
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
     duration: { type: Number, required: true }, // in days
+    halfDay: { type: Boolean, default: false },
     reason: { type: String, required: true },
     attachmentUrl: { type: String, default: "" },
     rejectionReason: { type: String, default: "" },

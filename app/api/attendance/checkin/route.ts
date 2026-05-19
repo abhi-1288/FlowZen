@@ -32,6 +32,9 @@ export async function GET() {
   if (!userId) return jsonError("Unauthorized", 401);
 
   await connectDb();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   const history = await Attendance.find({ user: userId }).sort({ date: -1 }).limit(30);
-  return NextResponse.json({ history });
+  return NextResponse.json({ history, today: today.toISOString() });
 }

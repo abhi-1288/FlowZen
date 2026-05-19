@@ -93,12 +93,12 @@ export default function SignupPage() {
               <Submit loading={loading} label="Send OTP" />
             </form>
 
-            <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-wide text-slate-400">
+            {/* <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-wide text-slate-400">
               <span className="h-px flex-1 bg-slate-200" />
               Project manager OAuth
               <span className="h-px flex-1 bg-slate-200" />
             </div>
-            <OAuthProviderIcons />
+            <OAuthProviderIcons /> */}
           </>
         ) : (
           <form className="space-y-4" onSubmit={verify}>
