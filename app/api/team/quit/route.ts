@@ -5,6 +5,7 @@ import { User } from "@/models/User";
 import { Team } from "@/models/Team";
 import { JoinRequest } from "@/models/JoinRequest";
 import { Company } from "@/models/Company";
+import { Board } from "@/models/Board";
 import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
 
@@ -37,6 +38,19 @@ export async function POST() {
   });
   if (existing) return jsonError("Quit request already pending.", 409);
 
+  const assignedBoards = await Board.find({
+    members: {
+      $elemMatch: {
+        user: user._id,
+        assignedTo: { $ne: null }
+      }
+    }
+  }, "title");
+  const boardTitles = assignedBoards.map((board) => board.title).filter(Boolean);
+  const assignedMessage = boardTitles.length
+    ? ` and they are assigned on board${boardTitles.length > 1 ? "s" : ""} ${boardTitles.join(", ")}`
+    : "";
+
   await JoinRequest.create({
     requester: user._id,
     approver: team.manager,
@@ -51,7 +65,7 @@ export async function POST() {
     team: user.team,
     type: "approval",
     title: "Quit Request",
-    message: `${user.name}: ${user.role} is requesting to quit the ${team.name} on ${company.name}`,
+    message: `${user.name}: ${user.role} is requesting to quit the ${team.name} on ${company.name}${assignedMessage}`,
   });
   emitNotification(String(team.manager));
 

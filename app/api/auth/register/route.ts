@@ -16,6 +16,7 @@ export async function POST(request: Request) {
     "employee",
     "project-manager",
     "qa-tester",
+    "human-resource",
     "admin",
     "others",
   ].includes(String(body.role))

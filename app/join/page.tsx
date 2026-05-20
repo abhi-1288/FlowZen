@@ -71,18 +71,26 @@ export default function JoinPage() {
     setMessage("");
     try {
       if (kind === "company") {
-        await apiFetch("/api/company/join", {
+        const data = await apiFetch<{ approvalNotifier?: "hr" | "admin" }>("/api/company/join", {
           method: "POST",
           body: JSON.stringify({ code })
         });
-        setMessage("Join request sent to company admin for approval.");
+        setMessage(
+          data.approvalNotifier === "hr"
+            ? "Join request sent to HR for approval."
+            : "Join request sent to company admin for approval."
+        );
         setJoinState("requested");
       } else if (kind === "team") {
-        await apiFetch("/api/team/join", {
+        const data = await apiFetch<{ approvalNotifier?: "hr" | "manager" }>("/api/team/join", {
           method: "POST",
           body: JSON.stringify({ code })
         });
-        setMessage("Join request sent to team manager for approval.");
+        setMessage(
+          data.approvalNotifier === "hr"
+            ? "Join request sent to HR for approval."
+            : "Join request sent to team manager for approval."
+        );
         setJoinState("requested");
       } else {
         setError("Invalid join code format.");

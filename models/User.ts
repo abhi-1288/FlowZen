@@ -13,7 +13,7 @@ const UserSchema = new Schema(
     passwordHash: { type: String, select: false },
     role: {
       type: String,
-      enum: ["employee", "project-manager", "qa-tester", "admin", "others"],
+      enum: ["employee", "project-manager", "qa-tester", "human-resource", "admin", "others"],
       default: "employee",
       index: true,
     },
@@ -96,6 +96,7 @@ const UserSchema = new Schema(
       index: true,
     },
     avatarUrl: { type: String, default: "" },
+    customRole: { type: String, default: "", trim: true, maxlength: 80 },
   },
   { timestamps: true },
 );

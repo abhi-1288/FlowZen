@@ -1,23 +1,27 @@
 # FlowZen
 
-FlowZen is a full-stack task management app built with Next.js App Router, MongoDB/Mongoose, Tailwind CSS, Zustand, NextAuth, and `@dnd-kit/core`.
+FlowZen is a full-stack team productivity platform built with Next.js App Router, Tailwind CSS, Zustand, NextAuth, MongoDB, Socket.IO, and `@dnd-kit/core`.
 
-## Features
+## Key Features
 
-- Email/password authentication with NextAuth credentials.
-- Role-based auth for employees, project managers, and admins.
-- Signup with name, email, password, role, and 6-digit OTP verification sent with Nodemailer.
-- Employee, project manager, and admin login with email/password after OTP verification.
-- Project manager login with Google, Microsoft, Apple, GitHub, or Discord OAuth.
-- Forgot-password flow that emails a temporary password.
-- Profile center with password update, logout, account deletion, role timeline, onboarding codes, approvals, and notifications.
-- User-scoped boards with owner/member roles.
-- Board CRUD with default Todo, In Progress, and Done columns.
-- Column CRUD and drag reordering.
-- Task CRUD with title, description, due date, priority, status column, and persisted order.
-- Task dragging within a column and across columns using `@dnd-kit/core`.
-- Zustand store for boards, columns, tasks, modal state, loading, and API sync.
-- Board invites, task comments, attachment URL UI, activity log, and notifications routes.
+- Real-time kanban boards with drag-and-drop task management.
+- Role-based access, approval workflows, and team onboarding.
+- Email/password authentication with 6-digit OTP verification.
+- Social OAuth login for Google, Microsoft, Apple, GitHub, and Discord.
+- Notifications, approvals, team invites, project events, and task activity.
+- Profile center with password updates, account deletion, and onboarding codes.
+
+## Tech Stack
+
+- Next.js 16 App Router
+- React 19
+- Tailwind CSS v3
+- MongoDB + Mongoose
+- NextAuth
+- Zustand
+- Framer Motion
+- Socket.IO
+- `@dnd-kit/core`
 
 ## Setup
 
@@ -27,9 +31,9 @@ FlowZen is a full-stack task management app built with Next.js App Router, Mongo
    npm install
    ```
 
-2. Create `.env.local`:
+2. Create `.env.local` with the values below:
 
-   ```bash
+   ```env
    MONGODB_URI=mongodb://127.0.0.1:27017/flowzen
    NEXTAUTH_URL=http://localhost:3000
    NEXTAUTH_SECRET=replace-with-a-long-random-secret
@@ -60,35 +64,47 @@ FlowZen is a full-stack task management app built with Next.js App Router, Mongo
    docker compose up -d
    ```
 
-   Without Docker, install MongoDB Community Server and make sure it is listening on `127.0.0.1:27017`.
+   Or install MongoDB Community Server and ensure it listens on `127.0.0.1:27017`.
 
-   For MongoDB Atlas, replace `MONGODB_URI` with your Atlas connection string, for example:
-
-   ```bash
-   MONGODB_URI=mongodb+srv://USER:PASSWORD@cluster0.xxxxx.mongodb.net/flowzen?retryWrites=true&w=majority
-   ```
-
-4. Run the app:
+4. Run the development server:
 
    ```bash
    npm run dev
    ```
 
-5. Open `http://localhost:3000`, create an account, and start building boards.
+5. Open `http://localhost:3000` and register a new account.
+
+## Scripts
+
+- `npm run dev` — start the development server.
+- `npm run build` — build the production app.
+- `npm run start` — start the production server.
+- `npm run lint` — run ESLint across the project.
+- `npm run typecheck` — run TypeScript type checking.
+
+## Routes
+
+- `/` — landing page
+- `/login` — login flow
+- `/signup` — signup and OTP verification
+- `/profile` — user profile and company onboarding
+- `/board/[id]` — authenticated board workspace
 
 ## Role Onboarding
 
 - Admins register a company from `/profile`, then share the generated company code or URL.
-- Project managers enter the company code from `/profile`; the admin receives an approval request.
-- After approval, project managers create a team and share the generated team code.
-- Employees enter the team code from `/profile`; the project manager receives an approval request.
-- Notifications track joins, approvals, system notices, project events, and deadline reminders.
+- Project managers request access using the company code; admins approve join requests.
+- After approval, project managers create teams and share team join codes.
+- Employees join via team code and wait for manager approval.
+- Notifications track join requests, approvals, system updates, and task events.
 
 ## Project Structure
 
-- `app/api`: Next.js route handlers for auth, boards, columns, tasks, comments, attachments, and notifications.
-- `app/board/[id]`: authenticated board workspace route.
-- `components/boards`: sidebar, board canvas, columns, task cards, and modals.
-- `store/board-store.ts`: Zustand state and backend sync actions.
-- `models`: Mongoose models for User, Board, Column, Task, and Notification.
-- `lib`: database, auth, API helpers, access checks, and shared types.
+- `app/api` — Next.js API route handlers for auth, approvals, boards, columns, tasks, notifications, attendance, and more.
+- `app/board/[id]` — board workspace and task collaboration route.
+- `components/boards` — board canvas, columns, task cards, modals, and board UI.
+- `components/profile` — profile dashboard and user settings.
+- `components/landing` — landing page UI.
+- `store/board-store.ts` — Zustand store for boards, columns, tasks, and backend sync.
+- `models` — Mongoose models for User, Board, Column, Task, Notification, and related data.
+- `lib` — shared database, auth, API, realtime, mailer, and type utilities.

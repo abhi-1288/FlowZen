@@ -44,14 +44,38 @@ export async function GET() {
   const insights: Record<string, unknown> = {};
 
   if (
-    safeRole === "admin" &&
-    user.company &&
-    typeof user.company === "object" &&
-    "joinCode" in user.company &&
-    !("otherJoinCode" in user.company && user.company.otherJoinCode)
+    (safeRole === "employee" || safeRole === "others") &&
+    !user.company &&
+    !user.team &&
+    user.teamStatus === "none" &&
+    Array.isArray(user.activeTeams) &&
+    user.activeTeams.length > 0
   ) {
-    user.company.otherJoinCode = createRoleJoinCode(String(user.company.joinCode));
-    await user.company.save();
+    await Team.updateMany(
+      { _id: { $in: user.activeTeams } },
+      { $pull: { employees: user._id } },
+    );
+    user.activeTeams = [];
+    await user.save();
+  }
+
+  if (
+    safeRole === "human-resource" &&
+    user.company &&
+    user.companyStatus === "approved"
+  ) {
+    const companyId = typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
+    const company = await Company.findById(companyId);
+    if (company) {
+      company.managerJoinCode = `${company.joinCode}-MANAGER`;
+      company.testerJoinCode = `${company.joinCode}-TESTER`;
+      company.employeeJoinCode = `${company.joinCode}-EMPLOYEE`;
+      if (!company.otherJoinCode) {
+        company.otherJoinCode = createRoleJoinCode(String(company.joinCode));
+      }
+      await company.save();
+      user.company = company;
+    }
   }
 
   const pendingQuitRequest = await JoinRequest.findOne({
@@ -60,6 +84,32 @@ export async function GET() {
     status: "pending",
   });
   insights.pendingQuit = !!pendingQuitRequest;
+  if (pendingQuitRequest && user.company) {
+    const companyDoc = await Company.findById(user.company).select("noticePeriodDays");
+    const noticeDays = Number(companyDoc?.noticePeriodDays ?? 0);
+    const elapsedDays = Math.max(
+      0,
+      Math.floor((Date.now() - new Date(pendingQuitRequest.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
+    );
+    insights.pendingQuitNotice = {
+      noticeDays,
+      elapsedDays,
+      remainingDays: Math.max(0, noticeDays - elapsedDays),
+    };
+  }
+
+  if (user.company && user.companyStatus === "approved") {
+    const companyMembers = await User.find({ company: user.company, companyStatus: "approved" })
+      .select("name email role customRole")
+      .sort({ role: 1, name: 1 });
+    insights.companyMembers = companyMembers.map((member) => ({
+      id: String(member._id),
+      name: member.name ?? "",
+      email: member.email ?? "",
+      role: member.role ?? "employee",
+      customRole: member.customRole ?? "",
+    }));
+  }
 
   if (safeRole === "employee" || safeRole === "others") {
     const history = Array.isArray(user.membershipHistory) ? user.membershipHistory : [];
@@ -94,6 +144,61 @@ export async function GET() {
         createdAt: team.createdAt
       })),
       totalTeams: teams.length
+    };
+  }
+
+  if (["human-resource", "admin"].includes(safeRole) && user.company && user.companyStatus === "approved") {
+    const companyId = typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
+    const [members, teams] = await Promise.all([
+      User.find({ company: companyId, companyStatus: "approved" })
+        .select("name email role customRole team teamStatus activeTeams membershipHistory")
+        .populate("membershipHistory.inviter", "name role")
+        .sort({ role: 1, name: 1 }),
+      Team.find({ company: companyId }).select("name manager employees"),
+    ]);
+
+    const teamNamesByMember = new Map<string, string[]>();
+    teams.forEach((team: any) => {
+      const managerId = String(team.manager ?? "");
+      if (managerId) {
+        teamNamesByMember.set(managerId, [...(teamNamesByMember.get(managerId) ?? []), String(team.name)]);
+      }
+      (team.employees ?? []).forEach((employeeId: any) => {
+        const id = String(employeeId);
+        teamNamesByMember.set(id, [...(teamNamesByMember.get(id) ?? []), String(team.name)]);
+      });
+    });
+
+    insights.hr = {
+      totalMembers: members.length,
+      roleCounts: members.reduce((counts: Record<string, number>, member: any) => {
+        const role = String(member.role ?? "employee");
+        counts[role] = (counts[role] ?? 0) + 1;
+        return counts;
+      }, {}),
+      members: members.map((member: any) => {
+        const teamNames = teamNamesByMember.get(String(member._id)) ?? [];
+        const history = Array.isArray(member.membershipHistory) ? member.membershipHistory : [];
+        const lastJoin = [...history].reverse().find((entry: any) => String(entry?.action ?? "") === "joined-company");
+        const inviter =
+          lastJoin && lastJoin.inviter && typeof lastJoin.inviter === "object" && "name" in lastJoin.inviter
+            ? {
+                name: String((lastJoin.inviter as any).name ?? ""),
+                role: String((lastJoin.inviter as any).role ?? ""),
+              }
+            : null;
+        return {
+          id: String(member._id),
+          name: member.name ?? "",
+          email: member.email ?? "",
+          role: member.role ?? "employee",
+          customRole: member.customRole ?? "",
+          teamStatus: member.teamStatus ?? "none",
+          teams: teamNames,
+          hasTeam: teamNames.length > 0,
+          joinedBy: inviter,
+        };
+      }),
     };
   }
 

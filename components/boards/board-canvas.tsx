@@ -49,6 +49,11 @@ export function BoardCanvas({ boardId }: { boardId: string }) {
   const isOwner = Boolean(session?.user?.id && activeBoard?.owner === session.user.id);
   const isAdminOwner = isOwner && session?.user?.role === "admin";
   const canAssignProject = isAdminOwner || ["manager", "tester"].includes(String(currentMember?.role));
+  const memberStatus = isOwner
+    ? "self"
+    : currentMember?.assignedTo || ["manager", "tester"].includes(String(currentMember?.role))
+      ? "assigned"
+      : "invited";
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 140, tolerance: 8 } })
@@ -115,7 +120,7 @@ export function BoardCanvas({ boardId }: { boardId: string }) {
                 {orderedColumns.length} columns
               </span>
               <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
-                {isOwner ? "self" : currentMember?.assignedTo ? "assigned" : "invited"}
+                {memberStatus}
               </span>
             </div>
             <p className="mt-1 max-w-2xl text-sm text-slate-500">

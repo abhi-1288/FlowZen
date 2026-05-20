@@ -5,12 +5,14 @@ import { Company } from "@/models/Company";
 import { JoinRequest } from "@/models/JoinRequest";
 import { Team } from "@/models/Team";
 import { User } from "@/models/User";
+import { stripHrInviteSuffix } from "@/lib/join-approvers";
 
 export async function GET(request: Request) {
-  const code = String(new URL(request.url).searchParams.get("code") ?? "")
+  const rawCode = String(new URL(request.url).searchParams.get("code") ?? "")
     .trim()
     .toUpperCase();
-  if (!code) return jsonError("Join code is required.");
+  if (!rawCode) return jsonError("Join code is required.");
+  const { baseCode: code } = stripHrInviteSuffix(rawCode);
 
   try {
     await connectDb();
@@ -26,20 +28,28 @@ export async function GET(request: Request) {
     const isSuffixedCompanyCode = /^CO-.+-\d+$/.test(code);
     const baseCode = isSuffixedCompanyCode ? code.replace(/-\d+$/, "") : code;
     const company = await Company.findOne({
-      $or: [{ joinCode: code }, { joinCode: baseCode }, { otherJoinCode: code }]
-    }).select("name joinCode otherJoinCode members");
+      $or: [
+        { joinCode: code },
+        { joinCode: baseCode },
+        { hrJoinCode: code },
+        { managerJoinCode: code },
+        { testerJoinCode: code },
+        { employeeJoinCode: code },
+        { otherJoinCode: code },
+      ]
+    }).select("name joinCode hrJoinCode managerJoinCode testerJoinCode employeeJoinCode otherJoinCode members");
     if (!company) return jsonError("Invalid company code.", 404);
     const joinState = userId ? await getCompanyJoinState(userId, company) : { status: "available" };
-    const isOtherCode = isSuffixedCompanyCode || String(company.otherJoinCode ?? "") === code;
+    const codeInfo = companyCodeInfo(company, code, baseCode);
     return NextResponse.json({
       kind: "company",
-      fromRole: "admin",
-      toRole: isOtherCode ? "others" : "manager",
+      fromRole: codeInfo.fromRole,
+      toRole: codeInfo.toRole,
       joinState,
       company: {
         id: company._id.toString(),
         name: company.name,
-        joinCode: isOtherCode ? company.otherJoinCode : company.joinCode
+        joinCode: codeInfo.joinCode
       }
     });
   }
@@ -84,6 +94,28 @@ export async function GET(request: Request) {
   }
 
   return jsonError("Invalid join code format.", 400);
+}
+
+function companyCodeInfo(company: any, code: string, baseCode: string) {
+  if (String(company.hrJoinCode ?? "") === code) {
+    return { fromRole: "admin", toRole: "hr", joinCode: company.hrJoinCode };
+  }
+  if (String(company.testerJoinCode ?? "") === code) {
+    return { fromRole: "hr", toRole: "tester", joinCode: company.testerJoinCode };
+  }
+  if (String(company.employeeJoinCode ?? "") === code) {
+    return { fromRole: "hr", toRole: "employee", joinCode: company.employeeJoinCode };
+  }
+  if (String(company.otherJoinCode ?? "") === code) {
+    return { fromRole: "hr", toRole: "others", joinCode: company.otherJoinCode };
+  }
+  if (String(company.managerJoinCode ?? "") === code) {
+    return { fromRole: "hr", toRole: "manager", joinCode: company.managerJoinCode };
+  }
+  if (String(company.joinCode ?? "") === code || String(company.joinCode ?? "") === baseCode) {
+    return { fromRole: "admin", toRole: "hr", joinCode: company.joinCode };
+  }
+  return { fromRole: "company", toRole: "member", joinCode: code };
 }
 
 async function getCompanyJoinState(userId: string, company: any) {

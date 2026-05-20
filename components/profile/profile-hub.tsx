@@ -31,6 +31,8 @@ type Tab =
   | "profile"
   | "timeline"
   | "onboarding"
+  | "members"
+  | "messages"
   | "approvals"
   | "notifications"
   | "attendance";
@@ -52,10 +54,21 @@ export function ProfileHub() {
   const [showRequestsModal, setShowRequestsModal] = useState(false);
 
   const role = session?.user?.role ?? String(profile?.role ?? "employee");
+  const displayRole = formatRoleWithCustom(String(role), profile?.customRole);
   const displayName = String(profile?.name ?? session?.user?.name ?? "User");
   const avatarUrl = profile?.avatarUrl ? String(profile.avatarUrl) : "";
   const unreadCount = notifications.filter((item) => !item.readAt).length;
-  const mobileTabs: Tab[] = ["profile", "timeline", "onboarding", "approvals", "notifications", "attendance"];
+  const hasCompany = Boolean(profile?.company && profile?.companyStatus === "approved");
+  const mobileTabs: Tab[] = [
+    "profile",
+    "timeline",
+    "onboarding",
+    ...(["human-resource", "admin"].includes(String(role)) ? (["members"] as Tab[]) : []),
+    ...(hasCompany ? (["messages"] as Tab[]) : []),
+    "approvals",
+    "notifications",
+    "attendance",
+  ];
 
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setToast({ text, type });
@@ -245,7 +258,7 @@ export function ProfileHub() {
             <AvatarBadge avatarUrl={avatarUrl} name={displayName} size="md" />
             <div>
               <p className="text-sm font-medium text-slate-200 capitalize">{displayName}</p>
-              <p className="text-xs text-slate-400 capitalize">{role}</p>
+              <p className="text-xs text-slate-400 capitalize">{displayRole}</p>
             </div>
           </div>
         </div>
@@ -265,6 +278,20 @@ export function ProfileHub() {
             label="Onboarding"
             onClick={() => setTab("onboarding")}
           />
+          {["human-resource", "admin"].includes(String(role)) ? (
+            <NavButton
+              active={tab === "members"}
+              label="Members"
+              onClick={() => setTab("members")}
+            />
+          ) : null}
+          {hasCompany ? (
+            <NavButton
+              active={tab === "messages"}
+              label="Messages"
+              onClick={() => setTab("messages")}
+            />
+          ) : null}
           <NavButton
             active={tab === "approvals"}
             label={`Approvals ${approvals.length ? `(${approvals.length})` : ""}`}
@@ -369,6 +396,19 @@ export function ProfileHub() {
                   refresh={load}
                   showToast={showToast}
                 />
+              ) : null}
+
+              {tab === "members" ? (
+                <MembersTab
+                  insights={insights}
+                  actorRole={String(role)}
+                  showToast={showToast}
+                  refresh={load}
+                />
+              ) : null}
+
+              {tab === "messages" ? (
+                <MessagesTab showToast={showToast} />
               ) : null}
 
               {tab === "notifications" ? (
@@ -1988,6 +2028,10 @@ function ProfileTab({
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [companyActionModal, setCompanyActionModal] = useState(false);
+  const [companyActionType, setCompanyActionType] = useState<"hold" | "takedown" | null>(null);
+  const [companyActionConfirm, setCompanyActionConfirm] = useState("");
+  const [companyActionLoading, setCompanyActionLoading] = useState(false);
 
   const company =
     typeof profile?.company === "object" && profile.company
@@ -2000,13 +2044,28 @@ function ProfileTab({
       : null;
 
   const role = profile?.role ? String(profile.role) : "";
+  const displayRole = formatRoleWithCustom(role, profile?.customRole);
+  const sectionClass = "rounded-lg border border-slate-200 bg-white p-5 shadow-sm";
   const avatarUrl = profile?.avatarUrl ? String(profile.avatarUrl) : "";
   const displayName = profile?.name ? String(profile.name) : "User";
+  const initialNotice = company?.noticePeriodDays ? Number(company.noticePeriodDays) : 30;
+  const [noticePeriodDays, setNoticePeriodDays] = useState<number>(initialNotice);
+  const [savingPolicy, setSavingPolicy] = useState(false);
   const managerTeams = Array.isArray(
     (insights?.manager as AnyRecord | undefined)?.teams,
   )
     ? ((insights?.manager as AnyRecord).teams as AnyRecord[])
     : [];
+  const companyMembers = Array.isArray((insights?.hr as AnyRecord | undefined)?.members)
+    ? (((insights?.hr as AnyRecord).members as AnyRecord[]) ?? [])
+    : [];
+  const profileId = String(profile?._id ?? profile?.id ?? "");
+  const approvedMembersBesidesAdmin = companyMembers.filter((member) => {
+    const memberId = String(member?._id ?? member?.id ?? "");
+    return memberId !== profileId;
+  }).length;
+  const canUseEmptyCompanyControls =
+    role === "admin" && Boolean(company) && approvedMembersBesidesAdmin === 0;
 
   async function updatePassword(event: FormEvent) {
     event.preventDefault();
@@ -2056,10 +2115,52 @@ function ProfileTab({
     }
   }
 
+  async function savePolicy() {
+    try {
+      setSavingPolicy(true);
+      await apiFetch("/api/hr/policy", {
+        method: "PATCH",
+        body: JSON.stringify({ noticePeriodDays }),
+      });
+      showToast("Policy updated.");
+      await refresh(true);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to update policy.", "error");
+    } finally {
+      setSavingPolicy(false);
+    }
+  }
+
+  async function executeCompanyAction() {
+    if (String(companyActionConfirm ?? "").trim().toUpperCase() !== "CONFIRM") {
+      showToast("Type Confirm to confirm.", "error");
+      return;
+    }
+
+    if (!companyActionType) return;
+    setCompanyActionLoading(true);
+    try {
+      const endpoint = companyActionType === "hold" ? "/api/company/hold-freeze" : "/api/company/takedown";
+      await apiFetch(endpoint, { method: "POST" });
+      showToast(
+        companyActionType === "hold"
+          ? "Hold & Freeze request submitted."
+          : "TakeDown request submitted.",
+      );
+      setCompanyActionModal(false);
+      setCompanyActionConfirm("");
+      await refresh(true);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to complete company action.", "error");
+    } finally {
+      setCompanyActionLoading(false);
+    }
+  }
+
   return (
     <>
       <div className="grid gap-5 xl:grid-cols-2">
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <section className={sectionClass}>
           <h3 className="text-lg font-semibold">Account</h3>
           <div className="mt-4 flex items-center gap-4 rounded-lg border border-slate-200 p-3">
             <AvatarBadge avatarUrl={avatarUrl} name={displayName} size="lg" />
@@ -2106,11 +2207,19 @@ function ProfileTab({
             />
             <Row
               label="Role"
-              value={profile?.role ? String(profile.role) : undefined}
+              value={displayRole || undefined}
             />
             <Row
               label="Company"
               value={company?.name ? String(company.name) : undefined}
+            />
+            <Row
+              label="Notice Period"
+              value={
+                company?.noticePeriodDays
+                  ? `${Number(company.noticePeriodDays)} day${Number(company.noticePeriodDays) === 1 ? "" : "s"}`
+                  : undefined
+              }
             />
             <Row
               label="Team"
@@ -2135,6 +2244,23 @@ function ProfileTab({
               }
             />
             <Row
+              label="Joined By HR"
+              value={(() => {
+                const safeRole = String(profile?.role ?? "");
+                if (!["employee", "project-manager", "qa-tester", "others"].includes(safeRole)) return undefined;
+                const history = Array.isArray(profile?.membershipHistory)
+                  ? (profile?.membershipHistory as AnyRecord[])
+                  : [];
+                const lastJoin = [...history].reverse().find((entry) => String(entry?.action ?? "") === "joined-company");
+                const inviter = lastJoin && typeof (lastJoin as AnyRecord)?.inviter === "object"
+                  ? ((lastJoin as AnyRecord).inviter as AnyRecord)
+                  : null;
+                const inviterRole = inviter?.role ? String(inviter.role) : "";
+                if (!inviter?.name || inviterRole !== "human-resource") return undefined;
+                return String(inviter.name);
+              })()}
+            />
+            <Row
               label="Team status"
               value={
                 profile?.teamStatus ? String(profile.teamStatus) : undefined
@@ -2153,17 +2279,85 @@ function ProfileTab({
           </dl>
         </section>
 
+        {role === "human-resource" && profile?.companyStatus === "approved" ? (
+          <section className={sectionClass}>
+            <h3 className="text-lg font-semibold">Policy</h3>
+<p className="mt-1 text-sm text-slate-500">
+              Configure notice period for your company.
+            </p>
+
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <label className="text-xs font-semibold uppercase text-slate-500" htmlFor="notice-period">
+                Notice period
+              </label>
+                <span>   current notice period:{noticePeriodDays}</span>
+              <select
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                id="notice-period"
+                value={noticePeriodDays}
+                onChange={(e) => setNoticePeriodDays(Number(e.target.value))}
+              >
+                <option value={0}>0 days</option>
+                <option value={15}>15 days</option>
+                <option value={30}>30 days</option>
+                <option value={45}>45 days</option>
+                <option value={60}>2 months (60 days)</option>
+                <option value={90}>3 months (90 days)</option>
+              </select>
+              <button
+                className="mt-3 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={savingPolicy}
+                type="button"
+                onClick={() => void savePolicy()}
+              >
+                {savingPolicy ? "Saving..." : "Save policy"}
+              </button>
+            </div>
+          </section>
+        ) : null}
+
+        {canUseEmptyCompanyControls ? (
+          <section className={sectionClass}>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold">Company controls</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  No approved members besides you remain in the company. Use these controls carefully.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                className="rounded-lg border border-amber-200 bg-amber-100 px-4 py-3 text-sm font-semibold text-amber-900 hover:bg-amber-200"
+                onClick={() => {
+                  setCompanyActionType("hold");
+                  setCompanyActionModal(true);
+                }}
+              >
+                Hold & Freeze Company
+              </button>
+              <button
+                type="button"
+                className="rounded-lg border border-rose-200 bg-rose-100 px-4 py-3 text-sm font-semibold text-rose-900 hover:bg-rose-200"
+                onClick={() => {
+                  setCompanyActionType("takedown");
+                  setCompanyActionModal(true);
+                }}
+              >
+                TakeDown Company
+              </button>
+            </div>
+          </section>
+        ) : null}
+
         {role === "admin" && company?.joinCode ? (
           <CodePanel
-            title="Company Staff Onboarding"
+            title="HR Onboarding"
             code={String(company.joinCode)}
-            label="Company code"
-            secondaryCodes={
-              company?.otherJoinCode
-                ? [{ code: String(company.otherJoinCode), label: "Others code" }]
-                : []
-            }
-            empty="Register a company to generate a permanent staff onboarding code."
+            label="HR code"
+            empty="Register a company to generate an HR onboarding code."
+            showToast={showToast}
           />
         ) : null}
 
@@ -2247,7 +2441,7 @@ function ProfileTab({
           </section>
         ) : null}
 
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <section className={sectionClass}>
           <h3 className="text-lg font-semibold">Security</h3>
 
           <form className="mt-4 space-y-3" onSubmit={updatePassword}>
@@ -2329,6 +2523,51 @@ function ProfileTab({
           </div>
         </div>
       ) : null}
+
+      {companyActionModal && companyActionType ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-slate-900">
+              {companyActionType === "hold" ? "Hold & Freeze Company?" : "TakeDown Company?"}
+            </h3>
+
+            <p className="mt-2 text-sm text-slate-600">
+              This action requires typing <span className="font-semibold">Confirm</span> before it will proceed.
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              {companyActionType === "hold"
+                ? "Freezing a company preserves its settings and prevents new activity."
+                : "Taking down a company marks it for removal and locks access."}
+            </p>
+
+            <input
+              className="mt-4 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-slate-900"
+              placeholder="Type Confirm"
+              value={companyActionConfirm}
+              onChange={(e) => setCompanyActionConfirm(e.target.value)}
+            />
+
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
+                onClick={() => {
+                  setCompanyActionModal(false);
+                  setCompanyActionConfirm("");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={String(companyActionConfirm ?? "").trim().toUpperCase() !== "CONFIRM" || companyActionLoading}
+                onClick={executeCompanyAction}
+              >
+                {companyActionLoading ? "Processing..." : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -2394,6 +2633,11 @@ function OnboardingTab({
   refresh: (silent?: boolean) => Promise<void>;
   showToast: (text: string, type?: 'success' | 'error') => void;
 }) {
+  const { data: session } = useSession();
+  const selfId = String(session?.user?.id ?? "");
+  const hrSuffix = selfId
+    ? `-HR${selfId.replace(/[^a-fA-F0-9]/g, "").toUpperCase().slice(-6)}`
+    : "";
   const [companyName, setCompanyName] = useState("");
   const [companyCode, setCompanyCode] = useState("");
   const [teamName, setTeamName] = useState("");
@@ -2423,7 +2667,37 @@ function OnboardingTab({
   const managerTeams = Array.isArray(managerInsight?.teams)
     ? (managerInsight.teams as AnyRecord[])
     : [];
+  const companyMembers = Array.isArray(insights?.companyMembers) ? (insights.companyMembers as AnyRecord[]) : [];
+  const replacementHrCandidates = companyMembers.filter((member) => {
+      const id = String(member.id ?? "");
+      return id && id !== selfId && String(member.role ?? "") === "human-resource";
+    });
+  const replacementRoleCandidates = companyMembers.filter((member) => {
+    const id = String(member.id ?? "");
+    return id && id !== selfId && String(member.role ?? "") === String(role);
+  });
+  const pendingQuitNotice = (insights?.pendingQuitNotice as AnyRecord | undefined) ?? null;
+  const [hrQuitModal, setHrQuitModal] = useState(false);
+  const [replacementHrId, setReplacementHrId] = useState("");
+  const [roleQuitModal, setRoleQuitModal] = useState(false);
+  const [replacementRoleUserId, setReplacementRoleUserId] = useState("");
+  const [requestingHrQuit, setRequestingHrQuit] = useState(false);
+  const [requestingRoleQuit, setRequestingRoleQuit] = useState(false);
+  const [cancelQuitModal, setCancelQuitModal] = useState(false);
+  const [cancelQuitReason, setCancelQuitReason] = useState("");
+  const [cancellingQuit, setCancellingQuit] = useState(false);
+  const [cancelJoinModal, setCancelJoinModal] = useState(false);
+  const [cancelJoinConfirmText, setCancelJoinConfirmText] = useState("");
+  const [cancellingJoin, setCancellingJoin] = useState(false);
   const canCreateMoreTeams = managerTeams.length < 5;
+  const companyJoinStatus = profile?.companyStatus ? String(profile.companyStatus) : "none";
+  const teamJoinStatus = profile?.teamStatus ? String(profile.teamStatus) : "none";
+  const pendingJoinStatus =
+    companyJoinStatus === "pending" || teamJoinStatus === "pending"
+      ? "pending"
+      : teamJoinStatus !== "none"
+        ? teamJoinStatus
+        : companyJoinStatus;
 
   async function createCompany(event: FormEvent) {
     event.preventDefault();
@@ -2466,8 +2740,102 @@ function OnboardingTab({
 
   async function requestManagerQuit() {
     await apiFetch("/api/company/quit", { method: "POST" });
-    showToast("Quit request sent to admin.");
+    showToast("Quit request sent.");
     await refresh();
+  }
+
+  async function requestHrQuit() {
+    if (!replacementHrId) {
+      showToast("Please select a replacement HR.", "error");
+      return;
+    }
+    try {
+      setRequestingHrQuit(true);
+      await apiFetch("/api/company/quit", {
+        method: "POST",
+        body: JSON.stringify({ replacementHrId }),
+      });
+      setHrQuitModal(false);
+      setReplacementHrId("");
+      showToast("HR quit request sent to admin.");
+      await refresh();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to request quit.", "error");
+    } finally {
+      setRequestingHrQuit(false);
+    }
+  }
+
+  async function requestRoleQuit() {
+    if (!replacementRoleUserId) {
+      showToast("Please select a replacement first.", "error");
+      return;
+    }
+    try {
+      setRequestingRoleQuit(true);
+      await apiFetch("/api/company/quit", {
+        method: "POST",
+        body: JSON.stringify({ replacementUserId: replacementRoleUserId }),
+      });
+      setRoleQuitModal(false);
+      setReplacementRoleUserId("");
+      showToast("Quit request sent to HR.");
+      await refresh();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to request quit.", "error");
+    } finally {
+      setRequestingRoleQuit(false);
+    }
+  }
+
+  function pendingQuitText(defaultText: string): string {
+    if (!insights?.pendingQuit) return defaultText;
+    const remaining = Number(pendingQuitNotice?.remainingDays ?? 0);
+    return `Requested to Quit${remaining > 0 ? ` (${remaining} day${remaining === 1 ? "" : "s"} left)` : " (notice completed)"}`;
+  }
+
+  async function cancelQuitRequest() {
+    const reason = String(cancelQuitReason ?? "").trim();
+    if (!reason) {
+      showToast("Reason is required.", "error");
+      return;
+    }
+    try {
+      setCancellingQuit(true);
+      await apiFetch("/api/quit/cancel", {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      });
+      setCancelQuitModal(false);
+      setCancelQuitReason("");
+      showToast("Quit request cancelled.");
+      await refresh();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to cancel request.", "error");
+    } finally {
+      setCancellingQuit(false);
+    }
+  }
+
+  async function cancelJoinRequest() {
+    if (String(cancelJoinConfirmText ?? "").trim().toUpperCase() !== "CANCEL") {
+      showToast("Type CANCEL to confirm.", "error");
+      return;
+    }
+    try {
+      setCancellingJoin(true);
+      await apiFetch("/api/join/cancel", {
+        method: "POST",
+      });
+      setCancelJoinModal(false);
+      setCancelJoinConfirmText("");
+      showToast("Join request cancelled.");
+      await refresh();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to cancel request.", "error");
+    } finally {
+      setCancellingJoin(false);
+    }
   }
 
   async function requestEmployeeQuit() {
@@ -2502,11 +2870,37 @@ function OnboardingTab({
   async function joinTeam(event: FormEvent) {
     event.preventDefault();
     try {
-      await apiFetch("/api/team/join", {
-        method: "POST",
-        body: JSON.stringify({ code: teamCode }),
-      });
-      showToast("Join request sent to manager.");
+      const normalizedCode = String(teamCode ?? "").trim().toUpperCase();
+      if (!normalizedCode) {
+        showToast("Enter a join code first.", "error");
+        return;
+      }
+
+      if (normalizedCode.startsWith("CO-")) {
+        const data = await apiFetch<{ approvalNotifier?: "hr" | "admin" }>("/api/company/join", {
+          method: "POST",
+          body: JSON.stringify({ code: normalizedCode }),
+        });
+        showToast(
+          data.approvalNotifier === "hr"
+            ? "Join request sent to HR."
+            : "Join request sent to admin.",
+        );
+      } else if (normalizedCode.startsWith("TM-")) {
+        const data = await apiFetch<{ approvalNotifier?: "hr" | "manager" }>("/api/team/join", {
+          method: "POST",
+          body: JSON.stringify({ code: normalizedCode }),
+        });
+        showToast(
+          data.approvalNotifier === "hr"
+            ? "Join request sent to HR."
+            : "Join request sent to manager.",
+        );
+      } else {
+        showToast("Invalid join code. Use a CO- or TM- code.", "error");
+        return;
+      }
+
       await refresh();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Unable to send join request.", "error");
@@ -2517,15 +2911,11 @@ function OnboardingTab({
     <div className="grid gap-5 xl:grid-cols-2">
       {role === "admin" ? (
         <CodePanel
-          title="Company Staff Onboarding"
+          title="HR Onboarding"
           code={company?.joinCode ? String(company.joinCode) : undefined}
-          label="Company code"
-          secondaryCodes={
-            company?.otherJoinCode
-              ? [{ code: String(company.otherJoinCode), label: "Others code" }]
-              : []
-          }
-          empty="Register a company to generate a permanent staff onboarding code."
+          label="HR code"
+          empty="Register a company to generate an HR onboarding code."
+          showToast={showToast}
         >
           {!company ? (
             <form className="mt-4 flex gap-2" onSubmit={createCompany}>
@@ -2541,6 +2931,305 @@ function OnboardingTab({
             </form>
           ) : null}
         </CodePanel>
+      ) : null}
+
+      {role === "human-resource" ? (
+        profile?.companyStatus === "approved" ? (
+          <>
+            <CodePanel
+              title="HR Staff Onboarding"
+              code={undefined}
+              label="Staff code"
+              showToast={showToast}
+              secondaryCodes={
+                [
+                  company?.managerJoinCode
+                    ? { code: `${String(company.managerJoinCode)}${hrSuffix}`, label: "Manager code" }
+                    : null,
+                  company?.testerJoinCode
+                    ? { code: `${String(company.testerJoinCode)}${hrSuffix}`, label: "Tester code" }
+                    : null,
+                  company?.employeeJoinCode
+                    ? { code: `${String(company.employeeJoinCode)}${hrSuffix}`, label: "Employee code" }
+                    : null,
+                  company?.otherJoinCode
+                    ? { code: `${String(company.otherJoinCode)}${hrSuffix}`, label: "Others code" }
+                    : null,
+                ].filter(Boolean) as { code: string; label: string }[]
+              }
+              empty="Generating HR staff onboarding codes. Refresh once if they do not appear."
+            />
+            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="text-lg font-semibold">HR Membership</h3>
+              <p className="mt-1 text-sm text-slate-500">
+                To quit, nominate another approved HR. Approval goes to admin.
+              </p>
+              <button
+                className="mt-4 w-full rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={Boolean(insights?.pendingQuit) || replacementHrCandidates.length === 0}
+                type="button"
+                onClick={() => setHrQuitModal(true)}
+              >
+                {pendingQuitText("Request Quit Company")}
+              </button>
+              {insights?.pendingQuit ? (
+                <button
+                  className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  type="button"
+                  onClick={() => setCancelQuitModal(true)}
+                >
+                  Cancel Request
+                </button>
+              ) : null}
+              {replacementHrCandidates.length === 0 ? (
+                <p className="mt-2 text-xs text-amber-700">
+                  Another approved HR is required before you can quit.
+                </p>
+              ) : null}
+            </section>
+          </>
+        ) : (
+          <JoinPanel
+            title="Join company as HR"
+            placeholder="HR company code"
+            value={companyCode}
+            onChange={setCompanyCode}
+            onSubmit={joinCompany}
+            status={profile?.companyStatus ? String(profile.companyStatus) : undefined}
+            onCancelRequest={() => setCancelJoinModal(true)}
+          />
+        )
+      ) : null}
+
+      {hrQuitModal ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setHrQuitModal(false);
+          }}
+        >
+          <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h4 className="text-lg font-semibold">Quit company (HR)</h4>
+                <p className="mt-1 text-sm text-slate-500">
+                  Select replacement HR before submitting quit request.
+                </p>
+              </div>
+              <button
+                aria-label="Close"
+                className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
+                type="button"
+                onClick={() => setHrQuitModal(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="mt-4">
+              <label className="text-xs font-semibold uppercase text-slate-500">Replacement HR</label>
+              <select
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                value={replacementHrId}
+                onChange={(e) => setReplacementHrId(e.target.value)}
+              >
+                <option value="">Select HR</option>
+                {replacementHrCandidates.map((member) => (
+                  <option key={String(member.id)} value={String(member.id)}>
+                    {String(member.name ?? "HR")} ({String(member.email ?? "")})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
+                type="button"
+                onClick={() => setHrQuitModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                disabled={!replacementHrId || requestingHrQuit}
+                type="button"
+                onClick={() => void requestHrQuit()}
+              >
+                {requestingHrQuit ? "Submitting..." : "Submit quit request"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {roleQuitModal ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setRoleQuitModal(false);
+          }}
+        >
+          <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h4 className="text-lg font-semibold">Quit company ({formatRole(String(role))})</h4>
+                <p className="mt-1 text-sm text-slate-500">
+                  Assign another approved {formatRole(String(role))} before quitting.
+                </p>
+              </div>
+              <button
+                aria-label="Close"
+                className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
+                type="button"
+                onClick={() => setRoleQuitModal(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="mt-4">
+              <label className="text-xs font-semibold uppercase text-slate-500">Replacement</label>
+              <select
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                value={replacementRoleUserId}
+                onChange={(e) => setReplacementRoleUserId(e.target.value)}
+              >
+                <option value="">Select replacement</option>
+                {replacementRoleCandidates.map((member) => (
+                  <option key={String(member.id)} value={String(member.id)}>
+                    {String(member.name ?? "Member")} ({String(member.email ?? "")})
+                  </option>
+                ))}
+              </select>
+              {replacementRoleCandidates.length === 0 ? (
+                <p className="mt-2 text-xs text-amber-700">
+                  No approved replacement available with this role.
+                </p>
+              ) : null}
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
+                type="button"
+                onClick={() => setRoleQuitModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                disabled={!replacementRoleUserId || requestingRoleQuit}
+                type="button"
+                onClick={() => void requestRoleQuit()}
+              >
+                {requestingRoleQuit ? "Submitting..." : "Submit quit request"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {cancelQuitModal ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setCancelQuitModal(false);
+          }}
+        >
+          <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h4 className="text-lg font-semibold">Cancel quit request</h4>
+                <p className="mt-1 text-sm text-slate-500">
+                  Tell the approver why you are cancelling this request.
+                </p>
+              </div>
+              <button
+                aria-label="Close"
+                className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
+                type="button"
+                onClick={() => setCancelQuitModal(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <textarea
+              className="mt-4 min-h-28 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              placeholder="Reason for cancelling quit request"
+              value={cancelQuitReason}
+              onChange={(event) => setCancelQuitReason(event.target.value)}
+            />
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
+                type="button"
+                onClick={() => setCancelQuitModal(false)}
+              >
+                Keep request
+              </button>
+              <button
+                className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                disabled={!String(cancelQuitReason ?? "").trim() || cancellingQuit}
+                type="button"
+                onClick={() => void cancelQuitRequest()}
+              >
+                {cancellingQuit ? "Cancelling..." : "Cancel Request"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {cancelJoinModal ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setCancelJoinModal(false);
+          }}
+        >
+          <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h4 className="text-lg font-semibold">Cancel join request</h4>
+                <p className="mt-1 text-sm text-slate-500">
+                  Type CANCEL to confirm you want to remove this pending join request.
+                </p>
+              </div>
+              <button
+                aria-label="Close"
+                className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
+                type="button"
+                onClick={() => setCancelJoinModal(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <input
+              className="mt-4 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm uppercase"
+              placeholder="Type CANCEL"
+              value={cancelJoinConfirmText}
+              onChange={(event) => setCancelJoinConfirmText(event.target.value)}
+            />
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
+                type="button"
+                onClick={() => setCancelJoinModal(false)}
+              >
+                Keep request
+              </button>
+              <button
+                className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                disabled={String(cancelJoinConfirmText ?? "").trim().toUpperCase() !== "CANCEL" || cancellingJoin}
+                type="button"
+                onClick={() => void cancelJoinRequest()}
+              >
+                {cancellingJoin ? "Cancelling..." : "Cancel Request"}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {role === "project-manager" || role === "qa-tester" ? (
@@ -2623,11 +3312,20 @@ function OnboardingTab({
                 <button
                   className="w-full rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={Boolean(insights?.pendingQuit)}
-                  onClick={requestManagerQuit}
+                  onClick={() => setRoleQuitModal(true)}
                   type="button"
                 >
-                  {insights?.pendingQuit ? "Requested to Quit" : "Request Quit.!"}
+                  {pendingQuitText("Request Quit Company")}
                 </button>
+                {insights?.pendingQuit ? (
+                  <button
+                    className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    onClick={() => setCancelQuitModal(true)}
+                    type="button"
+                  >
+                    Cancel Request
+                  </button>
+                ) : null}
               </div>
             </section>
 
@@ -2672,6 +3370,7 @@ function OnboardingTab({
                   ? String(profile.companyStatus)
                   : undefined
               }
+              onCancelRequest={() => setCancelJoinModal(true)}
             />
 
             <HistoryCard
@@ -2839,13 +3538,13 @@ function OnboardingTab({
       ) : null}
 
       {role === "employee" || role === "others" ? (
-        profile?.teamStatus === "approved" ? (
+        companyJoinStatus === "approved" ? (
           <>
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="text-lg font-semibold">Team Membership</h3>
+              <h3 className="text-lg font-semibold">Membership</h3>
 
               <p className="mt-1 text-sm text-slate-500">
-                You are currently assigned to a team.
+                You are currently approved in this company.
               </p>
 
               <div className="mt-5 space-y-4">
@@ -2881,20 +3580,49 @@ function OnboardingTab({
                     <span className="text-slate-500">Status</span>
 
                     <span className="font-medium capitalize text-emerald-600">
-                      {String(profile?.teamStatus)}
+                      Company {String(profile?.companyStatus)}
                     </span>
                   </div>
                 </div>
 
+                {teamJoinStatus === "approved" ? (
+                  <button
+                    className="w-full rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={Boolean(insights?.pendingQuit)}
+                    onClick={requestEmployeeQuit}
+                  >
+                    {pendingQuitText("Request Team Quit")}
+                  </button>
+                ) : null}
                 <button
-                  className="w-full rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full rounded-lg border border-orange-300 bg-orange-50 px-4 py-2.5 text-sm font-medium text-orange-600 hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={Boolean(insights?.pendingQuit)}
-                  onClick={requestEmployeeQuit}
+                  onClick={requestManagerQuit}
                 >
-                  {insights?.pendingQuit ? "Requested to Quit" : "Request Quit.!"}
+                  {pendingQuitText("Request Quit Company")}
                 </button>
+                {insights?.pendingQuit ? (
+                  <button
+                    className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    onClick={() => setCancelQuitModal(true)}
+                    type="button"
+                  >
+                    Cancel Request
+                  </button>
+                ) : null}
               </div>
             </section>
+            {teamJoinStatus !== "approved" ? (
+              <JoinPanel
+                title="Join team using code"
+                placeholder="TM-... code"
+                value={teamCode}
+                onChange={setTeamCode}
+                onSubmit={joinTeam}
+                status={teamJoinStatus === "none" ? undefined : teamJoinStatus}
+                onCancelRequest={() => setCancelJoinModal(true)}
+              />
+            ) : null}
             <HistoryCard
               title="Membership History"
               rows={toEmployeeHistoryRows(insights)}
@@ -2904,14 +3632,13 @@ function OnboardingTab({
         ) : (
           <>
             <JoinPanel
-              title="Join manager team"
-              placeholder="Team code"
+              title="Join using code"
+              placeholder="CO-... or TM-... code"
               value={teamCode}
               onChange={setTeamCode}
               onSubmit={joinTeam}
-              status={
-                profile?.teamStatus ? String(profile.teamStatus) : undefined
-              }
+              status={pendingJoinStatus}
+              onCancelRequest={() => setCancelJoinModal(true)}
             />
             <HistoryCard
               title="Membership History"
@@ -2946,13 +3673,25 @@ function ApprovalsTab({
     return value ? String(value) : "";
   }
 
-  async function decide(id: string, status: "approved" | "rejected") {
+  function quitNoticeInfo(request: AnyRecord) {
+    if (!String(request.kind ?? "").startsWith("quit-")) return null;
+    const noticeDays = Number((request.company as AnyRecord | undefined)?.noticePeriodDays ?? 0);
+    if (!Number.isFinite(noticeDays) || noticeDays <= 0) {
+      return { noticeDays: 0, elapsedDays: 0, remainingDays: 0, canApprove: true };
+    }
+    const createdAt = request.createdAt ? new Date(String(request.createdAt)) : new Date();
+    const elapsedDays = Math.max(0, Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24)));
+    const remainingDays = Math.max(0, noticeDays - elapsedDays);
+    return { noticeDays, elapsedDays, remainingDays, canApprove: remainingDays === 0 };
+  }
+
+  async function decide(id: string, status: "approved" | "rejected", force = false) {
     if (!id) return;
     await apiFetch(`/api/approvals/${id}`, {
       method: "PATCH",
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, force }),
     });
-    showToast(`Request ${status}.`);
+    showToast(`Request ${status}${force ? " (forced)" : ""}.`);
     await refresh();
   }
 
@@ -2961,10 +3700,7 @@ function ApprovalsTab({
       <h3 className="text-xl font-semibold">Pending Approvals</h3>
       <div className="mt-5 divide-y divide-slate-200">
         {approvals.map((request) => (
-          <div
-            className="flex flex-wrap items-center justify-between gap-4 py-4"
-            key={requestIdOf(request)}
-          >
+          <div className="flex flex-wrap items-center justify-between gap-4 py-4" key={requestIdOf(request)}>
             <div>
               <p className="font-medium">
                 {displayNested(request.requester, "name", "User")},{" "}
@@ -2979,6 +3715,25 @@ function ApprovalsTab({
                   ? displayNested(request.team, "name", "team")
                   : displayNested(request.company, "name", "company")}
               </p>
+              {String(request.kind).startsWith("quit-") ? (
+                <p className="mt-1 text-xs text-slate-500">
+                  {(() => {
+                    const info = quitNoticeInfo(request);
+                    if (!info || info.noticeDays <= 0) return "No notice period set.";
+                    return `Notice period: ${info.noticeDays} days. Pending: ${info.elapsedDays} days. Remaining: ${info.remainingDays} days.`;
+                  })()}
+                </p>
+              ) : null}
+              {request.kind === "quit-company" && request.replacementHr ? (
+                <p className="mt-1 text-xs text-slate-500">
+                  Replacement HR: {displayNested(request.replacementHr, "name", "HR")}
+                </p>
+              ) : null}
+              {request.kind === "quit-company" && request.replacementUser ? (
+                <p className="mt-1 text-xs text-slate-500">
+                  Replacement: {displayNested(request.replacementUser, "name", "Member")}
+                </p>
+              ) : null}
             </div>
             <div className="flex gap-2">
               <button
@@ -2988,11 +3743,24 @@ function ApprovalsTab({
                 Decline
               </button>
               <button
-                className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+                className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={(() => {
+                  const info = quitNoticeInfo(request);
+                  return !!info && !info.canApprove;
+                })()}
                 onClick={() => decide(requestIdOf(request), "approved")}
               >
                 Approve
               </button>
+              {String(request.kind).startsWith("quit-") ? (
+                <button
+                  className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100"
+                  onClick={() => decide(requestIdOf(request), "approved", true)}
+                  type="button"
+                >
+                  Force accept
+                </button>
+              ) : null}
             </div>
           </div>
         ))}
@@ -3000,6 +3768,834 @@ function ApprovalsTab({
           <p className="py-6 text-sm text-slate-500">No pending approvals.</p>
         ) : null}
       </div>
+    </section>
+  );
+}
+
+const MEETING_DURATION_OPTIONS = [
+  { minutes: 15, label: "15 minutes" },
+  { minutes: 30, label: "30 minutes" },
+  { minutes: 45, label: "45 minutes" },
+  { minutes: 60, label: "1 hour" },
+  { minutes: 90, label: "1.5 hours" },
+  { minutes: 120, label: "2 hours" },
+] as const;
+
+const HR_MEMBER_ROLE_KEYS = [
+  "human-resource",
+  "project-manager",
+  "qa-tester",
+  "employee",
+  "others",
+] as const;
+
+function MembersTab({
+  insights,
+  actorRole,
+  showToast,
+  refresh,
+}: {
+  insights: AnyRecord | null;
+  actorRole: string;
+  showToast: (text: string, type?: "success" | "error") => void;
+  refresh: (silent?: boolean) => Promise<void>;
+}) {
+  const { data: session } = useSession();
+  const selfId = session?.user?.id ?? "";
+  const hr = (insights?.hr as AnyRecord | undefined) ?? null;
+  const members = Array.isArray(hr?.members) ? (hr.members as AnyRecord[]) : [];
+  const roleCounts = (hr?.roleCounts as AnyRecord | undefined) ?? {};
+  const [modalRole, setModalRole] = useState<(typeof HR_MEMBER_ROLE_KEYS)[number] | null>(null);
+  const [meetingDuration, setMeetingDuration] = useState<number>(30);
+  const [invitingFor, setInvitingFor] = useState<string | null>(null);
+  const [firingFor, setFiringFor] = useState<string | null>(null);
+  const [fireConfirmMember, setFireConfirmMember] = useState<AnyRecord | null>(null);
+  const [fireConfirmText, setFireConfirmText] = useState("");
+  const [roleDrafts, setRoleDrafts] = useState<Record<string, string>>({});
+  const [savingRoleFor, setSavingRoleFor] = useState<string | null>(null);
+  const [selectedOtherRole, setSelectedOtherRole] = useState("all");
+
+  const otherRoleOptions = useMemo(() => {
+    const labels = new Set<string>();
+    members
+      .filter((member) => String(member.role ?? "") === "others")
+      .forEach((member) => {
+        const value = String(member.customRole ?? "").trim();
+        if (value) labels.add(value);
+      });
+    return Array.from(labels).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  }, [members]);
+
+  const otherRoleSelectOptions = useMemo(() => {
+    const labels = new Set<string>(otherRoleOptions);
+    ["Intern", "Trainee", "Junior Employee", "Employee", "Manager", "Tester", "Junior HR"].forEach((label) => labels.add(label));
+    return Array.from(labels).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  }, [otherRoleOptions]);
+
+  useEffect(() => {
+    if (modalRole !== "others") {
+      setSelectedOtherRole("all");
+      return;
+    }
+
+    if (selectedOtherRole !== "all" && !otherRoleOptions.includes(selectedOtherRole)) {
+      setSelectedOtherRole(otherRoleOptions[0] ?? "all");
+    }
+  }, [modalRole, otherRoleOptions, selectedOtherRole]);
+
+  useEffect(() => {
+    if (!modalRole) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setModalRole(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [modalRole]);
+
+  const canEditOthersRole = actorRole === "human-resource";
+
+  const modalMembers = modalRole
+    ? members.filter((m) => {
+        if (String(m.role ?? "") !== modalRole) return false;
+        if (modalRole === "others" && selectedOtherRole !== "all") {
+          return String(m.customRole ?? "").trim() === selectedOtherRole;
+        }
+        return true;
+      })
+    : [];
+
+  async function sendMeetingInvite(memberId: string) {
+    try {
+      setInvitingFor(memberId);
+      await apiFetch("/api/hr/meeting-invite", {
+        method: "POST",
+        body: JSON.stringify({ memberId, durationMinutes: meetingDuration }),
+      });
+      showToast("Meeting invite sent.");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Could not send invite.", "error");
+    } finally {
+      setInvitingFor(null);
+    }
+  }
+
+  function requestFire(member: AnyRecord) {
+    setFireConfirmText("");
+    setFireConfirmMember(member);
+  }
+
+  async function confirmFire() {
+    const member = fireConfirmMember;
+    const memberId = String(member?.id ?? "");
+    if (!memberId) return;
+    if (String(fireConfirmText ?? "").trim().toUpperCase() !== "FIRE") {
+      showToast("Type FIRE to confirm.", "error");
+      return;
+    }
+    try {
+      setFiringFor(memberId);
+      await apiFetch("/api/hr/fire", {
+        method: "POST",
+        body: JSON.stringify({ memberId }),
+      });
+      showToast("Member removed.");
+      setFireConfirmMember(null);
+      setModalRole(null);
+      await refresh(true);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Could not remove member.", "error");
+    } finally {
+      setFiringFor(null);
+    }
+  }
+
+  function displayMemberRole(member: AnyRecord) {
+    return formatRoleWithCustom(String(member.role ?? "employee"), member.customRole);
+  }
+
+  function roleDraftFor(member: AnyRecord) {
+    const memberId = String(member.id ?? "");
+    if (roleDrafts[memberId] !== undefined) return roleDrafts[memberId];
+    return String(member.customRole ?? "");
+  }
+
+  async function saveCustomRole(member: AnyRecord) {
+    if (!canEditOthersRole) {
+      showToast("Only HR can update role labels.", "error");
+      return;
+    }
+
+    const memberId = String(member.id ?? "");
+    if (!memberId) return;
+    try {
+      setSavingRoleFor(memberId);
+      await apiFetch("/api/hr/member-role", {
+        method: "PATCH",
+        body: JSON.stringify({
+          memberId,
+          customRole: roleDraftFor(member),
+        }),
+      });
+      showToast("Role label updated.");
+      await refresh(true);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to update role label.", "error");
+    } finally {
+      setSavingRoleFor(null);
+    }
+  }
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h3 className="text-xl font-semibold">Members</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            Click a role to view people and send a meeting invite. Invites notify the member in Notifications.
+          </p>
+          {actorRole === "admin" ? (
+            <p className="mt-1 text-xs text-slate-400">Admin view uses the same member tools as HR.</p>
+          ) : null}
+        </div>
+        <div className="rounded-lg bg-slate-50 px-4 py-3 text-right">
+          <p className="text-xs font-semibold uppercase text-slate-500">Total members</p>
+          <p className="text-2xl font-semibold">{Number(hr?.totalMembers ?? members.length)}</p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        {HR_MEMBER_ROLE_KEYS.map((roleName) => {
+          const count = Number(roleCounts[roleName] ?? 0);
+          return (
+            <button
+              className="rounded-lg border border-transparent bg-slate-50 px-3 py-2 text-left transition hover:border-slate-200 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+              key={roleName}
+              type="button"
+              onClick={() => {
+                setModalRole(roleName);
+                setMeetingDuration(30);
+              }}
+            >
+              <p className="text-xs font-medium text-slate-500">{formatRole(roleName)}</p>
+              <p className="text-lg font-semibold">{count}</p>
+              <p className="mt-0.5 text-[11px] text-slate-400">View & invite</p>
+            </button>
+          );
+        })}
+      </div>
+
+      {members.length === 0 ? (
+        <p className="mt-5 rounded-lg bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">
+          No approved company members yet.
+        </p>
+      ) : null}
+
+      {modalRole ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setModalRole(null);
+          }}
+        >
+          <div
+            className="max-h-[min(90vh,720px)] w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="members-modal-title"
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+              <div>
+                <h4 className="text-xl font-semibold" id="members-modal-title">
+                  {formatRole(modalRole)}
+                </h4>
+                <p className="text-sm text-slate-500">
+                  {modalMembers.length} member{modalMembers.length === 1 ? "" : "s"}
+                </p>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="min-w-[260px]">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Meeting Time In</p>
+                  <select
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                    value={meetingDuration}
+                    onChange={(e) => setMeetingDuration(Number(e.target.value))}
+                  >
+                    {MEETING_DURATION_OPTIONS.map((opt) => (
+                      <option key={opt.minutes} value={opt.minutes}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  aria-label="Close"
+                  className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
+                  type="button"
+                  onClick={() => setModalRole(null)}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+            {modalRole === "others" ? (
+              <div className="border-b border-slate-100 px-6 py-4">
+                <label className="text-xs font-semibold uppercase text-slate-500" htmlFor="others-role-filter">
+                  Filter others by label
+                </label>
+                <select
+                  id="others-role-filter"
+                  className="mt-2 w-full max-w-xs rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                  value={selectedOtherRole}
+                  onChange={(e) => setSelectedOtherRole(e.target.value)}
+                >
+                  <option value="all">All others</option>
+                  {otherRoleOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+
+            <div className="max-h-[min(55vh,420px)] overflow-y-auto px-6 py-4">
+              {modalMembers.length === 0 ? (
+                <p className="py-8 text-center text-sm text-slate-500">No members in this role.</p>
+              ) : (
+                <ul className="space-y-4">
+                  {modalMembers.map((member) => {
+                    const memberId = String(member.id);
+                    const teams = Array.isArray(member.teams) ? member.teams.map(String) : [];
+                    const isSelf = selfId && memberId === selfId;
+                    const joinedBy = member.joinedBy && typeof member.joinedBy === "object" ? (member.joinedBy as AnyRecord) : null;
+                    return (
+                      <li
+                        className="rounded-xl border border-slate-200 bg-white p-4"
+                        key={memberId}
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <p className="font-semibold">{String(member.name ?? "Member")}</p>
+                            <p className="truncate text-sm text-slate-500">{String(member.email ?? "")}</p>
+                            {joinedBy?.name ? (
+                              <p className="mt-1 text-xs text-slate-500">
+                                Joined by{" "}
+                                <span className="font-medium text-slate-700">{String(joinedBy.name)}</span>
+                              </p>
+                            ) : null}
+                          </div>
+
+                          <div className="grid items-center gap-2">
+                            <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
+                              role: {displayMemberRole(member)}
+                            </span>
+                            <span
+                              className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700"
+                              title={teams.length ? teams.join(", ") : "No team joined"}
+                            >
+                              team: {teams.length ? teams.join(", ") : "-"}
+                            </span>
+                          </div>
+
+                          {String(member.role ?? "") === "others" && canEditOthersRole ? (
+                            <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 sm:col-span-3">
+                              <p className="text-xs font-semibold uppercase text-slate-500">Role label</p>
+                              <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
+                                <select
+                                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                                  value={roleDraftFor(member)}
+                                  onChange={(event) =>
+                                    setRoleDrafts((current) => ({
+                                      ...current,
+                                      [memberId]: event.target.value,
+                                    }))
+                                  }
+                                >
+                                  <option value="">Select custom role</option>
+                                  {otherRoleSelectOptions.map((option) => (
+                                    <option key={option} value={option}>
+                                      {option}
+                                    </option>
+                                  ))}
+                                  {roleDraftFor(member) && !otherRoleSelectOptions.includes(roleDraftFor(member)) ? (
+                                    <option value={roleDraftFor(member)}>{roleDraftFor(member)}</option>
+                                  ) : null}
+                                </select>
+                                <button
+                                  className="rounded-lg bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                  disabled={savingRoleFor === memberId || !String(roleDraftFor(member)).trim()}
+                                  type="button"
+                                  onClick={() => void saveCustomRole(member)}
+                                >
+                                  {savingRoleFor === memberId ? "Saving..." : "Save role"}
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
+
+                          <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+                            <button
+                              className="rounded-lg bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                              disabled={!!isSelf || invitingFor === memberId}
+                              type="button"
+                              onClick={() => void sendMeetingInvite(memberId)}
+                            >
+                              {invitingFor === memberId ? "Sending…" : "Invite to meet"}
+                            </button>
+                            <button
+                              className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              disabled={!!isSelf || firingFor === memberId}
+                              type="button"
+                              onClick={() => requestFire(member)}
+                            >
+                              {firingFor === memberId ? "Removing…" : "Fire"}
+                            </button>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {fireConfirmMember ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setFireConfirmMember(null);
+          }}
+        >
+          <div
+            className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="fire-modal-title"
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-6 py-4">
+              <div>
+                <h4 className="text-lg font-semibold text-rose-700" id="fire-modal-title">
+                  Fire member
+                </h4>
+                <p className="mt-1 text-sm text-slate-600">
+                  This will remove the member from the company, teams, and boards.
+                </p>
+              </div>
+              <button
+                aria-label="Close"
+                className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
+                type="button"
+                onClick={() => setFireConfirmMember(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="px-6 py-5">
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                <p className="text-sm font-semibold text-rose-800">
+                  You are about to fire{" "}
+                  <span className="font-extrabold">
+                    {String(fireConfirmMember.name ?? "Member")}
+                  </span>
+                </p>
+                <p className="mt-1 text-sm text-rose-700">
+                  Type <span className="font-bold">FIRE</span> to confirm.
+                </p>
+              </div>
+
+              <input
+                className="mt-4 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                placeholder="Type FIRE to confirm"
+                value={fireConfirmText}
+                onChange={(e) => setFireConfirmText(e.target.value)}
+              />
+
+              <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
+                <button
+                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  type="button"
+                  onClick={() => setFireConfirmMember(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={
+                    firingFor === String(fireConfirmMember.id ?? "") ||
+                    String(fireConfirmText ?? "").trim().toUpperCase() !== "FIRE"
+                  }
+                  type="button"
+                  onClick={() => void confirmFire()}
+                >
+                  {firingFor === String(fireConfirmMember.id ?? "") ? "Removing…" : "Confirm fire"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function MessagesTab({
+  showToast,
+}: {
+  showToast: (text: string, type?: 'success' | 'error') => void;
+}) {
+  const [members, setMembers] = useState<AnyRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState<"normal" | "bulk">("normal");
+  const [chatMember, setChatMember] = useState<AnyRecord | null>(null);
+  const [chatMessage, setChatMessage] = useState("");
+  const [sendingChat, setSendingChat] = useState(false);
+  const [bulkMessage, setBulkMessage] = useState("");
+  const [bulkSelected, setBulkSelected] = useState<Record<string, boolean>>({});
+  const [sendingBulk, setSendingBulk] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    apiFetch<{ members: AnyRecord[] }>("/api/messages")
+      .then((result) => {
+        if (mounted) setMembers(result.members ?? []);
+      })
+      .catch(() => {
+        if (mounted) setMembers([]);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setChatMember(null);
+    }
+    if (!chatMember) return;
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [chatMember]);
+
+  const membersById = useMemo(() => {
+    const map = new Map<string, AnyRecord>();
+    members.forEach((m) => {
+      const id = String(m.id ?? m._id ?? "");
+      if (id) map.set(id, m);
+    });
+    return map;
+  }, [members]);
+
+  const bulkSelectedIds = useMemo(() => {
+    return Object.keys(bulkSelected).filter((id) => bulkSelected[id] && membersById.has(id));
+  }, [bulkSelected, membersById]);
+
+  function toggleBulkSelected(memberId: string) {
+    setBulkSelected((current) => ({ ...current, [memberId]: !current[memberId] }));
+  }
+
+  async function sendChat() {
+    const recipientId = String(chatMember?.id ?? chatMember?._id ?? "");
+    const message = String(chatMessage ?? "").trim();
+    if (!recipientId) return;
+    if (!message) {
+      showToast("Write a message first.", "error");
+      return;
+    }
+    try {
+      setSendingChat(true);
+      await apiFetch("/api/messages", {
+        method: "POST",
+        body: JSON.stringify({ recipientId, message }),
+      });
+      setChatMessage("");
+      setChatMember(null);
+      showToast("Message sent.");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to send message.", "error");
+    } finally {
+      setSendingChat(false);
+    }
+  }
+
+  async function sendBulk() {
+    const message = String(bulkMessage ?? "").trim();
+    if (!message) {
+      showToast("Write a message first.", "error");
+      return;
+    }
+    if (bulkSelectedIds.length === 0) {
+      showToast("Select at least one user.", "error");
+      return;
+    }
+    try {
+      setSendingBulk(true);
+      await Promise.all(
+        bulkSelectedIds.map((recipientId) =>
+          apiFetch("/api/messages", {
+            method: "POST",
+            body: JSON.stringify({ recipientId, message }),
+          }),
+        ),
+      );
+      setBulkMessage("");
+      setBulkSelected({});
+      showToast(`Message sent to ${bulkSelectedIds.length} user(s).`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to send bulk message.", "error");
+    } finally {
+      setSendingBulk(false);
+    }
+  }
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-xl font-semibold">Messages</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            Send a message to anyone in your company.
+          </p>
+        </div>
+        <span className="rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600">
+          {members.length} members
+        </span>
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+          <button
+            className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+              mode === "normal" ? "bg-slate-950 text-white" : "text-slate-700 hover:bg-slate-50"
+            }`}
+            type="button"
+            onClick={() => setMode("normal")}
+          >
+            Normal messages
+          </button>
+          <button
+            className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+              mode === "bulk" ? "bg-slate-950 text-white" : "text-slate-700 hover:bg-slate-50"
+            }`}
+            type="button"
+            onClick={() => setMode("bulk")}
+          >
+            Bulk messages
+          </button>
+        </div>
+
+        {mode === "bulk" ? (
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <span className="rounded-lg bg-slate-50 px-3 py-2">
+              Selected: <span className="font-semibold text-slate-900">{bulkSelectedIds.length}</span>
+            </span>
+            <button
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              disabled={bulkSelectedIds.length === 0}
+              type="button"
+              onClick={() => setBulkSelected({})}
+            >
+              Clear
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      {mode === "bulk" ? (
+        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <p className="text-sm font-semibold text-slate-900">Bulk message</p>
+          <p className="mt-1 text-sm text-slate-500">
+            Write one message, then click users below to send.
+          </p>
+          <textarea
+            className="mt-3 min-h-28 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+            placeholder="Type your bulk message…"
+            value={bulkMessage}
+            onChange={(e) => setBulkMessage(e.target.value)}
+          />
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-slate-500">
+              Tip: click user cards to select/unselect.
+            </p>
+            <button
+              className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={sendingBulk || bulkSelectedIds.length === 0 || String(bulkMessage ?? "").trim().length === 0}
+              type="button"
+              onClick={() => void sendBulk()}
+            >
+              {sendingBulk ? "Sending…" : "Send to selected"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mt-5 space-y-3">
+        {members.map((member) => {
+          const memberId = String(member.id ?? member._id ?? "");
+          const name = String(member.name ?? "Member");
+          const role = formatRole(String(member.role ?? "employee"));
+          const email = String(member.email ?? "");
+          const teamsRaw = Array.isArray(member.teams) ? member.teams.map(String) : [];
+          const teamLabel = teamsRaw.length ? teamsRaw.join(", ") : "No team joined";
+          const isSelected = !!bulkSelected[memberId];
+
+          return (
+            <button
+              className={`w-full rounded-lg border p-4 text-left transition ${
+                mode === "bulk"
+                  ? isSelected
+                    ? "border-slate-900 bg-slate-950 text-white"
+                    : "border-slate-200 bg-white hover:bg-slate-50"
+                  : "border-slate-200 bg-white hover:bg-slate-50"
+              }`}
+              key={memberId}
+              type="button"
+              onClick={() => {
+                if (mode === "bulk") {
+                  toggleBulkSelected(memberId);
+                } else {
+                  setChatMember(member);
+                  setChatMessage("");
+                }
+              }}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className={`font-semibold ${mode === "bulk" && isSelected ? "text-white" : "text-slate-900"}`}>
+                    {name}
+                  </p>
+                  <p className={`text-sm ${mode === "bulk" && isSelected ? "text-white/70" : "text-slate-500"}`}>
+                    {email}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-medium ${
+                      mode === "bulk" && isSelected
+                        ? "bg-white/10 text-white"
+                        : "bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    {role}
+                  </span>
+
+                  <span
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${
+                      mode === "bulk" && isSelected
+                        ? "border-white/20 bg-white/10 text-white"
+                        : "border-slate-200 bg-white text-slate-700"
+                    }`}
+                    title={teamLabel}
+                  >
+                    Team: {teamLabel}
+                  </span>
+
+                  {mode === "normal" ? (
+                    <span className="inline-flex items-center rounded-lg bg-slate-950 px-3 py-2 text-xs font-semibold text-white">
+                      Chat
+                    </span>
+                  ) : (
+                    <span
+                      className={`inline-flex items-center rounded-lg px-3 py-2 text-xs font-semibold ${
+                        isSelected ? "bg-white text-slate-950" : "bg-slate-950 text-white"
+                      }`}
+                    >
+                      {isSelected ? "Selected" : "Select"}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </button>
+          );
+        })}
+
+        {!loading && members.length === 0 ? (
+          <p className="rounded-lg bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">
+            No other approved company members yet.
+          </p>
+        ) : null}
+        {loading ? (
+          <p className="rounded-lg bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">
+            Loading company members...
+          </p>
+        ) : null}
+      </div>
+
+      {chatMember ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setChatMember(null);
+          }}
+        >
+          <div
+            className="w-full max-w-lg overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="chat-modal-title"
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+              <div>
+                <h4 className="text-lg font-semibold" id="chat-modal-title">
+                  Chat
+                </h4>
+                <p className="text-sm text-slate-500">
+                  To{" "}
+                  <span className="font-medium text-slate-900">
+                    {String(chatMember.name ?? "Member")}
+                  </span>{" "}
+                  • {formatRole(String(chatMember.role ?? "employee"))}
+                </p>
+              </div>
+              <button
+                aria-label="Close"
+                className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
+                type="button"
+                onClick={() => setChatMember(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="px-5 py-4">
+              <textarea
+                className="min-h-32 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                placeholder="Type your message…"
+                value={chatMessage}
+                onChange={(e) => setChatMessage(e.target.value)}
+              />
+              <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+                <button
+                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  type="button"
+                  onClick={() => setChatMember(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={sendingChat || String(chatMessage ?? "").trim().length === 0}
+                  type="button"
+                  onClick={() => void sendChat()}
+                >
+                  {sendingChat ? "Sending…" : "Send"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -3105,6 +4701,7 @@ function CodePanel({
   label,
   secondaryCodes = [],
   empty,
+  showToast,
   children,
 }: {
   title: string;
@@ -3112,12 +4709,18 @@ function CodePanel({
   label: string;
   secondaryCodes?: { code: string; label: string }[];
   empty: string;
+  showToast?: (text: string, type?: 'success' | 'error') => void;
   children?: ReactNode;
 }) {
   const makeJoinUrl = (value: string) =>
     typeof window !== "undefined"
       ? `${window.location.origin}/join?code=${value}`
       : value;
+  const codes = [
+    code ? { code, label } : null,
+    ...secondaryCodes,
+  ].filter(Boolean) as { code: string; label: string }[];
+
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-center gap-2">
@@ -3126,10 +4729,11 @@ function CodePanel({
           {title}
         </h3>
       </div>
-      {code ? (
+      {codes.length > 0 ? (
         <>
-          {[{ code, label }, ...secondaryCodes].map((item) => (
-            <div className="mb-3 last:mb-0" key={item.code}>
+          <div className={codes.length > 1 ? "grid gap-3 md:grid-cols-2" : "space-y-3"}>
+            {codes.map((item) => (
+            <div key={item.code}>
               <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4">
                 <p className="text-xs font-semibold uppercase text-slate-500">
                   {item.label}
@@ -3141,7 +4745,10 @@ function CodePanel({
                   <button
                     aria-label={`Copy ${item.label}`}
                     className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                    onClick={() => navigator.clipboard.writeText(item.code)}
+                    onClick={() => {
+                      navigator.clipboard.writeText(item.code);
+                      showToast?.(`${item.label} copied.`);
+                    }}
                     title="Copy code"
                     type="button"
                   >
@@ -3151,7 +4758,10 @@ function CodePanel({
               </div>
               <button
                 className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-100 px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-sky-200"
-                onClick={() => navigator.clipboard.writeText(makeJoinUrl(item.code))}
+                onClick={() => {
+                  navigator.clipboard.writeText(makeJoinUrl(item.code));
+                  showToast?.(`${item.label} join URL copied.`);
+                }}
                 type="button"
               >
                 <Users size={16} />
@@ -3159,6 +4769,7 @@ function CodePanel({
               </button>
             </div>
           ))}
+          </div>
           <p className="mt-3 text-xs text-slate-500">
             Share this code or join link with your staff.
           </p>
@@ -3178,6 +4789,7 @@ function JoinPanel({
   onChange,
   onSubmit,
   status,
+  onCancelRequest,
 }: {
   title: string;
   placeholder: string;
@@ -3185,7 +4797,9 @@ function JoinPanel({
   onChange: (value: string) => void;
   onSubmit: (event: FormEvent) => void;
   status?: string;
+  onCancelRequest?: () => void;
 }) {
+  const isPending = String(status ?? "") === "pending";
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <h3 className="text-lg font-semibold">{title}</h3>
@@ -3199,10 +4813,22 @@ function JoinPanel({
           value={value}
           onChange={(event) => onChange(event.target.value)}
         />
-        <button className="w-full rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white">
-          Request approval
+        <button
+          className="w-full rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={isPending}
+        >
+          {isPending ? "Requested" : "Request approval"}
         </button>
       </form>
+      {isPending && onCancelRequest ? (
+        <button
+          className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          type="button"
+          onClick={onCancelRequest}
+        >
+          Cancel Request
+        </button>
+      ) : null}
       {status && status !== "none" ? (
         <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
           Current status: {status}
@@ -3225,6 +4851,25 @@ function displayNested(value: unknown, key: string, fallback: string) {
   if (!value || typeof value !== "object") return fallback;
   const record = value as Record<string, unknown>;
   return record[key] ? String(record[key]) : fallback;
+}
+
+function formatRole(role: string) {
+  const labels: Record<string, string> = {
+    "human-resource": "Human Resource",
+    "project-manager": "Project Manager",
+    "qa-tester": "Q-A Tester",
+    employee: "Employee",
+    admin: "Admin",
+    others: "Others",
+  };
+  return labels[role] ?? role;
+}
+
+function formatRoleWithCustom(role: string, customRole: unknown) {
+  const baseRole = formatRole(role);
+  const label = String(customRole ?? "").trim();
+  if (role === "others" && label) return `${baseRole} | ${label}`;
+  return baseRole;
 }
 
 function AvatarBadge({
@@ -3352,4 +4997,3 @@ function loadData() {
 function showToast(arg0: string, p0: string) {
   throw new Error("Function not implemented.");
 }
-

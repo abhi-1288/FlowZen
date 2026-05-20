@@ -6,16 +6,41 @@ import { JoinRequest } from "@/models/JoinRequest";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
+import { findApprovedHrUserIdByInviteSuffix, resolveCompanyJoinApproverId, stripHrInviteSuffix } from "@/lib/join-approvers";
+
+function roleForCompanyCode(company: any, code: string, baseCode: string) {
+  const matches = (stored: unknown) => {
+    const value = String(stored ?? "").toUpperCase();
+    if (!value) return false;
+    return code === value || baseCode === value || code.startsWith(`${value}-HR`);
+  };
+
+  if (matches(company.managerJoinCode)) return "project-manager";
+  if (matches(company.testerJoinCode)) return "qa-tester";
+  if (matches(company.employeeJoinCode)) return "employee";
+  if (matches(company.otherJoinCode)) return "others";
+  if (matches(company.hrJoinCode) || matches(company.joinCode)) return "human-resource";
+  return null;
+}
+
+function joinTitleForRole(role: string) {
+  if (role === "human-resource") return "HR join request";
+  if (role === "project-manager") return "Manager join request";
+  if (role === "qa-tester") return "Tester join request";
+  if (role === "employee") return "Employee join request";
+  return "Others join request";
+}
 
 export async function POST(request: Request) {
   const userId = await requireUserId();
   if (!userId) return jsonError("Unauthorized", 401);
 
   const body = await request.json();
-  const code = String(body.code ?? "").trim().toUpperCase();
-  if (!code) return jsonError("Company code is required.");
-  const isSuffixedCompanyCode = /^CO-.+-\d+$/.test(code);
-  const baseCode = isSuffixedCompanyCode ? code.replace(/-\d+$/, "") : code;
+  const rawCode = String(body.code ?? "").trim().toUpperCase();
+  if (!rawCode) return jsonError("Company code is required.");
+  const { baseCode: withoutHrSuffix, hrSuffix } = stripHrInviteSuffix(rawCode);
+  const isSuffixedCompanyCode = /^CO-.+-\d+$/.test(withoutHrSuffix);
+  const baseCode = isSuffixedCompanyCode ? withoutHrSuffix.replace(/-\d+$/, "") : withoutHrSuffix;
 
   try {
     await connectDb();
@@ -27,17 +52,24 @@ export async function POST(request: Request) {
 
   const [user, company] = await Promise.all([
     User.findById(userId),
-    Company.findOne({ $or: [{ joinCode: code }, { joinCode: baseCode }, { otherJoinCode: code }] })
+    Company.findOne({
+      $or: [
+        { joinCode: withoutHrSuffix },
+        { joinCode: baseCode },
+        { hrJoinCode: withoutHrSuffix },
+        { managerJoinCode: withoutHrSuffix },
+        { testerJoinCode: withoutHrSuffix },
+        { employeeJoinCode: withoutHrSuffix },
+        { otherJoinCode: withoutHrSuffix },
+      ]
+    })
   ]);
   if (!user) return jsonError("User not found.", 404);
   if (!company) return jsonError("Invalid company code.", 404);
-  const isOtherCode = isSuffixedCompanyCode || String(company.otherJoinCode ?? "") === code;
-  if (isOtherCode) {
-    if (user.role !== "others") {
-      return jsonError("This company code is for Others role users.", 403);
-    }
-  } else if (!["project-manager", "qa-tester"].includes(String(user.role))) {
-    return jsonError("Company code onboarding is for project managers or Q-A testers.", 403);
+  const codeRole = roleForCompanyCode(company, rawCode, baseCode);
+  if (!codeRole) return jsonError("Invalid company code.", 404);
+  if (String(user.role) !== codeRole) {
+    return jsonError(`This company code is for ${joinTitleForRole(codeRole).replace(" join request", "")} role users.`, 403);
   }
   const isAlreadyMember = company.members?.some((memberId: { toString: () => string }) => String(memberId) === userId);
   if (isAlreadyMember || (String(user.company ?? "") === String(company._id) && user.companyStatus === "approved")) {
@@ -50,16 +82,52 @@ export async function POST(request: Request) {
     kind: "company",
     status: "pending"
   });
+  const invitedHrId =
+    hrSuffix && ["project-manager", "qa-tester", "employee", "others"].includes(codeRole)
+      ? await findApprovedHrUserIdByInviteSuffix(company._id, hrSuffix)
+      : null;
+  const approverId = invitedHrId ?? (await resolveCompanyJoinApproverId(company, codeRole));
+  const approvalNotifier: "hr" | "admin" =
+    approverId === String(company.owner) ? "admin" : "hr";
+
   if (existingPendingRequest) {
     user.company = company._id;
     user.companyStatus = "pending";
     await user.save();
-    return NextResponse.json({ request: serializeDoc(existingPendingRequest), status: "requested" });
+
+    await JoinRequest.updateOne(
+      { _id: existingPendingRequest._id },
+      { $set: { approver: approverId } },
+    );
+
+    const refreshedRequest = await JoinRequest.findById(existingPendingRequest._id);
+
+    await Notification.create({
+      user: approverId,
+      company: company._id,
+      type: "approval",
+      title: joinTitleForRole(codeRole),
+      message: `${user.name} requested approval to join ${company.name}.`
+    });
+    emitNotification(String(approverId));
+
+    return NextResponse.json({
+      request: serializeDoc(refreshedRequest ?? existingPendingRequest),
+      status: "requested",
+      approvalNotifier,
+    });
   }
 
   const joinRequest = await JoinRequest.findOneAndUpdate(
     { requester: userId, company: company._id, kind: "company", status: "pending" },
-    { $setOnInsert: { requester: userId, approver: company.owner, company: company._id, kind: "company" } },
+    {
+      $set: { approver: approverId },
+      $setOnInsert: {
+        requester: userId,
+        company: company._id,
+        kind: "company",
+      },
+    },
     { new: true, upsert: true }
   );
 
@@ -68,13 +136,16 @@ export async function POST(request: Request) {
   await user.save();
 
   await Notification.create({
-    user: company.owner,
+    user: approverId,
     company: company._id,
     type: "approval",
-    title: isOtherCode ? "Others join request" : "Manager join request",
+    title: joinTitleForRole(codeRole),
     message: `${user.name} requested approval to join ${company.name}.`
   });
-  emitNotification(String(company.owner));
+  emitNotification(String(approverId));
 
-  return NextResponse.json({ request: serializeDoc(joinRequest), status: "requested" }, { status: 201 });
+  return NextResponse.json(
+    { request: serializeDoc(joinRequest), status: "requested", approvalNotifier },
+    { status: 201 },
+  );
 }

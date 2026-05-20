@@ -1,5 +1,5 @@
 export type Role = "admin" | "manager" | "employee" | "tester" | "others";
-export type UserRole = "employee" | "project-manager" | "qa-tester" | "admin" | "others";
+export type UserRole = "employee" | "project-manager" | "qa-tester" | "human-resource" | "admin" | "others";
 export type Priority = "low" | "medium" | "high";
 
 export type Board = {

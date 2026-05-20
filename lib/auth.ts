@@ -103,7 +103,7 @@ export const authOptions: NextAuthOptions = {
       const provider = account.provider === "azure-ad" ? "microsoft" : account.provider;
       const existing = await User.findOne({ email: user.email.toLowerCase() });
 
-      if (existing && existing.role !== "project-manager" && existing.role !== "qa-tester") {
+      if (existing && existing.role !== "project-manager" && existing.role !== "qa-tester" && existing.role !== "human-resource") {
         return false;
       }
 
@@ -142,7 +142,18 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user && token.sub) {
         session.user.id = token.sub;
-        session.user.role = token.role as "employee" | "project-manager" | "qa-tester" | "admin" | undefined;
+        session.user.role = token.role as "employee" | "project-manager" | "qa-tester" | "human-resource" | "admin" | "others" | undefined;
+        
+        try {
+          await connectDb();
+          const user = await User.findById(token.sub).populate("company", "name").populate("team", "name");
+          if (user) {
+            session.user.company = (user.company as any)?.name || null;
+            session.user.team = (user.team as any)?.name || null;
+          }
+        } catch (error) {
+          console.error("Failed to fetch company/team in session:", error);
+        }
       }
       return session;
     }

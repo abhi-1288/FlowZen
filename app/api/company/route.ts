@@ -33,7 +33,6 @@ export async function POST(request: Request) {
     name,
     owner: userId,
     joinCode,
-    otherJoinCode: createRoleJoinCode(joinCode),
     members: [userId]
   });
 

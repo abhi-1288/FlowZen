@@ -118,6 +118,7 @@ export function LandingPage() {
 
       {/* Navigation */}
       <motion.nav
+        aria-label="Primary navigation"
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
@@ -175,7 +176,7 @@ export function LandingPage() {
                 </motion.h1>
 
                 <motion.p variants={itemVariants} className="text-xl md:text-2xl text-slate-400 mb-12 max-w-3xl mx-auto leading-relaxed">
-                  FlowZen is the beautiful, real-time workspace where projects actually get done. Build workflows, assign roles, and watch productivity soar.
+                  FlowZen is the real-time workflow platform where teams manage tasks, approvals, and roles in one beautifully animated workspace.
                 </motion.p>
 
                 <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto">
@@ -410,9 +411,9 @@ export function LandingPage() {
               <ul className="space-y-5">
                 {[
                   "Instant websocket-powered updates",
-                  "Advanced team role management",
-                  "Beautiful dark-mode first design",
-                  "Secure and scalable infrastructure"
+                  "Role-based approvals and permissions",
+                  "Drag-and-drop boards with task workflows",
+                  "Secure auth and audit-ready notifications"
                 ].map((item, i) => (
                   <motion.li
                     key={i}
@@ -523,3 +524,5 @@ export function LandingPage() {
     </div>
   );
 }
+
+export default LandingPage;

@@ -42,8 +42,9 @@ export function BoardShell({ boardId }: { boardId?: string }) {
         return mUserId === session?.user?.id;
       });
 
-      if (filter === "assigned") return !isOwner && memberInfo?.assignedTo;
-      if (filter === "invited") return !isOwner && !memberInfo?.assignedTo;
+      const isAssignedMember = Boolean(memberInfo?.assignedTo) || ["manager", "tester"].includes(String(memberInfo?.role));
+      if (filter === "assigned") return !isOwner && isAssignedMember;
+      if (filter === "invited") return !isOwner && !isAssignedMember;
       return true;
     });
   }, [boards, filter, session?.user?.id]);
@@ -154,6 +155,11 @@ export function BoardShell({ boardId }: { boardId?: string }) {
                 <h1 className="text-xl font-bold tracking-tight">FlowZen</h1>
               </div>
               <p className="mt-1 text-sm text-slate-500 capitalize">{session?.user?.name} &bull; {session?.user?.role}</p>
+              <p className="mt-1 text-sm text-slate-500">
+                {session?.user?.company ? session?.user?.company : 'Unemployed'}
+                <span className="mx-1">•</span>
+                {session?.user?.team ? `${session.user.team}` : 'No Team'}
+              </p>
             </div>
             <button
               aria-label="Sign out"
