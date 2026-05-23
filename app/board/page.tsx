@@ -1,5 +1,5 @@
-import { BoardShell } from "@/components/boards/board-shell";
+import { BoardClient } from "./board-client";
 
 export default function BoardsPage() {
-  return <BoardShell />;
+  return <BoardClient />;
 }

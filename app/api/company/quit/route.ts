@@ -60,12 +60,20 @@ export async function POST(request: Request) {
   if (existing) return jsonError("Quit request already pending.", 409);
 
   const assignedBoards = await Board.find({
-    members: {
-      $elemMatch: {
-        user: user._id,
-        assignedTo: { $ne: null }
-      }
-    }
+    $or: [
+      { "members.assignedTo": user._id },
+      {
+        members: {
+          $elemMatch: {
+            user: user._id,
+            $or: [
+              { assignedTo: { $ne: null } },
+              { role: { $in: ["manager", "tester"] } }
+            ]
+          },
+        },
+      },
+    ],
   }, "title");
   const boardTitles = assignedBoards.map((board) => board.title).filter(Boolean);
   const assignedMessage = boardTitles.length
@@ -99,6 +107,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
+  let replacement: any = null;
   if (role === "project-manager" || role === "qa-tester") {
     replacementUserId = String((body as any).replacementUserId ?? "").trim();
     if (!replacementUserId) {
@@ -107,7 +116,7 @@ export async function POST(request: Request) {
     if (replacementUserId === String(user._id)) {
       return jsonError("Replacement cannot be yourself.", 400);
     }
-    const replacement = await User.findById(replacementUserId).select("company role companyStatus");
+    replacement = await User.findById(replacementUserId).select("company role companyStatus name");
     if (!replacement) return jsonError("Replacement user not found.", 404);
     if (
       String(replacement.company ?? "") !== String(company._id) ||
@@ -150,6 +159,51 @@ export async function POST(request: Request) {
     })),
   );
   hrIds.forEach((id) => emitNotification(String(id)));
+
+  if (replacementUserId) {
+    const admin = await User.findOne({
+      company: company._id,
+      role: "admin",
+      companyStatus: "approved",
+    }).select("_id name");
+    const adminId = admin?._id ?? company.owner;
+    if (adminId) {
+      await JoinRequest.create({
+        requester: user._id,
+        approver: adminId,
+        company: user.company,
+        kind: "quit-company-board-transfer",
+        replacementUser: replacementUserId,
+      });
+
+      const boardLabel = boardTitles.length > 1 ? "boards were" : "board was";
+      const assignedReplacementLabel = replacement?.role
+        ? `a ${replacement.role}: ${replacement.name}`
+        : `a replacement: ${replacement?.name ?? "replacement"}`;
+
+      await Notification.create({
+        user: adminId,
+        company: user.company,
+        type: "approval",
+        title: "Role transfer approval",
+        message: boardTitles.length > 0 
+          ? `${user.name}, ${user.role} is quitting from ${company.name}, the assigned ${boardLabel} ${boardTitles.join(", ")}, and assigned ${assignedReplacementLabel}`
+          : `${user.name}, ${user.role} is quitting from ${company.name}, and assigned ${assignedReplacementLabel}`,
+      });
+      emitNotification(String(adminId));
+
+      await Notification.create({
+        user: replacementUserId,
+        company: user.company,
+        type: "info",
+        title: "Role transfer assigned",
+        message: boardTitles.length > 0 
+          ? `You were assigned to take over ${boardLabel} ${boardTitles.join(", ")} from ${user.name} as a ${replacement?.role ?? role}. Await admin approval to complete the transfer.`
+          : `You were assigned to take over as a ${replacement?.role ?? role} from ${user.name}. Await admin approval to complete the transfer.`,
+      });
+      emitNotification(String(replacementUserId));
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }

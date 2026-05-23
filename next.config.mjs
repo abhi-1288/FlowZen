@@ -1,8 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    // turbopack: {
-    //     root: __dirname,
-    // },
+    experimental: {
+        optimizePackageImports: ['lucide-react', 'react-icons', 'date-fns', 'framer-motion'],
+    },
 };
 
 export default nextConfig;

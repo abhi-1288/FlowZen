@@ -1,4 +1,4 @@
-import { ProfileHub } from "@/components/profile/profile-hub";
+import { ProfileClient } from "./profile-client";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -6,5 +6,5 @@ export const metadata: Metadata = {
 };
 
 export default function ProfilePage() {
-  return <ProfileHub />;
+  return <ProfileClient />;
 }

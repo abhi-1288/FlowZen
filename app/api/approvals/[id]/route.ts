@@ -7,6 +7,7 @@ import { Notification } from "@/models/Notification";
 import { Team } from "@/models/Team";
 import { Board } from "@/models/Board";
 import { User } from "@/models/User";
+import { Task } from "@/models/Task";
 import { emitNotification } from "@/lib/realtime";
 
 type Params = { params: Promise<{ id: string }> };
@@ -28,6 +29,98 @@ async function cleanupQuitterBoardAssignments(userId: any) {
     { $set: { "members.$[m].assignedTo": null } },
     { arrayFilters: [{ "m.assignedTo": userId }] },
   );
+}
+
+async function transferQuitterBoardAssignments(userId: any, replacementUserId: any) {
+  const assignedBoards = await Board.find({
+    $or: [
+      { "members.assignedTo": userId },
+      {
+        members: {
+          $elemMatch: {
+            user: userId,
+            $or: [
+              { assignedTo: { $ne: null } },
+              { role: { $in: ["manager", "tester"] } }
+            ]
+          },
+        },
+      },
+    ],
+  });
+
+  for (const board of assignedBoards) {
+    let changed = false;
+
+    if (String(board.owner) === String(userId)) {
+      board.owner = replacementUserId;
+      changed = true;
+    }
+
+    board.members.forEach((m: any) => {
+      if (String(m.assignedTo) === String(userId)) {
+        m.assignedTo = replacementUserId;
+        changed = true;
+      }
+    });
+
+    const memberIndex = board.members.findIndex((m: any) => String(m.user) === String(userId));
+    if (memberIndex !== -1) {
+      const existingReplacementIndex = board.members.findIndex((m: any) => String(m.user) === String(replacementUserId));
+      
+      if (existingReplacementIndex !== -1 && existingReplacementIndex !== memberIndex) {
+        board.members.splice(existingReplacementIndex, 1);
+        const updatedMemberIndex = board.members.findIndex((m: any) => String(m.user) === String(userId));
+        if (updatedMemberIndex !== -1) {
+          board.members[updatedMemberIndex].user = replacementUserId;
+        }
+      } else {
+        board.members[memberIndex].user = replacementUserId;
+      }
+      changed = true;
+    }
+
+    if (changed) {
+      board.markModified("members");
+      board.markModified("owner");
+      await board.save();
+    }
+  }
+
+  const tasks = await Task.find({
+    $or: [
+      { assignees: userId },
+      { takenBy: userId },
+      { takenLead: userId }
+    ]
+  });
+
+  for (const task of tasks) {
+    let taskChanged = false;
+    
+    if (task.assignees && task.assignees.some((id: any) => String(id) === String(userId))) {
+      task.assignees = task.assignees.map((id: any) => String(id) === String(userId) ? replacementUserId : id);
+      taskChanged = true;
+    }
+    
+    if (String(task.takenBy) === String(userId)) {
+      task.takenBy = replacementUserId;
+      const replacement = await User.findById(replacementUserId).select("name");
+      if (replacement) task.takenByName = replacement.name;
+      taskChanged = true;
+    }
+    
+    if (String(task.takenLead) === String(userId)) {
+      task.takenLead = replacementUserId;
+      const replacement = await User.findById(replacementUserId).select("name");
+      if (replacement) task.takenLeadName = replacement.name;
+      taskChanged = true;
+    }
+
+    if (taskChanged) {
+      await task.save();
+    }
+  }
 }
 
 export async function PATCH(request: Request, { params }: Params) {
@@ -65,6 +158,20 @@ export async function PATCH(request: Request, { params }: Params) {
     }
     if (!canDecide) return jsonError("Forbidden", 403);
     if (joinRequest.status !== "pending") return jsonError("Approval request already processed.", 409);
+
+    if (status === "approved" && joinRequest.kind === "quit-company") {
+      if (["project-manager", "qa-tester"].includes(String(requester.role ?? "")) && joinRequest.replacementUser) {
+        const pendingBoardTransfer = await JoinRequest.findOne({
+          requester: joinRequest.requester,
+          company: joinRequest.company,
+          kind: "quit-company-board-transfer",
+          status: "pending",
+        });
+        if (pendingBoardTransfer) {
+          return jsonError("Board transfer approval is still pending from admin.", 409);
+        }
+      }
+    }
 
     if (status === "approved" && (joinRequest.kind === "quit-company" || joinRequest.kind === "quit-team") && !force) {
       const company = await Company.findById(joinRequest.company).select("noticePeriodDays");
@@ -163,17 +270,17 @@ export async function PATCH(request: Request, { params }: Params) {
               { $set: { manager: joinRequest.replacementUser } },
             );
           } else {
-          const managedTeams = await Team.find({ manager: requester._id }).select("_id");
-          const managedTeamIds = managedTeams.map((t) => t._id);
+            const managedTeams = await Team.find({ manager: requester._id }).select("_id");
+            const managedTeamIds = managedTeams.map((t) => t._id);
 
-          await User.updateMany(
-            { team: { $in: managedTeamIds } },
-            {
-              $set: { team: null, teamStatus: "none" },
-              $pull: { activeTeams: { $in: managedTeamIds } },
-            },
-          );
-          await Team.deleteMany({ manager: requester._id });
+            await User.updateMany(
+              { team: { $in: managedTeamIds } },
+              {
+                $set: { team: null, teamStatus: "none" },
+                $pull: { activeTeams: { $in: managedTeamIds } },
+              },
+            );
+            await Team.deleteMany({ manager: requester._id });
           }
         }
 
@@ -213,6 +320,26 @@ export async function PATCH(request: Request, { params }: Params) {
           at: new Date(),
         });
         await Company.updateOne({ _id: joinRequest.company }, { $pull: { members: requester._id } });
+      }
+      if (status === "rejected") {
+        await JoinRequest.updateMany(
+          {
+            requester: requester._id,
+            company: joinRequest.company,
+            kind: "quit-company-board-transfer",
+            status: "pending",
+          },
+          { $set: { status: "rejected" } },
+        );
+      }
+    }
+
+    if (joinRequest.kind === "quit-company-board-transfer") {
+      if (status === "approved") {
+        if (!joinRequest.replacementUser) {
+          return jsonError("Replacement user is required for board transfer approval.", 400);
+        }
+        await transferQuitterBoardAssignments(requester._id, joinRequest.replacementUser);
       }
     }
 
@@ -256,7 +383,13 @@ export async function PATCH(request: Request, { params }: Params) {
     let title = status === "approved" ? "Request approved" : "Request declined";
     let message = `Your ${joinRequest.kind} join request was ${status}.`;
 
-    if (joinRequest.kind === "quit-company") {
+    if (joinRequest.kind === "quit-company-board-transfer") {
+      title = status === "approved" ? "Board transfer approved" : "Board transfer rejected";
+      message =
+        status === "approved"
+          ? `Your board transfer approval for ${companyName} was approved`
+          : `Your board transfer request for ${companyName} was rejected`;
+    } else if (joinRequest.kind === "quit-company") {
       title = status === "approved" ? "Quit request approved" : "Quit request rejected";
       message =
         status === "approved"
@@ -279,6 +412,21 @@ export async function PATCH(request: Request, { params }: Params) {
       message,
     });
     emitNotification(String(requester._id));
+
+    if (joinRequest.kind === "quit-company-board-transfer" && joinRequest.replacementUser) {
+      await Notification.create({
+        user: joinRequest.replacementUser,
+        company: joinRequest.company,
+        team: joinRequest.team,
+        type: "info",
+        title: status === "approved" ? "Board transfer completed" : "Board transfer rejected",
+        message:
+          status === "approved"
+            ? `You have been assigned to the board transfer from ${requester.name}. The transfer is now complete.`
+            : `The board transfer assignment from ${requester.name} was not approved.`,
+      });
+      emitNotification(String(joinRequest.replacementUser));
+    }
 
     return NextResponse.json({ request: serializeDoc(joinRequest) });
   } catch (error) {

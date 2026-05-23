@@ -4835,6 +4835,14 @@ function ApprovalsTab({
   }
 
   function quitNoticeInfo(request: AnyRecord) {
+    if (String(request.kind) === "quit-company-board-transfer") {
+      return {
+        noticeDays: 0,
+        elapsedDays: 0,
+        remainingDays: 0,
+        canApprove: true,
+      };
+    }
     if (!String(request.kind ?? "").startsWith("quit-")) return null;
     const noticeDays = Number(
       (request.company as AnyRecord | undefined)?.noticePeriodDays ?? 0,
@@ -4893,14 +4901,20 @@ function ApprovalsTab({
               </p>
               <p className="text-sm text-slate-500">
                 {displayNested(request.requester, "email", "unknown")}{" "}
-                {String(request.kind).startsWith("quit-")
+                {String(request.kind) === "quit-company-board-transfer"
+                  ? "requested board transfer approval"
+                  : String(request.kind).startsWith("quit-")
                   ? "requested to quit"
                   : "requested to join"}{" "}
                 {request.kind === "team" || request.kind === "quit-team"
                   ? displayNested(request.team, "name", "team")
                   : displayNested(request.company, "name", "company")}
               </p>
-              {String(request.kind).startsWith("quit-") ? (
+              {String(request.kind) === "quit-company-board-transfer" ? (
+                <p className="mt-1 text-xs text-slate-500">
+                  {String(request.message ?? "").trim() || "Board transfer approval pending."}
+                </p>
+              ) : String(request.kind).startsWith("quit-") ? (
                 <p className="mt-1 text-xs text-slate-500">
                   {(() => {
                     const info = quitNoticeInfo(request);
@@ -4916,7 +4930,7 @@ function ApprovalsTab({
                   {displayNested(request.replacementHr, "name", "HR")}
                 </p>
               ) : null}
-              {request.kind === "quit-company" && request.replacementUser ? (
+              {request.replacementUser ? (
                 <p className="mt-1 text-xs text-slate-500">
                   Replacement:{" "}
                   {displayNested(request.replacementUser, "name", "Member")}

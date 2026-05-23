@@ -39,12 +39,17 @@ export async function POST() {
   if (existing) return jsonError("Quit request already pending.", 409);
 
   const assignedBoards = await Board.find({
-    members: {
-      $elemMatch: {
-        user: user._id,
-        assignedTo: { $ne: null }
-      }
-    }
+    $or: [
+      { "members.assignedTo": user._id },
+      {
+        members: {
+          $elemMatch: {
+            user: user._id,
+            assignedTo: { $ne: null },
+          },
+        },
+      },
+    ],
   }, "title");
   const boardTitles = assignedBoards.map((board) => board.title).filter(Boolean);
   const assignedMessage = boardTitles.length
