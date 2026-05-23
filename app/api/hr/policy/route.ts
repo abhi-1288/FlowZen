@@ -4,7 +4,7 @@ import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 
-const ALLOWED_NOTICE_PERIOD_DAYS = new Set([15, 30, 45, 60, 90]);
+const ALLOWED_NOTICE_PERIOD_DAYS = new Set([5, 15, 30, 45, 60, 90]);
 
 export async function PATCH(request: Request) {
   const userId = await requireUserId();

@@ -397,8 +397,8 @@ export function ProfileHub() {
                 >
                   <div
                     className={`flex items-center gap-3 rounded-2xl px-6 py-4 shadow-2xl ring-1 ring-slate-950/5 backdrop-blur-md ${toast.type === "success"
-                        ? "bg-emerald-600/90 text-white"
-                        : "bg-rose-600/90 text-white"
+                      ? "bg-emerald-600/90 text-white"
+                      : "bg-rose-600/90 text-white"
                       }`}
                   >
                     {toast.type === "success" ? (
@@ -645,8 +645,8 @@ function CalendarTab() {
             <div
               key={wd}
               className={`flex flex-col gap-3 rounded-2xl p-2 pb-6 transition-all ${i === 0
-                  ? "bg-rose-50/50 text-rose-600 border border-rose-100/50"
-                  : "bg-emerald-50/50 text-emerald-600 border border-emerald-100/50"
+                ? "bg-rose-50/50 text-rose-600 border border-rose-100/50"
+                : "bg-emerald-50/50 text-emerald-600 border border-emerald-100/50"
                 }`}
             >
               <span className="text-center text-[10px] font-black uppercase tracking-tighter sm:text-xs">
@@ -681,20 +681,20 @@ function CalendarTab() {
                           : undefined
                       }
                       className={`relative cursor-pointer grid h-10 w-full place-items-center rounded-xl text-xs font-bold sm:h-14 sm:text-sm transition-all ${day
-                          ? holiday
-                            ? "bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 shadow-sm hover:border-fuchsia-300 hover:bg-fuchsia-50"
-                            : today
-                              ? checkedIn
-                                ? "bg-sky-100 text-sky-700 border border-sky-200 shadow-inner"
-                                : "bg-white text-rose-600 border border-rose-200 shadow-sm hover:border-rose-300 hover:bg-rose-50"
-                              : checkedIn
-                                ? "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm hover:border-emerald-300 hover:bg-emerald-50"
-                                : leave
-                                  ? "bg-emerald-100 text-rose-600 border border-emerald-200 shadow-sm hover:border-emerald-300 hover:bg-emerald-50"
-                                  : past
-                                    ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm"
-                                    : "bg-white shadow-sm border border-slate-100 text-slate-700 hover:border-slate-200 hover:bg-slate-50"
-                          : "opacity-0"
+                        ? holiday
+                          ? "bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 shadow-sm hover:border-fuchsia-300 hover:bg-fuchsia-50"
+                          : today
+                            ? checkedIn
+                              ? "bg-sky-100 text-sky-700 border border-sky-200 shadow-inner"
+                              : "bg-white text-rose-600 border border-rose-200 shadow-sm hover:border-rose-300 hover:bg-rose-50"
+                            : checkedIn
+                              ? "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm hover:border-emerald-300 hover:bg-emerald-50"
+                              : leave
+                                ? "bg-emerald-100 text-rose-600 border border-emerald-200 shadow-sm hover:border-emerald-300 hover:bg-emerald-50"
+                                : past
+                                  ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm"
+                                  : "bg-white shadow-sm border border-slate-100 text-slate-700 hover:border-slate-200 hover:bg-slate-50"
+                        : "opacity-0"
                         }`}
                     >
                       {day}
@@ -1422,8 +1422,8 @@ function AttendanceTab({
               <div
                 key={wd}
                 className={`flex flex-col gap-3 rounded-2xl p-2 pb-6 transition-all ${i === 0
-                    ? "bg-rose-50/50 text-rose-600 border border-rose-100/50"
-                    : "bg-emerald-50/50 text-emerald-600 border border-emerald-100/50"
+                  ? "bg-rose-50/50 text-rose-600 border border-rose-100/50"
+                  : "bg-emerald-50/50 text-emerald-600 border border-emerald-100/50"
                   }`}
               >
                 <span className="text-center text-[10px] font-black uppercase tracking-tighter sm:text-xs">
@@ -1468,26 +1468,26 @@ function AttendanceTab({
                         role={day ? "button" : undefined}
                         tabIndex={day ? 0 : undefined}
                         className={`relative cursor-pointer grid h-10 w-full place-items-center rounded-xl text-xs font-bold sm:h-14 sm:text-sm transition-all ${day
-                            ? beforeStart
-                              ? "bg-slate-100 text-slate-400 border border-slate-200 shadow-sm"
-                              : pendingLeave
-                                ? "bg-amber-50 text-amber-900 border border-amber-200 shadow-sm"
-                                : holiday
-                                  ? "bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 shadow-sm"
-                                  : today
-                                    ? checkedIn
-                                      ? "bg-sky-100 text-sky-700 border border-sky-200 shadow-inner"
-                                      : "bg-white text-rose-600 border border-rose-200 shadow-sm"
-                                    : checkedIn
-                                      ? "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm"
-                                      : leave
-                                        ? "bg-emerald-100 text-rose-600 border border-emerald-200 shadow-sm"
-                                        : weekend
-                                          ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm"
-                                          : missed
-                                            ? "bg-white text-rose-600 border border-rose-200 shadow-sm"
-                                            : "bg-white shadow-sm border border-slate-100 text-slate-700"
-                            : "opacity-0"
+                          ? beforeStart
+                            ? "bg-slate-100 text-slate-400 border border-slate-200 shadow-sm"
+                            : pendingLeave
+                              ? "bg-amber-50 text-amber-900 border border-amber-200 shadow-sm"
+                              : holiday
+                                ? "bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 shadow-sm"
+                                : today
+                                  ? checkedIn
+                                    ? "bg-sky-100 text-sky-700 border border-sky-200 shadow-inner"
+                                    : "bg-white text-rose-600 border border-rose-200 shadow-sm"
+                                  : checkedIn
+                                    ? "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm"
+                                    : leave
+                                      ? "bg-emerald-100 text-rose-600 border border-emerald-200 shadow-sm"
+                                      : weekend
+                                        ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm"
+                                        : missed
+                                          ? "bg-white text-rose-600 border border-rose-200 shadow-sm"
+                                          : "bg-white shadow-sm border border-slate-100 text-slate-700"
+                          : "opacity-0"
                           }`}
                       >
                         {day}
@@ -2230,10 +2230,10 @@ function RequestsListModal({
                           </span>
                           <span
                             className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${req.status === "approved"
-                                ? "bg-emerald-100 text-emerald-700"
-                                : req.status === "rejected"
-                                  ? "bg-rose-100 text-rose-700"
-                                  : "bg-amber-100 text-amber-700"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : req.status === "rejected"
+                                ? "bg-rose-100 text-rose-700"
+                                : "bg-amber-100 text-amber-700"
                               }`}
                           >
                             {req.status}
@@ -2324,10 +2324,10 @@ function LeaveDetailsModal({
             </div>
             <span
               className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${leave.status === "approved"
-                  ? "bg-emerald-100 text-emerald-700"
-                  : leave.status === "rejected"
-                    ? "bg-rose-100 text-rose-700"
-                    : "bg-amber-100 text-amber-700"
+                ? "bg-emerald-100 text-emerald-700"
+                : leave.status === "rejected"
+                  ? "bg-rose-100 text-rose-700"
+                  : "bg-amber-100 text-amber-700"
                 }`}
             >
               {String(leave.status)}
@@ -2529,17 +2529,25 @@ function DayDetailsModal({
 
           {attendance ? (
             <div className="rounded-xl border border-slate-100 p-4">
-              <p className="text-sm font-bold text-slate-900">Check-in</p>
-              <p className="text-sm text-slate-600">
-                {new Date(String(attendance.checkIn)).toLocaleTimeString()}
-              </p>
+              <div className="flex justify-between">
+                <p className="text-sm font-bold text-slate-900">Check-in</p>
+                <p className="text-sm text-slate-600">
+                  {new Date(String(attendance.checkIn)).toLocaleTimeString()}
+                </p>
+              </div>
+              <br />
+              <hr />
+              <br />
+              <div className="flex justify-between">
+                <p className="text-sm font-bold text-slate-900">Check-out</p>
+                <p className="text-sm text-slate-600">
+                  {attendance.checkOut ? new Date(String(attendance.checkOut)).toLocaleTimeString() : "--"}
+                </p>
+              </div>
             </div>
           ) : (
             <div className="rounded-xl border border-slate-100 p-4">
-              <p className="text-sm font-bold text-slate-900">No check-in</p>
-              <p className="text-sm text-slate-600">
-                No attendance recorded for this date.
-              </p>
+              <p className="text-sm font-bold text-slate-900">No attendance recorded</p>
             </div>
           )}
 
@@ -3174,7 +3182,7 @@ function ProfileTab({
                 value={noticePeriodDays}
                 onChange={(e) => setNoticePeriodDays(Number(e.target.value))}
               >
-                <option value={0}>0 days</option>
+                <option value={5}>5 days</option>
                 <option value={15}>15 days</option>
                 <option value={30}>30 days</option>
                 <option value={45}>45 days</option>
@@ -5660,8 +5668,8 @@ function MessagesTab({
         <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
           <button
             className={`rounded-md px-3 py-1.5 text-sm font-medium ${mode === "normal"
-                ? "bg-slate-950 text-white"
-                : "text-slate-700 hover:bg-slate-50"
+              ? "bg-slate-950 text-white"
+              : "text-slate-700 hover:bg-slate-50"
               }`}
             type="button"
             onClick={() => setMode("normal")}
@@ -5670,8 +5678,8 @@ function MessagesTab({
           </button>
           <button
             className={`rounded-md px-3 py-1.5 text-sm font-medium ${mode === "bulk"
-                ? "bg-slate-950 text-white"
-                : "text-slate-700 hover:bg-slate-50"
+              ? "bg-slate-950 text-white"
+              : "text-slate-700 hover:bg-slate-50"
               }`}
             type="button"
             onClick={() => setMode("bulk")}
@@ -5751,10 +5759,10 @@ function MessagesTab({
           return (
             <button
               className={`w-full rounded-lg border p-4 text-left transition ${mode === "bulk"
-                  ? isSelected
-                    ? "border-slate-900 bg-slate-950 text-white"
-                    : "border-slate-200 bg-white hover:bg-slate-50"
+                ? isSelected
+                  ? "border-slate-900 bg-slate-950 text-white"
                   : "border-slate-200 bg-white hover:bg-slate-50"
+                : "border-slate-200 bg-white hover:bg-slate-50"
                 }`}
               key={memberId}
               type="button"
@@ -5784,8 +5792,8 @@ function MessagesTab({
                 <div className="flex flex-wrap items-center gap-2">
                   <span
                     className={`rounded-full px-3 py-1 text-xs font-medium ${mode === "bulk" && isSelected
-                        ? "bg-white/10 text-white"
-                        : "bg-slate-100 text-slate-700"
+                      ? "bg-white/10 text-white"
+                      : "bg-slate-100 text-slate-700"
                       }`}
                   >
                     {role}
@@ -5793,8 +5801,8 @@ function MessagesTab({
 
                   <span
                     className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${mode === "bulk" && isSelected
-                        ? "border-white/20 bg-white/10 text-white"
-                        : "border-slate-200 bg-white text-slate-700"
+                      ? "border-white/20 bg-white/10 text-white"
+                      : "border-slate-200 bg-white text-slate-700"
                       }`}
                     title={teamLabel}
                   >
@@ -5808,8 +5816,8 @@ function MessagesTab({
                   ) : (
                     <span
                       className={`inline-flex items-center rounded-lg px-3 py-2 text-xs font-semibold ${isSelected
-                          ? "bg-white text-slate-950"
-                          : "bg-slate-950 text-white"
+                        ? "bg-white text-slate-950"
+                        : "bg-slate-950 text-white"
                         }`}
                     >
                       {isSelected ? "Selected" : "Select"}
