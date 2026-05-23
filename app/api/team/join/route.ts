@@ -69,8 +69,16 @@ export async function POST(request: Request) {
     status: "pending"
   });
   const approverId = await resolveTeamJoinApproverId(team);
-  const approvalNotifier: "hr" | "manager" =
-    approverId === String(team.manager) ? "manager" : "hr";
+  // Determine notifier label by looking up approver's role
+  const approverUser = await User.findById(approverId).select("role");
+  let approvalNotifier: "hr" | "manager" | "tester" = "manager";
+  if (approverUser) {
+    if (String(approverUser.role) === "human-resource") approvalNotifier = "hr";
+    else if (String(approverUser.role) === "qa-tester") approvalNotifier = "tester";
+    else approvalNotifier = "manager";
+  } else {
+    approvalNotifier = approverId === String(team.manager) ? "manager" : "hr";
+  }
 
   if (existingPendingRequest) {
     if (!user.company || String(user.company) !== String(team.company)) {

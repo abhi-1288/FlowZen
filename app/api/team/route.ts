@@ -25,12 +25,17 @@ export async function POST(request: Request) {
 
   const user = await User.findById(userId);
   if (!user) return jsonError("User not found.", 404);
-  if (!["project-manager", "qa-tester"].includes(String(user.role))) {
-    return jsonError("Only project managers or Q-A testers can create teams.", 403);
+  if (!["project-manager", "qa-tester", "human-resource"].includes(String(user.role))) {
+    return jsonError("Only project managers, Q-A testers, or HR can create teams.", 403);
   }
   if (!user.company || user.companyStatus !== "approved") return jsonError("You need admin approval before creating a team.", 403);
   const existingTeams = await Team.countDocuments({ manager: user._id });
-  if (existingTeams >= 5) return jsonError("You can create up to 5 teams only.", 409);
+  if (user.role === "human-resource" && existingTeams >= 2) {
+    return jsonError("HR can create up to 2 teams only.", 409);
+  }
+  if (["project-manager", "qa-tester"].includes(String(user.role)) && existingTeams >= 5) {
+    return jsonError("You can create up to 5 teams only.", 409);
+  }
 
   const joinCode = createJoinCode("TM");
   const team = await Team.create({

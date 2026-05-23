@@ -24,6 +24,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  Pen,
 } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 
@@ -45,7 +46,10 @@ export function ProfileHub() {
   const [insights, setInsights] = useState<AnyRecord | null>(null);
   const [approvals, setApprovals] = useState<AnyRecord[]>([]);
   const [notifications, setNotifications] = useState<AnyRecord[]>([]);
-  const [toast, setToast] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
+  const [toast, setToast] = useState<{
+    text: string;
+    type: "success" | "error";
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [attendanceHistory, setAttendanceHistory] = useState<AnyRecord[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<AnyRecord[]>([]);
@@ -58,19 +62,23 @@ export function ProfileHub() {
   const displayName = String(profile?.name ?? session?.user?.name ?? "User");
   const avatarUrl = profile?.avatarUrl ? String(profile.avatarUrl) : "";
   const unreadCount = notifications.filter((item) => !item.readAt).length;
-  const hasCompany = Boolean(profile?.company && profile?.companyStatus === "approved");
+  const hasCompany = Boolean(
+    profile?.company && profile?.companyStatus === "approved",
+  );
   const mobileTabs: Tab[] = [
     "profile",
     "timeline",
     "onboarding",
-    ...(["human-resource", "admin"].includes(String(role)) ? (["members"] as Tab[]) : []),
+    ...(["human-resource", "admin"].includes(String(role))
+      ? (["members"] as Tab[])
+      : []),
     ...(hasCompany ? (["messages"] as Tab[]) : []),
     "approvals",
     "notifications",
     "attendance",
   ];
 
-  const showToast = (text: string, type: 'success' | 'error' = 'success') => {
+  const showToast = (text: string, type: "success" | "error" = "success") => {
     setToast({ text, type });
     setTimeout(() => setToast(null), 4000);
   };
@@ -102,8 +110,12 @@ export function ProfileHub() {
       setApprovals(approvalsResult?.requests ?? []);
       setNotifications(notificationResult?.notifications ?? []);
 
-      apiFetch<{ history: AnyRecord[] }>("/api/attendance/checkin").then(res => setAttendanceHistory(res.history)).catch(() => { });
-      apiFetch<{ requests: AnyRecord[] }>("/api/attendance/leave").then(res => setLeaveRequests(res.requests)).catch(() => { });
+      apiFetch<{ history: AnyRecord[] }>("/api/attendance/checkin")
+        .then((res) => setAttendanceHistory(res.history))
+        .catch(() => { });
+      apiFetch<{ requests: AnyRecord[] }>("/api/attendance/leave")
+        .then((res) => setLeaveRequests(res.requests))
+        .catch(() => { });
     } finally {
       if (!silent) setLoading(false);
     }
@@ -189,53 +201,61 @@ export function ProfileHub() {
         : null,
     ].filter(Boolean) as { title: string; body: string; date?: string }[];
 
-    const historyItems = ((profile?.membershipHistory as any) || []).map((item: any) => {
-      if (item.action === "board-invite" || item.action === "board-remove") {
-        const boardName = item.board?.title || "a board";
-        const inviter = item.inviter;
-        const invitee = item.invitee;
-        const currentName = String(profile?.name ?? "You");
-        const currentRole = String(profile?.role ?? "user");
-        const verb = item.action === "board-invite" ? "invited" : "removed";
-        const title = item.action === "board-invite" ? "Board Invitation" : "Board Access Removed";
+    const historyItems = ((profile?.membershipHistory as any) || [])
+      .map((item: any) => {
+        if (item.action === "board-invite" || item.action === "board-remove") {
+          const boardName = item.board?.title || "a board";
+          const inviter = item.inviter;
+          const invitee = item.invitee;
+          const currentName = String(profile?.name ?? "You");
+          const currentRole = String(profile?.role ?? "user");
+          const verb = item.action === "board-invite" ? "invited" : "removed";
+          const title =
+            item.action === "board-invite"
+              ? "Board Invitation"
+              : "Board Access Removed";
 
-        if (inviter) {
-          return {
-            title,
-            body: `${inviter.name}: ${inviter.role} has ${verb} you ${item.action === "board-invite" ? "to" : "from"} ${boardName}`,
-            date: item.at ? String(item.at) : undefined,
-          };
+          if (inviter) {
+            return {
+              title,
+              body: `${inviter.name}: ${inviter.role} has ${verb} you ${item.action === "board-invite" ? "to" : "from"} ${boardName}`,
+              date: item.at ? String(item.at) : undefined,
+            };
+          }
+
+          if (invitee) {
+            return {
+              title:
+                item.action === "board-invite"
+                  ? "Board Invitation Sent"
+                  : "Board Member Removed",
+              body: `${currentName}: ${currentRole} has ${verb} ${invitee.name} ${item.action === "board-invite" ? "to" : "from"} ${boardName}`,
+              date: item.at ? String(item.at) : undefined,
+            };
+          }
         }
 
-        if (invitee) {
-          return {
-            title: item.action === "board-invite" ? "Board Invitation Sent" : "Board Member Removed",
-            body: `${currentName}: ${currentRole} has ${verb} ${invitee.name} ${item.action === "board-invite" ? "to" : "from"} ${boardName}`,
-            date: item.at ? String(item.at) : undefined,
-          };
-        }
-      }
-
-      const actionLabels: Record<string, string> = {
-        "joined-company": "Joined company",
-        "joined-team": "Joined team",
-        "switched-team": "Switched team",
-        "removed-team": "Was removed from team",
-        "removed-company": "Was removed from company",
-        "left-company": "Left company",
-        "left-team": "Left team",
-      };
-
-      if (actionLabels[item.action]) {
-        return {
-          title: actionLabels[item.action],
-          body: `User ${actionLabels[item.action].toLowerCase()}`,
-          date: item.at ? String(item.at) : undefined,
+        const actionLabels: Record<string, string> = {
+          "joined-company": "Joined company",
+          "joined-team": "Joined team",
+          "switched-team": "Switched team",
+          "removed-team": "Was removed from team",
+          "removed-company": "Was removed from company",
+          "left-company": "Left company",
+          "left-team": "Left team",
         };
-      }
 
-      return null;
-    }).filter(Boolean) as { title: string; body: string; date?: string }[];
+        if (actionLabels[item.action]) {
+          return {
+            title: actionLabels[item.action],
+            body: `User ${actionLabels[item.action].toLowerCase()}`,
+            date: item.at ? String(item.at) : undefined,
+          };
+        }
+
+        return null;
+      })
+      .filter(Boolean) as { title: string; body: string; date?: string }[];
 
     return [...staticItems, ...historyItems].sort((a, b) => {
       const dateA = a.date ? new Date(a.date).getTime() : 0;
@@ -250,14 +270,23 @@ export function ProfileHub() {
         <div className="mb-8 flex flex-col gap-4">
           <div className="flex items-center gap-3">
             <div className="relative h-10 w-10 overflow-hidden rounded-xl shadow-lg shadow-indigo-500/20">
-              <Image src="/Logos/logo.jpg" alt="FlowZen Logo" fill className="object-cover" />
+              <Image
+                src="/Logos/logo.jpg"
+                alt="FlowZen Logo"
+                fill
+                className="object-cover"
+              />
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-white">FlowZen</h1>
+            <h1 className="text-xl font-bold tracking-tight text-white">
+              FlowZen
+            </h1>
           </div>
           <div className="flex items-center gap-3 rounded-lg bg-slate-900 p-2 border border-slate-800">
             <AvatarBadge avatarUrl={avatarUrl} name={displayName} size="md" />
             <div>
-              <p className="text-sm font-medium text-slate-200 capitalize">{displayName}</p>
+              <p className="text-sm font-medium text-slate-200 capitalize">
+                {displayName}
+              </p>
               <p className="text-xs text-slate-400 capitalize">{displayRole}</p>
             </div>
           </div>
@@ -304,7 +333,7 @@ export function ProfileHub() {
           />
           <NavButton
             active={tab === "attendance"}
-            label={`Attendance ${leaveRequests.filter(r => r.status === "pending" || r.status === "manager-approved").length ? `(${leaveRequests.filter(r => r.status === "pending" || r.status === "manager-approved").length})` : ""}`}
+            label={`Attendance ${leaveRequests.filter((r) => r.status === "pending" || r.status === "manager-approved").length ? `(${leaveRequests.filter((r) => r.status === "pending" || r.status === "manager-approved").length})` : ""}`}
             onClick={() => setTab("attendance")}
           />
         </nav>
@@ -335,9 +364,14 @@ export function ProfileHub() {
           </div>
           <div className="mt-4 flex gap-2 overflow-x-auto lg:hidden">
             {mobileTabs.map((item) => {
-              const label = item === "attendance" && leaveRequests.filter(r => r.status === "pending" || r.status === "manager-approved").length > 0
-                ? `attendance (${leaveRequests.filter(r => r.status === "pending" || r.status === "manager-approved").length})`
-                : item;
+              const label =
+                item === "attendance" &&
+                  leaveRequests.filter(
+                    (r) =>
+                      r.status === "pending" || r.status === "manager-approved",
+                  ).length > 0
+                  ? `attendance (${leaveRequests.filter((r) => r.status === "pending" || r.status === "manager-approved").length})`
+                  : item;
 
               return (
                 <button
@@ -358,11 +392,23 @@ export function ProfileHub() {
           ) : (
             <>
               {toast && (
-                <div className={`fixed bottom-8 left-1/2 z-[100] -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4 duration-300`}>
-                  <div className={`flex items-center gap-3 rounded-2xl px-6 py-4 shadow-2xl ring-1 ring-slate-950/5 backdrop-blur-md ${toast.type === 'success' ? 'bg-emerald-600/90 text-white' : 'bg-rose-600/90 text-white'
-                    }`}>
-                    {toast.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
-                    <p className="text-sm font-semibold tracking-wide">{toast.text}</p>
+                <div
+                  className={`fixed bottom-8 left-1/2 z-[100] -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4 duration-300`}
+                >
+                  <div
+                    className={`flex items-center gap-3 rounded-2xl px-6 py-4 shadow-2xl ring-1 ring-slate-950/5 backdrop-blur-md ${toast.type === "success"
+                        ? "bg-emerald-600/90 text-white"
+                        : "bg-rose-600/90 text-white"
+                      }`}
+                  >
+                    {toast.type === "success" ? (
+                      <CheckCircle2 size={20} />
+                    ) : (
+                      <AlertCircle size={20} />
+                    )}
+                    <p className="text-sm font-semibold tracking-wide">
+                      {toast.text}
+                    </p>
                   </div>
                 </div>
               )}
@@ -443,8 +489,18 @@ function CalendarTab() {
   const year = viewDate.getFullYear();
 
   const monthNames = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
   ];
 
   const prevMonth = () => {
@@ -482,7 +538,11 @@ function CalendarTab() {
     if (!day) return false;
     const date = getDateForDay(day);
     if (!date) return false;
-    return history.some((entry) => normalizeDate(new Date(String(entry.date))).getTime() === date.getTime());
+    return history.some(
+      (entry) =>
+        normalizeDate(new Date(String(entry.date))).getTime() ===
+        date.getTime(),
+    );
   };
 
   const isOnLeave = (day: number | null) => {
@@ -520,9 +580,15 @@ function CalendarTab() {
 
   const loadData = async () => {
     const [historyRes, requestsRes, holidaysRes] = await Promise.all([
-      apiFetch<{ history: AnyRecord[] }>('/api/attendance/checkin').catch(() => ({ history: [] as AnyRecord[] })),
-      apiFetch<{ requests: AnyRecord[] }>('/api/attendance/leave').catch(() => ({ requests: [] as AnyRecord[] })),
-      apiFetch<{ holidays: AnyRecord[] }>('/api/attendance/holidays').catch(() => ({ holidays: [] as AnyRecord[] })),
+      apiFetch<{ history: AnyRecord[] }>("/api/attendance/checkin").catch(
+        () => ({ history: [] as AnyRecord[] }),
+      ),
+      apiFetch<{ requests: AnyRecord[] }>("/api/attendance/leave").catch(
+        () => ({ requests: [] as AnyRecord[] }),
+      ),
+      apiFetch<{ holidays: AnyRecord[] }>("/api/attendance/holidays").catch(
+        () => ({ holidays: [] as AnyRecord[] }),
+      ),
     ]);
 
     setHistory(historyRes.history ?? []);
@@ -547,7 +613,7 @@ function CalendarTab() {
   const weekDays = ["SUN.", "Mon.", "Tue.", "Wed.", "Thr.", "Fri.", "Sat."];
 
   return (
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-8 flex items-center justify-center gap-4">
         <button
           onClick={prevMonth}
@@ -579,8 +645,8 @@ function CalendarTab() {
             <div
               key={wd}
               className={`flex flex-col gap-3 rounded-2xl p-2 pb-6 transition-all ${i === 0
-                ? "bg-rose-50/50 text-rose-600 border border-rose-100/50"
-                : "bg-emerald-50/50 text-emerald-600 border border-emerald-100/50"
+                  ? "bg-rose-50/50 text-rose-600 border border-rose-100/50"
+                  : "bg-emerald-50/50 text-emerald-600 border border-emerald-100/50"
                 }`}
             >
               <span className="text-center text-[10px] font-black uppercase tracking-tighter sm:text-xs">
@@ -609,36 +675,44 @@ function CalendarTab() {
                       }}
                       role={day ? "button" : undefined}
                       tabIndex={day ? 0 : undefined}
-                      title={day ? `View details for ${monthNames[month]} ${day}, ${year}` : undefined}
+                      title={
+                        day
+                          ? `View details for ${monthNames[month]} ${day}, ${year}`
+                          : undefined
+                      }
                       className={`relative cursor-pointer grid h-10 w-full place-items-center rounded-xl text-xs font-bold sm:h-14 sm:text-sm transition-all ${day
-                        ? holiday
-                          ? "bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 shadow-sm hover:border-fuchsia-300 hover:bg-fuchsia-50"
-                          : today
-                            ? checkedIn
-                              ? "bg-sky-100 text-sky-700 border border-sky-200 shadow-inner"
-                              : "bg-white text-rose-600 border border-rose-200 shadow-sm hover:border-rose-300 hover:bg-rose-50"
-                            : checkedIn
-                              ? "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm hover:border-emerald-300 hover:bg-emerald-50"
-                              : leave
-                                ? "bg-emerald-100 text-rose-600 border border-emerald-200 shadow-sm hover:border-emerald-300 hover:bg-emerald-50"
-                                : past
-                                  ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm"
-                                  : "bg-white shadow-sm border border-slate-100 text-slate-700 hover:border-slate-200 hover:bg-slate-50"
-                        : "opacity-0"
+                          ? holiday
+                            ? "bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 shadow-sm hover:border-fuchsia-300 hover:bg-fuchsia-50"
+                            : today
+                              ? checkedIn
+                                ? "bg-sky-100 text-sky-700 border border-sky-200 shadow-inner"
+                                : "bg-white text-rose-600 border border-rose-200 shadow-sm hover:border-rose-300 hover:bg-rose-50"
+                              : checkedIn
+                                ? "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm hover:border-emerald-300 hover:bg-emerald-50"
+                                : leave
+                                  ? "bg-emerald-100 text-rose-600 border border-emerald-200 shadow-sm hover:border-emerald-300 hover:bg-emerald-50"
+                                  : past
+                                    ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm"
+                                    : "bg-white shadow-sm border border-slate-100 text-slate-700 hover:border-slate-200 hover:bg-slate-50"
+                          : "opacity-0"
                         }`}
                     >
                       {day}
-                      {day && (holiday || checkedIn || leave || (today && !checkedIn)) && (
-                        <span className="absolute right-1 top-1 rounded-full bg-white/90 p-0.5">
-                          {holiday ? (
-                            <Calendar className="h-3.5 w-3.5 text-fuchsia-600" />
-                          ) : checkedIn || leave ? (
-                            <Check className="h-3.5 w-3.5 text-emerald-600" />
-                          ) : (
-                            <X className="h-3.5 w-3.5 text-rose-600" />
-                          )}
-                        </span>
-                      )}
+                      {day &&
+                        (holiday ||
+                          checkedIn ||
+                          leave ||
+                          (today && !checkedIn)) && (
+                          <span className="absolute right-1 top-1 rounded-full bg-white/90 p-0.5">
+                            {holiday ? (
+                              <Calendar className="h-3.5 w-3.5 text-fuchsia-600" />
+                            ) : checkedIn || leave ? (
+                              <Check className="h-3.5 w-3.5 text-emerald-600" />
+                            ) : (
+                              <X className="h-3.5 w-3.5 text-rose-600" />
+                            )}
+                          </span>
+                        )}
                     </div>
                   );
                 })}
@@ -661,18 +735,30 @@ function CalendarTab() {
   );
 }
 
-function AttendanceTab({ profile, showToast }: { profile: AnyRecord | null; showToast: (text: string, type?: 'success' | 'error') => void }) {
+function AttendanceTab({
+  profile,
+  showToast,
+}: {
+  profile: AnyRecord | null;
+  showToast: (text: string, type?: "success" | "error") => void;
+}) {
   const { data: session } = useSession();
   const [viewDate, setViewDate] = useState(new Date());
   const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showHolidayModal, setShowHolidayModal] = useState(false);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
   const [showLeaveHistoryModal, setShowLeaveHistoryModal] = useState(false);
   const [showEditHolidayModal, setShowEditHolidayModal] = useState(false);
-  const [showDeleteHolidayConfirm, setShowDeleteHolidayConfirm] = useState(false);
-  const [selectedHoliday, setSelectedHoliday] = useState<AnyRecord | null>(null);
-  const [holidayToDelete, setHolidayToDelete] = useState<AnyRecord | null>(null);
+  const [showDeleteHolidayConfirm, setShowDeleteHolidayConfirm] =
+    useState(false);
+  const [selectedHoliday, setSelectedHoliday] = useState<AnyRecord | null>(
+    null,
+  );
+  const [holidayToDelete, setHolidayToDelete] = useState<AnyRecord | null>(
+    null,
+  );
   const [requests, setRequests] = useState<AnyRecord[]>([]);
   const [history, setHistory] = useState<AnyRecord[]>([]);
   const [holidays, setHolidays] = useState<AnyRecord[]>([]);
@@ -680,6 +766,8 @@ function AttendanceTab({ profile, showToast }: { profile: AnyRecord | null; show
   const [serverToday, setServerToday] = useState<Date | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [wfhDates, setWfhDates] = useState<{ date: string; reason: string }[]>([]);
+  const [wfhCheckInMode, setWfhCheckInMode] = useState<string>("all-day");
 
   const normalizeDate = (date: Date) => {
     const normalized = new Date(date);
@@ -699,21 +787,51 @@ function AttendanceTab({ profile, showToast }: { profile: AnyRecord | null; show
     const createdAt = parseDate(profile?.createdAt);
 
     if (companyJoined && teamJoined) {
-      return companyJoined.getTime() > teamJoined.getTime() ? companyJoined : teamJoined;
+      return companyJoined.getTime() > teamJoined.getTime()
+        ? companyJoined
+        : teamJoined;
     }
 
-    return companyJoined || teamJoined || createdAt || normalizeDate(new Date(0));
+    return (
+      companyJoined || teamJoined || createdAt || normalizeDate(new Date(0))
+    );
   }, [profile]);
 
   const loadData = async () => {
-    const [hRes, rRes, holRes] = await Promise.all([
-      apiFetch<{ history: AnyRecord[]; today?: string }>("/api/attendance/checkin").catch(() => ({ history: [] as AnyRecord[], today: undefined })),
-      apiFetch<{ requests: AnyRecord[] }>("/api/attendance/leave").catch(() => ({ requests: [] as AnyRecord[] })),
-      apiFetch<{ holidays: AnyRecord[] }>("/api/attendance/holidays").catch(() => ({ holidays: [] as AnyRecord[] }))
+    const [hRes, cRes, rRes, holRes, wfhRes] = await Promise.all([
+      apiFetch<{ history: AnyRecord[]; today?: string }>(
+        "/api/attendance/checkin",
+      ).catch(() => ({ history: [] as AnyRecord[], today: undefined })),
+      apiFetch<{ checkout: AnyRecord[] }>("/api/attendance/checkout").catch(() => ({ checkout: [] as AnyRecord[] })),
+      apiFetch<{ requests: AnyRecord[] }>("/api/attendance/leave").catch(
+        () => ({ requests: [] as AnyRecord[] }),
+      ),
+      apiFetch<{ holidays: AnyRecord[] }>("/api/attendance/holidays").catch(
+        () => ({ holidays: [] as AnyRecord[] }),
+      ),
+      apiFetch<{ wfhDates: any[]; wfhCheckInMode?: string }>("/api/company/wfh").catch(
+        () => ({ wfhDates: [] as any[], wfhCheckInMode: "all-day" }),
+      ),
     ]);
     setHistory(hRes.history);
     setRequests(rRes.requests);
     setHolidays(holRes.holidays);
+    setWfhCheckInMode(wfhRes.wfhCheckInMode ?? "all-day");
+
+
+    const mappedWfh = Array.isArray(wfhRes?.wfhDates)
+      ? wfhRes.wfhDates.map((item: any) => {
+        if (item && typeof item === "object") {
+          return {
+            date: String(item.date),
+            reason: item.reason ? String(item.reason) : ""
+          };
+        }
+        return { date: String(item), reason: "" };
+      })
+      : [];
+    setWfhDates(mappedWfh);
+
     if (hRes.today) {
       const today = new Date(hRes.today);
       if (!Number.isNaN(today.getTime())) {
@@ -724,7 +842,7 @@ function AttendanceTab({ profile, showToast }: { profile: AnyRecord | null; show
 
   const isAttendanceEnabled = Boolean(
     (profile?.companyStatus === "approved" && profile?.company) ||
-    (profile?.teamStatus === "approved" && profile?.team)
+    (profile?.teamStatus === "approved" && profile?.team),
   );
 
   useEffect(() => {
@@ -740,7 +858,10 @@ function AttendanceTab({ profile, showToast }: { profile: AnyRecord | null; show
 
   const handleCheckIn = async () => {
     if (todayLeave) {
-      showToast("You are on approved leave today. Check-in is disabled.", "error");
+      showToast(
+        "You are on approved leave today. Check-in is disabled.",
+        "error",
+      );
       return;
     }
 
@@ -750,7 +871,23 @@ function AttendanceTab({ profile, showToast }: { profile: AnyRecord | null; show
       loadData();
       showToast("Checked in successfully!");
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to check in", "error");
+      showToast(
+        err instanceof Error ? err.message : "Failed to check in",
+        "error",
+      );
+    } finally {
+      setIsCheckingIn(false);
+    }
+  };
+
+  const handleCheckOut = async () => {
+    setIsCheckingIn(true);
+    try {
+      await apiFetch("/api/attendance/checkout", { method: "POST" });
+      loadData();
+      showToast("Checked out successfully!");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to check out", "error");
     } finally {
       setIsCheckingIn(false);
     }
@@ -758,11 +895,17 @@ function AttendanceTab({ profile, showToast }: { profile: AnyRecord | null; show
 
   const handleApprove = async (id: string) => {
     try {
-      await apiFetch(`/api/attendance/leave/${id}`, { method: "PATCH", body: JSON.stringify({ action: "approve" }) });
+      await apiFetch(`/api/attendance/leave/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: "approve" }),
+      });
       loadData();
       showToast("Request approved.");
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to approve", "error");
+      showToast(
+        err instanceof Error ? err.message : "Failed to approve",
+        "error",
+      );
     }
   };
 
@@ -771,27 +914,41 @@ function AttendanceTab({ profile, showToast }: { profile: AnyRecord | null; show
     try {
       await apiFetch(`/api/attendance/leave/${rejectingId}`, {
         method: "PATCH",
-        body: JSON.stringify({ action: "reject", reason: rejectionReason })
+        body: JSON.stringify({ action: "reject", reason: rejectionReason }),
       });
       loadData();
       showToast("Request rejected.");
       setRejectingId(null);
       setRejectionReason("");
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to reject", "error");
+      showToast(
+        err instanceof Error ? err.message : "Failed to reject",
+        "error",
+      );
     }
   };
 
-  const handleEditHoliday = async (holiday: AnyRecord, updates: { title?: string; description?: string; startDate?: string; endDate?: string }) => {
+  const handleEditHoliday = async (
+    holiday: AnyRecord,
+    updates: {
+      title?: string;
+      description?: string;
+      startDate?: string;
+      endDate?: string;
+    },
+  ) => {
     try {
       await apiFetch("/api/attendance/holidays", {
         method: "PUT",
-        body: JSON.stringify({ id: holiday._id, ...updates })
+        body: JSON.stringify({ id: holiday._id, ...updates }),
       });
       loadData();
       showToast("Holiday updated.");
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to update holiday", "error");
+      showToast(
+        err instanceof Error ? err.message : "Failed to update holiday",
+        "error",
+      );
     }
   };
 
@@ -799,12 +956,15 @@ function AttendanceTab({ profile, showToast }: { profile: AnyRecord | null; show
     try {
       await apiFetch("/api/attendance/holidays", {
         method: "DELETE",
-        body: JSON.stringify({ id: holiday._id })
+        body: JSON.stringify({ id: holiday._id }),
       });
       loadData();
       showToast("Holiday deleted.");
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to delete holiday", "error");
+      showToast(
+        err instanceof Error ? err.message : "Failed to delete holiday",
+        "error",
+      );
     }
   };
 
@@ -817,8 +977,18 @@ function AttendanceTab({ profile, showToast }: { profile: AnyRecord | null; show
   const year = viewDate.getFullYear();
 
   const monthNames = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
   ];
 
   const prevMonth = () => {
@@ -926,6 +1096,18 @@ function AttendanceTab({ profile, showToast }: { profile: AnyRecord | null; show
     });
   };
 
+  const getWfhDetail = (day: number | null) => {
+    if (!day) return null;
+    const date = new Date(year, month, day);
+    date.setHours(0, 0, 0, 0);
+    const targetTime = date.getTime();
+    return wfhDates.find((wfh) => {
+      const wfhD = new Date(wfh.date);
+      wfhD.setHours(0, 0, 0, 0);
+      return wfhD.getTime() === targetTime;
+    }) || null;
+  };
+
   const todayLeave = requests.some((req: any) => {
     if (req.status !== "approved") return false;
     const start = new Date(req.startDate);
@@ -935,16 +1117,32 @@ function AttendanceTab({ profile, showToast }: { profile: AnyRecord | null; show
     return todayDate >= start && todayDate <= end;
   });
 
+  const todayAttendance = history.find((entry: any) => {
+    const entryDate = normalizeDate(new Date(entry.date));
+    return entryDate.getTime() === todayDate.getTime();
+  }) ?? null;
+
+  const isTodayWfh = useMemo(() => {
+    const todayTime = todayDate.getTime();
+    return wfhDates.some((wfh) => {
+      const wfhD = new Date(wfh.date);
+      wfhD.setHours(0, 0, 0, 0);
+      return wfhD.getTime() === todayTime;
+    });
+  }, [wfhDates, todayDate]);
+
   const currentHoliday = (day: number | null) => {
     if (!day) return null;
     const date = new Date(year, month, day);
-    return holidays.find((holiday: any) => {
-      const start = new Date(holiday.startDate);
-      const end = new Date(holiday.endDate);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-      return date >= start && date <= end;
-    }) || null;
+    return (
+      holidays.find((holiday: any) => {
+        const start = new Date(holiday.startDate);
+        const end = new Date(holiday.endDate);
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+        return date >= start && date <= end;
+      }) || null
+    );
   };
 
   const weekDays = ["SUN.", "Mon.", "Tue.", "Wed.", "Thr.", "Fri.", "Sat."];
@@ -953,9 +1151,12 @@ function AttendanceTab({ profile, showToast }: { profile: AnyRecord | null; show
     return (
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-          <p className="text-4xl font-extrabold tracking-tight text-slate-900">{todayDate.toLocaleDateString()}</p>
+          <p className="text-4xl font-extrabold tracking-tight text-slate-900">
+            {todayDate.toLocaleDateString()}
+          </p>
           <p className="max-w-md text-sm text-slate-500">
-            Join a company or team to access attendance, leave, and holiday features. Right now only the current date is shown.
+            Join a company or team to access attendance, leave, and holiday
+            features. Right now only the current date is shown.
           </p>
         </div>
       </section>
@@ -965,285 +1166,367 @@ function AttendanceTab({ profile, showToast }: { profile: AnyRecord | null; show
   return (
     <>
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h3 className="text-xl font-semibold">Attendance Tracker</h3>
-          <p className="text-sm text-slate-500">Monitor your daily presence and check-in history.</p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <button
-            onClick={() => setShowRequestsModal(true)}
-            className="relative rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
-          >
-            Requests
-            {requests.filter(r => r.status === "pending" || r.status === "manager-approved").length > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] text-white">
-                {requests.filter(r => r.status === "pending" || r.status === "manager-approved").length}
-              </span>
-            )}
-          </button>
-          {profile?.role === "admin" && (
-            <button
-              onClick={() => setShowLeaveHistoryModal(true)}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
-            >
-              Manage Holidays
-            </button>
-          )}
-          {profile?.role === "admin" ? (
-            <button
-              onClick={() => setShowHolidayModal(true)}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
-            >
-              Add Holiday
-            </button>
-          ) : (
-            <button
-              onClick={() => setShowLeaveModal(true)}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
-            >
-              Ask Leave
-            </button>
-          )}
-          <button
-            disabled={isCheckingIn || todayLeave}
-            onClick={handleCheckIn}
-            className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition shadow-sm disabled:opacity-50"
-            title={todayLeave ? "Today is approved leave, check-in disabled." : "Check in for today."}
-          >
-            {isCheckingIn ? "Checking..." : todayLeave ? "On Leave" : "Check In"}
-          </button>
-        </div>
-      </div>
-
-      {showLeaveModal && <LeaveModal onClose={() => setShowLeaveModal(false)} onRefresh={loadData} showToast={showToast} />}
-      {showHolidayModal && <HolidayModal onClose={() => setShowHolidayModal(false)} onRefresh={loadData} showToast={showToast} />}
-      {showLeaveHistoryModal && (
-        <AdminLeaveHistoryModal
-          requests={requests}
-          holidays={holidays}
-          onClose={() => setShowLeaveHistoryModal(false)}
-          onEditHoliday={(holiday) => { setSelectedHoliday(holiday); setShowEditHolidayModal(true); }}
-          onDeleteHoliday={requestHolidayDelete}
-        />
-      )}
-      {showEditHolidayModal && selectedHoliday && (
-        <EditHolidayModal
-          holiday={selectedHoliday}
-          onClose={() => { setShowEditHolidayModal(false); setSelectedHoliday(null); }}
-          onSave={async (updates) => {
-            if (!selectedHoliday) return;
-            await handleEditHoliday(selectedHoliday, updates);
-          }}
-          onDelete={async () => {
-            if (selectedHoliday) {
-              await handleDeleteHoliday(selectedHoliday);
-              setShowEditHolidayModal(false);
-              setSelectedHoliday(null);
-            }
-          }}
-          showToast={showToast}
-        />
-      )}
-
-      {showDeleteHolidayConfirm && holidayToDelete && (
-        <div className="fixed inset-0 z-[90] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
-            <h3 className="text-xl font-bold text-slate-900">Confirm Delete</h3>
-            <p className="mt-2 text-sm text-slate-500">
-              Delete holiday "{String(holidayToDelete.title)}"? This action cannot be undone.
+        <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h3 className="text-xl font-semibold">Attendance Tracker</h3>
+            <p className="text-sm text-slate-500">
+              Monitor your daily presence and check-in history.
             </p>
-            <div className="mt-6 flex gap-3">
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setShowRequestsModal(true)}
+              className="relative rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+            >
+              Requests
+              {requests.filter(
+                (r) =>
+                  r.status === "pending" || r.status === "manager-approved",
+              ).length > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] text-white">
+                    {
+                      requests.filter(
+                        (r) =>
+                          r.status === "pending" ||
+                          r.status === "manager-approved",
+                      ).length
+                    }
+                  </span>
+                )}
+            </button>
+            {profile?.role === "admin" && (
               <button
-                type="button"
-                onClick={() => setShowDeleteHolidayConfirm(false)}
-                className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                onClick={() => setShowLeaveHistoryModal(true)}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
               >
-                Cancel
+                Manage Holidays
               </button>
+            )}
+            {profile?.role === "admin" ? (
               <button
-                type="button"
-                onClick={async () => {
-                  await handleDeleteHoliday(holidayToDelete);
-                  setShowDeleteHolidayConfirm(false);
-                  setHolidayToDelete(null);
-                }}
-                className="flex-1 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700"
+                onClick={() => setShowHolidayModal(true)}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
               >
-                Delete
+                Add Holiday
               </button>
-            </div>
+            ) : (
+              <button
+                onClick={() => setShowLeaveModal(true)}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+              >
+                Ask Leave
+              </button>
+            )}
+            {(wfhCheckInMode === "all-day" || isTodayWfh) && (
+              todayAttendance && !todayAttendance.checkOut ? (
+                <button
+                  disabled={isCheckingIn}
+                  onClick={handleCheckOut}
+                  className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 transition shadow-sm disabled:opacity-50"
+                  title="Check out for today"
+                >
+                  {isCheckingIn ? "Processing..." : "Check Out"}
+                </button>
+              ) : !todayAttendance ? (
+                <button
+                  disabled={isCheckingIn || todayLeave}
+                  onClick={handleCheckIn}
+                  className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition shadow-sm disabled:opacity-50"
+                  title={
+                    todayLeave
+                      ? "Today is approved leave, check-in disabled."
+                      : "Check in for today."
+                  }
+                >
+                  {isCheckingIn
+                    ? "Checking..."
+                    : todayLeave
+                      ? "On Leave"
+                      : "Check In"}
+                </button>
+              ) : null
+            )}
           </div>
         </div>
-      )}
 
-      {showRequestsModal && (
-        <RequestsListModal
-          requests={requests}
-          onClose={() => setShowRequestsModal(false)}
-          onApprove={handleApprove}
-          onReject={(id) => setRejectingId(id)}
-          currentUserId={session?.user?.id}
-          onViewDay={(dateStr) => { setShowRequestsModal(false); setShowLeaveModal(false); setSelectedDate(new Date(dateStr)); }}
-        />
-      )}
+        {showLeaveModal && (
+          <LeaveModal
+            onClose={() => setShowLeaveModal(false)}
+            onRefresh={loadData}
+            showToast={showToast}
+          />
+        )}
+        {showHolidayModal && (
+          <HolidayModal
+            onClose={() => setShowHolidayModal(false)}
+            onRefresh={loadData}
+            showToast={showToast}
+          />
+        )}
+        {showLeaveHistoryModal && (
+          <AdminLeaveHistoryModal
+            requests={requests}
+            holidays={holidays}
+            onClose={() => setShowLeaveHistoryModal(false)}
+            onEditHoliday={(holiday) => {
+              setSelectedHoliday(holiday);
+              setShowEditHolidayModal(true);
+            }}
+            onDeleteHoliday={requestHolidayDelete}
+          />
+        )}
+        {showEditHolidayModal && selectedHoliday && (
+          <EditHolidayModal
+            holiday={selectedHoliday}
+            onClose={() => {
+              setShowEditHolidayModal(false);
+              setSelectedHoliday(null);
+            }}
+            onSave={async (updates) => {
+              if (!selectedHoliday) return;
+              await handleEditHoliday(selectedHoliday, updates);
+            }}
+            onDelete={async () => {
+              if (selectedHoliday) {
+                await handleDeleteHoliday(selectedHoliday);
+                setShowEditHolidayModal(false);
+                setSelectedHoliday(null);
+              }
+            }}
+            showToast={showToast}
+          />
+        )}
 
-      {rejectingId && (
-        <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/40 p-4 backdrop-blur-md">
-          <div className="w-full max-w-md animate-in zoom-in-95 fade-in duration-200 rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
-            <h3 className="text-xl font-bold text-slate-900">Reject Request</h3>
-            <p className="mt-1 text-sm text-slate-500">Please provide a reason for rejection.</p>
-
-            <div className="mt-6 space-y-4">
-              <textarea
-                required
-                rows={4}
-                placeholder="Reason for rejection (required)..."
-                value={rejectionReason}
-                onChange={e => setRejectionReason(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 p-4 text-sm focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all resize-none"
-              />
-
-              <div className="flex gap-3 pt-2">
+        {showDeleteHolidayConfirm && holidayToDelete && (
+          <div className="fixed inset-0 z-[90] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+              <h3 className="text-xl font-bold text-slate-900">
+                Confirm Delete
+              </h3>
+              <p className="mt-2 text-sm text-slate-500">
+                Delete holiday "{String(holidayToDelete.title)}"? This action
+                cannot be undone.
+              </p>
+              <div className="mt-6 flex gap-3">
                 <button
-                  onClick={() => { setRejectingId(null); setRejectionReason(""); }}
-                  className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition"
+                  type="button"
+                  onClick={() => setShowDeleteHolidayConfirm(false)}
+                  className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                 >
                   Cancel
                 </button>
                 <button
-                  disabled={!rejectionReason.trim()}
-                  onClick={handleReject}
-                  className="flex-1 rounded-xl bg-rose-600 py-3 text-sm font-semibold text-white hover:bg-rose-700 transition shadow-lg shadow-rose-500/20 disabled:opacity-50"
+                  type="button"
+                  onClick={async () => {
+                    await handleDeleteHoliday(holidayToDelete);
+                    setShowDeleteHolidayConfirm(false);
+                    setHolidayToDelete(null);
+                  }}
+                  className="flex-1 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700"
                 >
-                  Reject Request
+                  Delete
                 </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="mb-8 flex flex-col items-center justify-center gap-4">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={prevMonth}
-            className="grid h-10 w-12 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm"
-          >
-            <ChevronLeft size={20} />
-          </button>
+        {showRequestsModal && (
+          <RequestsListModal
+            requests={requests}
+            onClose={() => setShowRequestsModal(false)}
+            onApprove={handleApprove}
+            onReject={(id) => setRejectingId(id)}
+            currentUserId={session?.user?.id}
+            onViewDay={(dateStr) => {
+              setShowRequestsModal(false);
+              setShowLeaveModal(false);
+              setSelectedDate(new Date(dateStr));
+            }}
+          />
+        )}
 
-          <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 shadow-sm">
-            <div className="border-r border-slate-200 bg-slate-50 px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-600">
-              {monthNames[month]}
-            </div>
-            <div className="bg-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-900">
-              {year}
-            </div>
-          </div>
+        {rejectingId && (
+          <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/40 p-4 backdrop-blur-md">
+            <div className="w-full max-w-md animate-in zoom-in-95 fade-in duration-200 rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+              <h3 className="text-xl font-bold text-slate-900">
+                Reject Request
+              </h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Please provide a reason for rejection.
+              </p>
 
-          <button
-            onClick={nextMonth}
-            className="grid h-10 w-12 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm"
-          >
-            <ChevronRight size={20} />
-          </button>
-        </div>
-      </div>
+              <div className="mt-6 space-y-4">
+                <textarea
+                  required
+                  rows={4}
+                  placeholder="Reason for rejection (required)..."
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 p-4 text-sm focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all resize-none"
+                />
 
-      <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4">
-        <div className="grid grid-cols-7 gap-3">
-          {weekDays.map((wd, i) => (
-            <div
-              key={wd}
-              className={`flex flex-col gap-3 rounded-2xl p-2 pb-6 transition-all ${i === 0
-                ? "bg-rose-50/50 text-rose-600 border border-rose-100/50"
-                : "bg-emerald-50/50 text-emerald-600 border border-emerald-100/50"
-                }`}
-            >
-              <span className="text-center text-[10px] font-black uppercase tracking-tighter sm:text-xs">
-                {wd}
-              </span>
-              <div className="space-y-2">
-                {Array.from({ length: numWeeks }).map((_, rowIndex) => {
-                  const dayIndex = rowIndex * 7 + i;
-                  const day = days[dayIndex];
-                  if (day === undefined) return null;
-
-                  const today = isToday(day);
-                  const checkedIn = isCheckedIn(day);
-                  const leave = isOnLeave(day);
-                  const pendingLeave = isPendingLeave(day);
-                  const holiday = isHoliday(day);
-                  const holidayDetails = currentHoliday(day);
-                  const past = isPastDay(day);
-                  const weekend = isWeekend(day);
-                  const beforeStart = isBeforeAttendanceStart(day);
-                  const missed = past && !checkedIn && !leave && !holiday && !pendingLeave && !weekend && !beforeStart;
-                  return (
-                    <div
-                      key={rowIndex}
-                      onClick={() => {
-                        const date = getDateForDay(day);
-                        if (date && !isBeforeAttendanceStart(day)) {
-                          // Close other modals so the day details are visible
-                          setShowLeaveModal(false);
-                          setShowRequestsModal(false);
-                          setRejectingId(null);
-                          setSelectedDate(date);
-                        }
-                      }}
-                      role={day ? "button" : undefined}
-                      tabIndex={day ? 0 : undefined}
-                      className={`relative cursor-pointer grid h-10 w-full place-items-center rounded-xl text-xs font-bold sm:h-14 sm:text-sm transition-all ${day
-                        ? beforeStart
-                          ? "bg-slate-100 text-slate-400 border border-slate-200 shadow-sm"
-                          : pendingLeave
-                            ? "bg-amber-50 text-amber-900 border border-amber-200 shadow-sm"
-                            : holiday
-                              ? "bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 shadow-sm"
-                              : today
-                                ? checkedIn
-                                  ? "bg-sky-100 text-sky-700 border border-sky-200 shadow-inner"
-                                  : "bg-white text-rose-600 border border-rose-200 shadow-sm"
-                                : checkedIn
-                                  ? "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm"
-                                  : leave
-                                    ? "bg-emerald-100 text-rose-600 border border-emerald-200 shadow-sm"
-                                    : weekend
-                                      ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm"
-                                      : missed
-                                        ? "bg-white text-rose-600 border border-rose-200 shadow-sm"
-                                        : "bg-white shadow-sm border border-slate-100 text-slate-700"
-                        : "opacity-0"
-                        }`}
-                    >
-                      {day}
-                      {day && (pendingLeave || holiday || leave || (today && !checkedIn) || (past && checkedIn) || missed) && (
-                        <span className="absolute right-1 top-1 rounded-full bg-white/90 p-0.5">
-                          {pendingLeave ? (
-                            <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                          ) : holiday ? (
-                            <Calendar className="h-3.5 w-3.5 text-fuchsia-600" />
-                          ) : leave ? (
-                            <Check className="h-3.5 w-3.5 text-rose-600" />
-                          ) : today && !checkedIn ? (
-                            <X className="h-3.5 w-3.5 text-rose-600" />
-                          ) : missed ? (
-                            <X className="h-3.5 w-3.5 text-rose-600" />
-                          ) : (
-                            <Check className="h-3.5 w-3.5 text-emerald-600" />
-                          )}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      setRejectingId(null);
+                      setRejectionReason("");
+                    }}
+                    className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={!rejectionReason.trim()}
+                    onClick={handleReject}
+                    className="flex-1 rounded-xl bg-rose-600 py-3 text-sm font-semibold text-white hover:bg-rose-700 transition shadow-lg shadow-rose-500/20 disabled:opacity-50"
+                  >
+                    Reject Request
+                  </button>
+                </div>
               </div>
             </div>
-          ))}
+          </div>
+        )}
+
+        <div className="mb-8 flex flex-col items-center justify-center gap-4">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={prevMonth}
+              className="grid h-10 w-12 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm"
+            >
+              <ChevronLeft size={20} />
+            </button>
+
+            <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+              <div className="border-r border-slate-200 bg-slate-50 px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-600">
+                {monthNames[month]}
+              </div>
+              <div className="bg-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-900">
+                {year}
+              </div>
+            </div>
+
+            <button
+              onClick={nextMonth}
+              className="grid h-10 w-12 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
         </div>
-      </div>
+
+        <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4">
+          <div className="grid grid-cols-7 gap-3">
+            {weekDays.map((wd, i) => (
+              <div
+                key={wd}
+                className={`flex flex-col gap-3 rounded-2xl p-2 pb-6 transition-all ${i === 0
+                    ? "bg-rose-50/50 text-rose-600 border border-rose-100/50"
+                    : "bg-emerald-50/50 text-emerald-600 border border-emerald-100/50"
+                  }`}
+              >
+                <span className="text-center text-[10px] font-black uppercase tracking-tighter sm:text-xs">
+                  {wd}
+                </span>
+                <div className="space-y-2">
+                  {Array.from({ length: numWeeks }).map((_, rowIndex) => {
+                    const dayIndex = rowIndex * 7 + i;
+                    const day = days[dayIndex];
+                    if (day === undefined) return null;
+
+                    const today = isToday(day);
+                    const checkedIn = isCheckedIn(day);
+                    const leave = isOnLeave(day);
+                    const pendingLeave = isPendingLeave(day);
+                    const holiday = isHoliday(day);
+                    const holidayDetails = currentHoliday(day);
+                    const past = isPastDay(day);
+                    const weekend = isWeekend(day);
+                    const beforeStart = isBeforeAttendanceStart(day);
+                    const missed =
+                      past &&
+                      !checkedIn &&
+                      !leave &&
+                      !holiday &&
+                      !pendingLeave &&
+                      !weekend &&
+                      !beforeStart;
+                    return (
+                      <div
+                        key={rowIndex}
+                        onClick={() => {
+                          const date = getDateForDay(day);
+                          if (date && !isBeforeAttendanceStart(day)) {
+                            // Close other modals so the day details are visible
+                            setShowLeaveModal(false);
+                            setShowRequestsModal(false);
+                            setRejectingId(null);
+                            setSelectedDate(date);
+                          }
+                        }}
+                        role={day ? "button" : undefined}
+                        tabIndex={day ? 0 : undefined}
+                        className={`relative cursor-pointer grid h-10 w-full place-items-center rounded-xl text-xs font-bold sm:h-14 sm:text-sm transition-all ${day
+                            ? beforeStart
+                              ? "bg-slate-100 text-slate-400 border border-slate-200 shadow-sm"
+                              : pendingLeave
+                                ? "bg-amber-50 text-amber-900 border border-amber-200 shadow-sm"
+                                : holiday
+                                  ? "bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 shadow-sm"
+                                  : today
+                                    ? checkedIn
+                                      ? "bg-sky-100 text-sky-700 border border-sky-200 shadow-inner"
+                                      : "bg-white text-rose-600 border border-rose-200 shadow-sm"
+                                    : checkedIn
+                                      ? "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm"
+                                      : leave
+                                        ? "bg-emerald-100 text-rose-600 border border-emerald-200 shadow-sm"
+                                        : weekend
+                                          ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm"
+                                          : missed
+                                            ? "bg-white text-rose-600 border border-rose-200 shadow-sm"
+                                            : "bg-white shadow-sm border border-slate-100 text-slate-700"
+                            : "opacity-0"
+                          }`}
+                      >
+                        {day}
+                        {day && getWfhDetail(day) && (
+                          <span className="absolute left-1 top-1 rounded-full bg-white/90 p-0.5 shadow-sm">
+                            <Pen className="h-3 w-3 text-emerald-600" />
+                          </span>
+                        )}
+                        {day &&
+                          (pendingLeave ||
+                            holiday ||
+                            leave ||
+                            (today && !checkedIn) ||
+                            (past && checkedIn) ||
+                            missed) && (
+                            <span className="absolute right-1 top-1 rounded-full bg-white/90 p-0.5">
+                              {pendingLeave ? (
+                                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                              ) : holiday ? (
+                                <Calendar className="h-3.5 w-3.5 text-fuchsia-600" />
+                              ) : leave ? (
+                                <Check className="h-3.5 w-3.5 text-rose-600" />
+                              ) : today && !checkedIn ? (
+                                <X className="h-3.5 w-3.5 text-rose-600" />
+                              ) : missed ? (
+                                <X className="h-3.5 w-3.5 text-rose-600" />
+                              ) : (
+                                <Check className="h-3.5 w-3.5 text-emerald-600" />
+                              )}
+                            </span>
+                          )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
       {selectedDate && (
@@ -1253,14 +1536,28 @@ function AttendanceTab({ profile, showToast }: { profile: AnyRecord | null; show
           history={history}
           requests={requests}
           holidays={holidays}
+          wfhDates={wfhDates}
         />
       )}
     </>
   );
 }
 
-function LeaveModal({ onClose, onRefresh, showToast }: { onClose: () => void; onRefresh: () => void; showToast: (text: string, type?: 'success' | 'error') => void }) {
-  const [formData, setFormData] = useState({ startDate: "", endDate: "", reason: "", attachmentUrl: "" });
+function LeaveModal({
+  onClose,
+  onRefresh,
+  showToast,
+}: {
+  onClose: () => void;
+  onRefresh: () => void;
+  showToast: (text: string, type?: "success" | "error") => void;
+}) {
+  const [formData, setFormData] = useState({
+    startDate: "",
+    endDate: "",
+    reason: "",
+    attachmentUrl: "",
+  });
   const [loading, setLoading] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1268,7 +1565,10 @@ function LeaveModal({ onClose, onRefresh, showToast }: { onClose: () => void; on
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, attachmentUrl: reader.result as string }));
+        setFormData((prev) => ({
+          ...prev,
+          attachmentUrl: reader.result as string,
+        }));
       };
       reader.readAsDataURL(file);
     }
@@ -1278,12 +1578,18 @@ function LeaveModal({ onClose, onRefresh, showToast }: { onClose: () => void; on
     e.preventDefault();
     setLoading(true);
     try {
-      await apiFetch("/api/attendance/leave", { method: "POST", body: JSON.stringify(formData) });
+      await apiFetch("/api/attendance/leave", {
+        method: "POST",
+        body: JSON.stringify(formData),
+      });
       onRefresh();
       showToast("Leave request submitted!");
       onClose();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to submit leave", "error");
+      showToast(
+        err instanceof Error ? err.message : "Failed to submit leave",
+        "error",
+      );
     } finally {
       setLoading(false);
     }
@@ -1293,56 +1599,87 @@ function LeaveModal({ onClose, onRefresh, showToast }: { onClose: () => void; on
     <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
         <h3 className="text-xl font-bold text-slate-900">Ask Leave</h3>
-        <p className="mt-1 text-sm text-slate-500">Submit a leave request for approval.</p>
+        <p className="mt-1 text-sm text-slate-500">
+          Submit a leave request for approval.
+        </p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-xs font-bold uppercase text-slate-500">Start Date</label>
+              <label className="text-xs font-bold uppercase text-slate-500">
+                Start Date
+              </label>
               <input
                 required
                 type="date"
                 value={formData.startDate}
-                onChange={e => setFormData({ ...formData, startDate: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, startDate: e.target.value })
+                }
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-bold uppercase text-slate-500">End Date</label>
+              <label className="text-xs font-bold uppercase text-slate-500">
+                End Date
+              </label>
               <input
                 required
                 type="date"
                 value={formData.endDate}
-                onChange={e => setFormData({ ...formData, endDate: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, endDate: e.target.value })
+                }
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
               />
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-bold uppercase text-slate-500">Reason</label>
+            <label className="text-xs font-bold uppercase text-slate-500">
+              Reason
+            </label>
             <textarea
               required
               rows={3}
               placeholder="Why are you taking leave?"
               value={formData.reason}
-              onChange={e => setFormData({ ...formData, reason: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, reason: e.target.value })
+              }
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
             />
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-bold uppercase text-slate-500">Attachment (Optional)</label>
+            <label className="text-xs font-bold uppercase text-slate-500">
+              Attachment (Optional)
+            </label>
             <div className="flex items-center gap-3">
               <label className="flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500 hover:bg-slate-100 transition-colors">
                 <Camera size={18} />
-                <span>{formData.attachmentUrl ? "Image selected" : "Upload medical/reason document"}</span>
-                <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+                <span>
+                  {formData.attachmentUrl
+                    ? "Image selected"
+                    : "Upload medical/reason document"}
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
               </label>
               {formData.attachmentUrl && (
                 <div className="relative h-12 w-12 overflow-hidden rounded-lg border border-slate-200">
-                  <img src={formData.attachmentUrl} alt="preview" className="h-full w-full object-cover" />
+                  <img
+                    src={formData.attachmentUrl}
+                    alt="preview"
+                    className="h-full w-full object-cover"
+                  />
                   <button
                     type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, attachmentUrl: "" }))}
+                    onClick={() =>
+                      setFormData((prev) => ({ ...prev, attachmentUrl: "" }))
+                    }
                     className="absolute inset-0 grid place-items-center bg-black/40 text-white opacity-0 hover:opacity-100 transition-opacity"
                   >
                     <Trash2 size={14} />
@@ -1352,8 +1689,18 @@ function LeaveModal({ onClose, onRefresh, showToast }: { onClose: () => void; on
             </div>
           </div>
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900">Cancel</button>
-            <button disabled={loading} type="submit" className="rounded-lg bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"
+            >
+              Cancel
+            </button>
+            <button
+              disabled={loading}
+              type="submit"
+              className="rounded-lg bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+            >
               {loading ? "Submitting..." : "Submit"}
             </button>
           </div>
@@ -1363,20 +1710,39 @@ function LeaveModal({ onClose, onRefresh, showToast }: { onClose: () => void; on
   );
 }
 
-function HolidayModal({ onClose, onRefresh, showToast }: { onClose: () => void; onRefresh: () => void; showToast: (text: string, type?: 'success' | 'error') => void }) {
-  const [formData, setFormData] = useState({ title: "", description: "", startDate: "", endDate: "" });
+function HolidayModal({
+  onClose,
+  onRefresh,
+  showToast,
+}: {
+  onClose: () => void;
+  onRefresh: () => void;
+  showToast: (text: string, type?: "success" | "error") => void;
+}) {
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    startDate: "",
+    endDate: "",
+  });
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await apiFetch("/api/attendance/holidays", { method: "POST", body: JSON.stringify(formData) });
+      await apiFetch("/api/attendance/holidays", {
+        method: "POST",
+        body: JSON.stringify(formData),
+      });
       onRefresh();
       showToast("Holiday added successfully!");
       onClose();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to add holiday", "error");
+      showToast(
+        err instanceof Error ? err.message : "Failed to add holiday",
+        "error",
+      );
     } finally {
       setLoading(false);
     }
@@ -1386,27 +1752,37 @@ function HolidayModal({ onClose, onRefresh, showToast }: { onClose: () => void; 
     <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
         <h3 className="text-xl font-bold text-slate-900">Add Holiday</h3>
-        <p className="mt-1 text-sm text-slate-500">Create a future holiday for the organization.</p>
+        <p className="mt-1 text-sm text-slate-500">
+          Create a future holiday for the organization.
+        </p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div className="space-y-1">
-            <label className="text-xs font-bold uppercase text-slate-500">Holiday Title</label>
+            <label className="text-xs font-bold uppercase text-slate-500">
+              Holiday Title
+            </label>
             <input
               required
               type="text"
               value={formData.title}
-              onChange={e => setFormData({ ...formData, title: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, title: e.target.value })
+              }
               placeholder="Holiday name"
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-bold uppercase text-slate-500">Description</label>
+            <label className="text-xs font-bold uppercase text-slate-500">
+              Description
+            </label>
             <textarea
               rows={3}
               value={formData.description}
-              onChange={e => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
               placeholder="Optional holiday note"
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
             />
@@ -1414,30 +1790,48 @@ function HolidayModal({ onClose, onRefresh, showToast }: { onClose: () => void; 
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-xs font-bold uppercase text-slate-500">Start Date</label>
+              <label className="text-xs font-bold uppercase text-slate-500">
+                Start Date
+              </label>
               <input
                 required
                 type="date"
                 value={formData.startDate}
-                onChange={e => setFormData({ ...formData, startDate: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, startDate: e.target.value })
+                }
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-bold uppercase text-slate-500">End Date</label>
+              <label className="text-xs font-bold uppercase text-slate-500">
+                End Date
+              </label>
               <input
                 required
                 type="date"
                 value={formData.endDate}
-                onChange={e => setFormData({ ...formData, endDate: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, endDate: e.target.value })
+                }
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
               />
             </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900">Cancel</button>
-            <button disabled={loading} type="submit" className="rounded-lg bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"
+            >
+              Cancel
+            </button>
+            <button
+              disabled={loading}
+              type="submit"
+              className="rounded-lg bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+            >
               {loading ? "Saving..." : "Save Holiday"}
             </button>
           </div>
@@ -1456,15 +1850,24 @@ function EditHolidayModal({
 }: {
   holiday: AnyRecord;
   onClose: () => void;
-  onSave: (updates: { title: string; description: string; startDate: string; endDate: string }) => Promise<void>;
+  onSave: (updates: {
+    title: string;
+    description: string;
+    startDate: string;
+    endDate: string;
+  }) => Promise<void>;
   onDelete: () => Promise<void>;
-  showToast: (text: string, type?: 'success' | 'error') => void;
+  showToast: (text: string, type?: "success" | "error") => void;
 }) {
   const [formData, setFormData] = useState({
     title: String(holiday.title ?? ""),
     description: String(holiday.description ?? ""),
-    startDate: holiday.startDate ? new Date(String(holiday.startDate)).toISOString().slice(0, 10) : "",
-    endDate: holiday.endDate ? new Date(String(holiday.endDate)).toISOString().slice(0, 10) : "",
+    startDate: holiday.startDate
+      ? new Date(String(holiday.startDate)).toISOString().slice(0, 10)
+      : "",
+    endDate: holiday.endDate
+      ? new Date(String(holiday.endDate)).toISOString().slice(0, 10)
+      : "",
   });
   const [loading, setLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -1476,7 +1879,10 @@ function EditHolidayModal({
       await onSave(formData);
       onClose();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to update holiday", "error");
+      showToast(
+        err instanceof Error ? err.message : "Failed to update holiday",
+        "error",
+      );
     } finally {
       setLoading(false);
     }
@@ -1488,7 +1894,10 @@ function EditHolidayModal({
       await onDelete();
       onClose();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to delete holiday", "error");
+      showToast(
+        err instanceof Error ? err.message : "Failed to delete holiday",
+        "error",
+      );
     } finally {
       setLoading(false);
       setShowDeleteConfirm(false);
@@ -1501,30 +1910,45 @@ function EditHolidayModal({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-xl font-bold text-slate-900">Edit Holiday</h3>
-            <p className="mt-1 text-sm text-slate-500">Update holiday details or remove it entirely.</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Update holiday details or remove it entirely.
+            </p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700">Close</button>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-700"
+          >
+            Close
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div className="space-y-1">
-            <label className="text-xs font-bold uppercase text-slate-500">Holiday Title</label>
+            <label className="text-xs font-bold uppercase text-slate-500">
+              Holiday Title
+            </label>
             <input
               required
               type="text"
               value={formData.title}
-              onChange={e => setFormData({ ...formData, title: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, title: e.target.value })
+              }
               placeholder="Holiday name"
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-bold uppercase text-slate-500">Description</label>
+            <label className="text-xs font-bold uppercase text-slate-500">
+              Description
+            </label>
             <textarea
               rows={3}
               value={formData.description}
-              onChange={e => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
               placeholder="Optional holiday note"
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
             />
@@ -1532,34 +1956,56 @@ function EditHolidayModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-xs font-bold uppercase text-slate-500">Start Date</label>
+              <label className="text-xs font-bold uppercase text-slate-500">
+                Start Date
+              </label>
               <input
                 required
                 type="date"
                 value={formData.startDate}
-                onChange={e => setFormData({ ...formData, startDate: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, startDate: e.target.value })
+                }
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-bold uppercase text-slate-500">End Date</label>
+              <label className="text-xs font-bold uppercase text-slate-500">
+                End Date
+              </label>
               <input
                 required
                 type="date"
                 value={formData.endDate}
-                onChange={e => setFormData({ ...formData, endDate: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, endDate: e.target.value })
+                }
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
               />
             </div>
           </div>
 
           <div className="flex justify-between gap-3 pt-2">
-            <button type="button" onClick={() => setShowDeleteConfirm(true)} className="rounded-lg border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50 transition disabled:opacity-50">
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="rounded-lg border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50 transition disabled:opacity-50"
+            >
               Delete
             </button>
             <div className="flex gap-3">
-              <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900">Cancel</button>
-              <button disabled={loading} type="submit" className="rounded-lg bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={loading}
+                type="submit"
+                className="rounded-lg bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+              >
                 {loading ? "Saving..." : "Save Changes"}
               </button>
             </div>
@@ -1571,10 +2017,26 @@ function EditHolidayModal({
         <div className="fixed inset-0 z-[90] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
             <h3 className="text-xl font-bold text-slate-900">Confirm Delete</h3>
-            <p className="mt-2 text-sm text-slate-500">Delete holiday "{String(holiday.title ?? "")}"? This action cannot be undone.</p>
+            <p className="mt-2 text-sm text-slate-500">
+              Delete holiday "{String(holiday.title ?? "")}"? This action cannot
+              be undone.
+            </p>
             <div className="mt-6 flex gap-3">
-              <button type="button" onClick={() => setShowDeleteConfirm(false)} className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
-              <button type="button" onClick={handleDelete} disabled={loading} className="flex-1 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50">Delete</button>
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={loading}
+                className="flex-1 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50"
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>
@@ -1601,10 +2063,19 @@ function AdminLeaveHistoryModal({
       <div className="w-full max-w-5xl rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200 overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-100 p-6">
           <div>
-            <h3 className="text-xl font-bold text-slate-900">Manage Holidays</h3>
-            <p className="text-sm text-slate-500">Create, update, or remove company holidays from one place.</p>
+            <h3 className="text-xl font-bold text-slate-900">
+              Manage Holidays
+            </h3>
+            <p className="text-sm text-slate-500">
+              Create, update, or remove company holidays from one place.
+            </p>
           </div>
-          <button onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition">Close</button>
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+          >
+            Close
+          </button>
         </div>
 
         <div className="max-h-[70vh] overflow-y-auto p-6">
@@ -1621,14 +2092,30 @@ function AdminLeaveHistoryModal({
               <tbody>
                 {holidays.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-slate-500">No holidays available.</td>
+                    <td
+                      colSpan={4}
+                      className="px-3 py-8 text-center text-sm text-slate-500"
+                    >
+                      No holidays available.
+                    </td>
                   </tr>
                 ) : (
                   holidays.map((h: any) => (
-                    <tr key={h._id} className="border-b bg-white hover:bg-slate-50 transition">
+                    <tr
+                      key={h._id}
+                      className="border-b bg-white hover:bg-slate-50 transition"
+                    >
                       <td className="px-3 py-3 border">{h.title}</td>
-                      <td className="px-3 py-3 border">{h.startDate ? new Date(h.startDate).toLocaleDateString() : "-"}</td>
-                      <td className="px-3 py-3 border">{h.endDate ? new Date(h.endDate).toLocaleDateString() : "-"}</td>
+                      <td className="px-3 py-3 border">
+                        {h.startDate
+                          ? new Date(h.startDate).toLocaleDateString()
+                          : "-"}
+                      </td>
+                      <td className="px-3 py-3 border">
+                        {h.endDate
+                          ? new Date(h.endDate).toLocaleDateString()
+                          : "-"}
+                      </td>
                       <td className="px-3 py-3 border">
                         <div className="flex gap-3">
                           <button
@@ -1677,14 +2164,22 @@ function RequestsListModal({
   const [selectedLeave, setSelectedLeave] = useState<AnyRecord | null>(null);
 
   if (selectedLeave) {
-    return <LeaveDetailsModal
-      leave={selectedLeave}
-      onClose={() => setSelectedLeave(null)}
-      onApprove={() => { onApprove(String(selectedLeave._id)); setSelectedLeave(null); }}
-      onReject={() => { onReject(String(selectedLeave._id)); setSelectedLeave(null); }}
-      currentUserId={currentUserId}
-      onViewDay={onViewDay}
-    />;
+    return (
+      <LeaveDetailsModal
+        leave={selectedLeave}
+        onClose={() => setSelectedLeave(null)}
+        onApprove={() => {
+          onApprove(String(selectedLeave._id));
+          setSelectedLeave(null);
+        }}
+        onReject={() => {
+          onReject(String(selectedLeave._id));
+          setSelectedLeave(null);
+        }}
+        currentUserId={currentUserId}
+        onViewDay={onViewDay}
+      />
+    );
   }
 
   return (
@@ -1693,9 +2188,14 @@ function RequestsListModal({
         <div className="flex items-center justify-between border-b border-slate-100 p-6">
           <div>
             <h3 className="text-xl font-bold text-slate-900">Leave Requests</h3>
-            <p className="text-sm text-slate-500">Manage pending leave approvals and view status.</p>
+            <p className="text-sm text-slate-500">
+              Manage pending leave approvals and view status.
+            </p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 hover:bg-slate-50 text-slate-400">
+          <button
+            onClick={onClose}
+            className="rounded-lg p-2 hover:bg-slate-50 text-slate-400"
+          >
             <Trash2 size={20} />
           </button>
         </div>
@@ -1708,8 +2208,13 @@ function RequestsListModal({
           ) : (
             <div className="space-y-4">
               {requests.map((req: any) => {
-                const isRequester = req.requester?._id === currentUserId || req.requester === currentUserId;
-                const canApprove = !isRequester && (req.status === "pending" || req.status === "manager-approved");
+                const isRequester =
+                  req.requester?._id === currentUserId ||
+                  req.requester === currentUserId;
+                const canApprove =
+                  !isRequester &&
+                  (req.status === "pending" ||
+                    req.status === "manager-approved");
 
                 return (
                   <div
@@ -1720,17 +2225,29 @@ function RequestsListModal({
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900">{req.requester?.name || "User"}</span>
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${req.status === "approved" ? "bg-emerald-100 text-emerald-700" :
-                              req.status === "rejected" ? "bg-rose-100 text-rose-700" :
-                                "bg-amber-100 text-amber-700"
-                            }`}>
+                          <span className="font-bold text-slate-900">
+                            {req.requester?.name || "User"}
+                          </span>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${req.status === "approved"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : req.status === "rejected"
+                                  ? "bg-rose-100 text-rose-700"
+                                  : "bg-amber-100 text-amber-700"
+                              }`}
+                          >
                             {req.status}
                           </span>
                         </div>
-                        <p className="mt-1 text-sm text-slate-600">{req.reason}</p>
+                        <p className="mt-1 text-sm text-slate-600">
+                          {req.reason}
+                        </p>
                         <div className="mt-2 flex items-center gap-4 text-xs text-slate-500">
-                          <span className="flex items-center gap-1"><Clock size={12} /> {new Date(req.startDate).toLocaleDateString()} - {new Date(req.endDate).toLocaleDateString()}</span>
+                          <span className="flex items-center gap-1">
+                            <Clock size={12} />{" "}
+                            {new Date(req.startDate).toLocaleDateString()} -{" "}
+                            {new Date(req.endDate).toLocaleDateString()}
+                          </span>
                           <span className="font-bold">{req.duration} days</span>
                         </div>
                       </div>
@@ -1744,7 +2261,12 @@ function RequestsListModal({
           )}
         </div>
         <div className="border-t border-slate-100 p-4 flex justify-end">
-          <button onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition">Close</button>
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>
@@ -1766,8 +2288,12 @@ function LeaveDetailsModal({
   currentUserId?: string;
   onViewDay?: (dateStr: string) => void;
 }) {
-  const isRequester = (leave.requester as any)?._id === currentUserId || leave.requester === currentUserId;
-  const canApprove = !isRequester && (leave.status === "pending" || leave.status === "manager-approved");
+  const isRequester =
+    (leave.requester as any)?._id === currentUserId ||
+    leave.requester === currentUserId;
+  const canApprove =
+    !isRequester &&
+    (leave.status === "pending" || leave.status === "manager-approved");
 
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-md">
@@ -1778,7 +2304,10 @@ function LeaveDetailsModal({
               <Clock size={32} />
             </div>
           </div>
-          <button onClick={onClose} className="absolute top-4 right-4 h-8 w-8 grid place-items-center rounded-full bg-white/10 text-white hover:bg-white/20 transition">
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 h-8 w-8 grid place-items-center rounded-full bg-white/10 text-white hover:bg-white/20 transition"
+          >
             <LogOut className="rotate-180" size={16} />
           </button>
         </div>
@@ -1786,47 +2315,74 @@ function LeaveDetailsModal({
         <div className="p-8 pt-12">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-2xl font-bold text-slate-900">{String((leave.requester as any)?.name || "User")}</h3>
-              <p className="text-sm font-medium text-slate-500 capitalize">{String(leave.status)} Request</p>
+              <h3 className="text-2xl font-bold text-slate-900">
+                {String((leave.requester as any)?.name || "User")}
+              </h3>
+              <p className="text-sm font-medium text-slate-500 capitalize">
+                {String(leave.status)} Request
+              </p>
             </div>
-            <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${leave.status === "approved" ? "bg-emerald-100 text-emerald-700" :
-                leave.status === "rejected" ? "bg-rose-100 text-rose-700" :
-                  "bg-amber-100 text-amber-700"
-              }`}>
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${leave.status === "approved"
+                  ? "bg-emerald-100 text-emerald-700"
+                  : leave.status === "rejected"
+                    ? "bg-rose-100 text-rose-700"
+                    : "bg-amber-100 text-amber-700"
+                }`}
+            >
               {String(leave.status)}
             </span>
           </div>
 
           <div className="mt-8 grid grid-cols-2 gap-6 rounded-2xl bg-slate-50 p-5">
             <div className="space-y-1">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Duration</p>
-              <p className="text-sm font-bold text-slate-900">{Number(leave.duration)} Days</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                Duration
+              </p>
+              <p className="text-sm font-bold text-slate-900">
+                {Number(leave.duration)} Days
+              </p>
             </div>
             <div className="space-y-1">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Date Range</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                Date Range
+              </p>
               <p className="text-sm font-bold text-slate-900">
-                {new Date(String(leave.startDate)).toLocaleDateString()} - {new Date(String(leave.endDate)).toLocaleDateString()}
+                {new Date(String(leave.startDate)).toLocaleDateString()} -{" "}
+                {new Date(String(leave.endDate)).toLocaleDateString()}
               </p>
             </div>
           </div>
 
           <div className="mt-8 space-y-6">
             <div className="space-y-2">
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Reason for Leave</p>
-              <p className="text-sm leading-relaxed text-slate-700">{String(leave.reason)}</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                Reason for Leave
+              </p>
+              <p className="text-sm leading-relaxed text-slate-700">
+                {String(leave.reason)}
+              </p>
             </div>
 
             {!!leave.attachmentUrl && (
               <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Attachments</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Attachments
+                </p>
                 <div className="group relative aspect-video w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-                  <img src={String(leave.attachmentUrl)} alt="attachment" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                  <img
+                    src={String(leave.attachmentUrl)}
+                    alt="attachment"
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  />
                   <a
                     href={String(leave.attachmentUrl)}
                     download="attachment"
                     className="absolute inset-0 grid place-items-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
                   >
-                    <div className="rounded-full bg-white px-4 py-2 text-xs font-bold text-slate-900 shadow-xl">View Original</div>
+                    <div className="rounded-full bg-white px-4 py-2 text-xs font-bold text-slate-900 shadow-xl">
+                      View Original
+                    </div>
                   </a>
                 </div>
               </div>
@@ -1834,8 +2390,12 @@ function LeaveDetailsModal({
 
             {leave.status === "rejected" && !!leave.rejectionReason && (
               <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-5">
-                <p className="text-xs font-bold uppercase tracking-wide text-rose-500">Rejection Reason</p>
-                <p className="mt-2 text-sm leading-relaxed text-rose-700 font-medium">{String(leave.rejectionReason)}</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-rose-500">
+                  Rejection Reason
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-rose-700 font-medium">
+                  {String(leave.rejectionReason)}
+                </p>
               </div>
             )}
           </div>
@@ -1843,13 +2403,19 @@ function LeaveDetailsModal({
           {canApprove && (
             <div className="mt-10 flex gap-4">
               <button
-                onClick={(e) => { e.stopPropagation(); onReject(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReject();
+                }}
                 className="flex-1 rounded-2xl border border-rose-200 py-4 text-sm font-bold text-rose-600 hover:bg-rose-50 transition shadow-sm"
               >
                 Reject
               </button>
               <button
-                onClick={(e) => { e.stopPropagation(); onApprove(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onApprove();
+                }}
                 className="flex-1 rounded-2xl bg-emerald-600 py-4 text-sm font-bold text-white hover:bg-emerald-700 transition shadow-xl shadow-emerald-600/20"
               >
                 Approve
@@ -1889,7 +2455,21 @@ function LeaveDetailsModal({
   );
 }
 
-function DayDetailsModal({ date, onClose, history, requests, holidays }: { date: Date; onClose: () => void; history: AnyRecord[]; requests: AnyRecord[]; holidays: AnyRecord[] }) {
+function DayDetailsModal({
+  date,
+  onClose,
+  history,
+  requests,
+  holidays,
+  wfhDates = [],
+}: {
+  date: Date;
+  onClose: () => void;
+  history: AnyRecord[];
+  requests: AnyRecord[];
+  holidays: AnyRecord[];
+  wfhDates?: { date: string; reason: string }[];
+}) {
   const attendance = history.find((h: any) => {
     const d = new Date(h.date);
     d.setHours(0, 0, 0, 0);
@@ -1912,24 +2492,54 @@ function DayDetailsModal({ date, onClose, history, requests, holidays }: { date:
     return date >= start && date <= end;
   });
 
+  const wfh = wfhDates.find((w: any) => {
+    const d = new Date(w.date);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime() === date.getTime();
+  });
+
   return (
     <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-md">
       <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-bold">{date.toLocaleDateString()}</h3>
-          <button onClick={onClose} className="text-sm text-slate-500">Close</button>
+          <button onClick={onClose} className="text-sm text-slate-500 hover:text-slate-800 font-medium">
+            Close
+          </button>
         </div>
 
         <div className="space-y-4">
+          {wfh && (
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-bold text-emerald-800 flex items-center gap-1.5">
+                  <Pen className="h-4 w-4 text-emerald-600" /> Work From Home (WFH)
+                </p>
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">
+                  Assigned
+                </span>
+              </div>
+              {wfh.reason && (
+                <p className="mt-2 text-sm text-slate-700 leading-relaxed">
+                  Reason: {wfh.reason}
+                </p>
+              )}
+            </div>
+          )}
+
           {attendance ? (
             <div className="rounded-xl border border-slate-100 p-4">
               <p className="text-sm font-bold text-slate-900">Check-in</p>
-              <p className="text-sm text-slate-600">{new Date(String(attendance.checkIn)).toLocaleTimeString()}</p>
+              <p className="text-sm text-slate-600">
+                {new Date(String(attendance.checkIn)).toLocaleTimeString()}
+              </p>
             </div>
           ) : (
             <div className="rounded-xl border border-slate-100 p-4">
               <p className="text-sm font-bold text-slate-900">No check-in</p>
-              <p className="text-sm text-slate-600">No attendance recorded for this date.</p>
+              <p className="text-sm text-slate-600">
+                No attendance recorded for this date.
+              </p>
             </div>
           )}
 
@@ -1937,10 +2547,19 @@ function DayDetailsModal({ date, onClose, history, requests, holidays }: { date:
             <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-bold text-emerald-800">Leave</p>
-                {Boolean((leave as any).halfDay) && <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-700">Half-day</span>}
+                {Boolean((leave as any).halfDay) && (
+                  <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-700">
+                    Half-day
+                  </span>
+                )}
               </div>
-              <p className="mt-1 text-sm text-slate-700">{String((leave as any).reason ?? "")}</p>
-              <p className="mt-2 text-xs text-slate-500">Duration: {String((leave as any).duration ?? "")} day(s) • Status: {String((leave as any).status ?? "")}</p>
+              <p className="mt-1 text-sm text-slate-700">
+                {String((leave as any).reason ?? "")}
+              </p>
+              <p className="mt-2 text-xs text-slate-500">
+                Duration: {String((leave as any).duration ?? "")} day(s) •
+                Status: {String((leave as any).status ?? "")}
+              </p>
             </div>
           )}
           {holiday && (
@@ -1948,17 +2567,158 @@ function DayDetailsModal({ date, onClose, history, requests, holidays }: { date:
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-bold text-fuchsia-800">Holiday</p>
-                  <p className="mt-1 text-base font-semibold text-slate-900">{String((holiday as any).title ?? "Company holiday")}</p>
+                  <p className="mt-1 text-base font-semibold text-slate-900">
+                    {String((holiday as any).title ?? "Company holiday")}
+                  </p>
                 </div>
-                <span className="rounded-full bg-fuchsia-100 px-2 py-1 text-xs font-bold text-fuchsia-700">Holiday</span>
+                <span className="rounded-full bg-fuchsia-100 px-2 py-1 text-xs font-bold text-fuchsia-700">
+                  Holiday
+                </span>
               </div>
               {((holiday as any).description ?? "") && (
-                <p className="mt-3 text-sm text-slate-700">{String((holiday as any).description)}</p>
+                <p className="mt-3 text-sm text-slate-700">
+                  {String((holiday as any).description)}
+                </p>
               )}
-              <p className="mt-2 text-xs text-slate-500">Duration: {String((holiday as any).duration ?? "")} day(s)</p>
+              <p className="mt-2 text-xs text-slate-500">
+                Duration: {String((holiday as any).duration ?? "")} day(s)
+              </p>
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function WfhAssignModal({
+  onClose,
+  onRefresh,
+  showToast,
+}: {
+  onClose: () => void;
+  onRefresh: (dates: { date: string; reason: string }[]) => void;
+  showToast: (text: string, type?: "success" | "error") => void;
+}) {
+  const [formData, setFormData] = useState({
+    startDate: "",
+    endDate: "",
+    reason: "",
+  });
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!formData.startDate) return;
+    setLoading(true);
+    try {
+      const res = await apiFetch<{ wfhDates: any[]; wfhCheckInMode: string }>(
+        "/api/company/wfh",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            startDate: formData.startDate,
+            endDate: formData.endDate || formData.startDate,
+            reason: formData.reason,
+          }),
+        }
+      );
+      const mapped = Array.isArray(res.wfhDates)
+        ? res.wfhDates.map((item: any) => {
+          if (item && typeof item === "object") {
+            return {
+              date: String(item.date),
+              reason: item.reason ? String(item.reason) : ""
+            };
+          }
+          return { date: String(item), reason: "" };
+        })
+        : [];
+      onRefresh(mapped);
+      showToast("WFH dates assigned and notifications sent!", "success");
+      onClose();
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Failed to assign WFH",
+        "error"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+        <h3 className="text-xl font-bold text-slate-900">Assign Work From Home</h3>
+        <p className="mt-1 text-sm text-slate-500">
+          Assign Work From Home (WFH) dates for the company.
+        </p>
+
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold uppercase text-slate-500">
+                Start Date
+              </label>
+              <input
+                required
+                type="date"
+                value={formData.startDate}
+                onChange={(e) =>
+                  setFormData({ ...formData, startDate: e.target.value })
+                }
+                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold uppercase text-slate-500">
+                End Date (Optional)
+              </label>
+              <input
+                type="date"
+                value={formData.endDate}
+                onChange={(e) =>
+                  setFormData({ ...formData, endDate: e.target.value })
+                }
+                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-bold uppercase text-slate-500">
+              Reason / Instructions
+            </label>
+            <textarea
+              required
+              rows={3}
+              placeholder="Reason for WFH assignment..."
+              value={formData.reason}
+              onChange={(e) =>
+                setFormData({ ...formData, reason: e.target.value })
+              }
+              className="w-full rounded-xl border border-slate-200 p-4 text-sm resize-none"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !formData.startDate || !formData.reason}
+              className="flex-1 rounded-xl bg-slate-950 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition disabled:opacity-50"
+            >
+              {loading ? "Assigning..." : "Assign WFH"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -2019,7 +2779,7 @@ function ProfileTab({
   profile: AnyRecord | null;
   insights: AnyRecord | null;
   refresh: (silent?: boolean) => Promise<void>;
-  showToast: (text: string, type?: 'success' | 'error') => void;
+  showToast: (text: string, type?: "success" | "error") => void;
 }) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -2029,7 +2789,9 @@ function ProfileTab({
   const [deleting, setDeleting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [companyActionModal, setCompanyActionModal] = useState(false);
-  const [companyActionType, setCompanyActionType] = useState<"hold" | "takedown" | null>(null);
+  const [companyActionType, setCompanyActionType] = useState<
+    "hold" | "takedown" | null
+  >(null);
   const [companyActionConfirm, setCompanyActionConfirm] = useState("");
   const [companyActionLoading, setCompanyActionLoading] = useState(false);
 
@@ -2045,18 +2807,29 @@ function ProfileTab({
 
   const role = profile?.role ? String(profile.role) : "";
   const displayRole = formatRoleWithCustom(role, profile?.customRole);
-  const sectionClass = "rounded-lg border border-slate-200 bg-white p-5 shadow-sm";
+  const sectionClass =
+    "rounded-lg border border-slate-200 bg-white p-5 shadow-sm";
   const avatarUrl = profile?.avatarUrl ? String(profile.avatarUrl) : "";
   const displayName = profile?.name ? String(profile.name) : "User";
-  const initialNotice = company?.noticePeriodDays ? Number(company.noticePeriodDays) : 30;
-  const [noticePeriodDays, setNoticePeriodDays] = useState<number>(initialNotice);
+  const initialNotice = company?.noticePeriodDays
+    ? Number(company.noticePeriodDays)
+    : 30;
+  const [noticePeriodDays, setNoticePeriodDays] =
+    useState<number>(initialNotice);
   const [savingPolicy, setSavingPolicy] = useState(false);
+  // WFH settings (admin)
+  const [wfhDates, setWfhDates] = useState<{ date: string; reason: string }[]>([]);
+  const [wfhMode, setWfhMode] = useState<"all-day" | "wfh-only">("all-day");
+  const [wfhLoading, setWfhLoading] = useState(false);
+  const [showWfhModal, setShowWfhModal] = useState(false);
   const managerTeams = Array.isArray(
     (insights?.manager as AnyRecord | undefined)?.teams,
   )
     ? ((insights?.manager as AnyRecord).teams as AnyRecord[])
     : [];
-  const companyMembers = Array.isArray((insights?.hr as AnyRecord | undefined)?.members)
+  const companyMembers = Array.isArray(
+    (insights?.hr as AnyRecord | undefined)?.members,
+  )
     ? (((insights?.hr as AnyRecord).members as AnyRecord[]) ?? [])
     : [];
   const profileId = String(profile?._id ?? profile?.id ?? "");
@@ -2125,14 +2898,21 @@ function ProfileTab({
       showToast("Policy updated.");
       await refresh(true);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Unable to update policy.", "error");
+      showToast(
+        err instanceof Error ? err.message : "Unable to update policy.",
+        "error",
+      );
     } finally {
       setSavingPolicy(false);
     }
   }
 
   async function executeCompanyAction() {
-    if (String(companyActionConfirm ?? "").trim().toUpperCase() !== "CONFIRM") {
+    if (
+      String(companyActionConfirm ?? "")
+        .trim()
+        .toUpperCase() !== "CONFIRM"
+    ) {
       showToast("Type Confirm to confirm.", "error");
       return;
     }
@@ -2140,7 +2920,10 @@ function ProfileTab({
     if (!companyActionType) return;
     setCompanyActionLoading(true);
     try {
-      const endpoint = companyActionType === "hold" ? "/api/company/hold-freeze" : "/api/company/takedown";
+      const endpoint =
+        companyActionType === "hold"
+          ? "/api/company/hold-freeze"
+          : "/api/company/takedown";
       await apiFetch(endpoint, { method: "POST" });
       showToast(
         companyActionType === "hold"
@@ -2151,9 +2934,88 @@ function ProfileTab({
       setCompanyActionConfirm("");
       await refresh(true);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Unable to complete company action.", "error");
+      showToast(
+        err instanceof Error
+          ? err.message
+          : "Unable to complete company action.",
+        "error",
+      );
     } finally {
       setCompanyActionLoading(false);
+    }
+  }
+
+  async function loadWfh() {
+    if (!company) return;
+    try {
+      setWfhLoading(true);
+      const res = await apiFetch<{ wfhDates: any[]; wfhCheckInMode: string }>(
+        "/api/company/wfh",
+      );
+      const mapped = Array.isArray(res.wfhDates)
+        ? res.wfhDates.map((item: any) => {
+          if (item && typeof item === "object") {
+            return {
+              date: String(item.date),
+              reason: item.reason ? String(item.reason) : ""
+            };
+          }
+          return { date: String(item), reason: "" };
+        })
+        : [];
+      setWfhDates(mapped);
+      setWfhMode(res.wfhCheckInMode === "wfh-only" ? "wfh-only" : "all-day");
+    } catch (err) {
+      // ignore
+    } finally {
+      setWfhLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadWfh();
+  }, [company?.id]);
+
+  async function removeWfhDate(date: string) {
+    try {
+      setWfhLoading(true);
+      const res = await apiFetch<{ wfhDates: any[]; wfhCheckInMode: string }>(
+        "/api/company/wfh",
+        { method: "DELETE", body: JSON.stringify({ date }) },
+      );
+      const mapped = Array.isArray(res.wfhDates)
+        ? res.wfhDates.map((item: any) => {
+          if (item && typeof item === "object") {
+            return {
+              date: String(item.date),
+              reason: item.reason ? String(item.reason) : ""
+            };
+          }
+          return { date: String(item), reason: "" };
+        })
+        : [];
+      setWfhDates(mapped);
+      showToast("WFH date removed.", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to remove WFH date", "error");
+    } finally {
+      setWfhLoading(false);
+    }
+  }
+
+  async function updateWfhMode(mode: "all-day" | "wfh-only") {
+    try {
+      setWfhLoading(true);
+      const res = await apiFetch<{ wfhCheckInMode: string }>("/api/company/wfh", {
+        method: "PATCH",
+        body: JSON.stringify({ mode }),
+      });
+      setWfhMode(res.wfhCheckInMode === "wfh-only" ? "wfh-only" : "all-day");
+      showToast("WFH mode updated.", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to update mode", "error");
+    } finally {
+      setWfhLoading(false);
     }
   }
 
@@ -2205,10 +3067,7 @@ function ProfileTab({
                   : undefined
               }
             />
-            <Row
-              label="Role"
-              value={displayRole || undefined}
-            />
+            <Row label="Role" value={displayRole || undefined} />
             <Row
               label="Company"
               value={company?.name ? String(company.name) : undefined}
@@ -2247,16 +3106,31 @@ function ProfileTab({
               label="Joined By HR"
               value={(() => {
                 const safeRole = String(profile?.role ?? "");
-                if (!["employee", "project-manager", "qa-tester", "others"].includes(safeRole)) return undefined;
+                if (
+                  ![
+                    "employee",
+                    "project-manager",
+                    "qa-tester",
+                    "others",
+                  ].includes(safeRole)
+                )
+                  return undefined;
                 const history = Array.isArray(profile?.membershipHistory)
                   ? (profile?.membershipHistory as AnyRecord[])
                   : [];
-                const lastJoin = [...history].reverse().find((entry) => String(entry?.action ?? "") === "joined-company");
-                const inviter = lastJoin && typeof (lastJoin as AnyRecord)?.inviter === "object"
-                  ? ((lastJoin as AnyRecord).inviter as AnyRecord)
-                  : null;
+                const lastJoin = [...history]
+                  .reverse()
+                  .find(
+                    (entry) => String(entry?.action ?? "") === "joined-company",
+                  );
+                const inviter =
+                  lastJoin &&
+                    typeof (lastJoin as AnyRecord)?.inviter === "object"
+                    ? ((lastJoin as AnyRecord).inviter as AnyRecord)
+                    : null;
                 const inviterRole = inviter?.role ? String(inviter.role) : "";
-                if (!inviter?.name || inviterRole !== "human-resource") return undefined;
+                if (!inviter?.name || inviterRole !== "human-resource")
+                  return undefined;
                 return String(inviter.name);
               })()}
             />
@@ -2282,15 +3156,18 @@ function ProfileTab({
         {role === "human-resource" && profile?.companyStatus === "approved" ? (
           <section className={sectionClass}>
             <h3 className="text-lg font-semibold">Policy</h3>
-<p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-slate-500">
               Configure notice period for your company.
             </p>
 
             <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <label className="text-xs font-semibold uppercase text-slate-500" htmlFor="notice-period">
+              <label
+                className="text-xs font-semibold uppercase text-slate-500"
+                htmlFor="notice-period"
+              >
                 Notice period
               </label>
-                <span>   current notice period:{noticePeriodDays}</span>
+              <span> current notice period:{noticePeriodDays}</span>
               <select
                 className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                 id="notice-period"
@@ -2322,7 +3199,8 @@ function ProfileTab({
               <div>
                 <h3 className="text-lg font-semibold">Company controls</h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  No approved members besides you remain in the company. Use these controls carefully.
+                  No approved members besides you remain in the company. Use
+                  these controls carefully.
                 </p>
               </div>
             </div>
@@ -2352,13 +3230,102 @@ function ProfileTab({
         ) : null}
 
         {role === "admin" && company?.joinCode ? (
-          <CodePanel
-            title="HR Onboarding"
-            code={String(company.joinCode)}
-            label="HR code"
-            empty="Register a company to generate an HR onboarding code."
-            showToast={showToast}
-          />
+          <>
+            <CodePanel
+              title="HR Onboarding"
+              code={String(company.joinCode)}
+              label="HR code"
+              empty="Register a company to generate an HR onboarding code."
+              showToast={showToast}
+            />
+
+            <section className={sectionClass}>
+              <h3 className="text-lg font-semibold">Work From Home (WFH) Settings</h3>
+              <p className="mt-1 text-sm text-slate-500">Configure company-wide Work From Home dates and check-in behavior.</p>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold uppercase text-slate-500">Assigned WFH Dates</label>
+                    <button
+                      onClick={() => setShowWfhModal(true)}
+                      className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 transition"
+                      type="button"
+                    >
+                      Assign WFH
+                    </button>
+                  </div>
+
+                  <div className="mt-4 space-y-2 max-h-60 overflow-y-auto pr-1">
+                    {wfhDates.length === 0 ? (
+                      <p className="text-sm text-slate-500">No WFH dates set.</p>
+                    ) : (
+                      wfhDates.map((wfh) => (
+                        <div key={wfh.date} className="flex flex-col gap-2 rounded-lg border border-slate-100 bg-slate-50 p-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold">{new Date(wfh.date).toLocaleDateString()}</span>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => {
+                                  if (wfh.date) {
+                                    const iso = new Date(wfh.date).toISOString().slice(0, 10);
+                                    navigator.clipboard.writeText(iso);
+                                    showToast("WFH date copied.");
+                                  }
+                                }}
+                                className="rounded-lg border border-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                                type="button"
+                              >
+                                Copy
+                              </button>
+                              <button
+                                onClick={() => removeWfhDate(wfh.date)}
+                                disabled={wfhLoading}
+                                className="rounded-lg border border-rose-200 px-2 py-0.5 text-xs font-medium text-rose-600 hover:bg-rose-50"
+                                type="button"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                          {wfh.reason && (
+                            <p className="text-xs text-slate-500 border-t border-slate-200/60 pt-1 leading-relaxed">
+                              Reason: {wfh.reason}
+                            </p>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold uppercase text-slate-500">Check-in behavior</label>
+                  <p className="mt-1 text-sm text-slate-500">Choose when the check-in button should be enabled.</p>
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input id="mode-all" name="wfh-mode" type="radio" checked={wfhMode === 'all-day'} onChange={() => setWfhMode('all-day')} />
+                      <label htmlFor="mode-all" className="text-sm">Enable check-in all days</label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input id="mode-wfh" name="wfh-mode" type="radio" checked={wfhMode === 'wfh-only'} onChange={() => setWfhMode('wfh-only')} />
+                      <label htmlFor="mode-wfh" className="text-sm">Enable check-in only on WFH days</label>
+                    </div>
+                    <div className="mt-2">
+                      <button
+                        onClick={() => updateWfhMode(wfhMode)}
+                        disabled={wfhLoading}
+                        className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                        type="button"
+                      >
+                        Save mode
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </>
         ) : null}
 
         {role === "project-manager" || role === "qa-tester" ? (
@@ -2394,7 +3361,9 @@ function ProfileTab({
                       </div>
                       {[
                         { code, label: "Team code" },
-                        ...(otherCode ? [{ code: otherCode, label: "Others code" }] : []),
+                        ...(otherCode
+                          ? [{ code: otherCode, label: "Others code" }]
+                          : []),
                       ].map((item) => (
                         <div className="mb-3 last:mb-0" key={item.code}>
                           <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3">
@@ -2410,7 +3379,9 @@ function ProfileTab({
                                 className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                                 onClick={() => {
                                   navigator.clipboard.writeText(item.code);
-                                  showToast(`${teamName} ${item.label.toLowerCase()} copied.`);
+                                  showToast(
+                                    `${teamName} ${item.label.toLowerCase()} copied.`,
+                                  );
                                 }}
                                 title="Copy code"
                                 type="button"
@@ -2424,7 +3395,9 @@ function ProfileTab({
                             onClick={() => {
                               const joinUrl = `${window.location.origin}/join?code=${item.code}`;
                               navigator.clipboard.writeText(joinUrl);
-                              showToast(`${teamName} ${item.label.toLowerCase()} join URL copied.`);
+                              showToast(
+                                `${teamName} ${item.label.toLowerCase()} join URL copied.`,
+                              );
                             }}
                             type="button"
                           >
@@ -2528,11 +3501,15 @@ function ProfileTab({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             <h3 className="text-lg font-semibold text-slate-900">
-              {companyActionType === "hold" ? "Hold & Freeze Company?" : "TakeDown Company?"}
+              {companyActionType === "hold"
+                ? "Hold & Freeze Company?"
+                : "TakeDown Company?"}
             </h3>
 
             <p className="mt-2 text-sm text-slate-600">
-              This action requires typing <span className="font-semibold">Confirm</span> before it will proceed.
+              This action requires typing{" "}
+              <span className="font-semibold">Confirm</span> before it will
+              proceed.
             </p>
             <p className="mt-2 text-sm text-slate-600">
               {companyActionType === "hold"
@@ -2559,7 +3536,11 @@ function ProfileTab({
               </button>
               <button
                 className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={String(companyActionConfirm ?? "").trim().toUpperCase() !== "CONFIRM" || companyActionLoading}
+                disabled={
+                  String(companyActionConfirm ?? "")
+                    .trim()
+                    .toUpperCase() !== "CONFIRM" || companyActionLoading
+                }
                 onClick={executeCompanyAction}
               >
                 {companyActionLoading ? "Processing..." : "Confirm"}
@@ -2568,6 +3549,14 @@ function ProfileTab({
           </div>
         </div>
       ) : null}
+
+      {showWfhModal && (
+        <WfhAssignModal
+          onClose={() => setShowWfhModal(false)}
+          onRefresh={(dates) => setWfhDates(dates)}
+          showToast={showToast}
+        />
+      )}
     </>
   );
 }
@@ -2631,12 +3620,15 @@ function OnboardingTab({
   insights: AnyRecord | null;
   role: string;
   refresh: (silent?: boolean) => Promise<void>;
-  showToast: (text: string, type?: 'success' | 'error') => void;
+  showToast: (text: string, type?: "success" | "error") => void;
 }) {
   const { data: session } = useSession();
   const selfId = String(session?.user?.id ?? "");
   const hrSuffix = selfId
-    ? `-HR${selfId.replace(/[^a-fA-F0-9]/g, "").toUpperCase().slice(-6)}`
+    ? `-HR${selfId
+      .replace(/[^a-fA-F0-9]/g, "")
+      .toUpperCase()
+      .slice(-6)}`
     : "";
   const [companyName, setCompanyName] = useState("");
   const [companyCode, setCompanyCode] = useState("");
@@ -2667,16 +3659,21 @@ function OnboardingTab({
   const managerTeams = Array.isArray(managerInsight?.teams)
     ? (managerInsight.teams as AnyRecord[])
     : [];
-  const companyMembers = Array.isArray(insights?.companyMembers) ? (insights.companyMembers as AnyRecord[]) : [];
+  const companyMembers = Array.isArray(insights?.companyMembers)
+    ? (insights.companyMembers as AnyRecord[])
+    : [];
   const replacementHrCandidates = companyMembers.filter((member) => {
-      const id = String(member.id ?? "");
-      return id && id !== selfId && String(member.role ?? "") === "human-resource";
-    });
+    const id = String(member.id ?? "");
+    return (
+      id && id !== selfId && String(member.role ?? "") === "human-resource"
+    );
+  });
   const replacementRoleCandidates = companyMembers.filter((member) => {
     const id = String(member.id ?? "");
     return id && id !== selfId && String(member.role ?? "") === String(role);
   });
-  const pendingQuitNotice = (insights?.pendingQuitNotice as AnyRecord | undefined) ?? null;
+  const pendingQuitNotice =
+    (insights?.pendingQuitNotice as AnyRecord | undefined) ?? null;
   const [hrQuitModal, setHrQuitModal] = useState(false);
   const [replacementHrId, setReplacementHrId] = useState("");
   const [roleQuitModal, setRoleQuitModal] = useState(false);
@@ -2689,9 +3686,14 @@ function OnboardingTab({
   const [cancelJoinModal, setCancelJoinModal] = useState(false);
   const [cancelJoinConfirmText, setCancelJoinConfirmText] = useState("");
   const [cancellingJoin, setCancellingJoin] = useState(false);
-  const canCreateMoreTeams = managerTeams.length < 5;
-  const companyJoinStatus = profile?.companyStatus ? String(profile.companyStatus) : "none";
-  const teamJoinStatus = profile?.teamStatus ? String(profile.teamStatus) : "none";
+  const teamLimit = role === "human-resource" ? 2 : 5;
+  const canCreateMoreTeams = managerTeams.length < teamLimit;
+  const companyJoinStatus = profile?.companyStatus
+    ? String(profile.companyStatus)
+    : "none";
+  const teamJoinStatus = profile?.teamStatus
+    ? String(profile.teamStatus)
+    : "none";
   const pendingJoinStatus =
     companyJoinStatus === "pending" || teamJoinStatus === "pending"
       ? "pending"
@@ -2719,14 +3721,20 @@ function OnboardingTab({
       showToast("Join request sent to admin.");
       await refresh();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Unable to send join request.", "error");
+      showToast(
+        err instanceof Error ? err.message : "Unable to send join request.",
+        "error",
+      );
     }
   }
 
   async function createTeam(event: FormEvent) {
     event.preventDefault();
     if (!canCreateMoreTeams) {
-      showToast("Team limit reached. Managers can create up to 5 teams.", "error");
+      showToast(
+        `Team limit reached. ${role === "human-resource" ? "HR" : "Managers"} can create up to ${teamLimit} teams.`,
+        "error",
+      );
       return;
     }
     await apiFetch("/api/team", {
@@ -2760,7 +3768,10 @@ function OnboardingTab({
       showToast("HR quit request sent to admin.");
       await refresh();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Unable to request quit.", "error");
+      showToast(
+        err instanceof Error ? err.message : "Unable to request quit.",
+        "error",
+      );
     } finally {
       setRequestingHrQuit(false);
     }
@@ -2782,7 +3793,10 @@ function OnboardingTab({
       showToast("Quit request sent to HR.");
       await refresh();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Unable to request quit.", "error");
+      showToast(
+        err instanceof Error ? err.message : "Unable to request quit.",
+        "error",
+      );
     } finally {
       setRequestingRoleQuit(false);
     }
@@ -2811,14 +3825,21 @@ function OnboardingTab({
       showToast("Quit request cancelled.");
       await refresh();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Unable to cancel request.", "error");
+      showToast(
+        err instanceof Error ? err.message : "Unable to cancel request.",
+        "error",
+      );
     } finally {
       setCancellingQuit(false);
     }
   }
 
   async function cancelJoinRequest() {
-    if (String(cancelJoinConfirmText ?? "").trim().toUpperCase() !== "CANCEL") {
+    if (
+      String(cancelJoinConfirmText ?? "")
+        .trim()
+        .toUpperCase() !== "CANCEL"
+    ) {
       showToast("Type CANCEL to confirm.", "error");
       return;
     }
@@ -2832,7 +3853,10 @@ function OnboardingTab({
       showToast("Join request cancelled.");
       await refresh();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Unable to cancel request.", "error");
+      showToast(
+        err instanceof Error ? err.message : "Unable to cancel request.",
+        "error",
+      );
     } finally {
       setCancellingJoin(false);
     }
@@ -2870,31 +3894,40 @@ function OnboardingTab({
   async function joinTeam(event: FormEvent) {
     event.preventDefault();
     try {
-      const normalizedCode = String(teamCode ?? "").trim().toUpperCase();
+      const normalizedCode = String(teamCode ?? "")
+        .trim()
+        .toUpperCase();
       if (!normalizedCode) {
         showToast("Enter a join code first.", "error");
         return;
       }
 
       if (normalizedCode.startsWith("CO-")) {
-        const data = await apiFetch<{ approvalNotifier?: "hr" | "admin" }>("/api/company/join", {
-          method: "POST",
-          body: JSON.stringify({ code: normalizedCode }),
-        });
+        const data = await apiFetch<{ approvalNotifier?: "hr" | "admin" }>(
+          "/api/company/join",
+          {
+            method: "POST",
+            body: JSON.stringify({ code: normalizedCode }),
+          },
+        );
         showToast(
           data.approvalNotifier === "hr"
             ? "Join request sent to HR."
             : "Join request sent to admin.",
         );
       } else if (normalizedCode.startsWith("TM-")) {
-        const data = await apiFetch<{ approvalNotifier?: "hr" | "manager" }>("/api/team/join", {
+        const data = await apiFetch<{
+          approvalNotifier?: "hr" | "manager" | "tester";
+        }>("/api/team/join", {
           method: "POST",
           body: JSON.stringify({ code: normalizedCode }),
         });
         showToast(
           data.approvalNotifier === "hr"
             ? "Join request sent to HR."
-            : "Join request sent to manager.",
+            : data.approvalNotifier === "tester"
+              ? "Join request sent to tester."
+              : "Join request sent to manager.",
         );
       } else {
         showToast("Invalid join code. Use a CO- or TM- code.", "error");
@@ -2903,7 +3936,10 @@ function OnboardingTab({
 
       await refresh();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Unable to send join request.", "error");
+      showToast(
+        err instanceof Error ? err.message : "Unable to send join request.",
+        "error",
+      );
     }
   }
 
@@ -2944,16 +3980,28 @@ function OnboardingTab({
               secondaryCodes={
                 [
                   company?.managerJoinCode
-                    ? { code: `${String(company.managerJoinCode)}${hrSuffix}`, label: "Manager code" }
+                    ? {
+                      code: `${String(company.managerJoinCode)}${hrSuffix}`,
+                      label: "Manager code",
+                    }
                     : null,
                   company?.testerJoinCode
-                    ? { code: `${String(company.testerJoinCode)}${hrSuffix}`, label: "Tester code" }
+                    ? {
+                      code: `${String(company.testerJoinCode)}${hrSuffix}`,
+                      label: "Tester code",
+                    }
                     : null,
                   company?.employeeJoinCode
-                    ? { code: `${String(company.employeeJoinCode)}${hrSuffix}`, label: "Employee code" }
+                    ? {
+                      code: `${String(company.employeeJoinCode)}${hrSuffix}`,
+                      label: "Employee code",
+                    }
                     : null,
                   company?.otherJoinCode
-                    ? { code: `${String(company.otherJoinCode)}${hrSuffix}`, label: "Others code" }
+                    ? {
+                      code: `${String(company.otherJoinCode)}${hrSuffix}`,
+                      label: "Others code",
+                    }
                     : null,
                 ].filter(Boolean) as { code: string; label: string }[]
               }
@@ -2966,7 +4014,10 @@ function OnboardingTab({
               </p>
               <button
                 className="mt-4 w-full rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={Boolean(insights?.pendingQuit) || replacementHrCandidates.length === 0}
+                disabled={
+                  Boolean(insights?.pendingQuit) ||
+                  replacementHrCandidates.length === 0
+                }
                 type="button"
                 onClick={() => setHrQuitModal(true)}
               >
@@ -2995,7 +4046,9 @@ function OnboardingTab({
             value={companyCode}
             onChange={setCompanyCode}
             onSubmit={joinCompany}
-            status={profile?.companyStatus ? String(profile.companyStatus) : undefined}
+            status={
+              profile?.companyStatus ? String(profile.companyStatus) : undefined
+            }
             onCancelRequest={() => setCancelJoinModal(true)}
           />
         )
@@ -3027,7 +4080,9 @@ function OnboardingTab({
               </button>
             </div>
             <div className="mt-4">
-              <label className="text-xs font-semibold uppercase text-slate-500">Replacement HR</label>
+              <label className="text-xs font-semibold uppercase text-slate-500">
+                Replacement HR
+              </label>
               <select
                 className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                 value={replacementHrId}
@@ -3073,9 +4128,12 @@ function OnboardingTab({
           <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-5 shadow-xl">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h4 className="text-lg font-semibold">Quit company ({formatRole(String(role))})</h4>
+                <h4 className="text-lg font-semibold">
+                  Quit company ({formatRole(String(role))})
+                </h4>
                 <p className="mt-1 text-sm text-slate-500">
-                  Assign another approved {formatRole(String(role))} before quitting.
+                  Assign another approved {formatRole(String(role))} before
+                  quitting.
                 </p>
               </div>
               <button
@@ -3088,7 +4146,9 @@ function OnboardingTab({
               </button>
             </div>
             <div className="mt-4">
-              <label className="text-xs font-semibold uppercase text-slate-500">Replacement</label>
+              <label className="text-xs font-semibold uppercase text-slate-500">
+                Replacement
+              </label>
               <select
                 className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                 value={replacementRoleUserId}
@@ -3097,7 +4157,8 @@ function OnboardingTab({
                 <option value="">Select replacement</option>
                 {replacementRoleCandidates.map((member) => (
                   <option key={String(member.id)} value={String(member.id)}>
-                    {String(member.name ?? "Member")} ({String(member.email ?? "")})
+                    {String(member.name ?? "Member")} (
+                    {String(member.email ?? "")})
                   </option>
                 ))}
               </select>
@@ -3169,7 +4230,9 @@ function OnboardingTab({
               </button>
               <button
                 className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                disabled={!String(cancelQuitReason ?? "").trim() || cancellingQuit}
+                disabled={
+                  !String(cancelQuitReason ?? "").trim() || cancellingQuit
+                }
                 type="button"
                 onClick={() => void cancelQuitRequest()}
               >
@@ -3193,7 +4256,8 @@ function OnboardingTab({
               <div>
                 <h4 className="text-lg font-semibold">Cancel join request</h4>
                 <p className="mt-1 text-sm text-slate-500">
-                  Type CANCEL to confirm you want to remove this pending join request.
+                  Type CANCEL to confirm you want to remove this pending join
+                  request.
                 </p>
               </div>
               <button
@@ -3221,7 +4285,11 @@ function OnboardingTab({
               </button>
               <button
                 className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                disabled={String(cancelJoinConfirmText ?? "").trim().toUpperCase() !== "CANCEL" || cancellingJoin}
+                disabled={
+                  String(cancelJoinConfirmText ?? "")
+                    .trim()
+                    .toUpperCase() !== "CANCEL" || cancellingJoin
+                }
                 type="button"
                 onClick={() => void cancelJoinRequest()}
               >
@@ -3232,11 +4300,15 @@ function OnboardingTab({
         </div>
       ) : null}
 
-      {role === "project-manager" || role === "qa-tester" ? (
+      {["project-manager", "qa-tester", "human-resource"].includes(role) ? (
         profile?.companyStatus === "approved" ? (
           <>
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="text-lg font-semibold">Manager Membership</h3>
+              <h3 className="text-lg font-semibold">
+                {role === "human-resource"
+                  ? "HR Team Management"
+                  : "Manager Membership"}
+              </h3>
 
               <p className="mt-1 text-sm text-slate-500">
                 You are currently assigned to a company.
@@ -3259,7 +4331,7 @@ function OnboardingTab({
 
                     <span className="font-medium">
                       {Array.isArray(managerTeams)
-                        ? `${managerTeams.length}/5`
+                        ? `${managerTeams.length}/${teamLimit}`
                         : "No team created"}
                     </span>
                   </div>
@@ -3301,13 +4373,14 @@ function OnboardingTab({
                   </form>
                 ) : (
                   <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                    Team limit reached (5/5).
+                    Team limit reached ({managerTeams.length}/{teamLimit}).
                   </p>
                 )}
 
                 <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                  Managers can create up to 5 teams. Current:{" "}
-                  {managerTeams.length}/5
+                  {role === "human-resource" ? "HR" : "Managers"} can create up
+                  to {teamLimit} teams. Current: {managerTeams.length}/
+                  {teamLimit}
                 </p>
                 <button
                   className="w-full rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -3328,6 +4401,86 @@ function OnboardingTab({
                 ) : null}
               </div>
             </section>
+
+            {role === "human-resource" && managerTeams.length > 0 ? (
+              <section className="rounded-lg border overflow-y-auto max-h-[500px] border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <Building2 size={18} />
+                  <h3 className="text-lg font-semibold uppercase tracking-wide text-slate-700">
+                    HR Team Onboarding
+                  </h3>
+                </div>
+                <div className="space-y-3">
+                  {managerTeams.map((teamItem) => {
+                    const code = String(teamItem.joinCode ?? "");
+                    const otherCode = String(teamItem.otherJoinCode ?? "");
+                    const teamName = String(teamItem.name ?? "Team");
+                    return (
+                      <div
+                        key={String(teamItem.id)}
+                        className="rounded-lg border border-slate-200 p-4"
+                      >
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <p className="text-sm font-semibold text-slate-800">
+                            {teamName}
+                          </p>
+                          <span className="text-xs text-slate-500">
+                            {Number(teamItem.employeeCount ?? 0)} employees
+                          </span>
+                        </div>
+                        {[
+                          { code, label: "Team code" },
+                          ...(otherCode
+                            ? [{ code: otherCode, label: "Others code" }]
+                            : []),
+                        ].map((item) => (
+                          <div className="mb-3 last:mb-0" key={item.code}>
+                            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3">
+                              <p className="text-xs font-semibold uppercase text-slate-500">
+                                {item.label}
+                              </p>
+                              <div className="mt-2 flex items-center justify-between gap-3">
+                                <p className="min-w-0 truncate font-mono text-sm font-semibold text-indigo-700">
+                                  {item.code}
+                                </p>
+                                <button
+                                  aria-label={`Copy ${teamName} ${item.label}`}
+                                  className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(item.code);
+                                    showToast(
+                                      `${teamName} ${item.label.toLowerCase()} copied.`,
+                                    );
+                                  }}
+                                  title="Copy code"
+                                  type="button"
+                                >
+                                  <Clipboard size={16} />
+                                </button>
+                              </div>
+                            </div>
+                            <button
+                              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-100 px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-sky-200"
+                              onClick={() => {
+                                const joinUrl = `${window.location.origin}/join?code=${item.code}`;
+                                navigator.clipboard.writeText(joinUrl);
+                                showToast(
+                                  `${teamName} ${item.label.toLowerCase()} join URL copied.`,
+                                );
+                              }}
+                              type="button"
+                            >
+                              <Users size={16} />
+                              Copy {item.label} Join URL
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
 
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <h3 className="text-lg font-semibold">Manager Team History</h3>
@@ -3666,7 +4819,7 @@ function ApprovalsTab({
 }: {
   approvals: AnyRecord[];
   refresh: (silent?: boolean) => Promise<void>;
-  showToast: (text: string, type?: 'success' | 'error') => void;
+  showToast: (text: string, type?: "success" | "error") => void;
 }) {
   function requestIdOf(request: AnyRecord) {
     const value = request.id ?? request._id;
@@ -3675,17 +4828,38 @@ function ApprovalsTab({
 
   function quitNoticeInfo(request: AnyRecord) {
     if (!String(request.kind ?? "").startsWith("quit-")) return null;
-    const noticeDays = Number((request.company as AnyRecord | undefined)?.noticePeriodDays ?? 0);
+    const noticeDays = Number(
+      (request.company as AnyRecord | undefined)?.noticePeriodDays ?? 0,
+    );
     if (!Number.isFinite(noticeDays) || noticeDays <= 0) {
-      return { noticeDays: 0, elapsedDays: 0, remainingDays: 0, canApprove: true };
+      return {
+        noticeDays: 0,
+        elapsedDays: 0,
+        remainingDays: 0,
+        canApprove: true,
+      };
     }
-    const createdAt = request.createdAt ? new Date(String(request.createdAt)) : new Date();
-    const elapsedDays = Math.max(0, Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24)));
+    const createdAt = request.createdAt
+      ? new Date(String(request.createdAt))
+      : new Date();
+    const elapsedDays = Math.max(
+      0,
+      Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24)),
+    );
     const remainingDays = Math.max(0, noticeDays - elapsedDays);
-    return { noticeDays, elapsedDays, remainingDays, canApprove: remainingDays === 0 };
+    return {
+      noticeDays,
+      elapsedDays,
+      remainingDays,
+      canApprove: remainingDays === 0,
+    };
   }
 
-  async function decide(id: string, status: "approved" | "rejected", force = false) {
+  async function decide(
+    id: string,
+    status: "approved" | "rejected",
+    force = false,
+  ) {
     if (!id) return;
     await apiFetch(`/api/approvals/${id}`, {
       method: "PATCH",
@@ -3700,7 +4874,10 @@ function ApprovalsTab({
       <h3 className="text-xl font-semibold">Pending Approvals</h3>
       <div className="mt-5 divide-y divide-slate-200">
         {approvals.map((request) => (
-          <div className="flex flex-wrap items-center justify-between gap-4 py-4" key={requestIdOf(request)}>
+          <div
+            className="flex flex-wrap items-center justify-between gap-4 py-4"
+            key={requestIdOf(request)}
+          >
             <div>
               <p className="font-medium">
                 {displayNested(request.requester, "name", "User")},{" "}
@@ -3719,19 +4896,22 @@ function ApprovalsTab({
                 <p className="mt-1 text-xs text-slate-500">
                   {(() => {
                     const info = quitNoticeInfo(request);
-                    if (!info || info.noticeDays <= 0) return "No notice period set.";
+                    if (!info || info.noticeDays <= 0)
+                      return "No notice period set.";
                     return `Notice period: ${info.noticeDays} days. Pending: ${info.elapsedDays} days. Remaining: ${info.remainingDays} days.`;
                   })()}
                 </p>
               ) : null}
               {request.kind === "quit-company" && request.replacementHr ? (
                 <p className="mt-1 text-xs text-slate-500">
-                  Replacement HR: {displayNested(request.replacementHr, "name", "HR")}
+                  Replacement HR:{" "}
+                  {displayNested(request.replacementHr, "name", "HR")}
                 </p>
               ) : null}
               {request.kind === "quit-company" && request.replacementUser ? (
                 <p className="mt-1 text-xs text-slate-500">
-                  Replacement: {displayNested(request.replacementUser, "name", "Member")}
+                  Replacement:{" "}
+                  {displayNested(request.replacementUser, "name", "Member")}
                 </p>
               ) : null}
             </div>
@@ -3805,11 +4985,15 @@ function MembersTab({
   const hr = (insights?.hr as AnyRecord | undefined) ?? null;
   const members = Array.isArray(hr?.members) ? (hr.members as AnyRecord[]) : [];
   const roleCounts = (hr?.roleCounts as AnyRecord | undefined) ?? {};
-  const [modalRole, setModalRole] = useState<(typeof HR_MEMBER_ROLE_KEYS)[number] | null>(null);
+  const [modalRole, setModalRole] = useState<
+    (typeof HR_MEMBER_ROLE_KEYS)[number] | null
+  >(null);
   const [meetingDuration, setMeetingDuration] = useState<number>(30);
   const [invitingFor, setInvitingFor] = useState<string | null>(null);
   const [firingFor, setFiringFor] = useState<string | null>(null);
-  const [fireConfirmMember, setFireConfirmMember] = useState<AnyRecord | null>(null);
+  const [fireConfirmMember, setFireConfirmMember] = useState<AnyRecord | null>(
+    null,
+  );
   const [fireConfirmText, setFireConfirmText] = useState("");
   const [roleDrafts, setRoleDrafts] = useState<Record<string, string>>({});
   const [savingRoleFor, setSavingRoleFor] = useState<string | null>(null);
@@ -3823,13 +5007,25 @@ function MembersTab({
         const value = String(member.customRole ?? "").trim();
         if (value) labels.add(value);
       });
-    return Array.from(labels).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+    return Array.from(labels).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" }),
+    );
   }, [members]);
 
   const otherRoleSelectOptions = useMemo(() => {
     const labels = new Set<string>(otherRoleOptions);
-    ["Intern", "Trainee", "Junior Employee", "Employee", "Manager", "Tester", "Junior HR"].forEach((label) => labels.add(label));
-    return Array.from(labels).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+    [
+      "Intern",
+      "Trainee",
+      "Junior Employee",
+      "Employee",
+      "Manager",
+      "Tester",
+      "Junior HR",
+    ].forEach((label) => labels.add(label));
+    return Array.from(labels).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" }),
+    );
   }, [otherRoleOptions]);
 
   useEffect(() => {
@@ -3838,7 +5034,10 @@ function MembersTab({
       return;
     }
 
-    if (selectedOtherRole !== "all" && !otherRoleOptions.includes(selectedOtherRole)) {
+    if (
+      selectedOtherRole !== "all" &&
+      !otherRoleOptions.includes(selectedOtherRole)
+    ) {
       setSelectedOtherRole(otherRoleOptions[0] ?? "all");
     }
   }, [modalRole, otherRoleOptions, selectedOtherRole]);
@@ -3856,12 +5055,12 @@ function MembersTab({
 
   const modalMembers = modalRole
     ? members.filter((m) => {
-        if (String(m.role ?? "") !== modalRole) return false;
-        if (modalRole === "others" && selectedOtherRole !== "all") {
-          return String(m.customRole ?? "").trim() === selectedOtherRole;
-        }
-        return true;
-      })
+      if (String(m.role ?? "") !== modalRole) return false;
+      if (modalRole === "others" && selectedOtherRole !== "all") {
+        return String(m.customRole ?? "").trim() === selectedOtherRole;
+      }
+      return true;
+    })
     : [];
 
   async function sendMeetingInvite(memberId: string) {
@@ -3873,7 +5072,10 @@ function MembersTab({
       });
       showToast("Meeting invite sent.");
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Could not send invite.", "error");
+      showToast(
+        err instanceof Error ? err.message : "Could not send invite.",
+        "error",
+      );
     } finally {
       setInvitingFor(null);
     }
@@ -3888,7 +5090,11 @@ function MembersTab({
     const member = fireConfirmMember;
     const memberId = String(member?.id ?? "");
     if (!memberId) return;
-    if (String(fireConfirmText ?? "").trim().toUpperCase() !== "FIRE") {
+    if (
+      String(fireConfirmText ?? "")
+        .trim()
+        .toUpperCase() !== "FIRE"
+    ) {
       showToast("Type FIRE to confirm.", "error");
       return;
     }
@@ -3903,14 +5109,20 @@ function MembersTab({
       setModalRole(null);
       await refresh(true);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Could not remove member.", "error");
+      showToast(
+        err instanceof Error ? err.message : "Could not remove member.",
+        "error",
+      );
     } finally {
       setFiringFor(null);
     }
   }
 
   function displayMemberRole(member: AnyRecord) {
-    return formatRoleWithCustom(String(member.role ?? "employee"), member.customRole);
+    return formatRoleWithCustom(
+      String(member.role ?? "employee"),
+      member.customRole,
+    );
   }
 
   function roleDraftFor(member: AnyRecord) {
@@ -3939,7 +5151,10 @@ function MembersTab({
       showToast("Role label updated.");
       await refresh(true);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Unable to update role label.", "error");
+      showToast(
+        err instanceof Error ? err.message : "Unable to update role label.",
+        "error",
+      );
     } finally {
       setSavingRoleFor(null);
     }
@@ -3951,15 +5166,22 @@ function MembersTab({
         <div>
           <h3 className="text-xl font-semibold">Members</h3>
           <p className="mt-1 text-sm text-slate-500">
-            Click a role to view people and send a meeting invite. Invites notify the member in Notifications.
+            Click a role to view people and send a meeting invite. Invites
+            notify the member in Notifications.
           </p>
           {actorRole === "admin" ? (
-            <p className="mt-1 text-xs text-slate-400">Admin view uses the same member tools as HR.</p>
+            <p className="mt-1 text-xs text-slate-400">
+              Admin view uses the same member tools as HR.
+            </p>
           ) : null}
         </div>
         <div className="rounded-lg bg-slate-50 px-4 py-3 text-right">
-          <p className="text-xs font-semibold uppercase text-slate-500">Total members</p>
-          <p className="text-2xl font-semibold">{Number(hr?.totalMembers ?? members.length)}</p>
+          <p className="text-xs font-semibold uppercase text-slate-500">
+            Total members
+          </p>
+          <p className="text-2xl font-semibold">
+            {Number(hr?.totalMembers ?? members.length)}
+          </p>
         </div>
       </div>
 
@@ -3976,7 +5198,9 @@ function MembersTab({
                 setMeetingDuration(30);
               }}
             >
-              <p className="text-xs font-medium text-slate-500">{formatRole(roleName)}</p>
+              <p className="text-xs font-medium text-slate-500">
+                {formatRole(roleName)}
+              </p>
               <p className="text-lg font-semibold">{count}</p>
               <p className="mt-0.5 text-[11px] text-slate-400">View & invite</p>
             </button>
@@ -4010,12 +5234,15 @@ function MembersTab({
                   {formatRole(modalRole)}
                 </h4>
                 <p className="text-sm text-slate-500">
-                  {modalMembers.length} member{modalMembers.length === 1 ? "" : "s"}
+                  {modalMembers.length} member
+                  {modalMembers.length === 1 ? "" : "s"}
                 </p>
               </div>
               <div className="flex items-start gap-3">
                 <div className="min-w-[260px]">
-                  <p className="text-xs font-semibold uppercase text-slate-500">Meeting Time In</p>
+                  <p className="text-xs font-semibold uppercase text-slate-500">
+                    Meeting Time In
+                  </p>
                   <select
                     className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                     value={meetingDuration}
@@ -4040,7 +5267,10 @@ function MembersTab({
             </div>
             {modalRole === "others" ? (
               <div className="border-b border-slate-100 px-6 py-4">
-                <label className="text-xs font-semibold uppercase text-slate-500" htmlFor="others-role-filter">
+                <label
+                  className="text-xs font-semibold uppercase text-slate-500"
+                  htmlFor="others-role-filter"
+                >
                   Filter others by label
                 </label>
                 <select
@@ -4061,14 +5291,21 @@ function MembersTab({
 
             <div className="max-h-[min(55vh,420px)] overflow-y-auto px-6 py-4">
               {modalMembers.length === 0 ? (
-                <p className="py-8 text-center text-sm text-slate-500">No members in this role.</p>
+                <p className="py-8 text-center text-sm text-slate-500">
+                  No members in this role.
+                </p>
               ) : (
                 <ul className="space-y-4">
                   {modalMembers.map((member) => {
                     const memberId = String(member.id);
-                    const teams = Array.isArray(member.teams) ? member.teams.map(String) : [];
+                    const teams = Array.isArray(member.teams)
+                      ? member.teams.map(String)
+                      : [];
                     const isSelf = selfId && memberId === selfId;
-                    const joinedBy = member.joinedBy && typeof member.joinedBy === "object" ? (member.joinedBy as AnyRecord) : null;
+                    const joinedBy =
+                      member.joinedBy && typeof member.joinedBy === "object"
+                        ? (member.joinedBy as AnyRecord)
+                        : null;
                     return (
                       <li
                         className="rounded-xl border border-slate-200 bg-white p-4"
@@ -4076,12 +5313,18 @@ function MembersTab({
                       >
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div className="min-w-0">
-                            <p className="font-semibold">{String(member.name ?? "Member")}</p>
-                            <p className="truncate text-sm text-slate-500">{String(member.email ?? "")}</p>
+                            <p className="font-semibold">
+                              {String(member.name ?? "Member")}
+                            </p>
+                            <p className="truncate text-sm text-slate-500">
+                              {String(member.email ?? "")}
+                            </p>
                             {joinedBy?.name ? (
                               <p className="mt-1 text-xs text-slate-500">
                                 Joined by{" "}
-                                <span className="font-medium text-slate-700">{String(joinedBy.name)}</span>
+                                <span className="font-medium text-slate-700">
+                                  {String(joinedBy.name)}
+                                </span>
                               </p>
                             ) : null}
                           </div>
@@ -4092,18 +5335,29 @@ function MembersTab({
                             </span>
                             <span
                               className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700"
-                              title={teams.length ? teams.join(", ") : "No team joined"}
+                              title={
+                                teams.length
+                                  ? teams.join(", ")
+                                  : "No team joined"
+                              }
                             >
                               team: {teams.length ? teams.join(", ") : "-"}
                             </span>
                           </div>
 
-                          {String(member.role ?? "") === "others" && canEditOthersRole ? (
+                          {String(member.role ?? "") === "others" &&
+                            canEditOthersRole ? (
                             <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 sm:col-span-3">
-                              <p className="text-xs font-semibold uppercase text-slate-500">Role label</p>
+                              <p className="text-xs font-semibold uppercase text-slate-500">
+                                Role label
+                              </p>
+
                               <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
-                                <select
-                                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                                <input
+                                  type="text"
+                                  list={`roles-${memberId}`}
+                                  placeholder="Select or enter custom role"
+                                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-900"
                                   value={roleDraftFor(member)}
                                   onChange={(event) =>
                                     setRoleDrafts((current) => ({
@@ -4111,24 +5365,33 @@ function MembersTab({
                                       [memberId]: event.target.value,
                                     }))
                                   }
-                                >
-                                  <option value="">Select custom role</option>
+                                />
+
+                                <datalist id={`roles-${memberId}`}>
                                   {otherRoleSelectOptions.map((option) => (
-                                    <option key={option} value={option}>
-                                      {option}
-                                    </option>
+                                    <option key={option} value={option} />
                                   ))}
-                                  {roleDraftFor(member) && !otherRoleSelectOptions.includes(roleDraftFor(member)) ? (
-                                    <option value={roleDraftFor(member)}>{roleDraftFor(member)}</option>
+
+                                  {roleDraftFor(member) &&
+                                    !otherRoleSelectOptions.includes(
+                                      roleDraftFor(member),
+                                    ) ? (
+                                    <option value={roleDraftFor(member)} />
                                   ) : null}
-                                </select>
+                                </datalist>
+
                                 <button
                                   className="rounded-lg bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-                                  disabled={savingRoleFor === memberId || !String(roleDraftFor(member)).trim()}
+                                  disabled={
+                                    savingRoleFor === memberId ||
+                                    !String(roleDraftFor(member)).trim()
+                                  }
                                   type="button"
                                   onClick={() => void saveCustomRole(member)}
                                 >
-                                  {savingRoleFor === memberId ? "Saving..." : "Save role"}
+                                  {savingRoleFor === memberId
+                                    ? "Saving..."
+                                    : "Save role"}
                                 </button>
                               </div>
                             </div>
@@ -4141,7 +5404,9 @@ function MembersTab({
                               type="button"
                               onClick={() => void sendMeetingInvite(memberId)}
                             >
-                              {invitingFor === memberId ? "Sending…" : "Invite to meet"}
+                              {invitingFor === memberId
+                                ? "Sending…"
+                                : "Invite to meet"}
                             </button>
                             <button
                               className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -4179,11 +5444,15 @@ function MembersTab({
           >
             <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-6 py-4">
               <div>
-                <h4 className="text-lg font-semibold text-rose-700" id="fire-modal-title">
+                <h4
+                  className="text-lg font-semibold text-rose-700"
+                  id="fire-modal-title"
+                >
                   Fire member
                 </h4>
                 <p className="mt-1 text-sm text-slate-600">
-                  This will remove the member from the company, teams, and boards.
+                  This will remove the member from the company, teams, and
+                  boards.
                 </p>
               </div>
               <button
@@ -4228,12 +5497,16 @@ function MembersTab({
                   className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={
                     firingFor === String(fireConfirmMember.id ?? "") ||
-                    String(fireConfirmText ?? "").trim().toUpperCase() !== "FIRE"
+                    String(fireConfirmText ?? "")
+                      .trim()
+                      .toUpperCase() !== "FIRE"
                   }
                   type="button"
                   onClick={() => void confirmFire()}
                 >
-                  {firingFor === String(fireConfirmMember.id ?? "") ? "Removing…" : "Confirm fire"}
+                  {firingFor === String(fireConfirmMember.id ?? "")
+                    ? "Removing…"
+                    : "Confirm fire"}
                 </button>
               </div>
             </div>
@@ -4247,7 +5520,7 @@ function MembersTab({
 function MessagesTab({
   showToast,
 }: {
-  showToast: (text: string, type?: 'success' | 'error') => void;
+  showToast: (text: string, type?: "success" | "error") => void;
 }) {
   const [members, setMembers] = useState<AnyRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -4258,6 +5531,7 @@ function MessagesTab({
   const [bulkMessage, setBulkMessage] = useState("");
   const [bulkSelected, setBulkSelected] = useState<Record<string, boolean>>({});
   const [sendingBulk, setSendingBulk] = useState(false);
+  const { data: session } = useSession();
 
   useEffect(() => {
     let mounted = true;
@@ -4296,11 +5570,16 @@ function MessagesTab({
   }, [members]);
 
   const bulkSelectedIds = useMemo(() => {
-    return Object.keys(bulkSelected).filter((id) => bulkSelected[id] && membersById.has(id));
+    return Object.keys(bulkSelected).filter(
+      (id) => bulkSelected[id] && membersById.has(id),
+    );
   }, [bulkSelected, membersById]);
 
   function toggleBulkSelected(memberId: string) {
-    setBulkSelected((current) => ({ ...current, [memberId]: !current[memberId] }));
+    setBulkSelected((current) => ({
+      ...current,
+      [memberId]: !current[memberId],
+    }));
   }
 
   async function sendChat() {
@@ -4321,7 +5600,10 @@ function MessagesTab({
       setChatMember(null);
       showToast("Message sent.");
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Unable to send message.", "error");
+      showToast(
+        err instanceof Error ? err.message : "Unable to send message.",
+        "error",
+      );
     } finally {
       setSendingChat(false);
     }
@@ -4351,7 +5633,10 @@ function MessagesTab({
       setBulkSelected({});
       showToast(`Message sent to ${bulkSelectedIds.length} user(s).`);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Unable to send bulk message.", "error");
+      showToast(
+        err instanceof Error ? err.message : "Unable to send bulk message.",
+        "error",
+      );
     } finally {
       setSendingBulk(false);
     }
@@ -4374,18 +5659,20 @@ function MessagesTab({
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
         <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
           <button
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-              mode === "normal" ? "bg-slate-950 text-white" : "text-slate-700 hover:bg-slate-50"
-            }`}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium ${mode === "normal"
+                ? "bg-slate-950 text-white"
+                : "text-slate-700 hover:bg-slate-50"
+              }`}
             type="button"
             onClick={() => setMode("normal")}
           >
             Normal messages
           </button>
           <button
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-              mode === "bulk" ? "bg-slate-950 text-white" : "text-slate-700 hover:bg-slate-50"
-            }`}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium ${mode === "bulk"
+                ? "bg-slate-950 text-white"
+                : "text-slate-700 hover:bg-slate-50"
+              }`}
             type="button"
             onClick={() => setMode("bulk")}
           >
@@ -4396,7 +5683,10 @@ function MessagesTab({
         {mode === "bulk" ? (
           <div className="flex items-center gap-2 text-sm text-slate-600">
             <span className="rounded-lg bg-slate-50 px-3 py-2">
-              Selected: <span className="font-semibold text-slate-900">{bulkSelectedIds.length}</span>
+              Selected:{" "}
+              <span className="font-semibold text-slate-900">
+                {bulkSelectedIds.length}
+              </span>
             </span>
             <button
               className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
@@ -4428,7 +5718,11 @@ function MessagesTab({
             </p>
             <button
               className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={sendingBulk || bulkSelectedIds.length === 0 || String(bulkMessage ?? "").trim().length === 0}
+              disabled={
+                sendingBulk ||
+                bulkSelectedIds.length === 0 ||
+                String(bulkMessage ?? "").trim().length === 0
+              }
               type="button"
               onClick={() => void sendBulk()}
             >
@@ -4444,19 +5738,24 @@ function MessagesTab({
           const name = String(member.name ?? "Member");
           const role = formatRole(String(member.role ?? "employee"));
           const email = String(member.email ?? "");
-          const teamsRaw = Array.isArray(member.teams) ? member.teams.map(String) : [];
-          const teamLabel = teamsRaw.length ? teamsRaw.join(", ") : "No team joined";
+          const teamObj =
+            member.team && typeof member.team === "object" ? member.team : null;
+          const teamLabel =
+            teamObj && (teamObj as any).name
+              ? String((teamObj as any).name)
+              : Array.isArray(member.teams) && member.teams.length
+                ? member.teams.map(String).join(", ")
+                : "No team joined";
           const isSelected = !!bulkSelected[memberId];
 
           return (
             <button
-              className={`w-full rounded-lg border p-4 text-left transition ${
-                mode === "bulk"
+              className={`w-full rounded-lg border p-4 text-left transition ${mode === "bulk"
                   ? isSelected
                     ? "border-slate-900 bg-slate-950 text-white"
                     : "border-slate-200 bg-white hover:bg-slate-50"
                   : "border-slate-200 bg-white hover:bg-slate-50"
-              }`}
+                }`}
               key={memberId}
               type="button"
               onClick={() => {
@@ -4470,31 +5769,33 @@ function MessagesTab({
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className={`font-semibold ${mode === "bulk" && isSelected ? "text-white" : "text-slate-900"}`}>
+                  <p
+                    className={`font-semibold ${mode === "bulk" && isSelected ? "text-white" : "text-slate-900"}`}
+                  >
                     {name}
                   </p>
-                  <p className={`text-sm ${mode === "bulk" && isSelected ? "text-white/70" : "text-slate-500"}`}>
+                  <p
+                    className={`text-sm ${mode === "bulk" && isSelected ? "text-white/70" : "text-slate-500"}`}
+                  >
                     {email}
                   </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
                   <span
-                    className={`rounded-full px-3 py-1 text-xs font-medium ${
-                      mode === "bulk" && isSelected
+                    className={`rounded-full px-3 py-1 text-xs font-medium ${mode === "bulk" && isSelected
                         ? "bg-white/10 text-white"
                         : "bg-slate-100 text-slate-700"
-                    }`}
+                      }`}
                   >
                     {role}
                   </span>
 
                   <span
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${
-                      mode === "bulk" && isSelected
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${mode === "bulk" && isSelected
                         ? "border-white/20 bg-white/10 text-white"
                         : "border-slate-200 bg-white text-slate-700"
-                    }`}
+                      }`}
                     title={teamLabel}
                   >
                     Team: {teamLabel}
@@ -4506,9 +5807,10 @@ function MessagesTab({
                     </span>
                   ) : (
                     <span
-                      className={`inline-flex items-center rounded-lg px-3 py-2 text-xs font-semibold ${
-                        isSelected ? "bg-white text-slate-950" : "bg-slate-950 text-white"
-                      }`}
+                      className={`inline-flex items-center rounded-lg px-3 py-2 text-xs font-semibold ${isSelected
+                          ? "bg-white text-slate-950"
+                          : "bg-slate-950 text-white"
+                        }`}
                     >
                       {isSelected ? "Selected" : "Select"}
                     </span>
@@ -4585,7 +5887,9 @@ function MessagesTab({
                 </button>
                 <button
                   className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={sendingChat || String(chatMessage ?? "").trim().length === 0}
+                  disabled={
+                    sendingChat || String(chatMessage ?? "").trim().length === 0
+                  }
                   type="button"
                   onClick={() => void sendChat()}
                 >
@@ -4652,7 +5956,9 @@ function NotificationsTab({
                   <p className="font-medium">
                     {String(item.title ?? "Notification")}
                   </p>
-                  <p className="text-sm">{String(item.body || item.message || "")}</p>
+                  <p className="text-sm">
+                    {String(item.body || item.message || "")}
+                  </p>
                   <p className="mt-1 text-xs text-slate-400">
                     {item.createdAt
                       ? new Date(String(item.createdAt)).toLocaleString()
@@ -4709,17 +6015,16 @@ function CodePanel({
   label: string;
   secondaryCodes?: { code: string; label: string }[];
   empty: string;
-  showToast?: (text: string, type?: 'success' | 'error') => void;
+  showToast?: (text: string, type?: "success" | "error") => void;
   children?: ReactNode;
 }) {
   const makeJoinUrl = (value: string) =>
     typeof window !== "undefined"
       ? `${window.location.origin}/join?code=${value}`
       : value;
-  const codes = [
-    code ? { code, label } : null,
-    ...secondaryCodes,
-  ].filter(Boolean) as { code: string; label: string }[];
+  const codes = [code ? { code, label } : null, ...secondaryCodes].filter(
+    Boolean,
+  ) as { code: string; label: string }[];
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -4731,44 +6036,48 @@ function CodePanel({
       </div>
       {codes.length > 0 ? (
         <>
-          <div className={codes.length > 1 ? "grid gap-3 md:grid-cols-2" : "space-y-3"}>
+          <div
+            className={
+              codes.length > 1 ? "grid gap-3 md:grid-cols-2" : "space-y-3"
+            }
+          >
             {codes.map((item) => (
-            <div key={item.code}>
-              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4">
-                <p className="text-xs font-semibold uppercase text-slate-500">
-                  {item.label}
-                </p>
-                <div className="mt-2 flex items-center justify-between gap-3">
-                  <p className="min-w-0 truncate font-mono text-sm font-semibold text-indigo-700">
-                    {item.code}
+              <div key={item.code}>
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4">
+                  <p className="text-xs font-semibold uppercase text-slate-500">
+                    {item.label}
                   </p>
-                  <button
-                    aria-label={`Copy ${item.label}`}
-                    className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                    onClick={() => {
-                      navigator.clipboard.writeText(item.code);
-                      showToast?.(`${item.label} copied.`);
-                    }}
-                    title="Copy code"
-                    type="button"
-                  >
-                    <Clipboard size={16} />
-                  </button>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <p className="min-w-0 truncate font-mono text-sm font-semibold text-indigo-700">
+                      {item.code}
+                    </p>
+                    <button
+                      aria-label={`Copy ${item.label}`}
+                      className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                      onClick={() => {
+                        navigator.clipboard.writeText(item.code);
+                        showToast?.(`${item.label} copied.`);
+                      }}
+                      title="Copy code"
+                      type="button"
+                    >
+                      <Clipboard size={16} />
+                    </button>
+                  </div>
                 </div>
+                <button
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-100 px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-sky-200"
+                  onClick={() => {
+                    navigator.clipboard.writeText(makeJoinUrl(item.code));
+                    showToast?.(`${item.label} join URL copied.`);
+                  }}
+                  type="button"
+                >
+                  <Users size={16} />
+                  Copy {item.label} Join URL
+                </button>
               </div>
-              <button
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-100 px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-sky-200"
-                onClick={() => {
-                  navigator.clipboard.writeText(makeJoinUrl(item.code));
-                  showToast?.(`${item.label} join URL copied.`);
-                }}
-                type="button"
-              >
-                <Users size={16} />
-                Copy {item.label} Join URL
-              </button>
-            </div>
-          ))}
+            ))}
           </div>
           <p className="mt-3 text-xs text-slate-500">
             Share this code or join link with your staff.

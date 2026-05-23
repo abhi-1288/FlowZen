@@ -1,4 +1,6 @@
 import mongoose from "mongoose";
+// Ensure mongoose model schemas are registered when the DB module is imported
+import "@/models";
 
 type CachedConnection = {
   conn: typeof mongoose | null;

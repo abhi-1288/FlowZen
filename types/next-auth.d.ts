@@ -14,6 +14,7 @@ declare module "next-auth" {
       image?: string | null;
       company?: string | null;
       team?: string | null;
+      teamId?: string | null;
     };
   }
 }

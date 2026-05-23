@@ -121,7 +121,7 @@ export async function GET() {
     };
   }
 
-  if (safeRole === "project-manager" || safeRole === "qa-tester") {
+  if (["project-manager", "qa-tester", "human-resource"].includes(safeRole)) {
     const teams = await Team.find({ manager: user._id }).populate("employees", "name email").sort({ createdAt: -1 });
     for (const team of teams) {
       if (!team.otherJoinCode) {

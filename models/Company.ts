@@ -12,7 +12,14 @@ const CompanySchema = new Schema(
     employeeJoinCode: { type: String, unique: true, sparse: true, index: true },
     otherJoinCode: { type: String, unique: true, sparse: true, index: true },
     noticePeriodDays: { type: Number, default: 30 },
-    members: [{ type: Schema.Types.ObjectId, ref: "User" }]
+    members: [{ type: Schema.Types.ObjectId, ref: "User" }],
+    wfhDates: [
+      {
+        date: { type: Date, index: true },
+        reason: { type: String }
+      }
+    ],
+    wfhCheckInMode: { type: String, enum: ["all-day", "wfh-only"], default: "all-day" }
   },
   { timestamps: true }
 );

@@ -1,5 +1,6 @@
 import type { Types } from "mongoose";
 import { User } from "@/models/User";
+import { Company } from "@/models/Company";
 
 /** Company join codes tied to HR-distributed role invites → approve via HR, not company owner. */
 const COMPANY_JOIN_ROLES_USING_HR = new Set([
@@ -105,7 +106,24 @@ export async function resolveTeamJoinApproverId(team: {
   company: Types.ObjectId | string;
   manager: Types.ObjectId | string;
 }): Promise<string> {
+  // Prefer the team manager (creator) as the approver. If the manager record
+  // isn't present or isn't approved, fall back to an approved HR. If no HR
+  // exists, fall back to the company owner.
+  try {
+    if (team.manager) {
+      const manager = await User.findOne({ _id: team.manager, companyStatus: "approved" }).select("_id");
+      if (manager) return String(manager._id);
+    }
+  } catch (err) {
+    // ignore and try fallbacks
+  }
+
   const hrId = await findApprovedHrUserId(team.company);
   if (hrId) return hrId;
-  return String(team.manager);
+
+  const company = await Company.findById(team.company).select("owner");
+  if (company && (company as any).owner) return String((company as any).owner);
+
+  // Last resort: return manager id coerced to string (may be empty)
+  return String(team.manager ?? "");
 }

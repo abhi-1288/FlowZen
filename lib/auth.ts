@@ -148,8 +148,10 @@ export const authOptions: NextAuthOptions = {
           await connectDb();
           const user = await User.findById(token.sub).populate("company", "name").populate("team", "name");
           if (user) {
+            const team = user.team as any;
             session.user.company = (user.company as any)?.name || null;
-            session.user.team = (user.team as any)?.name || null;
+            session.user.team = team?.name || null;
+            session.user.teamId = team?._id ? String(team._id) : (typeof user.team === "string" ? user.team : null);
           }
         } catch (error) {
           console.error("Failed to fetch company/team in session:", error);
