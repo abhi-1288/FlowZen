@@ -6,6 +6,7 @@ import AppleProvider from "next-auth/providers/apple";
 import GitHubProvider from "next-auth/providers/github";
 import DiscordProvider from "next-auth/providers/discord";
 import bcrypt from "bcryptjs";
+import { createHash } from "crypto";
 import { connectDb } from "@/lib/db";
 import { User } from "@/models/User";
 
@@ -92,18 +93,59 @@ export const authOptions: NextAuthOptions = {
         };
       }
     }),
+    CredentialsProvider({
+      id: "forgot-password-magic",
+      name: "Forgot password magic link",
+      credentials: {
+        token: { label: "Token", type: "text" }
+      },
+      async authorize(credentials) {
+        const token = String(credentials?.token ?? "");
+        if (!token) return null;
+
+        await connectDb();
+        const tokenHash = createHash("sha256").update(token).digest("hex");
+        const user = await User.findOne({
+          passwordResetTokenHash: tokenHash,
+          passwordResetExpiresAt: { $gt: new Date() }
+        }).select("+passwordResetTokenHash +passwordResetExpiresAt");
+
+        if (!user) return null;
+        if (user.authProvider !== "credentials") return null;
+
+        user.passwordResetTokenHash = undefined;
+        user.passwordResetExpiresAt = null;
+        user.passwordResetRequired = true;
+        user.emailVerified = true;
+        await user.save();
+
+        return {
+          id: user._id.toString(),
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          passwordResetRequired: true
+        };
+      }
+    }),
     ...oauthProviders
   ],
   callbacks: {
     async signIn({ user, account }) {
-      if (!account || account.provider === "credentials-login") return true;
+      if (
+        !account ||
+        account.provider === "credentials-login" ||
+        account.provider === "forgot-password-magic"
+      ) {
+        return true;
+      }
       if (!user.email) return false;
 
       await connectDb();
       const provider = account.provider === "azure-ad" ? "microsoft" : account.provider;
       const existing = await User.findOne({ email: user.email.toLowerCase() });
 
-      if (existing && existing.role !== "project-manager" && existing.role !== "qa-tester" && existing.role !== "human-resource") {
+      if (existing && existing.role !== "project-manager" && existing.role !== "qa-tester" && existing.role !== "human-resource" && existing.role !== "finance") {
         return false;
       }
 
@@ -137,12 +179,14 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user?.id) token.sub = user.id;
       if (user?.role) token.role = user.role;
+      if ((user as any)?.passwordResetRequired) token.passwordResetRequired = true;
       return token;
     },
     async session({ session, token }) {
       if (session.user && token.sub) {
         session.user.id = token.sub;
-        session.user.role = token.role as "employee" | "project-manager" | "qa-tester" | "human-resource" | "admin" | "others" | undefined;
+        session.user.role = token.role as "employee" | "project-manager" | "qa-tester" | "human-resource" | "finance" | "admin" | "others" | undefined;
+        session.user.passwordResetRequired = Boolean(token.passwordResetRequired);
         
         try {
           await connectDb();

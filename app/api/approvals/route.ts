@@ -57,7 +57,7 @@ export async function GET() {
     if (String(actor.role) === "admin" && actor.company) {
       const companyPendingRequests = await JoinRequest.find({
         company: actor.company,
-        kind: { $in: ["company", "quit-company", "quit-company-board-transfer"] },
+        kind: { $in: ["company", "identity-code", "quit-company", "quit-company-board-transfer"] },
         status: "pending",
       })
         .sort({ createdAt: -1 })
@@ -71,9 +71,13 @@ export async function GET() {
         .lean();
       const rolesByUserId = new Map(requesters.map((requester) => [String(requester._id), String(requester.role ?? "")]));
 
-      const hrRequests = companyPendingRequests.filter(
-        (request) => rolesByUserId.get(String(request.requester ?? "")) === "human-resource",
-      );
+      const hrRequests = companyPendingRequests.filter((request) => {
+        const requesterRole = rolesByUserId.get(String(request.requester ?? ""));
+        if (String(request.kind) === "identity-code") {
+          return requesterRole === "human-resource";
+        }
+        return requesterRole === "human-resource";
+      });
 
       requests = [...requests, ...hrRequests].filter((request, index, all) => {
         const id = String(request._id);
@@ -107,6 +111,40 @@ export async function GET() {
           const id = String(request._id);
           return all.findIndex((r) => String(r._id) === id) === index;
         });
+    }
+
+    const identityRequests = requests.filter(
+      (request) => String(request.kind) === "identity-code",
+    );
+    if (identityRequests.length > 0) {
+      const identityRequesterIds = identityRequests
+        .map((request) => request.requester)
+        .filter(Boolean);
+      const identityRequesters = await User.find({
+        _id: { $in: identityRequesterIds },
+      })
+        .select("companyIdentityCode")
+        .lean();
+      const issuedRequesterIds = new Set(
+        identityRequesters
+          .filter((requester) =>
+            String((requester as any).companyIdentityCode ?? "").trim(),
+          )
+          .map((requester) => String(requester._id)),
+      );
+      const issuedRequestIds = identityRequests
+        .filter((request) => issuedRequesterIds.has(String(request.requester)))
+        .map((request) => request._id);
+
+      if (issuedRequestIds.length > 0) {
+        await JoinRequest.updateMany(
+          { _id: { $in: issuedRequestIds }, status: "pending" },
+          { $set: { status: "approved" } },
+        );
+        requests = requests.filter(
+          (request) => !issuedRequestIds.some((id) => String(id) === String(request._id)),
+        );
+      }
     }
 
     for (const request of requests) {

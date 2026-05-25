@@ -9,6 +9,7 @@ const CompanySchema = new Schema(
     hrJoinCode: { type: String, unique: true, sparse: true, index: true },
     managerJoinCode: { type: String, unique: true, sparse: true, index: true },
     testerJoinCode: { type: String, unique: true, sparse: true, index: true },
+    financeJoinCode: { type: String, unique: true, sparse: true, index: true },
     employeeJoinCode: { type: String, unique: true, sparse: true, index: true },
     otherJoinCode: { type: String, unique: true, sparse: true, index: true },
     noticePeriodDays: { type: Number, default: 30 },

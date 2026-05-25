@@ -13,13 +13,16 @@ const UserSchema = new Schema(
     passwordHash: { type: String, select: false },
     role: {
       type: String,
-      enum: ["employee", "project-manager", "qa-tester", "human-resource", "admin", "others"],
+      enum: ["employee", "project-manager", "qa-tester", "human-resource", "finance", "admin", "others"],
       default: "employee",
       index: true,
     },
     emailVerified: { type: Boolean, default: false },
     otpHash: { type: String, select: false },
     otpExpiresAt: { type: Date, default: null, select: false },
+    passwordResetTokenHash: { type: String, select: false },
+    passwordResetExpiresAt: { type: Date, default: null, select: false },
+    passwordResetRequired: { type: Boolean, default: false },
     authProvider: {
       type: String,
       enum: [
@@ -97,6 +100,7 @@ const UserSchema = new Schema(
     },
     avatarUrl: { type: String, default: "" },
     customRole: { type: String, default: "", trim: true, maxlength: 80 },
+    companyIdentityCode: { type: String, trim: true, unique: true, sparse: true, index: true },
   },
   { timestamps: true },
 );

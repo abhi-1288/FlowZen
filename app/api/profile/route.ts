@@ -69,6 +69,7 @@ export async function GET() {
     if (company) {
       company.managerJoinCode = `${company.joinCode}-MANAGER`;
       company.testerJoinCode = `${company.joinCode}-TESTER`;
+      company.financeJoinCode = `${company.joinCode}-FINANCE`;
       company.employeeJoinCode = `${company.joinCode}-EMPLOYEE`;
       if (!company.otherJoinCode) {
         company.otherJoinCode = createRoleJoinCode(String(company.joinCode));
@@ -84,6 +85,12 @@ export async function GET() {
     status: "pending",
   });
   insights.pendingQuit = !!pendingQuitRequest;
+  const pendingIdentityRequest = await JoinRequest.findOne({
+    requester: userId,
+    kind: "identity-code",
+    status: "pending",
+  }).select("_id");
+  insights.pendingIdentityCodeRequest = !!pendingIdentityRequest;
   if (pendingQuitRequest && user.company) {
     const companyDoc = await Company.findById(user.company).select("noticePeriodDays");
     const noticeDays = Number(companyDoc?.noticePeriodDays ?? 0);
@@ -111,7 +118,7 @@ export async function GET() {
     }));
   }
 
-  if (safeRole === "employee" || safeRole === "others") {
+  if (safeRole === "employee" || safeRole === "finance" || safeRole === "others") {
     const history = Array.isArray(user.membershipHistory) ? user.membershipHistory : [];
     insights.employee = {
       removedCount: history.filter((item: { action?: string }) => item.action === "removed-team" || item.action === "removed-company").length,
@@ -147,7 +154,7 @@ export async function GET() {
     };
   }
 
-  if (["human-resource", "admin"].includes(safeRole) && user.company && user.companyStatus === "approved") {
+  if (["human-resource", "finance", "admin"].includes(safeRole) && user.company && user.companyStatus === "approved") {
     const companyId = typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
     const [members, teams] = await Promise.all([
       User.find({ company: companyId, companyStatus: "approved" })
@@ -247,10 +254,13 @@ export async function PATCH(request: Request) {
   if (user.authProvider !== "credentials") return jsonError("OAuth accounts do not have a local password.", 400);
   if (!user.passwordHash) return jsonError("No local password is set for this account.", 400);
 
-  const valid = await bcrypt.compare(currentPassword, user.passwordHash);
-  if (!valid) return jsonError("Current password is incorrect.", 401);
+  if (!user.passwordResetRequired) {
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) return jsonError("Current password is incorrect.", 401);
+  }
 
   user.passwordHash = await bcrypt.hash(newPassword, 12);
+  user.passwordResetRequired = false;
   await user.save();
 
   return NextResponse.json({ ok: true });

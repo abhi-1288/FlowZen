@@ -9,6 +9,7 @@ import { Board } from "@/models/Board";
 import { User } from "@/models/User";
 import { Task } from "@/models/Task";
 import { emitNotification } from "@/lib/realtime";
+import { ensureCompanyIdentityCode } from "@/lib/company-identity";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -198,6 +199,10 @@ export async function PATCH(request: Request, { params }: Params) {
         await cleanupQuitterBoardAssignments(requester._id);
         requester.company = joinRequest.company;
         requester.companyJoined = new Date();
+        const approver = await User.findById(joinRequest.approver).select("role");
+        if (String(approver?.role ?? "") === "human-resource") {
+          await ensureCompanyIdentityCode(requester, joinRequest.company);
+        }
         requester.membershipHistory.push({
           company: joinRequest.company,
           inviter: joinRequest.approver,
@@ -214,6 +219,15 @@ export async function PATCH(request: Request, { params }: Params) {
           action: "removed-company",
           at: new Date(),
         });
+      }
+    }
+
+    if (joinRequest.kind === "identity-code") {
+      if (status === "approved") {
+        if (String(requester.company ?? "") !== String(joinRequest.company)) {
+          return jsonError("Requester is not in this company.", 409);
+        }
+        await ensureCompanyIdentityCode(requester, joinRequest.company);
       }
     }
 
@@ -307,6 +321,7 @@ export async function PATCH(request: Request, { params }: Params) {
         requester.company = null;
         requester.companyJoined = null;
         requester.companyStatus = "none";
+        requester.companyIdentityCode = undefined;
         
         // Clear any old pending join requests so new requests can be processed cleanly
         await JoinRequest.deleteMany({
@@ -401,6 +416,12 @@ export async function PATCH(request: Request, { params }: Params) {
         status === "approved"
           ? `Your quit approval for ${teamName} in ${companyName} was approved`
           : `Your request for removal of ${teamName} from ${companyName} was rejected`;
+    } else if (joinRequest.kind === "identity-code") {
+      title = status === "approved" ? "Unique identity issued" : "Unique identity request rejected";
+      message =
+        status === "approved"
+          ? `Your company identity code is ${String(requester.companyIdentityCode ?? "")}.`
+          : `Your request for a company identity code was rejected.`;
     }
 
     await Notification.create({

@@ -15,3 +15,7 @@ export function createTemporaryPassword() {
   const suffix = Math.floor(100 + Math.random() * 900);
   return `pass@#${suffix}`;
 }
+
+export function createMagicLinkToken() {
+  return randomBytes(32).toString("base64url");
+}

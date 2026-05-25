@@ -6,6 +6,7 @@ import { Company } from "@/models/Company";
 const COMPANY_JOIN_ROLES_USING_HR = new Set([
   "project-manager",
   "qa-tester",
+  "finance",
   "employee",
   "others",
 ]);
