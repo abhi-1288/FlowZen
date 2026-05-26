@@ -10,6 +10,7 @@ import { User } from "@/models/User";
 import { Task } from "@/models/Task";
 import { emitNotification } from "@/lib/realtime";
 import { ensureCompanyIdentityCode } from "@/lib/company-identity";
+import { FinanceSalary } from "@/models/FinanceSalary";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -210,6 +211,15 @@ export async function PATCH(request: Request, { params }: Params) {
           at: new Date(),
         });
         await Company.updateOne({ _id: joinRequest.company }, { $addToSet: { members: requester._id } });
+        const approverRole = String(approver?.role ?? "");
+        if (approverRole === "human-resource") {
+          const currentMonth = new Date().toISOString().slice(0, 7);
+          await FinanceSalary.findOneAndUpdate(
+            { company: joinRequest.company, employee: requester._id, month: currentMonth },
+            { $setOnInsert: { baseSalary: 0, allowances: 0, deductions: 0, netSalary: 0, status: "pending" } },
+            { upsert: true },
+          );
+        }
       } else {
         requester.company = null;
         requester.companyJoined = null;
@@ -228,6 +238,18 @@ export async function PATCH(request: Request, { params }: Params) {
           return jsonError("Requester is not in this company.", 409);
         }
         await ensureCompanyIdentityCode(requester, joinRequest.company);
+      }
+    }
+
+    if (joinRequest.kind === "salary") {
+      if (status === "approved") {
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        const salaryAmount = Math.max(0, Number(body.salaryAmount ?? 0));
+        await FinanceSalary.findOneAndUpdate(
+          { company: joinRequest.company, employee: requester._id, month: currentMonth },
+          { $set: { baseSalary: salaryAmount, allowances: 0, deductions: 0, netSalary: salaryAmount, status: "pending" } },
+          { upsert: true },
+        );
       }
     }
 
@@ -259,6 +281,15 @@ export async function PATCH(request: Request, { params }: Params) {
           at: new Date(),
         });
         await Team.updateOne({ _id: teamId }, { $addToSet: { employees: requester._id } });
+        const teamApprover = await User.findById(joinRequest.approver).select("role");
+        if (String(teamApprover?.role ?? "") === "human-resource") {
+          const currentMonth = new Date().toISOString().slice(0, 7);
+          await FinanceSalary.findOneAndUpdate(
+            { company: joinRequest.company, employee: requester._id, month: currentMonth },
+            { $setOnInsert: { baseSalary: 0, allowances: 0, deductions: 0, netSalary: 0, status: "pending" } },
+            { upsert: true },
+          );
+        }
       } else {
         requester.team = null;
         requester.teamJoined = null;
@@ -422,6 +453,12 @@ export async function PATCH(request: Request, { params }: Params) {
         status === "approved"
           ? `Your company identity code is ${String(requester.companyIdentityCode ?? "")}.`
           : `Your request for a company identity code was rejected.`;
+    } else if (joinRequest.kind === "salary") {
+      title = status === "approved" ? "Salary assigned" : "Salary request rejected";
+      message =
+        status === "approved"
+          ? `Your salary of ₹${Number(body.salaryAmount ?? 0).toLocaleString("en-IN")} has been assigned. Finance will process it shortly.`
+          : "Your salary assignment request was rejected.";
     }
 
     await Notification.create({

@@ -9,6 +9,7 @@ import bcrypt from "bcryptjs";
 import { createHash } from "crypto";
 import { connectDb } from "@/lib/db";
 import { User } from "@/models/User";
+import { Team } from "@/models/Team";
 
 const oauthProviders = [
   ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
@@ -196,6 +197,7 @@ export const authOptions: NextAuthOptions = {
             session.user.company = (user.company as any)?.name || null;
             session.user.team = team?.name || null;
             session.user.teamId = team?._id ? String(team._id) : (typeof user.team === "string" ? user.team : null);
+            session.user.managedTeamCount = await Team.countDocuments({ manager: user._id });
           }
         } catch (error) {
           console.error("Failed to fetch company/team in session:", error);

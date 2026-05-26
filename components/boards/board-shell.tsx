@@ -158,7 +158,11 @@ export function BoardShell({ boardId }: { boardId?: string }) {
               <p className="mt-1 text-sm text-slate-500">
                 {session?.user?.company ? session?.user?.company : 'Unemployed'}
                 <span className="mx-1">•</span>
-                {session?.user?.team ? `${session.user.team}` : 'No Team'}
+                {session?.user?.team
+                  ? session.user.team
+                  : session?.user?.managedTeamCount
+                    ? `${session.user.managedTeamCount} Team${session.user.managedTeamCount > 1 ? 's' : ''}`
+                    : 'No Team'}
               </p>
             </div>
             <button

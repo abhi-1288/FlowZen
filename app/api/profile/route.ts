@@ -11,6 +11,7 @@ import { Notification } from "@/models/Notification";
 import { JoinRequest } from "@/models/JoinRequest";
 import { Team } from "@/models/Team";
 import { Company } from "@/models/Company";
+import { FinanceSalary } from "@/models/FinanceSalary";
 import "@/models/Company";
 import "@/models/Team";
 
@@ -91,6 +92,14 @@ export async function GET() {
     status: "pending",
   }).select("_id");
   insights.pendingIdentityCodeRequest = !!pendingIdentityRequest;
+  const pendingSalaryRequest = await JoinRequest.findOne({
+    requester: userId,
+    kind: "salary",
+    status: "pending",
+  }).select("_id");
+  insights.pendingSalaryRequest = !!pendingSalaryRequest;
+  const existingSalary = user.company ? await FinanceSalary.findOne({ employee: userId, company: user.company }).select("_id") : null;
+  insights.hasSalary = !!existingSalary;
   if (pendingQuitRequest && user.company) {
     const companyDoc = await Company.findById(user.company).select("noticePeriodDays");
     const noticeDays = Number(companyDoc?.noticePeriodDays ?? 0);

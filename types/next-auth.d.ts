@@ -16,6 +16,7 @@ declare module "next-auth" {
       company?: string | null;
       team?: string | null;
       teamId?: string | null;
+      managedTeamCount?: number;
       passwordResetRequired?: boolean;
     };
   }

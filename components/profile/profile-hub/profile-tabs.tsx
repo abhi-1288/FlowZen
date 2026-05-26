@@ -24,6 +24,7 @@ export function ProfileTab({
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [salaryRequesting, setSalaryRequesting] = useState(false);
   const [companyActionModal, setCompanyActionModal] = useState(false);
   const [companyActionType, setCompanyActionType] = useState<
     "hold" | "takedown" | null
@@ -105,6 +106,22 @@ export function ProfileTab({
       );
     } finally {
       setIdentityRequesting(false);
+    }
+  }
+
+  async function requestSalary() {
+    try {
+      setSalaryRequesting(true);
+      await apiFetch("/api/finance/salary-request", { method: "POST" });
+      showToast("Salary request sent to HR.");
+      await refresh(true);
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Unable to request salary.",
+        "error",
+      );
+    } finally {
+      setSalaryRequesting(false);
     }
   }
 
@@ -430,6 +447,28 @@ export function ProfileTab({
                   : identityRequesting
                   ? "Requesting..."
                   : "Ask unique identity from HR"}
+              </button>
+            </div>
+          ) : null}
+          {profile?.companyStatus === "approved" && role !== "human-resource" && role !== "finance" && role !== "admin" && !insights?.hasSalary ? (
+            <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+              <p className="text-sm font-medium text-slate-700">
+                Salary not assigned yet?
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Request HR to set up your salary record.
+              </p>
+              <button
+                className="mt-3 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={salaryRequesting || Boolean(insights?.pendingSalaryRequest)}
+                onClick={requestSalary}
+                type="button"
+              >
+                {insights?.pendingSalaryRequest
+                  ? "Salary request pending"
+                  : salaryRequesting
+                  ? "Requesting..."
+                  : "Request salary from HR"}
               </button>
             </div>
           ) : null}

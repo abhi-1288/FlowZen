@@ -1,6 +1,8 @@
 // Central model registration and re-exports
 export * from "./Attendance";
 export * from "./Board";
+export * from "./ClientInvoice";
+export * from "./ExpenseBill";
 export * from "./Column";
 export * from "./Company";
 export * from "./ExpenseRequest";
@@ -10,6 +12,7 @@ export * from "./JoinRequest";
 export * from "./LeaveRequest";
 export * from "./Notification";
 export * from "./ProjectBudget";
+export * from "./ResourceRequest";
 export * from "./Task";
 export * from "./Team";
 export * from "./User";

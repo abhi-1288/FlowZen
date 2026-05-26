@@ -21,25 +21,34 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const leave = await LeaveRequest.findById(id).populate("requester");
     if (!leave) return jsonError("Request not found.");
 
-    // Validation
+    // Validation: who can approve
+    const approverRole = String(approver?.role ?? "");
+    const isAdminOrHr = approverRole === "admin" || approverRole === "human-resource";
     if (leave.currentStep === "admin") {
-      if (approver?.role !== "admin") return jsonError("Only admins can approve this step.");
+      if (!isAdminOrHr && approverRole !== "finance") {
+        return jsonError("Only admins, HR, or finance can approve this step.");
+      }
     } else if (leave.currentStep === "manager") {
-      const isManager = approver?.role === "project-manager" || approver?.role === "qa-tester";
-      if (!isManager) return jsonError("Only managers/testers can approve this step.");
-      
-      // Check if they are actually the manager for this user
-      const team = await Team.findOne({ employees: leave.requester._id, manager: userId });
-      if (!team && approver?.role !== "admin") {
-        return jsonError(`Authorization failed: You are not the manager of ${leave.requester.name}'s team.`);
+      const isManager = ["project-manager", "qa-tester", "finance"].includes(approverRole);
+      if (!isManager && !isAdminOrHr) {
+        return jsonError("Only managers/testers/finance/admin/HR can approve this step.");
+      }
+      if (!isAdminOrHr) {
+        const requesterId = typeof leave.requester === "object" ? leave.requester._id : leave.requester;
+        const team = await Team.findOne({ employees: requesterId, manager: userId });
+        if (!team) {
+          return jsonError(`Authorization failed: You are not the manager of ${leave.requester.name}'s team.`);
+        }
       }
     }
+
+    const bypassTwoStep = isAdminOrHr;
 
     if (action === "reject") {
       leave.status = "rejected";
       leave.rejectionReason = rejectionReason || "No reason provided.";
     } else {
-      if (leave.currentStep === "manager" && leave.duration > 5) {
+      if (leave.currentStep === "manager" && leave.duration > 5 && !bypassTwoStep) {
         leave.status = "manager-approved";
         leave.currentStep = "admin";
       } else {
@@ -50,8 +59,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     await leave.save();
 
     if (leave.status === "manager-approved") {
-      // Notify all admins
-      const admins = await User.find({ role: "admin" });
+      const admins = await User.find({ role: "admin", company: leave.company });
       for (const admin of admins) {
         await Notification.create({
           user: admin._id,
@@ -62,7 +70,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         emitToUser(String(admin._id), "notification:new", {});
       }
     } else {
-      // Final status - notify requester
       const requesterId = leave.requester._id || leave.requester;
       const statusTitle = leave.status.charAt(0).toUpperCase() + leave.status.slice(1);
       const rejectionNote = leave.status === "rejected" ? ` Reason: ${leave.rejectionReason}` : "";

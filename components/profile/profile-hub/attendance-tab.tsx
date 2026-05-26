@@ -374,13 +374,7 @@ export function AttendanceTab({
     (profile?.companyStatus === "approved" && profile?.company) ||
     (profile?.teamStatus === "approved" && profile?.team),
   );
-  const canExportAttendance = [
-    "admin",
-    "human-resource",
-    "finance",
-    "project-manager",
-    "qa-tester",
-  ].includes(String(profile?.role ?? ""));
+  const canExportAttendance = ["finance"].includes(String(profile?.role ?? ""));
 
   const exportAttendance = () => {
     if (!exportFrom || !exportTo) {
@@ -620,7 +614,7 @@ export function AttendanceTab({
     if (!day) return false;
     const date = new Date(year, month, day);
     return requests.some((req: any) => {
-      if (req.status !== "pending") return false;
+      if (req.status !== "pending" && req.status !== "manager-approved") return false;
       const start = new Date(req.startDate);
       const end = new Date(req.endDate);
       start.setHours(0, 0, 0, 0);
@@ -912,6 +906,7 @@ export function AttendanceTab({
             onApprove={handleApprove}
             onReject={(id) => setRejectingId(id)}
             currentUserId={session?.user?.id}
+            userRole={String(profile?.role ?? "")}
             onViewDay={(dateStr) => {
               setShowRequestsModal(false);
               setShowLeaveModal(false);
@@ -1054,8 +1049,8 @@ export function AttendanceTab({
                                     : "bg-white text-rose-600 border border-rose-200 shadow-sm"
                                   : checkedIn
                                     ? "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm"
-                                    : leave
-                                      ? "bg-emerald-100 text-rose-600 border border-emerald-200 shadow-sm"
+                  : leave
+                      ? "bg-amber-100 text-amber-900 border border-amber-200 shadow-sm"
                                       : weekend
                                         ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm"
                                         : missed
@@ -1083,7 +1078,7 @@ export function AttendanceTab({
                               ) : holiday ? (
                                 <Calendar className="h-3.5 w-3.5 text-fuchsia-600" />
                               ) : leave ? (
-                                <Check className="h-3.5 w-3.5 text-rose-600" />
+                                <Check className="h-3.5 w-3.5 text-amber-600" />
                               ) : today && !checkedIn ? (
                                 <X className="h-3.5 w-3.5 text-rose-600" />
                               ) : missed ? (
@@ -1727,6 +1722,7 @@ function RequestsListModal({
   onReject,
   currentUserId,
   onViewDay,
+  userRole,
 }: {
   requests: AnyRecord[];
   onClose: () => void;
@@ -1734,6 +1730,7 @@ function RequestsListModal({
   onReject: (id: string) => void;
   currentUserId?: string;
   onViewDay?: (dateStr: string) => void;
+  userRole?: string;
 }) {
   const [selectedLeave, setSelectedLeave] = useState<AnyRecord | null>(null);
 
@@ -1752,6 +1749,7 @@ function RequestsListModal({
         }}
         currentUserId={currentUserId}
         onViewDay={onViewDay}
+        userRole={userRole}
       />
     );
   }
@@ -1785,10 +1783,15 @@ function RequestsListModal({
                 const isRequester =
                   req.requester?._id === currentUserId ||
                   req.requester === currentUserId;
+                const step = String(req.currentStep ?? "manager");
                 const canApprove =
                   !isRequester &&
                   (req.status === "pending" ||
-                    req.status === "manager-approved");
+                    req.status === "manager-approved") &&
+                  (
+                    (step === "admin" && ["admin", "human-resource", "finance"].includes(String(userRole ?? ""))) ||
+                    (step === "manager" && ["project-manager", "qa-tester", "finance", "admin", "human-resource"].includes(String(userRole ?? "")))
+                  );
 
                 return (
                   <div
@@ -1854,6 +1857,7 @@ function LeaveDetailsModal({
   onReject,
   currentUserId,
   onViewDay,
+  userRole,
 }: {
   leave: AnyRecord;
   onClose: () => void;
@@ -1861,13 +1865,20 @@ function LeaveDetailsModal({
   onReject: () => void;
   currentUserId?: string;
   onViewDay?: (dateStr: string) => void;
+  userRole?: string;
 }) {
   const isRequester =
     (leave.requester as any)?._id === currentUserId ||
     leave.requester === currentUserId;
+  const step = String(leave.currentStep ?? "manager");
+
   const canApprove =
     !isRequester &&
-    (leave.status === "pending" || leave.status === "manager-approved");
+    (leave.status === "pending" || leave.status === "manager-approved") &&
+    (
+      (step === "admin" && ["admin", "human-resource", "finance"].includes(String(userRole ?? ""))) ||
+      (step === "manager" && ["project-manager", "qa-tester", "finance", "admin", "human-resource"].includes(String(userRole ?? "")))
+    );
 
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-md">

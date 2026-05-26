@@ -3,6 +3,7 @@ import { Bell, Building2, Check, Clipboard, Trash2, Users, X } from "lucide-reac
 import { useSession } from "next-auth/react";
 import { apiFetch } from "@/lib/client-utils";
 import { AnyRecord, AvatarBadge, displayNested, formatRole, formatRoleWithCustom } from "./shared";
+import { FinanceMembersView } from "./finance-members-tab";
 
 export function ApprovalsTab({
   approvals,
@@ -15,6 +16,7 @@ export function ApprovalsTab({
 }) {
   const [decidingIds, setDecidingIds] = useState<Record<string, boolean>>({});
   const [clearedIds, setClearedIds] = useState<Record<string, boolean>>({});
+  const [salaryAmounts, setSalaryAmounts] = useState<Record<string, string>>({});
 
   function requestIdOf(request: AnyRecord) {
     const value = request.id ?? request._id;
@@ -62,13 +64,15 @@ export function ApprovalsTab({
     id: string,
     status: "approved" | "rejected",
     force = false,
+    requestKind?: string,
   ) {
     if (!id) return;
+    const salaryAmount = requestKind === "salary" ? Math.max(0, Number(salaryAmounts[id] ?? 0)) : undefined;
     setDecidingIds((current) => ({ ...current, [id]: true }));
     try {
       await apiFetch(`/api/approvals/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ status, force }),
+        body: JSON.stringify({ status, force, salaryAmount }),
       });
       setClearedIds((current) => ({ ...current, [id]: true }));
       showToast(`Request ${status}${force ? " (forced)" : ""}.`);
@@ -112,6 +116,8 @@ export function ApprovalsTab({
                   ? "requested to quit"
                   : String(request.kind) === "identity-code"
                   ? "requested a unique identity code"
+                  : String(request.kind) === "salary"
+                  ? "requested salary assignment"
                   : "requested to join"}{" "}
                 {String(request.kind) === "identity-code"
                   ? displayNested(request.company, "name", "company")
@@ -150,25 +156,45 @@ export function ApprovalsTab({
               <button
                 className="rounded-lg px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50"
                 disabled={isDeciding}
-                onClick={() => decide(requestId, "rejected")}
+                onClick={() => decide(requestId, "rejected", false, String(request.kind ?? ""))}
               >
                 {isDeciding ? "Working..." : "Decline"}
               </button>
-              <button
-                className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={(() => {
-                  const info = quitNoticeInfo(request);
-                  return isDeciding || (!!info && !info.canApprove);
-                })()}
-                onClick={() => decide(requestId, "approved")}
-              >
-                {isDeciding ? "Working..." : "Approve"}
-              </button>
+              {String(request.kind ?? "") === "salary" ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    className="w-28 rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                    placeholder="Amount"
+                    type="number"
+                    min={0}
+                    value={salaryAmounts[requestId] ?? ""}
+                    onChange={(e) => setSalaryAmounts((a) => ({ ...a, [requestId]: e.target.value }))}
+                  />
+                  <button
+                    className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={isDeciding || !(Number(salaryAmounts[requestId] ?? 0) > 0)}
+                    onClick={() => decide(requestId, "approved", false, "salary")}
+                  >
+                    {isDeciding ? "Working..." : "Approve"}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={(() => {
+                    const info = quitNoticeInfo(request);
+                    return isDeciding || (!!info && !info.canApprove);
+                  })()}
+                  onClick={() => decide(requestId, "approved", false, String(request.kind ?? ""))}
+                >
+                  {isDeciding ? "Working..." : "Approve"}
+                </button>
+              )}
               {String(request.kind).startsWith("quit-") ? (
                 <button
                   className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100"
                   disabled={isDeciding}
-                  onClick={() => decide(requestId, "approved", true)}
+                  onClick={() => decide(requestId, "approved", true, String(request.kind ?? ""))}
                   type="button"
                 >
                   Force accept
@@ -393,6 +419,12 @@ export function MembersTab({
     } finally {
       setSavingRoleFor(null);
     }
+  }
+
+  const companyMembers = Array.isArray(insights?.companyMembers) ? insights.companyMembers as AnyRecord[] : [];
+
+  if (actorRole === "finance") {
+    return <FinanceMembersView members={companyMembers} showToast={showToast} />;
   }
 
   return (

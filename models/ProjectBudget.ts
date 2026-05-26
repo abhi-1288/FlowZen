@@ -7,7 +7,12 @@ const ProjectBudgetSchema = new Schema(
     totalBudget: { type: Number, default: 0 },
     teamSpendingLimit: { type: Number, default: 0 },
     resourceBudget: { type: Number, default: 0 },
+    deadline: { type: Date, default: null },
+    status: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
+    assignedTo: { type: Schema.Types.ObjectId, ref: "User", default: null },
     decidedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    rejectedAt: { type: Date, default: null },
+    rejectionReason: { type: String, default: "" },
   },
   { timestamps: true },
 );

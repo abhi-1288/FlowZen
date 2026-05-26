@@ -7,6 +7,7 @@ import { User } from "@/models/User";
 import { Team } from "@/models/Team";
 import { Notification } from "@/models/Notification";
 import { emitToUser } from "@/lib/socket-emit";
+import { emitNotification } from "@/lib/realtime";
 
 export async function POST(req: Request) {
   try {
@@ -34,7 +35,11 @@ export async function POST(req: Request) {
 
     // Determine the first step approver
     let firstApproverRole: "manager" | "admin" = "manager";
-    if (user.role === "project-manager" || user.role === "qa-tester" || user.role === "admin") {
+    if (["project-manager", "qa-tester", "finance", "admin"].includes(String(user.role))) {
+      firstApproverRole = "admin";
+    }
+    // HR leaves also go to admin (or another HR)
+    if (String(user.role) === "human-resource") {
       firstApproverRole = "admin";
     }
 
@@ -62,6 +67,53 @@ export async function POST(req: Request) {
       currentStep: firstApproverRole
     });
 
+    // Notify admin(s)
+    const admins = await User.find({ role: "admin", company: user.company, companyStatus: "approved" });
+    for (const admin of admins) {
+      await Notification.create({
+        user: admin._id,
+        title: "New Leave Request",
+        body: notificationBody,
+        link: "/profile?tab=attendance"
+      });
+      emitToUser(String(admin._id), "notification:new", {});
+    }
+
+    // For PM/QA/Finance/Admin roles, also notify HR
+    if (["project-manager", "qa-tester", "finance", "admin"].includes(String(user.role))) {
+      const hrs = await User.find({ role: "human-resource", company: user.company, companyStatus: "approved" });
+      for (const hr of hrs) {
+        await Notification.create({
+          user: hr._id,
+          title: "New Leave Request",
+          body: notificationBody,
+          link: "/profile?tab=attendance"
+        });
+        emitToUser(String(hr._id), "notification:new", {});
+      }
+    }
+
+    // For HR leaves, find another HR or fall back to admin (already notified above)
+    if (String(user.role) === "human-resource") {
+      const otherHr = await User.findOne({
+        _id: { $ne: userId },
+        role: "human-resource",
+        company: user.company,
+        companyStatus: "approved",
+      }).select("_id");
+      if (otherHr) {
+        await Notification.create({
+          user: otherHr._id,
+          title: "New Leave Request",
+          body: `${user.name} (HR) has requested a leave.`,
+          link: "/profile?tab=attendance"
+        });
+        emitToUser(String(otherHr._id), "notification:new", {});
+      }
+      // admins already notified above
+    }
+
+    // For regular employees, also notify the team manager
     if (firstApproverRole === "manager") {
       const team = await Team.findOne({ employees: userId }).populate("manager");
       if (team?.manager) {
@@ -73,18 +125,6 @@ export async function POST(req: Request) {
           link: "/profile?tab=attendance"
         });
         emitToUser(String(managerId), "notification:new", {});
-      }
-    } else {
-      // Notify all admins
-      const admins = await User.find({ role: "admin" });
-      for (const admin of admins) {
-        await Notification.create({
-          user: admin._id,
-          title: "New Leave Request",
-          body: notificationBody,
-          link: "/profile?tab=attendance"
-        });
-        emitToUser(String(admin._id), "notification:new", {});
       }
     }
 
@@ -103,13 +143,32 @@ export async function GET() {
   const user = await User.findById(userId);
   if (!user) return jsonError("User not found.");
 
-  // If user is admin, they see all admin-step requests
-  // If user is manager, they see requests from their team
-  // Otherwise, user sees their own requests
-
   let requests;
   if (user.role === "admin") {
-    requests = await LeaveRequest.find({ currentStep: "admin", status: { $in: ["pending", "manager-approved"] } })
+    requests = await LeaveRequest.find({
+      company: user.company,
+      status: { $in: ["pending", "manager-approved"] },
+      currentStep: "admin",
+    })
+      .populate("requester", "name email role")
+      .sort({ createdAt: -1 });
+  } else if (user.role === "human-resource") {
+    requests = await LeaveRequest.find({
+      company: user.company,
+      status: { $in: ["pending", "manager-approved"] },
+      currentStep: "admin",
+      requester: { $ne: userId },
+    })
+      .populate("requester", "name email role")
+      .sort({ createdAt: -1 });
+  } else if (user.role === "finance") {
+    requests = await LeaveRequest.find({
+      company: user.company,
+      $or: [
+        { currentStep: "admin", status: { $in: ["pending", "manager-approved"] } },
+        { requester: userId },
+      ],
+    })
       .populate("requester", "name email role")
       .sort({ createdAt: -1 });
   } else if (user.role === "project-manager" || user.role === "qa-tester") {

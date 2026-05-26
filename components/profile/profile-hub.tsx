@@ -40,6 +40,7 @@ export function ProfileHub() {
   const [loading, setLoading] = useState(true);
   const [attendanceHistory, setAttendanceHistory] = useState<AnyRecord[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<AnyRecord[]>([]);
+  const [financeCount, setFinanceCount] = useState(0);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
@@ -56,11 +57,11 @@ export function ProfileHub() {
     "profile",
     "timeline",
     "onboarding",
-    ...(["human-resource", "admin"].includes(String(role))
+    ...(["human-resource", "admin", "finance"].includes(String(role))
       ? (["members"] as Tab[])
       : []),
     ...(hasCompany ? (["messages"] as Tab[]) : []),
-    ...(hasCompany ? (["finance"] as Tab[]) : []),
+    ...(hasCompany && ["finance", "admin"].includes(String(role)) ? (["finance"] as Tab[]) : []),
     "approvals",
     "notifications",
     "attendance",
@@ -104,6 +105,17 @@ export function ProfileHub() {
       apiFetch<{ requests: AnyRecord[] }>("/api/attendance/leave")
         .then((res) => setLeaveRequests(res.requests))
         .catch(() => { });
+      if (["finance", "admin"].includes(String(role)) && hasCompany) {
+        const month = new Date().toISOString().slice(0, 7);
+        apiFetch<{ pendingSalaryApproval: number; pendingSalaryPayment: number; pendingExpenseApproval: number; forwardedExpenseApproval: number; pendingExpenseAcceptance: number; pendingAssignedExpenses: number; pendingBills: number; pendingBudgets: number }>(`/api/finance?counts=true&month=${month}`)
+          .then((res) => {
+            const count = String(role) === "admin"
+              ? res.pendingSalaryApproval + res.pendingExpenseApproval + res.forwardedExpenseApproval + res.pendingBills + res.pendingBudgets
+              : res.pendingSalaryPayment + res.pendingExpenseAcceptance + res.pendingAssignedExpenses + res.pendingBudgets;
+            setFinanceCount(count);
+          })
+          .catch(() => { });
+      }
     } finally {
       if (!silent) setLoading(false);
     }
@@ -312,7 +324,7 @@ export function ProfileHub() {
           {hasCompany ? (
             <NavButton
               active={tab === "finance"}
-              label="Finance"
+              label={`Finance${financeCount ? ` (${financeCount})` : ""}`}
               onClick={() => setTab("finance")}
             />
           ) : null}
@@ -366,7 +378,9 @@ export function ProfileHub() {
                       r.status === "pending" || r.status === "manager-approved",
                   ).length > 0
                   ? `attendance (${leaveRequests.filter((r) => r.status === "pending" || r.status === "manager-approved").length})`
-                  : item;
+                  : item === "finance" && financeCount > 0
+                    ? `finance (${financeCount})`
+                    : item;
 
               return (
                 <button
@@ -463,7 +477,7 @@ export function ProfileHub() {
               ) : null}
 
               {tab === "finance" ? (
-                <FinanceTab showToast={showToast} />
+                <FinanceTab actorRole={String(role)} profileId={String(profile?.id ?? session?.user?.id ?? "")} showToast={showToast} />
               ) : null}
 
               {tab === "attendance" ? (
