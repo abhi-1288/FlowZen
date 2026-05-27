@@ -13,6 +13,8 @@ const CompanySchema = new Schema(
     employeeJoinCode: { type: String, unique: true, sparse: true, index: true },
     otherJoinCode: { type: String, unique: true, sparse: true, index: true },
     noticePeriodDays: { type: Number, default: 30 },
+    paidLeaveDays: { type: Number, default: 0 },
+    paidLeavePeriod: { type: String, enum: ["monthly", "yearly"], default: "monthly" },
     members: [{ type: Schema.Types.ObjectId, ref: "User" }],
     wfhDates: [
       {

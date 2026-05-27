@@ -67,7 +67,9 @@ export function ApprovalsTab({
     requestKind?: string,
   ) {
     if (!id) return;
-    const salaryAmount = requestKind === "salary" ? Math.max(0, Number(salaryAmounts[id] ?? 0)) : undefined;
+    const salaryAmount = ["salary", "company"].includes(String(requestKind ?? ""))
+      ? Math.max(0, Number(salaryAmounts[id] ?? 0))
+      : undefined;
     setDecidingIds((current) => ({ ...current, [id]: true }));
     try {
       await apiFetch(`/api/approvals/${id}`, {
@@ -98,6 +100,7 @@ export function ApprovalsTab({
         {visibleApprovals.map((request) => {
           const requestId = requestIdOf(request);
           const isDeciding = Boolean(decidingIds[requestId]);
+          const metadata = (request.metadata ?? {}) as AnyRecord;
           return (
           <div
             className="flex flex-wrap items-center justify-between gap-4 py-4"
@@ -118,9 +121,13 @@ export function ApprovalsTab({
                   ? "requested a unique identity code"
                   : String(request.kind) === "salary"
                   ? "requested salary assignment"
+                  : String(request.kind) === "salary-increment"
+                  ? `requested salary update for ${metadata.targetUserName || "a member"}`
                   : "requested to join"}{" "}
                 {String(request.kind) === "identity-code"
                   ? displayNested(request.company, "name", "company")
+                  : String(request.kind) === "salary-increment"
+                  ? ""
                   : request.kind === "team" || request.kind === "quit-team"
                   ? displayNested(request.team, "name", "team")
                   : displayNested(request.company, "name", "company")}
@@ -160,11 +167,11 @@ export function ApprovalsTab({
               >
                 {isDeciding ? "Working..." : "Decline"}
               </button>
-              {String(request.kind ?? "") === "salary" ? (
+              {["company", "salary"].includes(String(request.kind ?? "")) ? (
                 <div className="flex items-center gap-2">
                   <input
                     className="w-28 rounded-lg border border-slate-200 px-2 py-2 text-sm"
-                    placeholder="Amount"
+                    placeholder="Base salary"
                     type="number"
                     min={0}
                     value={salaryAmounts[requestId] ?? ""}
@@ -172,12 +179,20 @@ export function ApprovalsTab({
                   />
                   <button
                     className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={isDeciding || !(Number(salaryAmounts[requestId] ?? 0) > 0)}
-                    onClick={() => decide(requestId, "approved", false, "salary")}
+                    disabled={isDeciding || (String(request.kind ?? "") === "salary" && !(Number(salaryAmounts[requestId] ?? 0) > 0))}
+                    onClick={() => decide(requestId, "approved", false, String(request.kind ?? ""))}
                   >
                     {isDeciding ? "Working..." : "Approve"}
                   </button>
                 </div>
+              ) : String(request.kind ?? "") === "salary-increment" ? (
+                <button
+                  className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={isDeciding}
+                  onClick={() => decide(requestId, "approved", false, String(request.kind ?? ""))}
+                >
+                  {isDeciding ? "Working..." : "Approve Update"}
+                </button>
               ) : (
                 <button
                   className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -258,6 +273,8 @@ export function MembersTab({
   const [fireConfirmText, setFireConfirmText] = useState("");
   const [roleDrafts, setRoleDrafts] = useState<Record<string, string>>({});
   const [savingRoleFor, setSavingRoleFor] = useState<string | null>(null);
+  const [salaryDrafts, setSalaryDrafts] = useState<Record<string, string>>({});
+  const [savingSalaryFor, setSavingSalaryFor] = useState<string | null>(null);
   const [selectedOtherRole, setSelectedOtherRole] = useState("all");
 
   const otherRoleOptions = useMemo(() => {
@@ -421,10 +438,42 @@ export function MembersTab({
     }
   }
 
-  const companyMembers = Array.isArray(insights?.companyMembers) ? insights.companyMembers as AnyRecord[] : [];
+  function salaryDraftFor(member: AnyRecord) {
+    const memberId = String(member.id ?? "");
+    if (salaryDrafts[memberId] !== undefined) return salaryDrafts[memberId];
+    const currentSalary = Math.max(0, Number(member.baseSalary ?? 0));
+    return currentSalary > 0 ? String(currentSalary) : "";
+  }
+
+  async function saveMemberSalary(member: AnyRecord) {
+    const memberId = String(member.id ?? "");
+    const baseSalary = Number(salaryDraftFor(member));
+    if (!memberId) return;
+    if (!(baseSalary > 0)) {
+      showToast("Enter a valid base salary.", "error");
+      return;
+    }
+
+    try {
+      setSavingSalaryFor(memberId);
+      await apiFetch(`/api/hr/member-salary/${memberId}`, {
+        method: "POST",
+        body: JSON.stringify({ baseSalary }),
+      });
+      showToast("Base salary saved.");
+      await refresh(true);
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Unable to save base salary.",
+        "error",
+      );
+    } finally {
+      setSavingSalaryFor(null);
+    }
+  }
 
   if (actorRole === "finance") {
-    return <FinanceMembersView members={companyMembers} showToast={showToast} />;
+    return <FinanceMembersView members={members} showToast={showToast} />;
   }
 
   return (
@@ -600,6 +649,9 @@ export function MembersTab({
                             <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
                               role: {displayMemberRole(member)}
                             </span>
+                            <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
+                              salary: {Number(member.baseSalary ?? 0) > 0 ? `Rs. ${Number(member.baseSalary).toLocaleString("en-IN")}` : "not set"}
+                            </span>
                             <span
                               className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700"
                               title={
@@ -663,6 +715,35 @@ export function MembersTab({
                               </div>
                             </div>
                           ) : null}
+
+                          <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 sm:col-span-3">
+                            <p className="text-xs font-semibold uppercase text-slate-500">
+                              Base salary
+                            </p>
+                            <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
+                              <input
+                                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-900"
+                                min={0}
+                                placeholder="Monthly base salary"
+                                type="number"
+                                value={salaryDraftFor(member)}
+                                onChange={(event) =>
+                                  setSalaryDrafts((current) => ({
+                                    ...current,
+                                    [memberId]: event.target.value,
+                                  }))
+                                }
+                              />
+                              <button
+                                className="rounded-lg bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                disabled={savingSalaryFor === memberId || !(Number(salaryDraftFor(member)) > 0)}
+                                type="button"
+                                onClick={() => void saveMemberSalary(member)}
+                              >
+                                {savingSalaryFor === memberId ? "Saving..." : "Save salary"}
+                              </button>
+                            </div>
+                          </div>
 
                           <div className="flex shrink-0 flex-col gap-2 sm:items-end">
                             <button

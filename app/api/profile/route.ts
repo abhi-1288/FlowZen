@@ -12,6 +12,7 @@ import { JoinRequest } from "@/models/JoinRequest";
 import { Team } from "@/models/Team";
 import { Company } from "@/models/Company";
 import { FinanceSalary } from "@/models/FinanceSalary";
+import { resolveEnrollingHr, resolveJoinedByInfo } from "@/lib/enrolling-hr";
 import "@/models/Company";
 import "@/models/Team";
 
@@ -98,10 +99,40 @@ export async function GET() {
     status: "pending",
   }).select("_id");
   insights.pendingSalaryRequest = !!pendingSalaryRequest;
-  const existingSalary = user.company ? await FinanceSalary.findOne({ employee: userId, company: user.company }).select("_id") : null;
-  insights.hasSalary = !!existingSalary;
+  const inApprovedCompany = Boolean(user.company && user.companyStatus === "approved");
+  const userCompanyId =
+    typeof user.company === "object" && user.company
+      ? (user.company as any)._id
+      : user.company;
+  let baseSalaryValue = 0;
+
+  if (inApprovedCompany) {
+    const assignedFinanceSalary = await FinanceSalary.findOne({
+      employee: userId,
+      company: userCompanyId,
+      $or: [{ baseSalary: { $gt: 0 } }, { netSalary: { $gt: 0 } }],
+    })
+      .sort({ updatedAt: -1 })
+      .select("baseSalary netSalary");
+    const financeSalaryAmount = Math.max(
+      0,
+      Number(assignedFinanceSalary?.baseSalary ?? assignedFinanceSalary?.netSalary ?? 0),
+    );
+    baseSalaryValue = Math.max(financeSalaryAmount, Math.max(0, Number(user.baseSalary ?? 0)));
+  } else if (Number(user.baseSalary ?? 0) > 0) {
+    user.baseSalary = 0;
+    await user.save();
+  }
+
+  insights.hasSalary = inApprovedCompany && baseSalaryValue > 0;
+  insights.baseSalary = inApprovedCompany ? baseSalaryValue : 0;
+
+  if (inApprovedCompany && !["human-resource", "admin"].includes(safeRole)) {
+    insights.enrolledByHr = await resolveEnrollingHr(user);
+    insights.joinedBy = await resolveJoinedByInfo(user);
+  }
   if (pendingQuitRequest && user.company) {
-    const companyDoc = await Company.findById(user.company).select("noticePeriodDays");
+    const companyDoc = await Company.findById(userCompanyId).select("noticePeriodDays");
     const noticeDays = Number(companyDoc?.noticePeriodDays ?? 0);
     const elapsedDays = Math.max(
       0,
@@ -115,7 +146,7 @@ export async function GET() {
   }
 
   if (user.company && user.companyStatus === "approved") {
-    const companyMembers = await User.find({ company: user.company, companyStatus: "approved" })
+    const companyMembers = await User.find({ company: userCompanyId, companyStatus: "approved" })
       .select("name email role customRole")
       .sort({ role: 1, name: 1 });
     insights.companyMembers = companyMembers.map((member) => ({
@@ -167,7 +198,7 @@ export async function GET() {
     const companyId = typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
     const [members, teams] = await Promise.all([
       User.find({ company: companyId, companyStatus: "approved" })
-        .select("name email role customRole team teamStatus activeTeams membershipHistory")
+        .select("name email role customRole team teamStatus activeTeams membershipHistory companyJoined createdAt baseSalary")
         .populate("membershipHistory.inviter", "name role")
         .sort({ role: 1, name: 1 }),
       Team.find({ company: companyId }).select("name manager employees"),
@@ -209,18 +240,21 @@ export async function GET() {
           email: member.email ?? "",
           role: member.role ?? "employee",
           customRole: member.customRole ?? "",
+          baseSalary: Math.max(0, Number(member.baseSalary ?? 0)),
           teamStatus: member.teamStatus ?? "none",
           teams: teamNames,
           hasTeam: teamNames.length > 0,
           joinedBy: inviter,
+          createdAt: member.createdAt,
+          companyJoined: member.companyJoined,
         };
       }),
     };
   }
 
   if (safeRole === "admin" && user.company) {
-    const teams = await Team.find({ company: user.company }).populate("manager", "name email").sort({ createdAt: -1 });
-    const company = await Company.findById(user.company).select("name");
+    const teams = await Team.find({ company: userCompanyId }).populate("manager", "name email").sort({ createdAt: -1 });
+    const company = await Company.findById(userCompanyId).select("name");
     insights.admin = {
       companyName: company?.name ?? "",
       totalTeams: teams.length,
@@ -238,7 +272,10 @@ export async function GET() {
     };
   }
 
-  return NextResponse.json({ user: serializeDoc(user), insights });
+  const serializedUser = serializeDoc(user);
+  serializedUser.baseSalary = baseSalaryValue;
+
+  return NextResponse.json({ user: serializedUser, insights });
 }
 
 export async function PATCH(request: Request) {

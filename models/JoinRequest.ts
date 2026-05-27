@@ -8,11 +8,12 @@ const JoinRequestSchema = new Schema(
     team: { type: Schema.Types.ObjectId, ref: "Team", default: null, index: true },
     replacementHr: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
     replacementUser: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
-    kind: { type: String, enum: ["company", "team", "identity-code", "salary", "quit-company", "quit-team", "quit-company-board-transfer"], required: true, index: true },
-    status: { type: String, enum: ["pending", "approved", "rejected"], default: "pending", index: true },
+    kind: { type: String, enum: ["company", "team", "identity-code", "salary", "quit-company", "quit-team", "quit-company-board-transfer", "salary-increment"], required: true, index: true },
+    status: { type: String, enum: ["pending", "hr-approved", "approved", "rejected"], default: "pending", index: true },
     noticeEndedNotifiedAt: { type: Date, default: null, index: true },
     cancelReason: { type: String, default: "" },
     cancelledAt: { type: Date, default: null, index: true },
+    metadata: { type: Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
 );

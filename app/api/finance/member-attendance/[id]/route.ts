@@ -17,7 +17,7 @@ export async function GET(request: Request, { params }: Params) {
   const actor = await User.findById(userId).select("role company companyStatus");
   if (!actor || !actor.company || actor.companyStatus !== "approved") return jsonError("Approved company access is required.", 403);
   if (String(actor.role) !== "finance") return jsonError("Only finance can view member attendance.", 403);
-  const member = await User.findOne({ _id: memberId, company: actor.company, companyStatus: "approved" }).select("name email role");
+  const member = await User.findOne({ _id: memberId, company: actor.company, companyStatus: "approved" }).select("name email role baseSalary companyJoined createdAt");
   if (!member) return jsonError("Member not found.", 404);
 
   const url = new URL(request.url);
@@ -56,11 +56,17 @@ export async function GET(request: Request, { params }: Params) {
     absent: boolean;
     holiday: boolean;
     holidayTitle: string;
+    notJoined: boolean;
   }[] = [];
+
+  const joinedDate = new Date(member.companyJoined || member.createdAt);
+  joinedDate.setHours(0, 0, 0, 0);
 
   for (let d = 1; d <= daysInMonth; d++) {
     const date = new Date(year, mon - 1, d);
-    const dateStr = date.toISOString().slice(0, 10);
+    const dateStr = `${year}-${String(mon).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const isBeforeJoined = date < joinedDate;
+
     const att = attendanceRecords.find((a: any) => {
       const aDate = new Date(a.date);
       return aDate.getFullYear() === year && aDate.getMonth() === mon - 1 && aDate.getDate() === d;
@@ -68,12 +74,20 @@ export async function GET(request: Request, { params }: Params) {
     const leave = leaveRecords.find((l: any) => {
       const start = new Date(l.startDate);
       const end = new Date(l.endDate);
-      return date >= start && date <= end;
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      const checkDate = new Date(date);
+      checkDate.setHours(12, 0, 0, 0);
+      return checkDate >= start && checkDate <= end;
     });
     const holiday = holidays.find((h: any) => {
       const start = new Date(h.startDate);
       const end = new Date(h.endDate);
-      return date >= start && date <= end;
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      const checkDate = new Date(date);
+      checkDate.setHours(12, 0, 0, 0);
+      return checkDate >= start && checkDate <= end;
     });
     const isWeekend = date.getDay() === 0 || date.getDay() === 6;
 
@@ -82,17 +96,18 @@ export async function GET(request: Request, { params }: Params) {
       date: dateStr,
       checkIn: att ? new Date(att.checkIn).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : null,
       checkOut: att?.checkOut ? new Date(att.checkOut).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : null,
-      leave: !!leave,
-      leaveReason: leave ? String(leave.reason ?? "") : "",
-      leaveStatus: leave ? String(leave.status ?? "") : "",
-      absent: !att && !leave && !isWeekend && !holiday,
+      leave: isBeforeJoined ? false : !!leave,
+      leaveReason: isBeforeJoined ? "" : leave ? String(leave.reason ?? "") : "",
+      leaveStatus: isBeforeJoined ? "Not Joined" : leave ? String(leave.status ?? "") : "",
+      absent: isBeforeJoined ? false : (!att && !leave && !isWeekend && !holiday),
       holiday: !!holiday,
       holidayTitle: holiday ? String(holiday.title ?? "") : "",
+      notJoined: isBeforeJoined,
     });
   }
 
   return NextResponse.json({
-    member: { id: String(member._id), name: member.name, email: member.email, role: member.role },
+    member: { id: String(member._id), name: member.name, email: member.email, role: member.role, baseSalary: member.baseSalary },
     month,
     salary: salary ? { netSalary: salary.netSalary, baseSalary: salary.baseSalary } : null,
     calendar,

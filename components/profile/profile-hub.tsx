@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { AlertCircle, CheckCircle2, LogOut } from "lucide-react";
@@ -28,7 +29,23 @@ export type Tab =
 
 export function ProfileHub() {
   const { data: session } = useSession();
-  const [tab, setTab] = useState<Tab>("profile");
+  const router = useRouter();
+  const params = useParams();
+  const routeTab = (Array.isArray(params?.tab) ? params.tab[0] : params?.tab) as Tab | undefined;
+  
+  const [tab, setTabState] = useState<Tab>(routeTab || "profile");
+  
+  useEffect(() => {
+    if (routeTab && routeTab !== tab) {
+      setTabState(routeTab);
+    }
+  }, [routeTab]);
+
+  const setTab = (newTab: Tab) => {
+    setTabState(newTab);
+    window.history.pushState(null, "", `/profile/${newTab}`);
+  };
+
   const [profile, setProfile] = useState<AnyRecord | null>(null);
   const [insights, setInsights] = useState<AnyRecord | null>(null);
   const [approvals, setApprovals] = useState<AnyRecord[]>([]);
@@ -50,6 +67,9 @@ export function ProfileHub() {
   const displayName = String(profile?.name ?? session?.user?.name ?? "User");
   const avatarUrl = profile?.avatarUrl ? String(profile.avatarUrl) : "";
   const unreadCount = notifications.filter((item) => !item.readAt).length;
+  const pendingLeaveCount = leaveRequests.filter((r) =>
+    ["pending", "hr-approved", "manager-approved"].includes(String(r.status)),
+  ).length;
   const hasCompany = Boolean(
     profile?.company && profile?.companyStatus === "approved",
   );
@@ -307,7 +327,7 @@ export function ProfileHub() {
             label="Onboarding"
             onClick={() => setTab("onboarding")}
           />
-          {["human-resource", "admin"].includes(String(role)) ? (
+          {["human-resource", "admin", "finance"].includes(String(role)) ? (
             <NavButton
               active={tab === "members"}
               label="Members"
@@ -340,7 +360,7 @@ export function ProfileHub() {
           />
           <NavButton
             active={tab === "attendance"}
-            label={`Attendance ${leaveRequests.filter((r) => r.status === "pending" || r.status === "manager-approved").length ? `(${leaveRequests.filter((r) => r.status === "pending" || r.status === "manager-approved").length})` : ""}`}
+            label={`Attendance ${pendingLeaveCount ? `(${pendingLeaveCount})` : ""}`}
             onClick={() => setTab("attendance")}
           />
         </nav>
@@ -373,11 +393,8 @@ export function ProfileHub() {
             {mobileTabs.map((item) => {
               const label =
                 item === "attendance" &&
-                  leaveRequests.filter(
-                    (r) =>
-                      r.status === "pending" || r.status === "manager-approved",
-                  ).length > 0
-                  ? `attendance (${leaveRequests.filter((r) => r.status === "pending" || r.status === "manager-approved").length})`
+                  pendingLeaveCount > 0
+                  ? `attendance (${pendingLeaveCount})`
                   : item === "finance" && financeCount > 0
                     ? `finance (${financeCount})`
                     : item;

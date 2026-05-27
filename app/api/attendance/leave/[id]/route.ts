@@ -3,7 +3,6 @@ import { connectDb } from "@/lib/db";
 import { requireUserId, jsonError } from "@/lib/api";
 import { LeaveRequest } from "@/models/LeaveRequest";
 import { User } from "@/models/User";
-import { Team } from "@/models/Team";
 import { Notification } from "@/models/Notification";
 import { emitToUser } from "@/lib/socket-emit";
 
@@ -21,50 +20,44 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const leave = await LeaveRequest.findById(id).populate("requester");
     if (!leave) return jsonError("Request not found.");
 
-    // Validation: who can approve
     const approverRole = String(approver?.role ?? "");
-    const isAdminOrHr = approverRole === "admin" || approverRole === "human-resource";
+    const requesterId = typeof leave.requester === "object" ? leave.requester._id : leave.requester;
+    const isRequester = String(requesterId) === String(userId);
+    if (isRequester) return jsonError("You cannot approve your own leave request.", 403);
+
     if (leave.currentStep === "admin") {
-      if (!isAdminOrHr && approverRole !== "finance") {
-        return jsonError("Only admins, HR, or finance can approve this step.");
+      if (approverRole !== "admin") {
+        return jsonError("Only admins can approve the final leave step.", 403);
       }
-    } else if (leave.currentStep === "manager") {
-      const isManager = ["project-manager", "qa-tester", "finance"].includes(approverRole);
-      if (!isManager && !isAdminOrHr) {
-        return jsonError("Only managers/testers/finance/admin/HR can approve this step.");
-      }
-      if (!isAdminOrHr) {
-        const requesterId = typeof leave.requester === "object" ? leave.requester._id : leave.requester;
-        const team = await Team.findOne({ employees: requesterId, manager: userId });
-        if (!team) {
-          return jsonError(`Authorization failed: You are not the manager of ${leave.requester.name}'s team.`);
-        }
+    } else {
+      if (approverRole !== "human-resource" && approverRole !== "admin") {
+        return jsonError("Only HR can approve this leave step.", 403);
       }
     }
-
-    const bypassTwoStep = isAdminOrHr;
 
     if (action === "reject") {
       leave.status = "rejected";
       leave.rejectionReason = rejectionReason || "No reason provided.";
     } else {
-      if (leave.currentStep === "manager" && leave.duration > 5 && !bypassTwoStep) {
-        leave.status = "manager-approved";
+      if (leave.currentStep === "hr" && approverRole === "human-resource") {
+        leave.status = "hr-approved";
+        leave.hrApprover = approver?._id;
         leave.currentStep = "admin";
       } else {
         leave.status = "approved";
+        leave.adminApprover = approver?._id;
       }
     }
 
     await leave.save();
 
-    if (leave.status === "manager-approved") {
+    if (leave.status === "hr-approved") {
       const admins = await User.find({ role: "admin", company: leave.company });
       for (const admin of admins) {
         await Notification.create({
           user: admin._id,
-          title: "Leave Escalated",
-          body: `A leave request from ${leave.requester.name} needs your final approval.`,
+          title: "Paid Leave Final Approval",
+          body: `A paid leave request from ${leave.requester.name} needs your final approval.`,
           link: "/profile?tab=attendance"
         });
         emitToUser(String(admin._id), "notification:new", {});

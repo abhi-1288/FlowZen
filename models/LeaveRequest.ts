@@ -8,17 +8,19 @@ const LeaveRequestSchema = new Schema(
     endDate: { type: Date, required: true },
     duration: { type: Number, required: true }, // in days
     halfDay: { type: Boolean, default: false },
+    isPaidLeave: { type: Boolean, default: true },
     reason: { type: String, required: true },
     attachmentUrl: { type: String, default: "" },
     rejectionReason: { type: String, default: "" },
     status: { 
       type: String, 
-      enum: ["pending", "manager-approved", "approved", "rejected"], 
+      enum: ["pending", "hr-approved", "manager-approved", "approved", "rejected"], 
       default: "pending" 
     },
+    hrApprover: { type: Schema.Types.ObjectId, ref: "User" },
     managerApprover: { type: Schema.Types.ObjectId, ref: "User" },
     adminApprover: { type: Schema.Types.ObjectId, ref: "User" },
-    currentStep: { type: String, enum: ["manager", "admin"], default: "manager" }
+    currentStep: { type: String, enum: ["hr", "manager", "admin"], default: "hr" }
   },
   { timestamps: true }
 );

@@ -17,6 +17,7 @@ export function ProfileTab({
   refresh: (silent?: boolean) => Promise<void>;
   showToast: (text: string, type?: "success" | "error") => void;
 }) {
+  const { data: session } = useSession();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
@@ -43,17 +44,35 @@ export function ProfileTab({
       : null;
 
   const role = profile?.role ? String(profile.role) : "";
-  const displayRole = formatRoleWithCustom(role, profile?.customRole);
+  const sessionRole = session?.user?.role ? String(session.user.role) : "";
+  const effectiveRole = role || sessionRole;
+  const displayRole = formatRoleWithCustom(effectiveRole, profile?.customRole);
+  const inApprovedCompany =
+    Boolean(profile?.company) && String(profile?.companyStatus ?? "") === "approved";
+  const effectiveBaseSalary = inApprovedCompany
+    ? Math.max(Number(insights?.baseSalary ?? 0), 0)
+    : 0;
+  const joinedBy = (insights?.joinedBy as AnyRecord | undefined) ?? null;
   const passwordResetRequired = Boolean(profile?.passwordResetRequired);
   const sectionClass =
     "rounded-lg border border-slate-200 bg-white p-5 shadow-sm";
   const avatarUrl = profile?.avatarUrl ? String(profile.avatarUrl) : "";
-  const displayName = profile?.name ? String(profile.name) : "User";
+  const displayName = profile?.name
+    ? String(profile.name)
+    : session?.user?.name
+    ? String(session.user.name)
+    : "User";
   const initialNotice = company?.noticePeriodDays
     ? Number(company.noticePeriodDays)
     : 30;
   const [noticePeriodDays, setNoticePeriodDays] =
     useState<number>(initialNotice);
+  const [paidLeaveDays, setPaidLeaveDays] = useState<number>(
+    Math.max(0, Number(company?.paidLeaveDays ?? 0)),
+  );
+  const [paidLeavePeriod, setPaidLeavePeriod] = useState<"monthly" | "yearly">(
+    String(company?.paidLeavePeriod ?? "monthly") === "yearly" ? "yearly" : "monthly",
+  );
   const [savingPolicy, setSavingPolicy] = useState(false);
   // WFH settings (admin)
   const [wfhDates, setWfhDates] = useState<{ date: string; reason: string }[]>([]);
@@ -113,7 +132,11 @@ export function ProfileTab({
     try {
       setSalaryRequesting(true);
       await apiFetch("/api/finance/salary-request", { method: "POST" });
-      showToast("Salary request sent to HR.");
+      showToast(
+        role === "human-resource"
+          ? "Salary request sent to admin."
+          : "Salary request sent to HR.",
+      );
       await refresh(true);
     } catch (err) {
       showToast(
@@ -165,7 +188,7 @@ export function ProfileTab({
       setSavingPolicy(true);
       await apiFetch("/api/hr/policy", {
         method: "PATCH",
-        body: JSON.stringify({ noticePeriodDays }),
+        body: JSON.stringify({ noticePeriodDays, paidLeaveDays, paidLeavePeriod }),
       });
       showToast("Policy updated.");
       await refresh(true);
@@ -325,11 +348,23 @@ export function ProfileTab({
           <dl className="mt-4 space-y-3 text-sm">
             <Row
               label="Name"
-              value={profile?.name ? String(profile.name) : undefined}
+              value={
+                profile?.name
+                  ? String(profile.name)
+                  : session?.user?.name
+                  ? String(session.user.name)
+                  : undefined
+              }
             />
             <Row
               label="Email"
-              value={profile?.email ? String(profile.email) : undefined}
+              value={
+                profile?.email
+                  ? String(profile.email)
+                  : session?.user?.email
+                  ? String(session.user.email)
+                  : undefined
+              }
             />
             <Row
               label="Email-Verified"
@@ -339,7 +374,7 @@ export function ProfileTab({
                   : undefined
               }
             />
-            <Row label="Role" value={displayRole || undefined} />
+            <Row label="Role" value={effectiveRole ? displayRole : undefined} />
             <Row
               label="Unique Identity"
               value={
@@ -357,6 +392,14 @@ export function ProfileTab({
               value={
                 company?.noticePeriodDays
                   ? `${Number(company.noticePeriodDays)} day${Number(company.noticePeriodDays) === 1 ? "" : "s"}`
+                  : undefined
+              }
+            />
+            <Row
+              label="Paid Leave"
+              value={
+                company
+                  ? `${Math.max(0, Number(company.paidLeaveDays ?? 0))} day${Number(company.paidLeaveDays ?? 0) === 1 ? "" : "s"} ${String(company.paidLeavePeriod ?? "monthly")}`
                   : undefined
               }
             />
@@ -382,38 +425,22 @@ export function ProfileTab({
                   : undefined
               }
             />
-            <Row
-              label="Joined By HR"
-              value={(() => {
-                const safeRole = String(profile?.role ?? "");
-                if (
-                  ![
-                    "employee",
-                    "project-manager",
-                    "qa-tester",
-                    "others",
-                  ].includes(safeRole)
-                )
-                  return undefined;
-                const history = Array.isArray(profile?.membershipHistory)
-                  ? (profile?.membershipHistory as AnyRecord[])
-                  : [];
-                const lastJoin = [...history]
-                  .reverse()
-                  .find(
-                    (entry) => String(entry?.action ?? "") === "joined-company",
-                  );
-                const inviter =
-                  lastJoin &&
-                    typeof (lastJoin as AnyRecord)?.inviter === "object"
-                    ? ((lastJoin as AnyRecord).inviter as AnyRecord)
-                    : null;
-                const inviterRole = inviter?.role ? String(inviter.role) : "";
-                if (!inviter?.name || inviterRole !== "human-resource")
-                  return undefined;
-                return String(inviter.name);
-              })()}
-            />
+            {inApprovedCompany && !["human-resource", "admin"].includes(role) ? (
+              <Row
+                label={joinedBy?.viaHr ? "Joined By HR" : "Company approved by"}
+                value={
+                  joinedBy?.name
+                    ? String(joinedBy.name)
+                    : undefined
+                }
+              />
+            ) : null}
+            {inApprovedCompany ? (
+              <Row
+                label="Base Salary"
+                value={effectiveBaseSalary > 0 ? `₹${effectiveBaseSalary.toLocaleString("en-IN")}` : undefined}
+              />
+            ) : null}
             <Row
               label="Team status"
               value={
@@ -450,13 +477,15 @@ export function ProfileTab({
               </button>
             </div>
           ) : null}
-          {profile?.companyStatus === "approved" && role !== "human-resource" && role !== "finance" && role !== "admin" && !insights?.hasSalary ? (
+          {inApprovedCompany && role !== "admin" && !insights?.hasSalary ? (
             <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
               <p className="text-sm font-medium text-slate-700">
                 Salary not assigned yet?
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Request HR to set up your salary record.
+                {role === "human-resource"
+                  ? "Request admin to set up your salary record."
+                  : "Request the HR who enrolled you to set up your salary."}
               </p>
               <button
                 className="mt-3 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
@@ -468,6 +497,8 @@ export function ProfileTab({
                   ? "Salary request pending"
                   : salaryRequesting
                   ? "Requesting..."
+                  : role === "human-resource"
+                  ? "Request salary from admin"
                   : "Request salary from HR"}
               </button>
             </div>
@@ -509,6 +540,45 @@ export function ProfileTab({
                 onClick={() => void savePolicy()}
               >
                 {savingPolicy ? "Saving..." : "Save policy"}
+              </button>
+            </div>
+
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <label
+                className="text-xs font-semibold uppercase text-slate-500"
+                htmlFor="paid-leave-days"
+              >
+                Paid leave quota
+              </label>
+              <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
+                <input
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                  id="paid-leave-days"
+                  min={0}
+                  max={365}
+                  type="number"
+                  value={paidLeaveDays}
+                  onChange={(e) => setPaidLeaveDays(Math.max(0, Number(e.target.value)))}
+                />
+                <select
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                  value={paidLeavePeriod}
+                  onChange={(e) => setPaidLeavePeriod(e.target.value === "yearly" ? "yearly" : "monthly")}
+                >
+                  <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Approved paid leaves remain payable in finance salary calculation.
+              </p>
+              <button
+                className="mt-3 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={savingPolicy}
+                type="button"
+                onClick={() => void savePolicy()}
+              >
+                {savingPolicy ? "Saving..." : "Save paid leave"}
               </button>
             </div>
           </section>
@@ -649,7 +719,7 @@ export function ProfileTab({
           </>
         ) : null}
 
-        {role === "project-manager" || role === "qa-tester" ? (
+        {role === "project-manager" || role === "qa-tester" || role === "finance" ? (
           <section className="rounded-lg border overflow-y-auto max-h-[500px] border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center gap-2">
               <Building2 size={18} />
@@ -1634,7 +1704,7 @@ export function OnboardingTab({
         </div>
       ) : null}
 
-      {["project-manager", "qa-tester", "human-resource"].includes(role) ? (
+      {["project-manager", "qa-tester", "human-resource", "finance"].includes(role) ? (
         profile?.companyStatus === "approved" ? (
           <>
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -2024,7 +2094,7 @@ export function OnboardingTab({
         </div>
       ) : null}
 
-      {["employee", "others", "finance"].includes(role) ? (
+      {["employee", "others"].includes(role) ? (
         companyJoinStatus === "approved" ? (
           <>
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">

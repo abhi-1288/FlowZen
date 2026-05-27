@@ -133,12 +133,18 @@ export async function PATCH(request: Request, { params }: Params) {
     if (!isObjectId(id)) return jsonError("Invalid approval id.");
 
     const body = await request.json();
-    const status = body.status === "approved" ? "approved" : "rejected";
+    const validStatuses = ["approved", "hr-approved", "rejected"];
+    let status = validStatuses.includes(body.status) ? body.status : "rejected";
     const force = Boolean(body.force);
 
     await connectDb();
     const joinRequest = await JoinRequest.findById(id);
     if (!joinRequest) return jsonError("Approval request not found.", 404);
+    
+    // Auto-map frontend 'approved' to 'hr-approved' for the first step of salary-increment
+    if (status === "approved" && joinRequest.kind === "salary-increment" && joinRequest.status === "pending") {
+      status = "hr-approved";
+    }
     const requester = await User.findById(joinRequest.requester);
     if (!requester) return jsonError("Requester not found.", 404);
 
@@ -159,7 +165,7 @@ export async function PATCH(request: Request, { params }: Params) {
         String(actor.company ?? "") === String(joinRequest.company);
     }
     if (!canDecide) return jsonError("Forbidden", 403);
-    if (joinRequest.status !== "pending") return jsonError("Approval request already processed.", 409);
+    if (!["pending", "hr-approved"].includes(joinRequest.status)) return jsonError("Approval request already processed.", 409);
 
     if (status === "approved" && joinRequest.kind === "quit-company") {
       if (["project-manager", "qa-tester"].includes(String(requester.role ?? "")) && joinRequest.replacementUser) {
@@ -197,16 +203,49 @@ export async function PATCH(request: Request, { params }: Params) {
     if (joinRequest.kind === "company") {
       requester.companyStatus = status;
       if (status === "approved") {
+        const salaryAmount = Math.max(0, Number(body.salaryAmount ?? 0));
         await cleanupQuitterBoardAssignments(requester._id);
         requester.company = joinRequest.company;
         requester.companyJoined = new Date();
+        requester.baseSalary = salaryAmount;
+        if (salaryAmount > 0) {
+          if (!Array.isArray(requester.salaryHistory)) requester.salaryHistory = [];
+          requester.salaryHistory.push({
+            amount: salaryAmount,
+            date: new Date(),
+            type: "increment",
+          });
+        }
         const approver = await User.findById(joinRequest.approver).select("role");
         if (String(approver?.role ?? "") === "human-resource") {
           await ensureCompanyIdentityCode(requester, joinRequest.company);
         }
+        const meta = (joinRequest.metadata ?? {}) as { enrollingHrId?: unknown };
+        let historyInviterId = joinRequest.approver;
+        if (meta.enrollingHrId) {
+          const enrollingHr = await User.findOne({
+            _id: meta.enrollingHrId,
+            company: joinRequest.company,
+            role: "human-resource",
+            companyStatus: "approved",
+          }).select("_id");
+          if (enrollingHr) historyInviterId = enrollingHr._id;
+        } else {
+          const approverDoc = await User.findById(joinRequest.approver).select("role");
+          if (String(approverDoc?.role ?? "") !== "human-resource") {
+            const fallbackHr = await User.findOne({
+              company: joinRequest.company,
+              role: "human-resource",
+              companyStatus: "approved",
+            })
+              .select("_id")
+              .sort({ createdAt: 1 });
+            if (fallbackHr) historyInviterId = fallbackHr._id;
+          }
+        }
         requester.membershipHistory.push({
           company: joinRequest.company,
-          inviter: joinRequest.approver,
+          inviter: historyInviterId,
           action: "joined-company",
           at: new Date(),
         });
@@ -216,7 +255,15 @@ export async function PATCH(request: Request, { params }: Params) {
           const currentMonth = new Date().toISOString().slice(0, 7);
           await FinanceSalary.findOneAndUpdate(
             { company: joinRequest.company, employee: requester._id, month: currentMonth },
-            { $setOnInsert: { baseSalary: 0, allowances: 0, deductions: 0, netSalary: 0, status: "pending" } },
+            {
+              $set: {
+                baseSalary: salaryAmount,
+                allowances: 0,
+                deductions: 0,
+                netSalary: salaryAmount,
+                status: "pending",
+              },
+            },
             { upsert: true },
           );
         }
@@ -245,11 +292,64 @@ export async function PATCH(request: Request, { params }: Params) {
       if (status === "approved") {
         const currentMonth = new Date().toISOString().slice(0, 7);
         const salaryAmount = Math.max(0, Number(body.salaryAmount ?? 0));
+        requester.baseSalary = salaryAmount;
+        if (salaryAmount > 0) {
+          if (!Array.isArray(requester.salaryHistory)) requester.salaryHistory = [];
+          requester.salaryHistory.push({
+            amount: salaryAmount,
+            date: new Date(),
+            type: "increment",
+          });
+        }
         await FinanceSalary.findOneAndUpdate(
           { company: joinRequest.company, employee: requester._id, month: currentMonth },
           { $set: { baseSalary: salaryAmount, allowances: 0, deductions: 0, netSalary: salaryAmount, status: "pending" } },
           { upsert: true },
         );
+      }
+    }
+
+    if (joinRequest.kind === "salary-increment") {
+      if (status === "hr-approved") {
+        const admin = await User.findOne({ company: joinRequest.company, role: "admin", companyStatus: "approved" }).select("_id");
+        if (!admin) {
+          return jsonError("No admin available to provide final approval.", 404);
+        }
+        joinRequest.approver = admin._id;
+        
+        await Notification.create({
+          user: admin._id,
+          company: joinRequest.company,
+          type: "approval",
+          title: "Salary Update Approval Required",
+          message: `HR has approved the salary update for ${joinRequest.metadata?.targetUserName || "a member"}. Admin approval required.`,
+        });
+        emitNotification(String(admin._id));
+      } else if (status === "approved") {
+        const metadata = joinRequest.metadata || {};
+        const targetUser = await User.findById(metadata.targetUser);
+        if (targetUser) {
+          const oldSalary = targetUser.baseSalary || 0;
+          const newSalary = Number(metadata.newBaseSalary) || 0;
+          
+          targetUser.baseSalary = newSalary;
+          if (!Array.isArray(targetUser.salaryHistory)) targetUser.salaryHistory = [];
+          targetUser.salaryHistory.push({
+            amount: newSalary,
+            date: new Date(),
+            type: newSalary >= oldSalary ? "increment" : "decrement"
+          });
+          await targetUser.save();
+          
+          await Notification.create({
+            user: targetUser._id,
+            company: joinRequest.company,
+            type: "info",
+            title: "Salary Updated",
+            message: `your last salary was ${oldSalary} and now ${newSalary >= oldSalary ? "incremented" : "decremented"} with ${Math.abs(newSalary - oldSalary)} and your current salary is ${newSalary}`
+          });
+          emitNotification(String(targetUser._id));
+        }
       }
     }
 
@@ -353,6 +453,7 @@ export async function PATCH(request: Request, { params }: Params) {
         requester.companyJoined = null;
         requester.companyStatus = "none";
         requester.companyIdentityCode = undefined;
+        requester.baseSalary = 0;
         
         // Clear any old pending join requests so new requests can be processed cleanly
         await JoinRequest.deleteMany({
@@ -415,9 +516,15 @@ export async function PATCH(request: Request, { params }: Params) {
       }
     }
 
-    await requester.save();
+    if (joinRequest.kind !== "salary-increment" || status === "approved" || status === "rejected") {
+      await requester.save();
+    }
     joinRequest.status = status;
     await joinRequest.save();
+    
+    if (joinRequest.kind === "salary-increment" && status === "hr-approved") {
+      return NextResponse.json({ request: serializeDoc(joinRequest) });
+    }
 
     const populatedRequest = await JoinRequest.findById(id)
       .populate("company", "name")
@@ -459,6 +566,12 @@ export async function PATCH(request: Request, { params }: Params) {
         status === "approved"
           ? `Your salary of ₹${Number(body.salaryAmount ?? 0).toLocaleString("en-IN")} has been assigned. Finance will process it shortly.`
           : "Your salary assignment request was rejected.";
+    } else if (joinRequest.kind === "salary-increment") {
+      title = status === "approved" ? "Salary update approved" : "Salary update rejected";
+      message =
+        status === "approved"
+          ? `The salary update request for ${joinRequest.metadata?.targetUserName || "a member"} was approved by the admin.`
+          : `The salary update request for ${joinRequest.metadata?.targetUserName || "a member"} was rejected.`;
     }
 
     await Notification.create({

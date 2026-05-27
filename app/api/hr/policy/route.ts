@@ -5,15 +5,28 @@ import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 
 const ALLOWED_NOTICE_PERIOD_DAYS = new Set([5, 15, 30, 45, 60, 90]);
+const ALLOWED_PAID_LEAVE_PERIODS = new Set(["monthly", "yearly"]);
 
 export async function PATCH(request: Request) {
   const userId = await requireUserId();
   if (!userId) return jsonError("Unauthorized", 401);
 
   const body = await request.json().catch(() => ({}));
+  const hasNoticePeriod = Object.prototype.hasOwnProperty.call(body, "noticePeriodDays");
+  const hasPaidLeaveDays = Object.prototype.hasOwnProperty.call(body, "paidLeaveDays");
+  const hasPaidLeavePeriod = Object.prototype.hasOwnProperty.call(body, "paidLeavePeriod");
   const noticePeriodDays = Number((body as any).noticePeriodDays);
-  if (!Number.isFinite(noticePeriodDays) || !ALLOWED_NOTICE_PERIOD_DAYS.has(noticePeriodDays)) {
+  const paidLeaveDays = Number((body as any).paidLeaveDays);
+  const paidLeavePeriod = String((body as any).paidLeavePeriod ?? "");
+
+  if (hasNoticePeriod && (!Number.isFinite(noticePeriodDays) || !ALLOWED_NOTICE_PERIOD_DAYS.has(noticePeriodDays))) {
     return jsonError("Invalid notice period.", 400);
+  }
+  if (hasPaidLeaveDays && (!Number.isFinite(paidLeaveDays) || paidLeaveDays < 0 || paidLeaveDays > 365)) {
+    return jsonError("Invalid paid leave days.", 400);
+  }
+  if (hasPaidLeavePeriod && !ALLOWED_PAID_LEAVE_PERIODS.has(paidLeavePeriod)) {
+    return jsonError("Invalid paid leave period.", 400);
   }
 
   try {
@@ -33,9 +46,16 @@ export async function PATCH(request: Request) {
   const company = await Company.findById(hr.company);
   if (!company) return jsonError("Company not found.", 404);
 
-  company.noticePeriodDays = noticePeriodDays;
+  if (hasNoticePeriod) company.noticePeriodDays = noticePeriodDays;
+  if (hasPaidLeaveDays) company.paidLeaveDays = Math.floor(paidLeaveDays);
+  if (hasPaidLeavePeriod) company.paidLeavePeriod = paidLeavePeriod;
   await company.save();
 
-  return NextResponse.json({ ok: true, noticePeriodDays });
+  return NextResponse.json({
+    ok: true,
+    noticePeriodDays: company.noticePeriodDays,
+    paidLeaveDays: company.paidLeaveDays,
+    paidLeavePeriod: company.paidLeavePeriod,
+  });
 }
 

@@ -9,6 +9,7 @@ export function CalendarTab() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [history, setHistory] = useState<AnyRecord[]>([]);
   const [requests, setRequests] = useState<AnyRecord[]>([]);
+  const [leavePolicy, setLeavePolicy] = useState<AnyRecord | null>(null);
   const [holidays, setHolidays] = useState<AnyRecord[]>([]);
 
   const month = viewDate.getMonth();
@@ -109,8 +110,8 @@ export function CalendarTab() {
       apiFetch<{ history: AnyRecord[] }>("/api/attendance/checkin").catch(
         () => ({ history: [] as AnyRecord[] }),
       ),
-      apiFetch<{ requests: AnyRecord[] }>("/api/attendance/leave").catch(
-        () => ({ requests: [] as AnyRecord[] }),
+      apiFetch<{ requests: AnyRecord[]; leavePolicy?: AnyRecord }>("/api/attendance/leave").catch(
+        () => ({ requests: [] as AnyRecord[], leavePolicy: null }),
       ),
       apiFetch<{ holidays: AnyRecord[] }>("/api/attendance/holidays").catch(
         () => ({ holidays: [] as AnyRecord[] }),
@@ -298,6 +299,7 @@ export function AttendanceTab({
   currentMonthStart.setDate(1);
   const [exportFrom, setExportFrom] = useState(currentMonthStart.toISOString().slice(0, 10));
   const [exportTo, setExportTo] = useState(new Date().toISOString().slice(0, 10));
+  const [leavePolicy, setLeavePolicy] = useState<AnyRecord | null>(null);
 
   const normalizeDate = (date: Date) => {
     const normalized = new Date(date);
@@ -345,6 +347,7 @@ export function AttendanceTab({
     ]);
     setHistory(hRes.history);
     setRequests(rRes.requests);
+    setLeavePolicy(rRes.leavePolicy ?? null);
     setHolidays(holRes.holidays);
     setWfhCheckInMode(wfhRes.wfhCheckInMode ?? "all-day");
 
@@ -614,7 +617,7 @@ export function AttendanceTab({
     if (!day) return false;
     const date = new Date(year, month, day);
     return requests.some((req: any) => {
-      if (req.status !== "pending" && req.status !== "manager-approved") return false;
+      if (!["pending", "hr-approved", "manager-approved"].includes(String(req.status))) return false;
       const start = new Date(req.startDate);
       const end = new Date(req.endDate);
       start.setHours(0, 0, 0, 0);
@@ -660,6 +663,10 @@ export function AttendanceTab({
     const entryDate = normalizeDate(new Date(entry.date));
     return entryDate.getTime() === todayDate.getTime();
   }) ?? null;
+  const remainingPaidLeaveDays = Math.max(0, Number(leavePolicy?.remainingPaidLeaveDays ?? 0));
+  const paidLeaveDays = Math.max(0, Number(leavePolicy?.paidLeaveDays ?? 0));
+  const paidLeavePeriod = String(leavePolicy?.paidLeavePeriod ?? "monthly");
+  const canAskPaidLeave = String(profile?.role ?? "") !== "admin" && remainingPaidLeaveDays > 0;
 
   const isTodayWfh = useMemo(() => {
     const todayTime = todayDate.getTime();
@@ -749,14 +756,13 @@ export function AttendanceTab({
               Requests
               {requests.filter(
                 (r) =>
-                  r.status === "pending" || r.status === "manager-approved",
+                  ["pending", "hr-approved", "manager-approved"].includes(String(r.status)),
               ).length > 0 && (
                   <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] text-white">
                     {
                       requests.filter(
                         (r) =>
-                          r.status === "pending" ||
-                          r.status === "manager-approved",
+                          ["pending", "hr-approved", "manager-approved"].includes(String(r.status)),
                       ).length
                     }
                   </span>
@@ -779,8 +785,16 @@ export function AttendanceTab({
               </button>
             ) : (
               <button
-                onClick={() => setShowLeaveModal(true)}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+                disabled={!canAskPaidLeave}
+                onClick={() => {
+                  if (!canAskPaidLeave) {
+                    showToast("Paid leave quota is used up. Missed dates will count as absent.", "error");
+                    return;
+                  }
+                  setShowLeaveModal(true);
+                }}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition disabled:cursor-not-allowed disabled:opacity-50"
+                title={!canAskPaidLeave ? "Paid leave quota used up." : "Request paid leave."}
               >
                 Ask Leave
               </button>
@@ -795,15 +809,17 @@ export function AttendanceTab({
                 >
                   {isCheckingIn ? "Processing..." : "Check Out"}
                 </button>
-              ) : !todayAttendance ? (
+              ) : (!todayAttendance && !isHoliday(todayDate.getDate())) ? (
                 <button
-                  disabled={isCheckingIn || todayLeave}
+                  disabled={isCheckingIn || todayLeave || isHoliday(todayDate.getDate())}
                   onClick={handleCheckIn}
-                  className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition shadow-sm disabled:opacity-50"
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition shadow-sm disabled:opacity-50"
                   title={
                     todayLeave
                       ? "Today is approved leave, check-in disabled."
-                      : "Check in for today."
+                      : isHoliday(todayDate.getDate())
+                        ? "Today is a holiday, check-in disabled."
+                        : "Check in for today."
                   }
                 >
                   {isCheckingIn
@@ -816,12 +832,24 @@ export function AttendanceTab({
             )}
           </div>
         </div>
+        <div className="mb-6 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          Paid leave policy:{" "}
+          <span className="font-semibold text-slate-950">
+            {paidLeaveDays} day{paidLeaveDays === 1 ? "" : "s"} {paidLeavePeriod}
+          </span>
+          . Remaining:{" "}
+          <span className="font-semibold text-slate-950">
+            {remainingPaidLeaveDays} day{remainingPaidLeaveDays === 1 ? "" : "s"}
+          </span>
+          .
+        </div>
 
         {showLeaveModal && (
           <LeaveModal
             onClose={() => setShowLeaveModal(false)}
             onRefresh={loadData}
             showToast={showToast}
+            leavePolicy={leavePolicy}
           />
         )}
         {showHolidayModal && (
@@ -1049,8 +1077,8 @@ export function AttendanceTab({
                                     : "bg-white text-rose-600 border border-rose-200 shadow-sm"
                                   : checkedIn
                                     ? "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm"
-                  : leave
-                      ? "bg-amber-100 text-amber-900 border border-amber-200 shadow-sm"
+                                    : leave
+                                      ? "bg-amber-100 text-amber-900 border border-amber-200 shadow-sm"
                                       : weekend
                                         ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm"
                                         : missed
@@ -1116,10 +1144,12 @@ function LeaveModal({
   onClose,
   onRefresh,
   showToast,
+  leavePolicy,
 }: {
   onClose: () => void;
   onRefresh: () => void;
   showToast: (text: string, type?: "success" | "error") => void;
+  leavePolicy?: AnyRecord | null;
 }) {
   const [formData, setFormData] = useState({
     startDate: "",
@@ -1169,7 +1199,14 @@ function LeaveModal({
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
         <h3 className="text-xl font-bold text-slate-900">Ask Leave</h3>
         <p className="mt-1 text-sm text-slate-500">
-          Submit a leave request for approval.
+          Submit a paid leave request for HR and admin approval.
+        </p>
+        <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          Remaining paid leave:{" "}
+          <span className="font-semibold text-slate-900">
+            {Math.max(0, Number(leavePolicy?.remainingPaidLeaveDays ?? 0))} day{Number(leavePolicy?.remainingPaidLeaveDays ?? 0) === 1 ? "" : "s"}
+          </span>{" "}
+          this {String(leavePolicy?.paidLeavePeriod ?? "monthly")} period.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -1783,14 +1820,13 @@ function RequestsListModal({
                 const isRequester =
                   req.requester?._id === currentUserId ||
                   req.requester === currentUserId;
-                const step = String(req.currentStep ?? "manager");
+                const step = String(req.currentStep ?? "hr");
                 const canApprove =
                   !isRequester &&
-                  (req.status === "pending" ||
-                    req.status === "manager-approved") &&
+                  ["pending", "hr-approved"].includes(String(req.status)) &&
                   (
-                    (step === "admin" && ["admin", "human-resource", "finance"].includes(String(userRole ?? ""))) ||
-                    (step === "manager" && ["project-manager", "qa-tester", "finance", "admin", "human-resource"].includes(String(userRole ?? "")))
+                    (step === "admin" && String(userRole ?? "") === "admin") ||
+                    (step === "hr" && ["human-resource", "admin"].includes(String(userRole ?? "")))
                   );
 
                 return (
@@ -1870,14 +1906,14 @@ function LeaveDetailsModal({
   const isRequester =
     (leave.requester as any)?._id === currentUserId ||
     leave.requester === currentUserId;
-  const step = String(leave.currentStep ?? "manager");
+  const step = String(leave.currentStep ?? "hr");
 
   const canApprove =
     !isRequester &&
-    (leave.status === "pending" || leave.status === "manager-approved") &&
+    ["pending", "hr-approved"].includes(String(leave.status)) &&
     (
-      (step === "admin" && ["admin", "human-resource", "finance"].includes(String(userRole ?? ""))) ||
-      (step === "manager" && ["project-manager", "qa-tester", "finance", "admin", "human-resource"].includes(String(userRole ?? "")))
+      (step === "admin" && String(userRole ?? "") === "admin") ||
+      (step === "hr" && ["human-resource", "admin"].includes(String(userRole ?? "")))
     );
 
   return (

@@ -24,6 +24,7 @@ export async function GET(request: Request) {
   const approvedLeaves = await LeaveRequest.find({
     company: actor.company,
     status: "approved",
+    isPaidLeave: false,
     startDate: { $lt: monthEnd },
     endDate: { $gte: monthStart },
   }).populate("requester", "name email");

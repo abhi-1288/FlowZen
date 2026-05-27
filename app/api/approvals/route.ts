@@ -48,7 +48,10 @@ export async function GET() {
     const actor = await User.findById(userId).select("role company companyStatus");
     if (!actor) return jsonError("User not found.", 404);
 
-    const directRequests = await JoinRequest.find({ approver: userId, status: "pending" })
+    const directRequests = await JoinRequest.find({ 
+      approver: userId, 
+      status: { $in: ["pending", "hr-approved"] } 
+    })
       .sort({ createdAt: -1 })
       .lean();
 

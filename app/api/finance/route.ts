@@ -9,6 +9,9 @@ import { Notification } from "@/models/Notification";
 import { ProjectBudget } from "@/models/ProjectBudget";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
+import { LeaveRequest } from "@/models/LeaveRequest";
+import { Attendance } from "@/models/Attendance";
+import { Holiday } from "@/models/Holiday";
 
 const FINANCE_ROLES = new Set(["finance", "admin"]);
 
@@ -27,6 +30,181 @@ async function actorWithCompany(userId: string) {
 
 function canManageFinance(role: string) {
   return FINANCE_ROLES.has(role);
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function startOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function endOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+}
+
+function toDateKey(date: Date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function inclusiveDaysBetween(start: Date, end: Date) {
+  return Math.floor((startOfDay(end).getTime() - startOfDay(start).getTime()) / DAY_MS) + 1;
+}
+
+function roundCurrency(value: number) {
+  return Math.round(Number.isFinite(value) ? value : 0);
+}
+
+async function computeSalaryBreakdown(params: {
+  actorCompany: any;
+  employeeId: string;
+  periodStart: string;
+  periodEnd: string;
+  allowances: number;
+  manualDeductions: number;
+}) {
+  const { actorCompany, employeeId, periodStart, periodEnd, allowances, manualDeductions } = params;
+  const requestedStart = new Date(`${periodStart}T00:00:00`);
+  const requestedEnd = new Date(`${periodEnd}T00:00:00`);
+  if (
+    Number.isNaN(requestedStart.getTime()) ||
+    Number.isNaN(requestedEnd.getTime()) ||
+    requestedEnd < requestedStart
+  ) {
+    return { error: "Invalid salary period dates." as const };
+  }
+
+  const employee = await User.findOne({
+    _id: employeeId,
+    company: actorCompany,
+    companyStatus: "approved",
+  }).select("_id name baseSalary companyJoined createdAt");
+  if (!employee) return { error: "Employee not found in this company." as const };
+
+  const monthlySalary = Math.max(0, Number(employee.baseSalary ?? 0));
+  if (monthlySalary <= 0) {
+    return { error: "Employee does not have a base salary assigned yet." as const };
+  }
+
+  const joinedRef = employee.companyJoined ?? employee.createdAt;
+  const companyJoined = joinedRef ? startOfDay(new Date(joinedRef)) : null;
+  let effectiveStart = startOfDay(requestedStart);
+  const effectiveEnd = startOfDay(requestedEnd);
+  if (companyJoined && companyJoined > effectiveStart && companyJoined <= effectiveEnd) {
+    effectiveStart = companyJoined;
+  }
+
+  const totalDays = inclusiveDaysBetween(effectiveStart, effectiveEnd);
+  const totalDaysInMonth = new Date(
+    effectiveStart.getFullYear(),
+    effectiveStart.getMonth() + 1,
+    0,
+  ).getDate();
+  const dailySalary = monthlySalary / totalDaysInMonth;
+
+  const [attendanceRecords, leaveRecords, holidays] = await Promise.all([
+    Attendance.find({
+      user: employeeId,
+      date: { $gte: effectiveStart, $lte: endOfDay(effectiveEnd) },
+    }).select("date"),
+    LeaveRequest.find({
+      requester: employeeId,
+      status: "approved",
+      startDate: { $lte: endOfDay(effectiveEnd) },
+      endDate: { $gte: effectiveStart },
+    }).select("startDate endDate halfDay isPaidLeave"),
+    Holiday.find({
+      company: actorCompany,
+      startDate: { $lte: endOfDay(effectiveEnd) },
+      endDate: { $gte: effectiveStart },
+    }).select("startDate endDate"),
+  ]);
+
+  const presentDays = new Set<string>();
+  for (const record of attendanceRecords as any[]) {
+    presentDays.add(toDateKey(new Date(record.date)));
+  }
+
+  const paidLeaveMap = new Map<string, number>();
+  const unpaidLeaveMap = new Map<string, number>();
+  for (const leave of leaveRecords as any[]) {
+    const leaveStart = startOfDay(new Date(leave.startDate)) < effectiveStart
+      ? effectiveStart
+      : startOfDay(new Date(leave.startDate));
+    const leaveEnd = startOfDay(new Date(leave.endDate)) > effectiveEnd
+      ? effectiveEnd
+      : startOfDay(new Date(leave.endDate));
+    const days = inclusiveDaysBetween(leaveStart, leaveEnd);
+    for (let i = 0; i < days; i += 1) {
+      const day = new Date(leaveStart.getTime() + i * DAY_MS);
+      const key = toDateKey(day);
+      const amount = leave.halfDay ? 0.5 : 1;
+      if (leave.isPaidLeave !== false) {
+        paidLeaveMap.set(key, (paidLeaveMap.get(key) ?? 0) + amount);
+      } else {
+        unpaidLeaveMap.set(key, (unpaidLeaveMap.get(key) ?? 0) + amount);
+      }
+    }
+  }
+
+  const holidayDays = new Set<string>();
+  for (const holiday of holidays as any[]) {
+    const holidayStart = startOfDay(new Date(holiday.startDate)) < effectiveStart
+      ? effectiveStart
+      : startOfDay(new Date(holiday.startDate));
+    const holidayEnd = startOfDay(new Date(holiday.endDate)) > effectiveEnd
+      ? effectiveEnd
+      : startOfDay(new Date(holiday.endDate));
+    const days = inclusiveDaysBetween(holidayStart, holidayEnd);
+    for (let i = 0; i < days; i += 1) {
+      const day = new Date(holidayStart.getTime() + i * DAY_MS);
+      holidayDays.add(toDateKey(day));
+    }
+  }
+
+  let absentDays = 0;
+  for (let i = 0; i < totalDays; i += 1) {
+    const day = new Date(effectiveStart.getTime() + i * DAY_MS);
+    const dayKey = toDateKey(day);
+    const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+    const isHoliday = holidayDays.has(dayKey);
+    const hasPresent = presentDays.has(dayKey);
+    const hasLeave = ((paidLeaveMap.get(dayKey) ?? 0) + (unpaidLeaveMap.get(dayKey) ?? 0)) > 0;
+    if (!isWeekend && !isHoliday && !hasPresent && !hasLeave) {
+      absentDays += 1;
+    }
+  }
+
+  const paidLeaveDays = Array.from(paidLeaveMap.values()).reduce((sum, value) => sum + value, 0);
+  const unpaidLeaveDays = Array.from(unpaidLeaveMap.values()).reduce((sum, value) => sum + value, 0);
+  const totalUnpaidDays = absentDays + unpaidLeaveDays;
+  const payableDays = Math.max(0, totalDays - totalUnpaidDays);
+  const leaveDeduction = roundCurrency(dailySalary * totalUnpaidDays);
+  const grossSalary = roundCurrency(dailySalary * payableDays);
+  const totalDeductions = leaveDeduction + manualDeductions;
+  const finalSalary = Math.max(0, grossSalary + allowances - manualDeductions);
+
+  return {
+    breakdown: {
+      totalDays,
+      absentDays,
+      paidLeaveDays,
+      unpaidLeaveDays,
+      payableDays,
+      dailySalary: roundCurrency(dailySalary),
+      leaveDeduction,
+      allowances,
+      manualDeductions,
+      totalDeductions,
+      grossSalary,
+      finalSalary,
+      periodStart: toDateKey(effectiveStart),
+      periodEnd,
+    },
+    employee,
+  };
 }
 
 export async function GET(request: Request) {
@@ -102,11 +280,11 @@ export async function GET(request: Request) {
       : [],
     canManage
       ? User.find({ company: actor.company, companyStatus: "approved" })
-          .select("name email role customRole companyIdentityCode")
+          .select("name email role customRole companyIdentityCode baseSalary")
           .sort({ name: 1 })
       : [],
     User.find({ company: actor.company, role: "finance", companyStatus: "approved" })
-      .select("name email role customRole companyIdentityCode")
+      .select("name email role customRole companyIdentityCode baseSalary")
       .sort({ name: 1 }),
     canManage
       ? ExpenseBill.find({ company: actor.company })
@@ -233,26 +411,50 @@ export async function POST(request: Request) {
 
   if (!canManageFinance(role)) return jsonError("Only finance, HR, or admins can manage finance.", 403);
 
+  if (action === "calculate-salary") {
+    const employeeId = String(body.employeeId ?? "");
+    const periodStart = String(body.periodStart ?? "");
+    const periodEnd = String(body.periodEnd ?? "");
+    if (!periodStart || !periodEnd) return jsonError("Salary period dates are required.");
+    const computed = await computeSalaryBreakdown({
+      actorCompany: actor.company,
+      employeeId,
+      periodStart,
+      periodEnd,
+      allowances: 0,
+      manualDeductions: 0,
+    });
+    if ("error" in computed) return jsonError(computed.error, computed.error.includes("not found") ? 404 : 400);
+    return NextResponse.json({ breakdown: computed.breakdown });
+  }
+
   if (action === "generate-salary") {
     const employeeId = String(body.employeeId ?? "");
-    const month = monthKey(body.month);
-    const baseSalary = Math.max(0, Number(body.baseSalary ?? 0));
+    const periodStart = String(body.periodStart ?? "");
+    const periodEnd = String(body.periodEnd ?? "");
+    if (!periodStart || !periodEnd) return jsonError("Salary period dates are required.");
     const allowances = Math.max(0, Number(body.allowances ?? 0));
-    const deductions = Math.max(0, Number(body.deductions ?? 0));
-    const employee = await User.findOne({
-      _id: employeeId,
-      company: actor.company,
-      companyStatus: "approved",
-    }).select("_id");
-    if (!employee) return jsonError("Employee not found in this company.", 404);
+    const manualDeductions = Math.max(0, Number(body.deductions ?? 0));
+    const computed = await computeSalaryBreakdown({
+      actorCompany: actor.company,
+      employeeId,
+      periodStart,
+      periodEnd,
+      allowances,
+      manualDeductions,
+    });
+    if ("error" in computed) return jsonError(computed.error, computed.error.includes("not found") ? 404 : 400);
+    const { breakdown, employee } = computed;
+    const month = breakdown.periodStart.slice(0, 7);
+
     const salary = await FinanceSalary.findOneAndUpdate(
       { company: actor.company, employee: employeeId, month },
       {
         $set: {
-          baseSalary,
+          baseSalary: breakdown.grossSalary,
           allowances,
-          deductions,
-          netSalary: Math.max(0, baseSalary + allowances - deductions),
+          deductions: breakdown.totalDeductions,
+          netSalary: breakdown.finalSalary,
         },
         $setOnInsert: { status: "pending" },
       },
@@ -265,11 +467,14 @@ export async function POST(request: Request) {
         company: actor.company,
         type: "approval",
         title: "Salary pending approval",
-        message: `${actor.name ?? "Finance"} generated a salary record for ${month}.`,
+        message: `${actor.name ?? "Finance"} generated a salary for ${String(employee.name ?? "an employee")} (${breakdown.periodStart} to ${periodEnd}).`,
       }))
     );
     admins.forEach((u) => emitNotification(String(u._id)));
-    return NextResponse.json({ salary });
+    return NextResponse.json({
+      salary,
+      breakdown,
+    });
   }
 
   if (action === "set-budget") {

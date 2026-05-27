@@ -25,7 +25,28 @@ export function FinanceTab({
 }) {
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
   const [data, setData] = useState<FinanceData | null>(null);
-  const [salaryForm, setSalaryForm] = useState({ employeeId: "", baseSalary: "", allowances: "", deductions: "" });
+  const [salaryStep, setSalaryStep] = useState<1 | 2 | 3>(1);
+  const [salaryPeriod, setSalaryPeriod] = useState({ start: "", end: "" });
+  const [salaryEmployeeId, setSalaryEmployeeId] = useState("");
+  const [salaryAllowances, setSalaryAllowances] = useState("");
+  const [salaryDeductions, setSalaryDeductions] = useState("");
+  const [salaryBreakdown, setSalaryBreakdown] = useState<{
+    totalDays: number;
+    absentDays: number;
+    paidLeaveDays: number;
+    unpaidLeaveDays: number;
+    payableDays: number;
+    dailySalary: number;
+    leaveDeduction: number;
+    allowances: number;
+    manualDeductions: number;
+    totalDeductions: number;
+    grossSalary: number;
+    finalSalary: number;
+    periodStart: string;
+    periodEnd: string;
+  } | null>(null);
+  const [salaryGenerating, setSalaryGenerating] = useState(false);
   const [budgetForm, setBudgetForm] = useState({ boardId: "", totalBudget: "", teamSpendingLimit: "", resourceBudget: "", deadline: "", assignedTo: "" });
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
@@ -45,16 +66,6 @@ export function FinanceTab({
   // Leave impact
   const [leaveImpacts, setLeaveImpacts] = useState<{ employeeName: string; leaves: number; deduction: number }[]>([]);
 
-  // Members attendance
-  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
-  const [memberAttendance, setMemberAttendance] = useState<{
-    member: { id: string; name: string; email: string; role: string };
-    month: string;
-    salary: { netSalary: number; baseSalary: number } | null;
-    calendar: { day: number; date: string; checkIn: string | null; checkOut: string | null; leave: boolean; absent: boolean }[];
-  } | null>(null);
-  const [attendanceMonth, setAttendanceMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [loadingAttendance, setLoadingAttendance] = useState(false);
 
   // Resource requests
   const [resourceRequests, setResourceRequests] = useState<AnyRecord[]>([]);
@@ -75,7 +86,7 @@ export function FinanceTab({
     if (!data) return;
     apiFetch<{ invoices: AnyRecord[] }>("/api/finance/invoice")
       .then((res) => setInvoices(res.invoices))
-      .catch(() => {});
+      .catch(() => { });
   }, [data]);
 
   // Load reports
@@ -83,7 +94,7 @@ export function FinanceTab({
     if (!data) return;
     apiFetch<{ revenue: number; expenses: number; profit: number; pendingInvoices: number; pendingInvoicesAmount: number }>("/api/finance/reports")
       .then(setReports)
-      .catch(() => {});
+      .catch(() => { });
   }, [data]);
 
   // Load leave impacts
@@ -91,7 +102,7 @@ export function FinanceTab({
     if (!data) return;
     apiFetch<{ impacts: { employeeName: string; leaves: number; deduction: number }[] }>(`/api/finance/leave-impact?month=${month}`)
       .then((res) => setLeaveImpacts(res.impacts))
-      .catch(() => {});
+      .catch(() => { });
   }, [data, month]);
 
   // Load resource requests
@@ -102,18 +113,57 @@ export function FinanceTab({
       : "/api/finance/resource-request";
     apiFetch<{ requests: AnyRecord[] }>(url)
       .then((res) => setResourceRequests(res.requests))
-      .catch(() => {});
+      .catch(() => { });
   }, [data, actorRole]);
+
+  async function calculateSalary(event: FormEvent) {
+    event.preventDefault();
+    try {
+      const res = await apiFetch<any>("/api/finance", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "calculate-salary",
+          employeeId: salaryEmployeeId,
+          periodStart: salaryPeriod.start,
+          periodEnd: salaryPeriod.end,
+        }),
+      });
+      setSalaryBreakdown(res.breakdown);
+      setSalaryAllowances("");
+      setSalaryDeductions("");
+      setSalaryStep(3);
+    } catch (err: any) {
+      showToast(err.message || "Failed to calculate salary.", "error");
+    }
+  }
 
   async function submitSalary(event: FormEvent) {
     event.preventDefault();
-    await apiFetch("/api/finance", {
-      method: "POST",
-      body: JSON.stringify({ action: "generate-salary", month, ...salaryForm }),
-    });
-    setSalaryForm({ employeeId: "", baseSalary: "", allowances: "", deductions: "" });
-    showToast("Salary record generated.", "success");
-    await load();
+    if (salaryGenerating) return;
+    setSalaryGenerating(true);
+    try {
+      await apiFetch("/api/finance", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "generate-salary",
+          employeeId: salaryEmployeeId,
+          periodStart: salaryPeriod.start,
+          periodEnd: salaryPeriod.end,
+          allowances: salaryAllowances,
+          deductions: salaryDeductions,
+        }),
+      });
+      showToast("Salary record generated and sent for approval.", "success");
+      setSalaryStep(1);
+      setSalaryPeriod({ start: "", end: "" });
+      setSalaryEmployeeId("");
+      setSalaryBreakdown(null);
+      await load();
+    } catch (err: any) {
+      showToast(err.message || "Failed to generate salary.", "error");
+    } finally {
+      setSalaryGenerating(false);
+    }
   }
 
   async function openBudgetModal(budget?: AnyRecord) {
@@ -251,33 +301,10 @@ export function FinanceTab({
     setResourceForm({ ...resourceForm, items: resourceForm.items.filter((_, i) => i !== index) });
   }
 
-  // Salary edit
+  // Salary edit (removed in favor of regenerate)
   const salaryFormRef = useRef<HTMLDivElement>(null);
-  function editSalary(salary: AnyRecord) {
-    const empId = String((salary.employee as AnyRecord)?._id ?? (salary.employee as AnyRecord)?.id ?? "");
-    setSalaryForm({
-      employeeId: empId,
-      baseSalary: String(salary.baseSalary ?? ""),
-      allowances: String(salary.allowances ?? ""),
-      deductions: String(salary.deductions ?? ""),
-    });
-    setTimeout(() => salaryFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
-  }
 
-  // Members attendance
-  async function selectMember(memberId: string, monthOverride?: string) {
-    setSelectedMemberId(memberId);
-    setLoadingAttendance(true);
-    setMemberAttendance(null);
-    const m = monthOverride ?? attendanceMonth;
-    try {
-      const res = await apiFetch<typeof memberAttendance>(`/api/finance/member-attendance/${memberId}?month=${m}`);
-      setMemberAttendance(res);
-    } catch {
-      showToast("Failed to load attendance.", "error");
-    }
-    setLoadingAttendance(false);
-  }
+
 
   if (!data) {
     return <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">Loading finance...</section>;
@@ -332,121 +359,81 @@ export function FinanceTab({
         </section>
       ) : null}
 
-      {/* Members sidebar with attendance calendar */}
-      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h4 className="font-semibold">Members</h4>
-        <p className="mt-1 text-xs text-slate-400">View employee check-in, check-out, and leave records.</p>
-        <div className="mt-4 flex gap-4">
-          <div className="w-56 shrink-0 space-y-1 overflow-y-auto max-h-96">
-            {data.members.map((member) => {
-              const memberId = String(member.id);
-              const isSelected = selectedMemberId === memberId;
-              return (
-                <button
-                  key={memberId}
-                  className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${isSelected ? "bg-slate-100 font-medium" : "hover:bg-slate-50"}`}
-                  onClick={() => selectMember(memberId)}
-                >
-                  <span className="truncate block">{String(member.name)}</span>
-                  <span className="text-xs text-slate-400 truncate block">{formatRoleWithCustom(String(member.role), member.customRole)}</span>
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex-1 min-w-0">
-            {!selectedMemberId ? (
-              <p className="py-8 text-center text-sm text-slate-400">Select a member to view their attendance calendar.</p>
-            ) : loadingAttendance ? (
-              <p className="py-8 text-center text-sm text-slate-400">Loading...</p>
-            ) : memberAttendance ? (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <p className="font-medium">{memberAttendance.member.name}</p>
-                    <p className="text-xs text-slate-500">{memberAttendance.member.email} • {memberAttendance.member.role}
-                      {memberAttendance.salary ? <> • ₹{memberAttendance.salary.netSalary.toLocaleString("en-IN")}/mo</> : null}
-                    </p>
-                  </div>
-                  <input
-                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                    type="month"
-                    value={attendanceMonth}
-                    onChange={(e) => { const newMonth = e.target.value; setAttendanceMonth(newMonth); selectMember(selectedMemberId, newMonth); }}
-                  />
-                </div>
-                <div className="grid grid-cols-7 gap-1 text-center text-xs">
-                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-                    <div key={d} className="py-1 font-medium text-slate-500">{d}</div>
-                  ))}
-                  {(() => {
-                    const firstDay = new Date(attendanceMonth + "-01").getDay();
-                    const blanks = Array.from({ length: firstDay });
-                    const cells: React.ReactNode[] = blanks.map((_, i) => <div key={`b${i}`} />);
-                    memberAttendance.calendar.forEach((day) => {
-                      const dayDate = new Date(day.date);
-                      const isSunday = dayDate.getDay() === 0;
-                      const today = new Date().toISOString().slice(0, 10) === day.date;
-                      cells.push(
-                        <div
-                          key={day.day}
-                          className={`rounded p-1.5 text-center transition-colors ${today ? "ring-2 ring-blue-400" : ""} ${
-                            day.leave
-                              ? "bg-amber-100 text-amber-800"
-                              : day.absent
-                                ? "bg-rose-50 text-rose-500"
-                                : day.checkIn
-                                  ? "bg-emerald-50 text-emerald-700"
-                                  : isSunday
-                                    ? "bg-slate-50 text-slate-300"
-                                    : "text-slate-400"
-                          }`}
-                          title={`${day.date}${day.leave ? " (Leave)" : day.absent ? " (Absent)" : day.checkIn ? ` In: ${day.checkIn}${day.checkOut ? ` Out: ${day.checkOut}` : ""}` : ""}`}
-                        >
-                          <p className="font-medium">{day.day}</p>
-                          {day.leave ? <p className="text-[10px] leading-tight">Leave</p> : null}
-                          {day.absent ? <p className="text-[10px] leading-tight">Absent</p> : null}
-                          {day.checkIn ? (
-                            <p className="text-[10px] leading-tight">{day.checkIn}{day.checkOut ? `-${day.checkOut}` : ""}</p>
-                          ) : null}
-                          {!day.leave && !day.absent && !day.checkIn && !isSunday ? <p className="text-[10px] leading-tight">—</p> : null}
-                        </div>
-                      );
-                    });
-                    return cells;
-                  })()}
-                </div>
-                <div className="mt-3 flex gap-4 text-xs text-slate-500">
-                  <span><span className="inline-block w-3 h-3 rounded bg-emerald-50 border border-emerald-200 align-middle mr-1" /> Present</span>
-                  <span><span className="inline-block w-3 h-3 rounded bg-amber-100 border border-amber-200 align-middle mr-1" /> Leave</span>
-                  <span><span className="inline-block w-3 h-3 rounded bg-rose-50 border border-rose-200 align-middle mr-1" /> Absent</span>
-                </div>
-              </div>
-            ) : (
-              <p className="py-8 text-center text-sm text-slate-400">Failed to load attendance data.</p>
-            )}
-          </div>
-        </div>
-      </section>
+
 
       {data.canManage ? (
         <><div className="grid gap-5 xl:grid-cols-2">
           {actorRole === "finance" ? (
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" ref={salaryFormRef}>
               <h4 className="font-semibold">Generate Monthly Salary</h4>
-              <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={submitSalary}>
-                <select className="rounded-lg border border-slate-200 px-3 py-2" required value={salaryForm.employeeId} onChange={(e) => setSalaryForm({ ...salaryForm, employeeId: e.target.value })}>
-                  <option value="">Select employee</option>
-                  {data.members.map((member) => (
-                    <option key={String(member.id)} value={String(member.id)}>
-                      {String(member.name)} - {formatRoleWithCustom(String(member.role), member.customRole)}
-                    </option>
-                  ))}
-                </select>
-                <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Base salary" type="number" value={salaryForm.baseSalary} onChange={(e) => setSalaryForm({ ...salaryForm, baseSalary: e.target.value })} />
-                <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Allowances" type="number" value={salaryForm.allowances} onChange={(e) => setSalaryForm({ ...salaryForm, allowances: e.target.value })} />
-                <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Deductions" type="number" value={salaryForm.deductions} onChange={(e) => setSalaryForm({ ...salaryForm, deductions: e.target.value })} />
-                <button className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white md:col-span-2">Generate salary</button>
-              </form>
+              <div className="mt-4">
+                {salaryStep === 1 && (
+                  <form onSubmit={(e) => { e.preventDefault(); setSalaryStep(2); }} className="grid gap-3">
+                    <p className="text-sm font-medium text-slate-700">Step 1: Select Date Range</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <input className="rounded-lg border border-slate-200 px-3 py-2" type="date" required value={salaryPeriod.start} onChange={(e) => setSalaryPeriod({ ...salaryPeriod, start: e.target.value })} />
+                      <input className="rounded-lg border border-slate-200 px-3 py-2" type="date" required value={salaryPeriod.end} onChange={(e) => setSalaryPeriod({ ...salaryPeriod, end: e.target.value })} />
+                    </div>
+                    <button className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white justify-self-end">Next</button>
+                  </form>
+                )}
+                {salaryStep === 2 && (
+                  <form onSubmit={calculateSalary} className="grid gap-3">
+                    <p className="text-sm font-medium text-slate-700">Step 2: Select Employee</p>
+                    <select className="rounded-lg border border-slate-200 px-3 py-2" required value={salaryEmployeeId} onChange={(e) => setSalaryEmployeeId(e.target.value)}>
+                      <option value="">Select employee</option>
+                      {data.members.map((member) => (
+                        <option key={String(member.id)} value={String(member.id)}>
+                          {String(member.name)} - {formatRoleWithCustom(String(member.role), member.customRole)}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex justify-between">
+                      <button type="button" className="rounded-lg border border-slate-200 px-4 py-2 text-sm" onClick={() => setSalaryStep(1)}>Back</button>
+                      <button className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white">Calculate</button>
+                    </div>
+                  </form>
+                )}
+                {salaryStep === 3 && salaryBreakdown && (
+                  <form onSubmit={submitSalary} className="grid gap-3 text-sm">
+                    <p className="font-medium text-slate-700">Step 3: Review & Adjust</p>
+                    <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 space-y-2">
+                      <div className="flex justify-between"><span>Period:</span> <span>{salaryBreakdown.periodStart} to {salaryBreakdown.periodEnd}</span></div>
+                      {salaryBreakdown.periodStart !== salaryPeriod.start && (
+                        <p className="text-xs text-amber-600 bg-amber-50 rounded px-2 py-1">⚠ Period adjusted — employee joined on {salaryBreakdown.periodStart}</p>
+                      )}
+                      <div className="flex justify-between"><span>Total Days:</span> <span>{salaryBreakdown.totalDays}</span></div>
+                      <div className="flex justify-between text-rose-600"><span>Absent Days:</span> <span>{salaryBreakdown.absentDays}</span></div>
+                      <div className="flex justify-between text-emerald-600"><span>Paid Leave Days:</span> <span>{salaryBreakdown.paidLeaveDays}</span></div>
+                      <div className="flex justify-between text-rose-600"><span>Unpaid Leave Days:</span> <span>{salaryBreakdown.unpaidLeaveDays}</span></div>
+                      <div className="flex justify-between"><span>Payable Days:</span> <span>{salaryBreakdown.payableDays}</span></div>
+                      <div className="flex justify-between"><span>Daily Salary:</span> <span>₹{salaryBreakdown.dailySalary.toLocaleString("en-IN")}</span></div>
+                      <div className="flex justify-between"><span>Gross Salary:</span> <span>₹{salaryBreakdown.grossSalary.toLocaleString("en-IN")}</span></div>
+                      <div className="flex justify-between text-rose-600"><span>Attendance/Leave Deduction:</span> <span>- ₹{salaryBreakdown.leaveDeduction.toLocaleString("en-IN")}</span></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-medium text-slate-500 mb-1 block">Manual Allowances (₹)</label>
+                        <input className="w-full rounded-lg border border-slate-200 px-3 py-2" type="number" min="0" value={salaryAllowances} onChange={(e) => setSalaryAllowances(e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-slate-500 mb-1 block">Manual Deductions (₹)</label>
+                        <input className="w-full rounded-lg border border-slate-200 px-3 py-2" type="number" min="0" value={salaryDeductions} onChange={(e) => setSalaryDeductions(e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-emerald-50 p-3 flex justify-between font-bold text-emerald-700 text-lg mt-2">
+                      <span>Net Salary:</span>
+                      <span>₹{Math.max(0, salaryBreakdown.grossSalary + Number(salaryAllowances || 0) - (salaryBreakdown.leaveDeduction + Number(salaryDeductions || 0))).toLocaleString("en-IN")}</span>
+                    </div>
+                    <div className="flex justify-between mt-2">
+                      <button type="button" className="rounded-lg border border-slate-200 px-4 py-2 text-sm" onClick={() => setSalaryStep(2)}>Back</button>
+                      <button className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50" disabled={salaryGenerating}>
+                        {salaryGenerating ? "Generating..." : "Generate Salary"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
             </section>
           ) : null}
           <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -561,179 +548,178 @@ export function FinanceTab({
             </div>
           </section>
         </div>
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h4 className="font-semibold">Allocated Budgets
-              {data.budgets.filter((b) => String(b.status) === "pending").length > 0 ? (
-                <span className="ml-2 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                  {data.budgets.filter((b) => String(b.status) === "pending").length} pending
-                </span>
+          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold">Allocated Budgets
+                {data.budgets.filter((b) => String(b.status) === "pending").length > 0 ? (
+                  <span className="ml-2 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                    {data.budgets.filter((b) => String(b.status) === "pending").length} pending
+                  </span>
+                ) : null}
+              </h4>
+              {actorRole === "finance" ? (
+                <button className="text-sm text-blue-600 underline" onClick={() => setShowExpiredBudgets(true)}>View expired budgets</button>
               ) : null}
-            </h4>
-            {actorRole === "finance" ? (
-              <button className="text-sm text-blue-600 underline" onClick={() => setShowExpiredBudgets(true)}>View expired budgets</button>
-            ) : null}
-          </div>
-          <div className="mt-4 divide-y divide-slate-200">
-            {data.budgets.map((budget) => {
-              const deadline = budget.deadline ? new Date(String(budget.deadline)) : null;
-              const isExpired = deadline && (Date.now() - deadline.getTime()) > 25 * 24 * 60 * 60 * 1000;
-              if (isExpired) return null;
-              const budgetStatus = String(budget.status ?? "pending");
-              const budgetAssignedTo = (budget.assignedTo as AnyRecord)?._id ?? (budget.assignedTo as AnyRecord)?.id ?? "";
-              const isPendingForMe =
-                (actorRole === "finance" && String(budgetAssignedTo) === profileId && budgetStatus === "pending") ||
-                (actorRole === "admin" && !budget.assignedTo && budgetStatus === "pending");
-              return (
-                <div className="flex flex-wrap items-center justify-between gap-3 py-3" key={String(budget.id)}>
-                  <div>
-                    <p className="font-medium">{displayNested(budget.board, "title", "Board")}</p>
-                    <p className="text-sm text-slate-500">
-                      Total: ₹{Number(budget.totalBudget ?? 0).toLocaleString("en-IN")}
-                      {Number(budget.teamSpendingLimit ?? 0) > 0 ? <> • Team limit: ₹{Number(budget.teamSpendingLimit).toLocaleString("en-IN")}</> : null}
-                      {Number(budget.resourceBudget ?? 0) > 0 ? <> • Resource: ₹{Number(budget.resourceBudget).toLocaleString("en-IN")}</> : null}
-                      {budget.deadline ? <> • Deadline: {new Date(String(budget.deadline)).toLocaleDateString()}</> : null}
-                      {budget.decidedBy ? <> • By: {displayNested(budget.decidedBy, "name", "User")}</> : null}
-                    </p>
-                    <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-                      budgetStatus === "approved" ? "bg-emerald-100 text-emerald-700" :
-                      budgetStatus === "rejected" ? "bg-rose-100 text-rose-700" :
-                      "bg-amber-100 text-amber-700"
-                    }`}>{budgetStatus}</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button className="rounded-lg border border-slate-200 px-3 py-2 text-sm" onClick={() => openBudgetModal(budget)}>Edit</button>
-                    {isPendingForMe ? (
-                      <>
-                        <button className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white" onClick={() => updateStatus("budget", String(budget.id), "approved")}>Approve</button>
-                        <button className="rounded-lg border border-rose-200 px-3 py-2 text-sm text-rose-600" onClick={() => setRejectTarget({ id: String(budget.id), type: "budget" })}>Reject</button>
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
-            {data.budgets.filter((b) => {
-              const d = b.deadline ? new Date(String(b.deadline)) : null;
-              return !(d && (Date.now() - d.getTime()) > 25 * 24 * 60 * 60 * 1000);
-            }).length === 0 ? <p className="py-4 text-sm text-slate-500">No budgets allocated yet.</p> : null}
-          </div>
-        </section>
-        {showExpiredBudgets ? (
-          <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
-            <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
-              <div className="flex items-center justify-between">
-                <h4 className="text-lg font-semibold">Expired Budgets</h4>
-                <button className="text-sm text-slate-500" onClick={() => setShowExpiredBudgets(false)}>Close</button>
-              </div>
-              <div className="mt-4 divide-y divide-slate-200">
-                {data.budgets.filter((b) => {
-                  const d = b.deadline ? new Date(String(b.deadline)) : null;
-                  return d && (Date.now() - d.getTime()) > 25 * 24 * 60 * 60 * 1000;
-                }).length === 0 ? <p className="py-4 text-sm text-slate-500">No expired budgets.</p> : null}
-                {data.budgets.map((budget) => {
-                  const deadline = budget.deadline ? new Date(String(budget.deadline)) : null;
-                  const isExpired = deadline && (Date.now() - deadline.getTime()) > 25 * 24 * 60 * 60 * 1000;
-                  if (!isExpired) return null;
-                  return (
-                    <div className="flex flex-wrap items-center justify-between gap-3 py-3" key={String(budget.id)}>
-                      <div>
-                        <p className="font-medium">{displayNested(budget.board, "title", "Board")}</p>
-                        <p className="text-sm text-slate-500">
-                          Total: ₹{Number(budget.totalBudget ?? 0).toLocaleString("en-IN")}
-                          {budget.deadline ? <> • Deadline: {new Date(String(budget.deadline)).toLocaleDateString()}</> : null}
-                          {budget.decidedBy ? <> • Set by: {displayNested(budget.decidedBy, "name", "User")}</> : null}
-                        </p>
-                      </div>
+            </div>
+            <div className="mt-4 divide-y divide-slate-200">
+              {data.budgets.map((budget) => {
+                const deadline = budget.deadline ? new Date(String(budget.deadline)) : null;
+                const isExpired = deadline && (Date.now() - deadline.getTime()) > 25 * 24 * 60 * 60 * 1000;
+                if (isExpired) return null;
+                const budgetStatus = String(budget.status ?? "pending");
+                const budgetAssignedTo = (budget.assignedTo as AnyRecord)?._id ?? (budget.assignedTo as AnyRecord)?.id ?? "";
+                const isPendingForMe =
+                  (actorRole === "finance" && String(budgetAssignedTo) === profileId && budgetStatus === "pending") ||
+                  (actorRole === "admin" && !budget.assignedTo && budgetStatus === "pending");
+                return (
+                  <div className="flex flex-wrap items-center justify-between gap-3 py-3" key={String(budget.id)}>
+                    <div>
+                      <p className="font-medium">{displayNested(budget.board, "title", "Board")}</p>
+                      <p className="text-sm text-slate-500">
+                        Total: ₹{Number(budget.totalBudget ?? 0).toLocaleString("en-IN")}
+                        {Number(budget.teamSpendingLimit ?? 0) > 0 ? <> • Team limit: ₹{Number(budget.teamSpendingLimit).toLocaleString("en-IN")}</> : null}
+                        {Number(budget.resourceBudget ?? 0) > 0 ? <> • Resource: ₹{Number(budget.resourceBudget).toLocaleString("en-IN")}</> : null}
+                        {budget.deadline ? <> • Deadline: {new Date(String(budget.deadline)).toLocaleDateString()}</> : null}
+                        {budget.decidedBy ? <> • By: {displayNested(budget.decidedBy, "name", "User")}</> : null}
+                      </p>
+                      <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${budgetStatus === "approved" ? "bg-emerald-100 text-emerald-700" :
+                        budgetStatus === "rejected" ? "bg-rose-100 text-rose-700" :
+                          "bg-amber-100 text-amber-700"
+                        }`}>{budgetStatus}</span>
                     </div>
-                  );
-                })}
+                    <div className="flex gap-2">
+                      <button className="rounded-lg border border-slate-200 px-3 py-2 text-sm" onClick={() => openBudgetModal(budget)}>Edit</button>
+                      {isPendingForMe ? (
+                        <>
+                          <button className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white" onClick={() => updateStatus("budget", String(budget.id), "approved")}>Approve</button>
+                          <button className="rounded-lg border border-rose-200 px-3 py-2 text-sm text-rose-600" onClick={() => setRejectTarget({ id: String(budget.id), type: "budget" })}>Reject</button>
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+              {data.budgets.filter((b) => {
+                const d = b.deadline ? new Date(String(b.deadline)) : null;
+                return !(d && (Date.now() - d.getTime()) > 25 * 24 * 60 * 60 * 1000);
+              }).length === 0 ? <p className="py-4 text-sm text-slate-500">No budgets allocated yet.</p> : null}
+            </div>
+          </section>
+          {showExpiredBudgets ? (
+            <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
+              <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-lg font-semibold">Expired Budgets</h4>
+                  <button className="text-sm text-slate-500" onClick={() => setShowExpiredBudgets(false)}>Close</button>
+                </div>
+                <div className="mt-4 divide-y divide-slate-200">
+                  {data.budgets.filter((b) => {
+                    const d = b.deadline ? new Date(String(b.deadline)) : null;
+                    return d && (Date.now() - d.getTime()) > 25 * 24 * 60 * 60 * 1000;
+                  }).length === 0 ? <p className="py-4 text-sm text-slate-500">No expired budgets.</p> : null}
+                  {data.budgets.map((budget) => {
+                    const deadline = budget.deadline ? new Date(String(budget.deadline)) : null;
+                    const isExpired = deadline && (Date.now() - deadline.getTime()) > 25 * 24 * 60 * 60 * 1000;
+                    if (!isExpired) return null;
+                    return (
+                      <div className="flex flex-wrap items-center justify-between gap-3 py-3" key={String(budget.id)}>
+                        <div>
+                          <p className="font-medium">{displayNested(budget.board, "title", "Board")}</p>
+                          <p className="text-sm text-slate-500">
+                            Total: ₹{Number(budget.totalBudget ?? 0).toLocaleString("en-IN")}
+                            {budget.deadline ? <> • Deadline: {new Date(String(budget.deadline)).toLocaleDateString()}</> : null}
+                            {budget.decidedBy ? <> • Set by: {displayNested(budget.decidedBy, "name", "User")}</> : null}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
-        ) : null}
-        {showBudgetModal ? (
-          <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
-            <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
-              <h4 className="text-lg font-semibold">{editingBudgetId ? "Edit Budget" : "Allocate Budget"}</h4>
-              <form className="mt-4 grid gap-3" onSubmit={submitBudget}>
-                <select className="rounded-lg border border-slate-200 px-3 py-2" required value={budgetForm.boardId} onChange={(e) => setBudgetForm({ ...budgetForm, boardId: e.target.value })}>
-                  <option value="">Select project</option>
-                  {data.boards.map((board: AnyRecord) => (
-                    <option key={String(board.id)} value={String(board.id)}>
-                      {String(board.title)} ({String(board.label ?? "Created by Unknown")})
-                    </option>
-                  ))}
-                </select>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Total project budget" type="number" value={budgetForm.totalBudget} onChange={(e) => setBudgetForm({ ...budgetForm, totalBudget: e.target.value })} />
-                  <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Team spending limit" type="number" value={budgetForm.teamSpendingLimit} onChange={(e) => setBudgetForm({ ...budgetForm, teamSpendingLimit: e.target.value })} />
-                  <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Resource budget" type="number" value={budgetForm.resourceBudget} onChange={(e) => setBudgetForm({ ...budgetForm, resourceBudget: e.target.value })} />
-                  <input className="rounded-lg border border-slate-200 px-3 py-2" type="date" value={budgetForm.deadline} onChange={(e) => setBudgetForm({ ...budgetForm, deadline: e.target.value })} />
-                </div>
-                {actorRole === "admin" ? (
-                  <select className="rounded-lg border border-slate-200 px-3 py-2" required value={budgetForm.assignedTo} onChange={(e) => setBudgetForm({ ...budgetForm, assignedTo: e.target.value })}>
-                    <option value="">Assign a finance user to approve</option>
-                    {data.financeMembers.map((fm) => (
-                      <option key={String(fm.id)} value={String(fm.id)}>{String(fm.name)}</option>
+          ) : null}
+          {showBudgetModal ? (
+            <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
+              <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
+                <h4 className="text-lg font-semibold">{editingBudgetId ? "Edit Budget" : "Allocate Budget"}</h4>
+                <form className="mt-4 grid gap-3" onSubmit={submitBudget}>
+                  <select className="rounded-lg border border-slate-200 px-3 py-2" required value={budgetForm.boardId} onChange={(e) => setBudgetForm({ ...budgetForm, boardId: e.target.value })}>
+                    <option value="">Select project</option>
+                    {data.boards.map((board: AnyRecord) => (
+                      <option key={String(board.id)} value={String(board.id)}>
+                        {String(board.title)} ({String(board.label ?? "Created by Unknown")})
+                      </option>
                     ))}
                   </select>
-                ) : null}
-                <div className="flex justify-end gap-3">
-                  <button type="button" className="rounded-lg border border-slate-200 px-4 py-2 text-sm" onClick={() => { setShowBudgetModal(false); setEditingBudgetId(null); }}>Cancel</button>
-                  <button className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white">{editingBudgetId ? "Update" : "Allocate"}</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        ) : null}
-        {/* Invoice form modal */}
-        {showInvoiceForm ? (
-          <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
-            <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
-              <h4 className="text-lg font-semibold">Create Invoice</h4>
-              <form className="mt-4 grid gap-3" onSubmit={createInvoice}>
-                <input className="rounded-lg border border-slate-200 px-3 py-2" required placeholder="Client name" value={invoiceForm.clientName} onChange={(e) => setInvoiceForm({ ...invoiceForm, clientName: e.target.value })} />
-                <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Client email" type="email" value={invoiceForm.clientEmail} onChange={(e) => setInvoiceForm({ ...invoiceForm, clientEmail: e.target.value })} />
-                <input className="rounded-lg border border-slate-200 px-3 py-2" required placeholder="Amount" type="number" value={invoiceForm.amount} onChange={(e) => setInvoiceForm({ ...invoiceForm, amount: e.target.value })} />
-                <textarea className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Description (optional)" value={invoiceForm.description} onChange={(e) => setInvoiceForm({ ...invoiceForm, description: e.target.value })} />
-                <div className="flex justify-end gap-3">
-                  <button type="button" className="rounded-lg border border-slate-200 px-4 py-2 text-sm" onClick={() => { setShowInvoiceForm(false); setInvoiceForm({ boardId: "", clientName: "", clientEmail: "", amount: "", description: "" }); }}>Cancel</button>
-                  <button className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white">Create</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        ) : null}
-        {/* Resource request form modal */}
-        {showResourceForm ? (
-          <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
-            <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
-              <h4 className="text-lg font-semibold">Request Resource</h4>
-              <form className="mt-4 grid gap-3" onSubmit={createResourceRequest}>
-                {resourceForm.items.map((item, idx) => (
-                  <div className="flex gap-2 items-start" key={idx}>
-                    <div className="flex-1 grid gap-2">
-                      <input className="rounded-lg border border-slate-200 px-3 py-2" required placeholder="Item name" value={item.name} onChange={(e) => updateResourceItem(idx, "name", e.target.value)} />
-                      <div className="flex gap-2">
-                        <input className="w-24 rounded-lg border border-slate-200 px-3 py-2" required placeholder="Qty" type="number" min={1} value={item.quantity} onChange={(e) => updateResourceItem(idx, "quantity", Number(e.target.value))} />
-                        <input className="flex-1 rounded-lg border border-slate-200 px-3 py-2" placeholder="Reason" value={item.reason} onChange={(e) => updateResourceItem(idx, "reason", e.target.value)} />
-                      </div>
-                    </div>
-                    <button type="button" className="mt-2 rounded-lg border border-rose-200 px-2 py-1 text-xs text-rose-600" onClick={() => removeResourceItem(idx)}>X</button>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Total project budget" type="number" value={budgetForm.totalBudget} onChange={(e) => setBudgetForm({ ...budgetForm, totalBudget: e.target.value })} />
+                    <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Team spending limit" type="number" value={budgetForm.teamSpendingLimit} onChange={(e) => setBudgetForm({ ...budgetForm, teamSpendingLimit: e.target.value })} />
+                    <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Resource budget" type="number" value={budgetForm.resourceBudget} onChange={(e) => setBudgetForm({ ...budgetForm, resourceBudget: e.target.value })} />
+                    <input className="rounded-lg border border-slate-200 px-3 py-2" type="date" value={budgetForm.deadline} onChange={(e) => setBudgetForm({ ...budgetForm, deadline: e.target.value })} />
                   </div>
-                ))}
-                <button type="button" className="text-sm text-blue-600 underline text-left" onClick={addResourceItem}>+ Add item</button>
-                <textarea className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Additional notes (optional)" value={resourceForm.notes} onChange={(e) => setResourceForm({ ...resourceForm, notes: e.target.value })} />
-                <div className="flex justify-end gap-3">
-                  <button type="button" className="rounded-lg border border-slate-200 px-4 py-2 text-sm" onClick={() => { setShowResourceForm(false); setResourceForm({ items: [{ name: "", quantity: 1, reason: "" }], notes: "" }); }}>Cancel</button>
-                  <button className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white">Submit</button>
-                </div>
-              </form>
+                  {actorRole === "admin" ? (
+                    <select className="rounded-lg border border-slate-200 px-3 py-2" required value={budgetForm.assignedTo} onChange={(e) => setBudgetForm({ ...budgetForm, assignedTo: e.target.value })}>
+                      <option value="">Assign a finance user to approve</option>
+                      {data.financeMembers.map((fm) => (
+                        <option key={String(fm.id)} value={String(fm.id)}>{String(fm.name)}</option>
+                      ))}
+                    </select>
+                  ) : null}
+                  <div className="flex justify-end gap-3">
+                    <button type="button" className="rounded-lg border border-slate-200 px-4 py-2 text-sm" onClick={() => { setShowBudgetModal(false); setEditingBudgetId(null); }}>Cancel</button>
+                    <button className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white">{editingBudgetId ? "Update" : "Allocate"}</button>
+                  </div>
+                </form>
+              </div>
             </div>
-          </div>
-        ) : null}
-      </>) : null}
+          ) : null}
+          {/* Invoice form modal */}
+          {showInvoiceForm ? (
+            <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
+              <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
+                <h4 className="text-lg font-semibold">Create Invoice</h4>
+                <form className="mt-4 grid gap-3" onSubmit={createInvoice}>
+                  <input className="rounded-lg border border-slate-200 px-3 py-2" required placeholder="Client name" value={invoiceForm.clientName} onChange={(e) => setInvoiceForm({ ...invoiceForm, clientName: e.target.value })} />
+                  <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Client email" type="email" value={invoiceForm.clientEmail} onChange={(e) => setInvoiceForm({ ...invoiceForm, clientEmail: e.target.value })} />
+                  <input className="rounded-lg border border-slate-200 px-3 py-2" required placeholder="Amount" type="number" value={invoiceForm.amount} onChange={(e) => setInvoiceForm({ ...invoiceForm, amount: e.target.value })} />
+                  <textarea className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Description (optional)" value={invoiceForm.description} onChange={(e) => setInvoiceForm({ ...invoiceForm, description: e.target.value })} />
+                  <div className="flex justify-end gap-3">
+                    <button type="button" className="rounded-lg border border-slate-200 px-4 py-2 text-sm" onClick={() => { setShowInvoiceForm(false); setInvoiceForm({ boardId: "", clientName: "", clientEmail: "", amount: "", description: "" }); }}>Cancel</button>
+                    <button className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white">Create</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          ) : null}
+          {/* Resource request form modal */}
+          {showResourceForm ? (
+            <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
+              <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
+                <h4 className="text-lg font-semibold">Request Resource</h4>
+                <form className="mt-4 grid gap-3" onSubmit={createResourceRequest}>
+                  {resourceForm.items.map((item, idx) => (
+                    <div className="flex gap-2 items-start" key={idx}>
+                      <div className="flex-1 grid gap-2">
+                        <input className="rounded-lg border border-slate-200 px-3 py-2" required placeholder="Item name" value={item.name} onChange={(e) => updateResourceItem(idx, "name", e.target.value)} />
+                        <div className="flex gap-2">
+                          <input className="w-24 rounded-lg border border-slate-200 px-3 py-2" required placeholder="Qty" type="number" min={1} value={item.quantity} onChange={(e) => updateResourceItem(idx, "quantity", Number(e.target.value))} />
+                          <input className="flex-1 rounded-lg border border-slate-200 px-3 py-2" placeholder="Reason" value={item.reason} onChange={(e) => updateResourceItem(idx, "reason", e.target.value)} />
+                        </div>
+                      </div>
+                      <button type="button" className="mt-2 rounded-lg border border-rose-200 px-2 py-1 text-xs text-rose-600" onClick={() => removeResourceItem(idx)}>X</button>
+                    </div>
+                  ))}
+                  <button type="button" className="text-sm text-blue-600 underline text-left" onClick={addResourceItem}>+ Add item</button>
+                  <textarea className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Additional notes (optional)" value={resourceForm.notes} onChange={(e) => setResourceForm({ ...resourceForm, notes: e.target.value })} />
+                  <div className="flex justify-end gap-3">
+                    <button type="button" className="rounded-lg border border-slate-200 px-4 py-2 text-sm" onClick={() => { setShowResourceForm(false); setResourceForm({ items: [{ name: "", quantity: 1, reason: "" }], notes: "" }); }}>Cancel</button>
+                    <button className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white">Submit</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          ) : null}
+        </>) : null}
 
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <h4 className="font-semibold">Expense Request</h4>
@@ -768,9 +754,9 @@ export function FinanceTab({
                 <p className="font-medium">{displayNested(salary.employee, "name", "Employee")} - ₹{Number(salary.netSalary ?? 0).toLocaleString("en-IN")}</p>
                 <p className="text-sm text-slate-500">{String(salary.month)} • {String(salary.status)}</p>
               </div>
-              {actorRole === "finance" ? (
+              {/* {actorRole === "finance" ? (
                 <button className="rounded-lg border border-slate-200 px-3 py-2 text-sm" onClick={() => editSalary(salary)}>Edit</button>
-              ) : null}
+              ) : null} */}
               {String(salary.status) === "pending" && actorRole === "admin" ? (
                 <button className="rounded-lg border border-slate-200 px-3 py-2 text-sm" onClick={() => updateStatus("salary", String(salary.id), "approved")}>Approve payout</button>
               ) : null}

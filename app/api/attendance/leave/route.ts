@@ -4,10 +4,46 @@ import { requireUserId, jsonError } from "@/lib/api";
 import { LeaveRequest } from "@/models/LeaveRequest";
 import { Attendance } from "@/models/Attendance";
 import { User } from "@/models/User";
-import { Team } from "@/models/Team";
 import { Notification } from "@/models/Notification";
+import { Company } from "@/models/Company";
 import { emitToUser } from "@/lib/socket-emit";
-import { emitNotification } from "@/lib/realtime";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function startOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function endOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+}
+
+function leaveWindow(date: Date, period: string) {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  if (period === "yearly") {
+    return {
+      start: new Date(year, 0, 1),
+      end: endOfDay(new Date(year, 11, 31)),
+    };
+  }
+  return {
+    start: new Date(year, month, 1),
+    end: endOfDay(new Date(year, month + 1, 0)),
+  };
+}
+
+function overlapDuration(leave: any, windowStart: Date, windowEnd: Date) {
+  const start = startOfDay(new Date(leave.startDate)) < windowStart
+    ? windowStart
+    : startOfDay(new Date(leave.startDate));
+  const end = startOfDay(new Date(leave.endDate)) > windowEnd
+    ? windowEnd
+    : startOfDay(new Date(leave.endDate));
+  if (end < start) return 0;
+  const days = Math.floor((end.getTime() - start.getTime()) / DAY_MS) + 1;
+  return leave.halfDay ? Math.min(0.5, days) : days;
+}
 
 export async function POST(req: Request) {
   try {
@@ -29,19 +65,18 @@ export async function POST(req: Request) {
     const user = await User.findById(userId).populate("team");
     if (!user) return jsonError("User not found.");
     if (!user.company) return jsonError("You must belong to a company to request leave.", 400);
+    if (String(user.role) === "admin") return jsonError("Admins cannot request paid leave.", 403);
+
+    const company = await Company.findById(user.company).select("paidLeaveDays paidLeavePeriod");
+    if (!company) return jsonError("Company not found.", 404);
+    const paidLeaveDays = Math.max(0, Number(company.paidLeaveDays ?? 0));
+    const paidLeavePeriod = String(company.paidLeavePeriod ?? "monthly");
+    if (paidLeaveDays <= 0) {
+      return jsonError("Paid leave is not configured for this company yet.", 409);
+    }
 
     const teamName = (user.team as any)?.name || "General Team";
     const notificationBody = `${user.name}: ${user.role}, from ${teamName} has requested a leave.`;
-
-    // Determine the first step approver
-    let firstApproverRole: "manager" | "admin" = "manager";
-    if (["project-manager", "qa-tester", "finance", "admin"].includes(String(user.role))) {
-      firstApproverRole = "admin";
-    }
-    // HR leaves also go to admin (or another HR)
-    if (String(user.role) === "human-resource") {
-      firstApproverRole = "admin";
-    }
 
     // If requesting leave for today and user already checked in, treat as half-day
     let halfDay = false;
@@ -54,78 +89,74 @@ export async function POST(req: Request) {
       }
     }
 
+    const requestedDuration = halfDay ? 0.5 : diffDays;
+    const quota = leaveWindow(start, paidLeavePeriod);
+    const existingLeaves = await LeaveRequest.find({
+      requester: userId,
+      company: user.company,
+      isPaidLeave: { $ne: false },
+      status: { $in: ["pending", "hr-approved", "manager-approved", "approved"] },
+      startDate: { $lte: quota.end },
+      endDate: { $gte: quota.start },
+    }).select("startDate endDate duration halfDay");
+    const usedLeaveDays = existingLeaves.reduce(
+      (sum, leave) => sum + overlapDuration(leave, quota.start, quota.end),
+      0,
+    );
+    const remainingLeaveDays = Math.max(0, paidLeaveDays - usedLeaveDays);
+    if (requestedDuration > remainingLeaveDays) {
+      return jsonError(
+        `Paid leave quota exceeded. Remaining ${paidLeavePeriod} paid leave: ${remainingLeaveDays} day${remainingLeaveDays === 1 ? "" : "s"}.`,
+        409,
+      );
+    }
+
     const leave = await LeaveRequest.create({
       requester: userId,
       company: user.company,
       startDate: start,
       endDate: end,
-      duration: halfDay ? 0.5 : diffDays,
+      duration: requestedDuration,
       halfDay,
+      isPaidLeave: true,
       reason,
       attachmentUrl: attachmentUrl || "",
       status: "pending",
-      currentStep: firstApproverRole
+      currentStep: "hr"
     });
 
-    // Notify admin(s)
-    const admins = await User.find({ role: "admin", company: user.company, companyStatus: "approved" });
-    for (const admin of admins) {
-      await Notification.create({
-        user: admin._id,
-        title: "New Leave Request",
-        body: notificationBody,
-        link: "/profile?tab=attendance"
-      });
-      emitToUser(String(admin._id), "notification:new", {});
-    }
+    const hrs = String(user.role) === "human-resource"
+      ? await User.find({
+        _id: { $ne: userId },
+        role: "human-resource",
+        company: user.company,
+        companyStatus: "approved",
+      })
+      : await User.find({ role: "human-resource", company: user.company, companyStatus: "approved" });
 
-    // For PM/QA/Finance/Admin roles, also notify HR
-    if (["project-manager", "qa-tester", "finance", "admin"].includes(String(user.role))) {
-      const hrs = await User.find({ role: "human-resource", company: user.company, companyStatus: "approved" });
+    if (hrs.length > 0) {
       for (const hr of hrs) {
         await Notification.create({
           user: hr._id,
-          title: "New Leave Request",
+          title: "Paid Leave Request",
           body: notificationBody,
           link: "/profile?tab=attendance"
         });
         emitToUser(String(hr._id), "notification:new", {});
       }
-    }
-
-    // For HR leaves, find another HR or fall back to admin (already notified above)
-    if (String(user.role) === "human-resource") {
-      const otherHr = await User.findOne({
-        _id: { $ne: userId },
-        role: "human-resource",
-        company: user.company,
-        companyStatus: "approved",
-      }).select("_id");
-      if (otherHr) {
+    } else {
+      const admins = await User.find({ role: "admin", company: user.company, companyStatus: "approved" });
+      for (const admin of admins) {
         await Notification.create({
-          user: otherHr._id,
-          title: "New Leave Request",
-          body: `${user.name} (HR) has requested a leave.`,
+          user: admin._id,
+          title: "Paid Leave Request",
+          body: `${notificationBody} No HR is available, admin approval required.`,
           link: "/profile?tab=attendance"
         });
-        emitToUser(String(otherHr._id), "notification:new", {});
+        emitToUser(String(admin._id), "notification:new", {});
       }
-      // admins already notified above
-    }
-
-    // For regular employees, also notify the team manager
-    if (firstApproverRole === "manager") {
-      const team = await Team.findOne({ employees: userId }).populate("manager");
-      if (team?.manager) {
-        const managerId = (team.manager as any)._id || team.manager;
-        await Notification.create({
-          user: managerId,
-          title: "New Leave Request",
-          body: notificationBody,
-          link: "/profile?tab=attendance"
-        });
-        emitToUser(String(managerId), "notification:new", {});
-      }
+      leave.currentStep = "admin";
+      await leave.save();
     }
 
     return NextResponse.json({ leave });
@@ -141,49 +172,62 @@ export async function GET() {
 
   await connectDb();
   const user = await User.findById(userId);
-  if (!user) return jsonError("User not found.");
+  if (!user) return jsonError("User not found.", 404);
+  const company = user.company
+    ? await Company.findById(user.company).select("paidLeaveDays paidLeavePeriod")
+    : null;
+  const paidLeaveDays = Math.max(0, Number(company?.paidLeaveDays ?? 0));
+  const paidLeavePeriod = String(company?.paidLeavePeriod ?? "monthly");
+  const quota = leaveWindow(new Date(), paidLeavePeriod);
+  const ownPaidLeaves = user.company
+    ? await LeaveRequest.find({
+      requester: userId,
+      company: user.company,
+      isPaidLeave: { $ne: false },
+      status: { $in: ["pending", "hr-approved", "manager-approved", "approved"] },
+      startDate: { $lte: quota.end },
+      endDate: { $gte: quota.start },
+    }).select("startDate endDate duration halfDay")
+    : [];
+  const usedPaidLeaveDays = ownPaidLeaves.reduce(
+    (sum, leave) => sum + overlapDuration(leave, quota.start, quota.end),
+    0,
+  );
 
-  let requests;
-  if (user.role === "admin") {
-    requests = await LeaveRequest.find({
-      company: user.company,
-      status: { $in: ["pending", "manager-approved"] },
-      currentStep: "admin",
-    })
-      .populate("requester", "name email role")
-      .sort({ createdAt: -1 });
-  } else if (user.role === "human-resource") {
-    requests = await LeaveRequest.find({
-      company: user.company,
-      status: { $in: ["pending", "manager-approved"] },
-      currentStep: "admin",
-      requester: { $ne: userId },
-    })
-      .populate("requester", "name email role")
-      .sort({ createdAt: -1 });
-  } else if (user.role === "finance") {
-    requests = await LeaveRequest.find({
-      company: user.company,
-      $or: [
-        { currentStep: "admin", status: { $in: ["pending", "manager-approved"] } },
-        { requester: userId },
-      ],
-    })
-      .populate("requester", "name email role")
-      .sort({ createdAt: -1 });
+  // Base query: all leave requests for the same company
+  let query: any = { company: user.company };
+  let requests: any = [];
+
+    if (user.role === "admin") {
+      requests = await LeaveRequest.find({
+        ...query,
+        status: { $in: ["pending", "hr-approved", "manager-approved", "approved", "rejected"] },
+      })
+        .populate("requester", "name email role")
+        .sort({ createdAt: -1 });
+    } else if (user.role === "human-resource") {
+      requests = await LeaveRequest.find({
+        ...query,
+        $or: [
+          { requester: { $ne: userId }, status: { $in: ["pending", "hr-approved", "manager-approved", "approved", "rejected"] } },
+          { requester: userId },
+        ],
+      })
+        .populate("requester", "name email role")
+        .sort({ createdAt: -1 });
+    } else if (user.role === "finance") {
+      requests = await LeaveRequest.find({
+        ...query,
+        requester: userId,
+      })
+        .populate("requester", "name email role")
+        .sort({ createdAt: -1 });
   } else if (user.role === "project-manager" || user.role === "qa-tester") {
-    const teams = await Team.find({ manager: userId });
-    const teamUserIds = teams.flatMap(t => t.employees);
     const ownQuery: any = { requester: userId };
     if (user.company) {
       ownQuery.company = user.company;
     }
-    requests = await LeaveRequest.find({ 
-      $or: [
-        ownQuery,
-        { requester: { $in: teamUserIds }, currentStep: "manager", status: "pending" }
-      ]
-    }).populate("requester", "name email role").sort({ createdAt: -1 });
+    requests = await LeaveRequest.find(ownQuery).populate("requester", "name email role").sort({ createdAt: -1 });
   } else {
     const query: any = { requester: userId };
     if (user.company) {
@@ -192,5 +236,13 @@ export async function GET() {
     requests = await LeaveRequest.find(query).populate("requester", "name email role").sort({ createdAt: -1 });
   }
 
-  return NextResponse.json({ requests });
+  return NextResponse.json({
+    requests,
+    leavePolicy: {
+      paidLeaveDays,
+      paidLeavePeriod,
+      usedPaidLeaveDays,
+      remainingPaidLeaveDays: Math.max(0, paidLeaveDays - usedPaidLeaveDays),
+    },
+  });
 }

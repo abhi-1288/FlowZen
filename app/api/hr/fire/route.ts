@@ -112,6 +112,8 @@ export async function POST(request: Request) {
   member.company = null;
   member.companyJoined = null;
   member.companyStatus = "none";
+  member.baseSalary = 0;
+  member.companyIdentityCode = undefined;
   await member.save();
 
   await Company.updateOne({ _id: company._id }, { $pull: { members: member._id } });

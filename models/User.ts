@@ -101,6 +101,14 @@ const UserSchema = new Schema(
     avatarUrl: { type: String, default: "" },
     customRole: { type: String, default: "", trim: true, maxlength: 80 },
     companyIdentityCode: { type: String, trim: true, unique: true, sparse: true, index: true },
+    baseSalary: { type: Number, default: 0 },
+    salaryHistory: [
+      {
+        amount: { type: Number, required: true },
+        date: { type: Date, default: Date.now },
+        type: { type: String, default: "increment" }
+      }
+    ]
   },
   { timestamps: true },
 );

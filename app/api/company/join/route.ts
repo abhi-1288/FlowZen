@@ -92,6 +92,8 @@ export async function POST(request: Request) {
   const approverId = invitedHrId ?? (await resolveCompanyJoinApproverId(company, codeRole));
   const approvalNotifier: "hr" | "admin" =
     approverId === String(company.owner) ? "admin" : "hr";
+  const enrollingHrId =
+    invitedHrId ?? (approvalNotifier === "hr" ? approverId : null);
 
   if (existingPendingRequest) {
     user.company = company._id;
@@ -100,7 +102,18 @@ export async function POST(request: Request) {
 
     await JoinRequest.updateOne(
       { _id: existingPendingRequest._id },
-      { $set: { approver: approverId } },
+      {
+        $set: {
+          approver: approverId,
+          metadata: {
+            ...(typeof existingPendingRequest.metadata === "object" &&
+            existingPendingRequest.metadata !== null
+              ? (existingPendingRequest.metadata as Record<string, unknown>)
+              : {}),
+            enrollingHrId,
+          },
+        },
+      },
     );
 
     const refreshedRequest = await JoinRequest.findById(existingPendingRequest._id);
@@ -124,7 +137,7 @@ export async function POST(request: Request) {
   const joinRequest = await JoinRequest.findOneAndUpdate(
     { requester: userId, company: company._id, kind: "company", status: "pending" },
     {
-      $set: { approver: approverId },
+      $set: { approver: approverId, metadata: { enrollingHrId } },
       $setOnInsert: {
         requester: userId,
         company: company._id,
