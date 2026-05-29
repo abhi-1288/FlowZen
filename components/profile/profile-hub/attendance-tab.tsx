@@ -347,7 +347,7 @@ export function AttendanceTab({
     ]);
     setHistory(hRes.history);
     setRequests(rRes.requests);
-    setLeavePolicy(rRes.leavePolicy ?? null);
+    setLeavePolicy((rRes as { leavePolicy?: AnyRecord | null }).leavePolicy ?? null);
     setHolidays(holRes.holidays);
     setWfhCheckInMode(wfhRes.wfhCheckInMode ?? "all-day");
 
