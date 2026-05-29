@@ -11,17 +11,7 @@ FlowZen is a full-stack team productivity platform built with Next.js App Router
 - Notifications, approvals, team invites, project events, and task activity.
 - Profile center with password updates, account deletion, and onboarding codes.
 
-## Tech Stack
 
-- Next.js 16 App Router
-- React 19
-- Tailwind CSS v3
-- MongoDB + Mongoose
-- NextAuth
-- Zustand
-- Framer Motion
-- Socket.IO
-- `@dnd-kit/core`
 
 ## Setup
 
