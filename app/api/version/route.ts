@@ -104,10 +104,9 @@ export async function GET() {
       version: `v1.0.0-build.${total}`,
       tag: tag === hash ? null : tag,
       lastUpdate: formatDate(date),
+      rawDate: date,
       commitHash: hash.slice(0, 7),
       totalCommits: Number(total),
-      environment: "Production",
-      status: "Stable",
       releaseNotes,
       knownIssues,
     });
@@ -115,9 +114,8 @@ export async function GET() {
     return NextResponse.json({
       version: "v1.0.0",
       lastUpdate: "N/A",
+      rawDate: new Date().toISOString().slice(0, 10),
       totalCommits: 0,
-      environment: "Production",
-      status: "Stable",
       releaseNotes: [],
       knownIssues: [],
     });
