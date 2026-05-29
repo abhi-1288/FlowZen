@@ -4,6 +4,7 @@ import { jsonError, requireUserId } from "@/lib/api";
 import { User } from "@/models/User";
 import { Attendance } from "@/models/Attendance";
 import { LeaveRequest } from "@/models/LeaveRequest";
+import { WfhRequest } from "@/models/WfhRequest";
 import { FinanceSalary } from "@/models/FinanceSalary";
 import { Holiday } from "@/models/Holiday";
 
@@ -29,7 +30,7 @@ export async function GET(request: Request, { params }: Params) {
   const monthStart = new Date(year, mon - 1, 1);
   const monthEnd = new Date(year, mon, 1);
 
-  const [attendanceRecords, leaveRecords, holidays, salary] = await Promise.all([
+  const [attendanceRecords, leaveRecords, wfhRecords, holidays, salary] = await Promise.all([
     Attendance.find({
       user: memberId,
       date: { $gte: monthStart, $lt: monthEnd },
@@ -37,6 +38,12 @@ export async function GET(request: Request, { params }: Params) {
     LeaveRequest.find({
       requester: memberId,
       status: { $in: ["approved", "pending", "manager-approved"] },
+      startDate: { $lt: monthEnd },
+      endDate: { $gte: monthStart },
+    }).sort({ startDate: 1 }),
+    WfhRequest.find({
+      requester: memberId,
+      status: "approved",
       startDate: { $lt: monthEnd },
       endDate: { $gte: monthStart },
     }).sort({ startDate: 1 }),
@@ -57,6 +64,9 @@ export async function GET(request: Request, { params }: Params) {
     holiday: boolean;
     holidayTitle: string;
     notJoined: boolean;
+    wfh: boolean;
+    wfhReason: string;
+    wfhDuration: number;
   }[] = [];
 
   const joinedDate = new Date(member.companyJoined || member.createdAt);
@@ -91,6 +101,16 @@ export async function GET(request: Request, { params }: Params) {
     });
     const isWeekend = date.getDay() === 0 || date.getDay() === 6;
 
+    const wfh = wfhRecords.find((w: any) => {
+      const start = new Date(w.startDate);
+      const end = new Date(w.endDate);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      const checkDate = new Date(date);
+      checkDate.setHours(12, 0, 0, 0);
+      return checkDate >= start && checkDate <= end;
+    });
+
     calendar.push({
       day: d,
       date: dateStr,
@@ -99,10 +119,13 @@ export async function GET(request: Request, { params }: Params) {
       leave: isBeforeJoined ? false : !!leave,
       leaveReason: isBeforeJoined ? "" : leave ? String(leave.reason ?? "") : "",
       leaveStatus: isBeforeJoined ? "Not Joined" : leave ? String(leave.status ?? "") : "",
-      absent: isBeforeJoined ? false : (!att && !leave && !isWeekend && !holiday),
+      absent: isBeforeJoined ? false : (!att && !leave && !wfh && !isWeekend && !holiday),
       holiday: !!holiday,
       holidayTitle: holiday ? String(holiday.title ?? "") : "",
       notJoined: isBeforeJoined,
+      wfh: !!wfh,
+      wfhReason: wfh ? String(wfh.reason ?? "") : "",
+      wfhDuration: wfh ? Number(wfh.duration) : 0,
     });
   }
 

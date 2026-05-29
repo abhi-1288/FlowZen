@@ -19,6 +19,9 @@ type MemberAttendance = {
     holiday: boolean;
     holidayTitle?: string;
     notJoined?: boolean;
+    wfh: boolean;
+    wfhReason: string;
+    wfhDuration: number;
   }[];
 };
 
@@ -388,17 +391,20 @@ export function FinanceMembersView({
                                           : "bg-white text-rose-600 border border-rose-200 hover:bg-rose-50 ring-2 ring-rose-400"
                                         : dayData.checkIn
                                           ? "bg-emerald-100 text-emerald-900 border border-emerald-200 hover:bg-emerald-200"
-                                          : dayData.leave
-                                            ? "bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-200"
-                                            : dayData.absent
-                                              ? "bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100"
-                                              : i === 0
+                                                  : dayData.wfh
+                                                    ? "bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-200"
+                                                    : dayData.leave
+                                                      ? "bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-200"
+                                                      : dayData.absent
+                                                        ? "bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100"
+                                                        : i === 0
                                                 ? "bg-slate-50 text-slate-400 border border-slate-200"
                                                 : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
                                     }`}
                                 >
                                   <div className="flex flex-col items-center leading-tight">
                                     <span className={today && !dayData.checkIn ? "text-rose-600" : ""}>{dayNum}</span>
+                                    {dayData.wfh ? <span className="text-[9px] font-medium mt-0.5">WFH</span> : null}
                                     {dayData.leave ? <span className="text-[9px] font-medium mt-0.5">Leave</span> : null}
                                     {dayData.absent ? <span className="text-[9px] font-medium mt-0.5">Absent</span> : null}
                                   </div>
@@ -415,6 +421,7 @@ export function FinanceMembersView({
 
                 <div className="mt-6 flex flex-wrap justify-center gap-6 text-xs font-semibold text-slate-600 bg-slate-50 py-3 px-6 rounded-full w-fit mx-auto border border-slate-200">
                   <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-emerald-100 border border-emerald-300"></span> Present</div>
+                  <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-blue-100 border border-blue-300"></span> WFH</div>
                   <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-amber-100 border border-amber-300"></span> Leave</div>
                   <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-rose-50 border border-rose-300"></span> Absent</div>
                   <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-purple-100 border border-purple-300"></span> Holiday</div>
@@ -446,7 +453,7 @@ export function FinanceMembersView({
                   <span className="font-medium text-emerald-900">{dayModal.checkOut}</span>
                 </div>
               ) : null}
-              {!dayModal.checkIn && !dayModal.checkOut && !dayModal.leave && !dayModal.holiday && !dayModal.absent && !dayModal.notJoined ? (
+              {!dayModal.checkIn && !dayModal.checkOut && !dayModal.leave && !dayModal.holiday && !dayModal.absent && !dayModal.notJoined && !dayModal.wfh ? (
                 <div className="flex justify-between items-center rounded-xl bg-slate-50 px-4 py-3 border border-slate-200">
                   <span className="font-semibold text-slate-600">Status</span>
                   <span className="font-medium text-slate-500">Weekend / No record</span>
@@ -482,6 +489,20 @@ export function FinanceMembersView({
                   <div className="flex justify-between items-center">
                     <span className="font-semibold text-purple-800">Holiday</span>
                     <span className="text-purple-700 font-bold">{dayModal.holidayTitle}</span>
+                  </div>
+                </div>
+              ) : null}
+              {dayModal.wfh ? (
+                <div className="rounded-xl bg-blue-50 px-4 py-3 border border-blue-100">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-semibold text-blue-800">Work From Home (Approved)</span>
+                    <span className="text-blue-600 font-bold">Approved</span>
+                  </div>
+                  <div className="mt-2 bg-white/50 p-2 rounded-lg">
+                    <p className="text-sm text-slate-700"><span className="font-semibold">Reason: </span>{dayModal.wfhReason || "No reason provided"}</p>
+                    {dayModal.wfhDuration > 0 && (
+                      <p className="text-sm text-slate-700 mt-1"><span className="font-semibold">Duration: </span>{dayModal.wfhDuration} day{dayModal.wfhDuration === 1 ? "" : "s"}</p>
+                    )}
                   </div>
                 </div>
               ) : null}

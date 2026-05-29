@@ -6,6 +6,16 @@ import { Company } from "@/models/Company";
 import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
 
+const formatDate = (date: Date) => date.toLocaleDateString("en-GB");
+
+const buildWfhNotificationBody = (companyName: string, start: Date, end: Date, reason: string) => {
+  const dateText = start.getTime() === end.getTime()
+    ? formatDate(start)
+    : `${formatDate(start)} to ${formatDate(end)}`;
+  const reasonText = reason ? ` (${reason})` : "";
+  return `${companyName} has a company-wide WFH day on ${dateText}${reasonText}`;
+};
+
 export async function GET() {
   const userId = await requireUserId();
   if (!userId) return jsonError("Unauthorized", 401);
@@ -19,8 +29,10 @@ export async function GET() {
   if (!company) return jsonError("Company not found", 404);
 
   return NextResponse.json({
+    wfhDays: company.wfhDays ?? 0,
+    wfhPeriod: company.wfhPeriod ?? "monthly",
+    wfhCheckInMode: company.wfhCheckInMode || "all-day",
     wfhDates: company.wfhDates || [],
-    wfhCheckInMode: company.wfhCheckInMode || "all-day"
   });
 }
 
@@ -36,88 +48,74 @@ export async function POST(request: Request) {
   const company = await Company.findById(user.company);
   if (!company) return jsonError("Company not found", 404);
 
-  // Check if user is owner or HR
   if (String(company.owner) !== String(userId) && user.role !== "human-resource") {
-    return jsonError("Only company owner or HR can manage WFH dates", 403);
+    return jsonError("Only company owner or HR can manage WFH settings", 403);
   }
 
-  const { date, startDate, endDate, reason, mode } = await request.json();
+  const { wfhDays, wfhPeriod, mode, startDate, endDate, reason } = await request.json();
 
-  const startStr = startDate || date;
-  const endStr = endDate || startStr;
-
-  if (!startStr) {
-    return jsonError("Date/Start date is required", 400);
-  }
-
-  const start = new Date(startStr);
-  const end = new Date(endStr);
-  start.setHours(0, 0, 0, 0);
-  end.setHours(0, 0, 0, 0);
-
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    return jsonError("Invalid dates provided", 400);
-  }
-
-  if (end < start) {
-    return jsonError("End date must be on or after start date", 400);
-  }
-
-  const datesToAdd: Date[] = [];
-  const current = new Date(start);
-  while (current <= end) {
-    datesToAdd.push(new Date(current));
-    current.setDate(current.getDate() + 1);
-  }
-
-  if (!company.wfhDates) {
-    company.wfhDates = [];
-  }
-
-  let addedCount = 0;
-  for (const wfhDate of datesToAdd) {
-    const exists = company.wfhDates.some((d: any) => {
-      const existingDate = new Date(d?.date ? d.date : d);
-      existingDate.setHours(0, 0, 0, 0);
-      return existingDate.getTime() === wfhDate.getTime();
-    });
-
-    if (!exists) {
-      company.wfhDates.push({ date: wfhDate, reason: reason || "" });
-      addedCount++;
+  if (wfhDays !== undefined) {
+    const days = Number(wfhDays);
+    if (Number.isNaN(days) || days < 0) {
+      return jsonError("Invalid WFH days value", 400);
     }
+    company.wfhDays = days;
   }
 
-  if (addedCount === 0) {
-    return jsonError("Selected dates are already marked as WFH", 400);
+  if (wfhPeriod && ["monthly", "yearly"].includes(wfhPeriod)) {
+    company.wfhPeriod = wfhPeriod;
   }
 
   if (mode && ["all-day", "wfh-only"].includes(mode)) {
     company.wfhCheckInMode = mode;
   }
 
-  await company.save();
+  if (startDate) {
+    const start = new Date(startDate);
+    const end = endDate ? new Date(endDate) : new Date(start);
+    const dates: { date: Date; reason: string }[] = [];
+    const current = new Date(start);
+    while (current <= end) {
+      dates.push({ date: new Date(current), reason: reason || "" });
+      current.setDate(current.getDate() + 1);
+    }
+    company.wfhDates.push(...dates);
 
-  // Send notifications to all company members
-  const members = await User.find({ company: company._id, companyStatus: "approved" });
-  const dateRangeStr = startStr === endStr 
-    ? new Date(startStr).toLocaleDateString()
-    : `${new Date(startStr).toLocaleDateString()} to ${new Date(endStr).toLocaleDateString()}`;
+    // Notify all company members
+    const populatedCompany = await Company.findById(user.company).select("name owner members");
+    if (populatedCompany) {
+      const targets = new Set<string>(
+        (populatedCompany.members ?? []).map((member: any) => String(member))
+      );
+      if (populatedCompany.owner) targets.add(String(populatedCompany.owner));
 
-  for (const member of members) {
-    await Notification.create({
-      user: member._id,
-      company: company._id,
-      type: "info",
-      title: "Work From Home Assigned",
-      message: `Work From Home has been assigned for ${dateRangeStr}.${reason ? ` Reason: ${reason}` : ""}`
-    });
-    emitNotification(String(member._id));
+      const body = buildWfhNotificationBody(
+        String(populatedCompany.name),
+        start,
+        end,
+        reason || ""
+      );
+
+      await Notification.insertMany(
+        Array.from(targets).map((targetUserId) => ({
+          user: targetUserId,
+          company: populatedCompany._id,
+          type: "system",
+          title: "Company WFH announced",
+          body,
+        }))
+      );
+      Array.from(targets).forEach((target) => emitNotification(target));
+    }
   }
 
+  await company.save();
+
   return NextResponse.json({
-    wfhDates: company.wfhDates,
-    wfhCheckInMode: company.wfhCheckInMode
+    wfhDays: company.wfhDays,
+    wfhPeriod: company.wfhPeriod,
+    wfhCheckInMode: company.wfhCheckInMode,
+    wfhDates: company.wfhDates || [],
   });
 }
 
@@ -133,29 +131,25 @@ export async function DELETE(request: Request) {
   const company = await Company.findById(user.company);
   if (!company) return jsonError("Company not found", 404);
 
-  // Check if user is owner or HR
-  if (String(company.owner) !== String(userId) && user.role !== "human-resource") {
-    return jsonError("Only company owner or HR can manage WFH dates", 403);
+  if (String(company.owner) !== String(userId)) {
+    return jsonError("Only company owner can delete WFH dates", 403);
   }
 
   const { date } = await request.json();
   if (!date) return jsonError("Date is required", 400);
 
-  const wfhDate = new Date(date);
-  wfhDate.setHours(0, 0, 0, 0);
+  const targetDate = new Date(date);
+  targetDate.setHours(0, 0, 0, 0);
 
-  company.wfhDates = company.wfhDates?.filter((d: any) => {
-    const existingDate = new Date(d?.date ? d.date : d);
-    existingDate.setHours(0, 0, 0, 0);
-    return existingDate.getTime() !== wfhDate.getTime();
-  }) || [];
+  company.wfhDates = company.wfhDates.filter((d: any) => {
+    const dDate = new Date(d.date);
+    dDate.setHours(0, 0, 0, 0);
+    return dDate.getTime() !== targetDate.getTime();
+  });
 
   await company.save();
 
-  return NextResponse.json({
-    wfhDates: company.wfhDates,
-    wfhCheckInMode: company.wfhCheckInMode
-  });
+  return NextResponse.json({ wfhDates: company.wfhDates || [] });
 }
 
 export async function PATCH(request: Request) {
@@ -170,7 +164,6 @@ export async function PATCH(request: Request) {
   const company = await Company.findById(user.company);
   if (!company) return jsonError("Company not found", 404);
 
-  // Check if user is owner or HR
   if (String(company.owner) !== String(userId) && user.role !== "human-resource") {
     return jsonError("Only company owner or HR can manage WFH settings", 403);
   }
@@ -183,7 +176,5 @@ export async function PATCH(request: Request) {
   company.wfhCheckInMode = mode;
   await company.save();
 
-  return NextResponse.json({
-    wfhCheckInMode: company.wfhCheckInMode
-  });
+  return NextResponse.json({ wfhCheckInMode: company.wfhCheckInMode });
 }

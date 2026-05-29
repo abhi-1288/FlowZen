@@ -28,8 +28,9 @@ import {
   toEmployeeHistoryRows,
   toManagerHistoryRows,
 } from "./shared";
-import { WfhAssignModal } from "./wfh-assign-modal";
 import { VersionPanel } from "@/components/version/version-panel";
+import { WfhAssignModal } from "./wfh-assign-modal";
+import { ManageWfhDatesModal } from "./manage-wfh-dates-modal";
 
 export function ProfileTab({
   profile,
@@ -102,13 +103,15 @@ export function ProfileTab({
       : "monthly",
   );
   const [savingPolicy, setSavingPolicy] = useState(false);
-  // WFH settings (admin)
-  const [wfhDates, setWfhDates] = useState<{ date: string; reason: string }[]>(
-    [],
-  );
+  // WFH quota (HR)
+  const [wfhDays, setWfhDays] = useState(0);
+  const [wfhPeriod, setWfhPeriod] = useState<"monthly" | "yearly">("monthly");
+  // WFH mode & dates (Admin)
   const [wfhMode, setWfhMode] = useState<"all-day" | "wfh-only">("all-day");
   const [wfhLoading, setWfhLoading] = useState(false);
-  const [showWfhModal, setShowWfhModal] = useState(false);
+  const [wfhDates, setWfhDates] = useState<{ date: string; reason: string }[]>([]);
+  const [showWfhAssignModal, setShowWfhAssignModal] = useState(false);
+  const [showManageWfhModal, setShowManageWfhModal] = useState(false);
   const [identityRequesting, setIdentityRequesting] = useState(false);
   const managerTeams = Array.isArray(
     (insights?.manager as AnyRecord | undefined)?.teams,
@@ -280,22 +283,13 @@ export function ProfileTab({
     if (!company) return;
     try {
       setWfhLoading(true);
-      const res = await apiFetch<{ wfhDates: any[]; wfhCheckInMode: string }>(
+      const res = await apiFetch<{ wfhDays: number; wfhPeriod: string; wfhCheckInMode: string; wfhDates: { date: string; reason: string }[] }>(
         "/api/company/wfh",
       );
-      const mapped = Array.isArray(res.wfhDates)
-        ? res.wfhDates.map((item: any) => {
-            if (item && typeof item === "object") {
-              return {
-                date: String(item.date),
-                reason: item.reason ? String(item.reason) : "",
-              };
-            }
-            return { date: String(item), reason: "" };
-          })
-        : [];
-      setWfhDates(mapped);
+      setWfhDays(res.wfhDays ?? 0);
+      setWfhPeriod(res.wfhPeriod === "yearly" ? "yearly" : "monthly");
       setWfhMode(res.wfhCheckInMode === "wfh-only" ? "wfh-only" : "all-day");
+      setWfhDates(res.wfhDates || []);
     } catch (err) {
       // ignore
     } finally {
@@ -307,29 +301,17 @@ export function ProfileTab({
     void loadWfh();
   }, [company?.id]);
 
-  async function removeWfhDate(date: string) {
+  async function saveWfhQuota() {
     try {
       setWfhLoading(true);
-      const res = await apiFetch<{ wfhDates: any[]; wfhCheckInMode: string }>(
-        "/api/company/wfh",
-        { method: "DELETE", body: JSON.stringify({ date }) },
-      );
-      const mapped = Array.isArray(res.wfhDates)
-        ? res.wfhDates.map((item: any) => {
-            if (item && typeof item === "object") {
-              return {
-                date: String(item.date),
-                reason: item.reason ? String(item.reason) : "",
-              };
-            }
-            return { date: String(item), reason: "" };
-          })
-        : [];
-      setWfhDates(mapped);
-      showToast("WFH date removed.", "success");
+      await apiFetch("/api/company/wfh", {
+        method: "POST",
+        body: JSON.stringify({ wfhDays, wfhPeriod }),
+      });
+      showToast("WFH quota updated.", "success");
     } catch (err) {
       showToast(
-        err instanceof Error ? err.message : "Failed to remove WFH date",
+        err instanceof Error ? err.message : "Failed to update WFH quota",
         "error",
       );
     } finally {
@@ -640,6 +622,41 @@ export function ProfileTab({
                 {savingPolicy ? "Saving..." : "Save paid leave"}
               </button>
             </div>
+
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <label className="text-xs font-semibold uppercase text-slate-500">
+                WFH Quota
+              </label>
+              <p className="mt-1 mb-3 text-sm text-slate-500">
+                Set the Work From Home allowance that members can request.
+              </p>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min="0"
+                  value={wfhDays}
+                  onChange={(e) => setWfhDays(Math.max(0, Number(e.target.value)))}
+                  className="w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+                <span className="text-sm text-slate-600">day(s) per</span>
+                <select
+                  value={wfhPeriod}
+                  onChange={(e) => setWfhPeriod(e.target.value as "monthly" | "yearly")}
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value="monthly">Month</option>
+                  <option value="yearly">Year</option>
+                </select>
+                <button
+                  onClick={saveWfhQuota}
+                  disabled={wfhLoading}
+                  className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 transition"
+                  type="button"
+                >
+                  {wfhLoading ? "Saving..." : "Save"}
+                </button>
+              </div>
+            </div>
           </section>
         ) : null}
 
@@ -694,74 +711,37 @@ export function ProfileTab({
                 Work From Home (WFH) Settings
               </h3>
               <p className="mt-1 text-sm text-slate-500">
-                Configure company-wide Work From Home dates and check-in
-                behavior.
+                Assign company-wide WFH dates and configure check-in behavior.
               </p>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold uppercase text-slate-500">
-                      Assigned WFH Dates
-                    </label>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <label className="text-xs font-semibold uppercase text-slate-500">
+                    Company WFH Dates
+                  </label>
+                  <p className="mt-1 mb-3 text-sm text-slate-500">
+                    Assign or remove company-wide WFH days.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
                     <button
-                      onClick={() => setShowWfhModal(true)}
-                      className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 transition"
+                      onClick={() => setShowWfhAssignModal(true)}
+                      className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition"
                       type="button"
                     >
-                      Assign WFH
+                      Assign WFH Dates
                     </button>
-                  </div>
-
-                  <div className="mt-4 space-y-2 max-h-60 overflow-y-auto pr-1">
-                    {wfhDates.length === 0 ? (
-                      <p className="text-sm text-slate-500">
-                        No WFH dates set.
-                      </p>
-                    ) : (
-                      wfhDates.map((wfh) => (
-                        <div
-                          key={wfh.date}
-                          className="flex flex-col gap-2 rounded-lg border border-slate-100 bg-slate-50 p-3"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-semibold">
-                              {new Date(wfh.date).toLocaleDateString()}
-                            </span>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => {
-                                  if (wfh.date) {
-                                    const iso = new Date(wfh.date)
-                                      .toISOString()
-                                      .slice(0, 10);
-                                    navigator.clipboard.writeText(iso);
-                                    showToast("WFH date copied.");
-                                  }
-                                }}
-                                className="rounded-lg border border-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                                type="button"
-                              >
-                                Copy
-                              </button>
-                              <button
-                                onClick={() => removeWfhDate(wfh.date)}
-                                disabled={wfhLoading}
-                                className="rounded-lg border border-rose-200 px-2 py-0.5 text-xs font-medium text-rose-600 hover:bg-rose-50"
-                                type="button"
-                              >
-                                Remove
-                              </button>
-                            </div>
-                          </div>
-                          {wfh.reason && (
-                            <p className="text-xs text-slate-500 border-t border-slate-200/60 pt-1 leading-relaxed">
-                              Reason: {wfh.reason}
-                            </p>
-                          )}
-                        </div>
-                      ))
-                    )}
+                    <button
+                      onClick={() => { void loadWfh(); setShowManageWfhModal(true); }}
+                      className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 transition"
+                      type="button"
+                    >
+                      Manage WFH Dates
+                      {wfhDates.length > 0 && (
+                        <span className="ml-1.5 rounded-full bg-slate-700 px-1.5 py-0.5 text-xs text-white">
+                          {wfhDates.length}
+                        </span>
+                      )}
+                    </button>
                   </div>
                 </div>
 
@@ -811,6 +791,25 @@ export function ProfileTab({
                 </div>
               </div>
             </section>
+
+            {showWfhAssignModal && (
+              <WfhAssignModal
+                onClose={() => setShowWfhAssignModal(false)}
+                onRefresh={(dates) => {
+                  setWfhDates(dates);
+                  void loadWfh();
+                }}
+                showToast={showToast}
+              />
+            )}
+            {showManageWfhModal && (
+              <ManageWfhDatesModal
+                wfhDates={wfhDates}
+                onClose={() => setShowManageWfhModal(false)}
+                onRefresh={() => void loadWfh()}
+                showToast={showToast}
+              />
+            )}
           </>
         ) : null}
 
@@ -1054,13 +1053,7 @@ export function ProfileTab({
         </div>
       ) : null}
 
-      {showWfhModal && (
-        <WfhAssignModal
-          onClose={() => setShowWfhModal(false)}
-          onRefresh={(dates) => setWfhDates(dates)}
-          showToast={showToast}
-        />
-      )}
+
     </>
   );
 }

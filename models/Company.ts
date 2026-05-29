@@ -15,6 +15,8 @@ const CompanySchema = new Schema(
     noticePeriodDays: { type: Number, default: 30 },
     paidLeaveDays: { type: Number, default: 0 },
     paidLeavePeriod: { type: String, enum: ["monthly", "yearly"], default: "monthly" },
+    wfhDays: { type: Number, default: 0 },
+    wfhPeriod: { type: String, enum: ["monthly", "yearly"], default: "monthly" },
     members: [{ type: Schema.Types.ObjectId, ref: "User" }],
     wfhDates: [
       {

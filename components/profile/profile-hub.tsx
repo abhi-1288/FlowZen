@@ -57,6 +57,7 @@ export function ProfileHub() {
   const [loading, setLoading] = useState(true);
   const [attendanceHistory, setAttendanceHistory] = useState<AnyRecord[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<AnyRecord[]>([]);
+  const [wfhRequests, setWfhRequests] = useState<AnyRecord[]>([]);
   const [financeCount, setFinanceCount] = useState(0);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
@@ -70,6 +71,10 @@ export function ProfileHub() {
   const pendingLeaveCount = leaveRequests.filter((r) =>
     ["pending", "hr-approved", "manager-approved"].includes(String(r.status)),
   ).length;
+  const pendingWfhCount = wfhRequests.filter((r) =>
+    ["pending", "manager-approved", "hr-approved"].includes(String(r.status)),
+  ).length;
+  const pendingAttendanceCount = pendingLeaveCount + pendingWfhCount;
   const hasCompany = Boolean(
     profile?.company && profile?.companyStatus === "approved",
   );
@@ -124,6 +129,9 @@ export function ProfileHub() {
         .catch(() => { });
       apiFetch<{ requests: AnyRecord[] }>("/api/attendance/leave")
         .then((res) => setLeaveRequests(res.requests))
+        .catch(() => { });
+      apiFetch<{ requests: AnyRecord[] }>("/api/attendance/wfh")
+        .then((res) => setWfhRequests(res.requests))
         .catch(() => { });
       if (["finance", "admin"].includes(String(role)) && hasCompany) {
         const month = new Date().toISOString().slice(0, 7);
@@ -360,7 +368,7 @@ export function ProfileHub() {
           />
           <NavButton
             active={tab === "attendance"}
-            label={`Attendance ${pendingLeaveCount ? `(${pendingLeaveCount})` : ""}`}
+            label={`Attendance ${pendingAttendanceCount ? `(${pendingAttendanceCount})` : ""}`}
             onClick={() => setTab("attendance")}
           />
         </nav>
@@ -393,8 +401,8 @@ export function ProfileHub() {
             {mobileTabs.map((item) => {
               const label =
                 item === "attendance" &&
-                  pendingLeaveCount > 0
-                  ? `attendance (${pendingLeaveCount})`
+                  pendingAttendanceCount > 0
+                  ? `attendance (${pendingAttendanceCount})`
                   : item === "finance" && financeCount > 0
                     ? `finance (${financeCount})`
                     : item;

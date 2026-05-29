@@ -175,7 +175,7 @@ export async function GET() {
   const user = await User.findById(userId);
   if (!user) return jsonError("User not found.", 404);
 
-  const query: any = { endDate: { $gte: new Date() } };
+  const query: any = {};
   if (user.company) {
     query.company = user.company;
   } else {

@@ -1,13 +1,14 @@
 {
   "name": "flowzen",
-  "version": "1.0.0",
+  "version": "1.5.0",
   "private": true,
   "scripts": {
     "dev": "node node_modules/next/dist/bin/next dev",
     "build": "node node_modules/next/dist/bin/next build",
     "start": "node node_modules/next/dist/bin/next start",
     "lint": "node node_modules/eslint/bin/eslint.js .",
-    "typecheck": "node node_modules/typescript/bin/tsc --noEmit"
+    "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
+    "doctor": "npx react-doctor@latest"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

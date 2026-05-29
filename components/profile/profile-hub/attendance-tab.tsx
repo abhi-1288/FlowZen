@@ -293,13 +293,18 @@ export function AttendanceTab({
   const [serverToday, setServerToday] = useState<Date | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
-  const [wfhDates, setWfhDates] = useState<{ date: string; reason: string }[]>([]);
   const [wfhCheckInMode, setWfhCheckInMode] = useState<string>("all-day");
+  const [companyWfhDates, setCompanyWfhDates] = useState<{ date: string; reason: string }[]>([]);
   const currentMonthStart = new Date();
   currentMonthStart.setDate(1);
   const [exportFrom, setExportFrom] = useState(currentMonthStart.toISOString().slice(0, 10));
   const [exportTo, setExportTo] = useState(new Date().toISOString().slice(0, 10));
   const [leavePolicy, setLeavePolicy] = useState<AnyRecord | null>(null);
+  const [wfhRequests, setWfhRequests] = useState<AnyRecord[]>([]);
+  const [showWfhFormModal, setShowWfhFormModal] = useState(false);
+  const [showWfhRequestsModal, setShowWfhRequestsModal] = useState(false);
+  const [wfhRejectingId, setWfhRejectingId] = useState<string | null>(null);
+  const [wfhRejectionReason, setWfhRejectionReason] = useState("");
 
   const normalizeDate = (date: Date) => {
     const normalized = new Date(date);
@@ -330,7 +335,7 @@ export function AttendanceTab({
   }, [profile]);
 
   const loadData = async () => {
-    const [hRes, cRes, rRes, holRes, wfhRes] = await Promise.all([
+    const [hRes, cRes, rRes, holRes, wfhRes, wfhReqRes] = await Promise.all([
       apiFetch<{ history: AnyRecord[]; today?: string }>(
         "/api/attendance/checkin",
       ).catch(() => ({ history: [] as AnyRecord[], today: undefined })),
@@ -341,29 +346,20 @@ export function AttendanceTab({
       apiFetch<{ holidays: AnyRecord[] }>("/api/attendance/holidays").catch(
         () => ({ holidays: [] as AnyRecord[] }),
       ),
-      apiFetch<{ wfhDates: any[]; wfhCheckInMode?: string }>("/api/company/wfh").catch(
-        () => ({ wfhDates: [] as any[], wfhCheckInMode: "all-day" }),
+      apiFetch<{ wfhDays: number; wfhPeriod: string; wfhCheckInMode?: string; wfhDates?: { date: string; reason: string }[] }>("/api/company/wfh").catch(
+        () => ({ wfhDays: 0, wfhPeriod: "monthly" as string, wfhCheckInMode: "all-day", wfhDates: [] }),
+      ),
+      apiFetch<{ requests: AnyRecord[] }>("/api/attendance/wfh").catch(
+        () => ({ requests: [] as AnyRecord[] }),
       ),
     ]);
     setHistory(hRes.history);
     setRequests(rRes.requests);
+    setWfhRequests(wfhReqRes?.requests ?? []);
     setLeavePolicy((rRes as { leavePolicy?: AnyRecord | null }).leavePolicy ?? null);
     setHolidays(holRes.holidays);
     setWfhCheckInMode(wfhRes.wfhCheckInMode ?? "all-day");
-
-
-    const mappedWfh = Array.isArray(wfhRes?.wfhDates)
-      ? wfhRes.wfhDates.map((item: any) => {
-        if (item && typeof item === "object") {
-          return {
-            date: String(item.date),
-            reason: item.reason ? String(item.reason) : ""
-          };
-        }
-        return { date: String(item), reason: "" };
-      })
-      : [];
-    setWfhDates(mappedWfh);
+    setCompanyWfhDates((wfhRes as any).wfhDates ?? []);
 
     if (hRes.today) {
       const today = new Date(hRes.today);
@@ -465,6 +461,41 @@ export function AttendanceTab({
     } catch (err) {
       showToast(
         err instanceof Error ? err.message : "Failed to reject",
+        "error",
+      );
+    }
+  };
+
+  const handleWfhApprove = async (id: string) => {
+    try {
+      await apiFetch(`/api/attendance/wfh/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: "approve" }),
+      });
+      loadData();
+      showToast("WFH request approved.");
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Failed to approve WFH",
+        "error",
+      );
+    }
+  };
+
+  const handleWfhReject = async () => {
+    if (!wfhRejectingId) return;
+    try {
+      await apiFetch(`/api/attendance/wfh/${wfhRejectingId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: "reject", reason: wfhRejectionReason }),
+      });
+      loadData();
+      showToast("WFH request rejected.");
+      setWfhRejectingId(null);
+      setWfhRejectionReason("");
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Failed to reject WFH",
         "error",
       );
     }
@@ -613,6 +644,19 @@ export function AttendanceTab({
     });
   };
 
+  const isOnWfh = (day: number | null) => {
+    if (!day) return false;
+    const date = new Date(year, month, day);
+    return wfhRequests.some((req: any) => {
+      if (req.status !== "approved") return false;
+      const start = new Date(req.startDate);
+      const end = new Date(req.endDate);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      return date >= start && date <= end;
+    });
+  };
+
   const isPendingLeave = (day: number | null) => {
     if (!day) return false;
     const date = new Date(year, month, day);
@@ -642,12 +686,29 @@ export function AttendanceTab({
     if (!day) return null;
     const date = new Date(year, month, day);
     date.setHours(0, 0, 0, 0);
-    const targetTime = date.getTime();
-    return wfhDates.find((wfh) => {
-      const wfhD = new Date(wfh.date);
-      wfhD.setHours(0, 0, 0, 0);
-      return wfhD.getTime() === targetTime;
+    return wfhRequests.find((req: any) => {
+      if (req.status !== "approved") return false;
+      const start = new Date(req.startDate);
+      const end = new Date(req.endDate);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      return date >= start && date <= end;
     }) || null;
+  };
+
+  const getCompanyWfhDetail = (day: number | null) => {
+    if (!day) return null;
+    const date = new Date(year, month, day);
+    date.setHours(0, 0, 0, 0);
+    return companyWfhDates.find((d) => {
+      const dDate = new Date(d.date);
+      dDate.setHours(0, 0, 0, 0);
+      return dDate.getTime() === date.getTime();
+    }) || null;
+  };
+
+  const isCompanyWfh = (day: number | null) => {
+    return !!getCompanyWfhDetail(day);
   };
 
   const todayLeave = requests.some((req: any) => {
@@ -670,12 +731,15 @@ export function AttendanceTab({
 
   const isTodayWfh = useMemo(() => {
     const todayTime = todayDate.getTime();
-    return wfhDates.some((wfh) => {
-      const wfhD = new Date(wfh.date);
-      wfhD.setHours(0, 0, 0, 0);
-      return wfhD.getTime() === todayTime;
+    return wfhRequests.some((req: any) => {
+      if (req.status !== "approved") return false;
+      const start = new Date(req.startDate);
+      const end = new Date(req.endDate);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      return todayTime >= start.getTime() && todayTime <= end.getTime();
     });
-  }, [wfhDates, todayDate]);
+  }, [wfhRequests, todayDate]);
 
   const currentHoliday = (day: number | null) => {
     if (!day) return null;
@@ -768,6 +832,25 @@ export function AttendanceTab({
                   </span>
                 )}
             </button>
+            <button
+              onClick={() => setShowWfhRequestsModal(true)}
+              className="relative rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+            >
+              WFH
+              {wfhRequests.filter(
+                (r) =>
+                  ["pending", "manager-approved", "hr-approved"].includes(String(r.status)),
+              ).length > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] text-white">
+                    {
+                      wfhRequests.filter(
+                        (r) =>
+                          ["pending", "manager-approved", "hr-approved"].includes(String(r.status)),
+                      ).length
+                    }
+                  </span>
+                )}
+            </button>
             {profile?.role === "admin" && (
               <button
                 onClick={() => setShowLeaveHistoryModal(true)}
@@ -799,6 +882,12 @@ export function AttendanceTab({
                 Ask Leave
               </button>
             )}
+            <button
+              onClick={() => setShowWfhFormModal(true)}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+            >
+              Request WFH
+            </button>
             {(wfhCheckInMode === "all-day" || isTodayWfh) && (
               todayAttendance && !todayAttendance.checkOut ? (
                 <button
@@ -986,6 +1075,66 @@ export function AttendanceTab({
           </div>
         )}
 
+        {showWfhFormModal && (
+          <WfhRequestModal
+            onClose={() => setShowWfhFormModal(false)}
+            onRefresh={loadData}
+            showToast={showToast}
+          />
+        )}
+
+        {showWfhRequestsModal && (
+          <WfhRequestsListModal
+            requests={wfhRequests}
+            onClose={() => setShowWfhRequestsModal(false)}
+            onApprove={handleWfhApprove}
+            onReject={(id) => setWfhRejectingId(id)}
+            currentUserId={session?.user?.id}
+            userRole={String(profile?.role ?? "")}
+          />
+        )}
+
+        {wfhRejectingId && (
+          <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/40 p-4 backdrop-blur-md">
+            <div className="w-full max-w-md animate-in zoom-in-95 fade-in duration-200 rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+              <h3 className="text-xl font-bold text-slate-900">
+                Reject WFH Request
+              </h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Please provide a reason for rejection.
+              </p>
+              <div className="mt-6 space-y-4">
+                <textarea
+                  required
+                  rows={4}
+                  placeholder="Reason for rejection (required)..."
+                  value={wfhRejectionReason}
+                  onChange={(e) => setWfhRejectionReason(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 p-4 text-sm focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all resize-none"
+                />
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      setWfhRejectingId(null);
+                      setWfhRejectionReason("");
+                    }}
+                    className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={!wfhRejectionReason.trim()}
+                    onClick={handleWfhReject}
+                    className="flex-1 rounded-xl bg-rose-600 py-3 text-sm font-semibold text-white hover:bg-rose-700 transition shadow-lg shadow-rose-500/20 disabled:opacity-50"
+                  >
+                    Reject Request
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="mb-8 flex flex-col items-center justify-center gap-4">
           <div className="flex items-center gap-4">
             <button
@@ -1035,6 +1184,8 @@ export function AttendanceTab({
                     const today = isToday(day);
                     const checkedIn = isCheckedIn(day);
                     const leave = isOnLeave(day);
+                    const wfh = isOnWfh(day);
+                    const companyWfh = isCompanyWfh(day);
                     const pendingLeave = isPendingLeave(day);
                     const holiday = isHoliday(day);
                     const holidayDetails = currentHoliday(day);
@@ -1045,6 +1196,8 @@ export function AttendanceTab({
                       past &&
                       !checkedIn &&
                       !leave &&
+                      !wfh &&
+                      !companyWfh &&
                       !holiday &&
                       !pendingLeave &&
                       !weekend &&
@@ -1077,9 +1230,13 @@ export function AttendanceTab({
                                     : "bg-white text-rose-600 border border-rose-200 shadow-sm"
                                   : checkedIn
                                     ? "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm"
-                                    : leave
-                                      ? "bg-amber-100 text-amber-900 border border-amber-200 shadow-sm"
-                                      : weekend
+                                      : companyWfh
+                                        ? "bg-teal-100 text-teal-700 border border-teal-200 shadow-sm"
+                                        : wfh
+                                          ? "bg-blue-100 text-blue-700 border border-blue-200 shadow-sm"
+                                          : leave
+                                        ? "bg-amber-100 text-amber-900 border border-amber-200 shadow-sm"
+                                        : weekend
                                         ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm"
                                         : missed
                                           ? "bg-white text-rose-600 border border-rose-200 shadow-sm"
@@ -1088,8 +1245,8 @@ export function AttendanceTab({
                           }`}
                       >
                         {day}
-                        {day && getWfhDetail(day) && (
-                          <span className="absolute left-1 top-1 rounded-full bg-white/90 p-0.5 shadow-sm">
+                        {(day && (getWfhDetail(day) || isOnWfh(day) || companyWfh)) && (
+                          <span className="absolute left-1 top-1 rounded-full p-0.5 shadow-sm">
                             <Pen className="h-3 w-3 text-emerald-600" />
                           </span>
                         )}
@@ -1100,7 +1257,7 @@ export function AttendanceTab({
                             (today && !checkedIn) ||
                             (past && checkedIn) ||
                             missed) && (
-                            <span className="absolute right-1 top-1 rounded-full bg-white/90 p-0.5">
+                            <span className="absolute right-1 top-1 rounded-full p-0.5">
                               {pendingLeave ? (
                                 <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
                               ) : holiday ? (
@@ -1133,7 +1290,8 @@ export function AttendanceTab({
           history={history}
           requests={requests}
           holidays={holidays}
-          wfhDates={wfhDates}
+          wfhRequests={wfhRequests}
+          companyWfhDates={companyWfhDates}
         />
       )}
     </>
@@ -2082,14 +2240,16 @@ function DayDetailsModal({
   history,
   requests,
   holidays,
-  wfhDates = [],
+  wfhRequests = [],
+  companyWfhDates = [],
 }: {
   date: Date;
   onClose: () => void;
   history: AnyRecord[];
   requests: AnyRecord[];
   holidays: AnyRecord[];
-  wfhDates?: { date: string; reason: string }[];
+  wfhRequests?: AnyRecord[];
+  companyWfhDates?: { date: string; reason: string }[];
 }) {
   const attendance = history.find((h: any) => {
     const d = new Date(h.date);
@@ -2113,10 +2273,19 @@ function DayDetailsModal({
     return date >= start && date <= end;
   });
 
-  const wfh = wfhDates.find((w: any) => {
-    const d = new Date(w.date);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime() === date.getTime();
+  const approvedWfh = wfhRequests.find((r: any) => {
+    if (r.status !== "approved") return false;
+    const start = new Date(String(r.startDate));
+    const end = new Date(String(r.endDate));
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    return date >= start && date <= end;
+  });
+
+  const companyWfh = companyWfhDates.find((d) => {
+    const dDate = new Date(d.date);
+    dDate.setHours(0, 0, 0, 0);
+    return dDate.getTime() === date.getTime();
   });
 
   return (
@@ -2130,20 +2299,37 @@ function DayDetailsModal({
         </div>
 
         <div className="space-y-4">
-          {wfh && (
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
+          {approvedWfh && (
+            <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-bold text-emerald-800 flex items-center gap-1.5">
-                  <Pen className="h-4 w-4 text-emerald-600" /> Work From Home (WFH)
+                <p className="text-sm font-bold text-blue-800 flex items-center gap-1.5">
+                  <Pen className="h-4 w-4 text-blue-600" /> Work From Home (Approved)
                 </p>
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">
-                  Assigned
+                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700">
+                  Approved
                 </span>
               </div>
-              {wfh.reason && (
-                <p className="mt-2 text-sm text-slate-700 leading-relaxed">
-                  Reason: {wfh.reason}
+              <p className="mt-1 text-sm text-slate-700">
+                {String((approvedWfh as any).reason ?? "")}
+              </p>
+              <p className="mt-2 text-xs text-slate-500">
+                Duration: {String((approvedWfh as any).duration ?? "")} day(s)
+              </p>
+            </div>
+          )}
+
+          {!approvedWfh && companyWfh && (
+            <div className="rounded-xl border border-teal-100 bg-teal-50/50 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-bold text-teal-800 flex items-center gap-1.5">
+                  <Pen className="h-4 w-4 text-teal-600" /> Company WFH Day
                 </p>
+                <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs font-bold text-teal-700">
+                  Company
+                </span>
+              </div>
+              {companyWfh.reason && (
+                <p className="mt-1 text-sm text-slate-700">{companyWfh.reason}</p>
               )}
             </div>
           )}
@@ -2220,13 +2406,13 @@ function DayDetailsModal({
   );
 }
 
-function WfhAssignModal({
+function WfhRequestModal({
   onClose,
   onRefresh,
   showToast,
 }: {
   onClose: () => void;
-  onRefresh: (dates: { date: string; reason: string }[]) => void;
+  onRefresh: () => void;
   showToast: (text: string, type?: "success" | "error") => void;
 }) {
   const [formData, setFormData] = useState({
@@ -2238,38 +2424,19 @@ function WfhAssignModal({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!formData.startDate) return;
     setLoading(true);
     try {
-      const res = await apiFetch<{ wfhDates: any[]; wfhCheckInMode: string }>(
-        "/api/company/wfh",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            startDate: formData.startDate,
-            endDate: formData.endDate || formData.startDate,
-            reason: formData.reason,
-          }),
-        }
-      );
-      const mapped = Array.isArray(res.wfhDates)
-        ? res.wfhDates.map((item: any) => {
-          if (item && typeof item === "object") {
-            return {
-              date: String(item.date),
-              reason: item.reason ? String(item.reason) : ""
-            };
-          }
-          return { date: String(item), reason: "" };
-        })
-        : [];
-      onRefresh(mapped);
-      showToast("WFH dates assigned and notifications sent!", "success");
+      await apiFetch("/api/attendance/wfh", {
+        method: "POST",
+        body: JSON.stringify(formData),
+      });
+      onRefresh();
+      showToast("WFH request submitted!");
       onClose();
     } catch (err) {
       showToast(
-        err instanceof Error ? err.message : "Failed to assign WFH",
-        "error"
+        err instanceof Error ? err.message : "Failed to submit WFH request",
+        "error",
       );
     } finally {
       setLoading(false);
@@ -2279,75 +2446,319 @@ function WfhAssignModal({
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
-        <h3 className="text-xl font-bold text-slate-900">Assign Work From Home</h3>
+        <h3 className="text-xl font-bold text-slate-900">Request WFH</h3>
         <p className="mt-1 text-sm text-slate-500">
-          Assign Work From Home (WFH) dates for the company.
+          Submit a Work From Home request for approval.
         </p>
-
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-xs font-bold uppercase text-slate-500">
-                Start Date
-              </label>
+              <label className="text-xs font-bold uppercase text-slate-500">Start Date</label>
               <input
                 required
                 type="date"
                 value={formData.startDate}
-                onChange={(e) =>
-                  setFormData({ ...formData, startDate: e.target.value })
-                }
-                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm"
+                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-bold uppercase text-slate-500">
-                End Date (Optional)
-              </label>
+              <label className="text-xs font-bold uppercase text-slate-500">End Date</label>
               <input
+                required
                 type="date"
                 value={formData.endDate}
-                onChange={(e) =>
-                  setFormData({ ...formData, endDate: e.target.value })
-                }
-                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm"
+                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
               />
             </div>
           </div>
-
           <div className="space-y-1">
-            <label className="text-xs font-bold uppercase text-slate-500">
-              Reason / Instructions
-            </label>
+            <label className="text-xs font-bold uppercase text-slate-500">Reason</label>
             <textarea
               required
               rows={3}
-              placeholder="Reason for WFH assignment..."
+              placeholder="Why are you requesting WFH?"
               value={formData.reason}
-              onChange={(e) =>
-                setFormData({ ...formData, reason: e.target.value })
-              }
-              className="w-full rounded-xl border border-slate-200 p-4 text-sm resize-none"
+              onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
             />
           </div>
-
-          <div className="flex gap-3 pt-2">
+          <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition"
+              className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"
             >
               Cancel
             </button>
             <button
+              disabled={loading}
               type="submit"
-              disabled={loading || !formData.startDate || !formData.reason}
-              className="flex-1 rounded-xl bg-slate-950 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition disabled:opacity-50"
+              className="rounded-lg bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
             >
-              {loading ? "Assigning..." : "Assign WFH"}
+              {loading ? "Submitting..." : "Submit"}
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function WfhRequestsListModal({
+  requests,
+  onClose,
+  onApprove,
+  onReject,
+  currentUserId,
+  userRole,
+}: {
+  requests: AnyRecord[];
+  onClose: () => void;
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
+  currentUserId?: string;
+  userRole?: string;
+}) {
+  const [selectedWfh, setSelectedWfh] = useState<AnyRecord | null>(null);
+
+  if (selectedWfh) {
+    return (
+      <WfhDetailsModal
+        wfh={selectedWfh}
+        onClose={() => setSelectedWfh(null)}
+        onApprove={() => {
+          onApprove(String(selectedWfh._id));
+          setSelectedWfh(null);
+        }}
+        onReject={() => {
+          onReject(String(selectedWfh._id));
+          setSelectedWfh(null);
+        }}
+        currentUserId={currentUserId}
+        userRole={userRole}
+      />
+    );
+  }
+
+  const isManagerRole = userRole === "project-manager" || userRole === "qa-tester" || userRole === "admin";
+  const isHrRole = userRole === "human-resource" || userRole === "admin";
+  const isAdmin = userRole === "admin";
+
+  const canApproveWfh = (req: AnyRecord) => {
+    const reqRequester = req.requester as { _id?: string } | undefined;
+    if (String(reqRequester?._id || req.requester) === currentUserId) return false;
+    if (req.status === "rejected" || req.status === "approved") return false;
+    const step = String(req.currentStep ?? "manager");
+    if (step === "manager" && isManagerRole) return true;
+    if (step === "hr" && isHrRole) return true;
+    if (step === "admin" && isAdmin) return true;
+    return false;
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200">
+        <div className="flex items-center justify-between border-b border-slate-100 p-6">
+          <div>
+            <h3 className="text-xl font-bold text-slate-900">WFH Requests</h3>
+            <p className="text-sm text-slate-500">
+              Manage WFH request approvals and view status.
+            </p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-2 hover:bg-slate-50 text-slate-400">
+            <Trash2 size={20} />
+          </button>
+        </div>
+
+        <div className="max-h-[60vh] overflow-y-auto p-6">
+          {requests.length === 0 ? (
+            <div className="py-12 text-center">
+              <p className="text-sm text-slate-400">No WFH requests found.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {requests.map((req: any) => {
+                const canApprove = canApproveWfh(req);
+
+                return (
+                  <div
+                    key={req._id}
+                    onClick={() => setSelectedWfh(req)}
+                    className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 cursor-pointer hover:border-slate-200 hover:bg-slate-100/50 transition-all active:scale-[0.98]"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900">
+                            {req.requester?.name || "User"}
+                          </span>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${req.status === "approved"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : req.status === "rejected"
+                                ? "bg-rose-100 text-rose-700"
+                                : "bg-amber-100 text-amber-700"
+                              }`}
+                          >
+                            {req.status}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm text-slate-600">{req.reason}</p>
+                        <div className="mt-2 flex items-center gap-4 text-xs text-slate-500">
+                          <span className="flex items-center gap-1">
+                            <Clock size={12} />{" "}
+                            {new Date(String(req.startDate)).toLocaleDateString()} -{" "}
+                            {new Date(String(req.endDate)).toLocaleDateString()}
+                          </span>
+                          <span className="font-bold">{Number(req.duration)} day{Number(req.duration) === 1 ? "" : "s"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <div className="border-t border-slate-100 p-4 flex justify-end">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WfhDetailsModal({
+  wfh,
+  onClose,
+  onApprove,
+  onReject,
+  currentUserId,
+  userRole,
+}: {
+  wfh: AnyRecord;
+  onClose: () => void;
+  onApprove: () => void;
+  onReject: () => void;
+  currentUserId?: string;
+  userRole?: string;
+}) {
+  const isRequester =
+    String((wfh.requester as any)?._id || wfh.requester) === currentUserId;
+  const step = String(wfh.currentStep ?? "manager");
+  const isManagerRole = userRole === "project-manager" || userRole === "qa-tester" || userRole === "admin";
+  const isHrRole = userRole === "human-resource" || userRole === "admin";
+  const isAdmin = userRole === "admin";
+
+  const canApprove =
+    !isRequester &&
+    wfh.status !== "rejected" &&
+    wfh.status !== "approved" &&
+    (
+      (step === "manager" && isManagerRole) ||
+      (step === "hr" && isHrRole) ||
+      (step === "admin" && isAdmin)
+    );
+
+  return (
+    <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-md">
+      <div className="w-full max-w-lg animate-in zoom-in-95 fade-in duration-300 rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200 overflow-hidden">
+        <div className="relative h-32 bg-slate-900">
+          <div className="absolute -bottom-8 left-6">
+            <div className="h-16 w-16 rounded-2xl bg-emerald-600 shadow-xl shadow-emerald-600/20 grid place-items-center text-white">
+              <Clock size={32} />
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 h-8 w-8 grid place-items-center rounded-full bg-white/10 text-white hover:bg-white/20 transition"
+          >
+            <LogOut className="rotate-180" size={16} />
+          </button>
+        </div>
+
+        <div className="p-8 pt-12">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-2xl font-bold text-slate-900">
+                {String((wfh.requester as any)?.name || "User")}
+              </h3>
+              <p className="text-sm font-medium text-slate-500 capitalize">
+                {String(wfh.status)} WFH Request
+              </p>
+            </div>
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${wfh.status === "approved"
+                ? "bg-emerald-100 text-emerald-700"
+                : wfh.status === "rejected"
+                  ? "bg-rose-100 text-rose-700"
+                  : "bg-amber-100 text-amber-700"
+                }`}
+            >
+              {String(wfh.status)}
+            </span>
+          </div>
+
+          <div className="mt-6 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-xl bg-slate-50 p-4">
+                <p className="text-xs font-bold uppercase text-slate-500">Start Date</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  {new Date(String(wfh.startDate)).toLocaleDateString()}
+                </p>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-4">
+                <p className="text-xs font-bold uppercase text-slate-500">End Date</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  {new Date(String(wfh.endDate)).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-slate-50 p-4">
+              <p className="text-xs font-bold uppercase text-slate-500">Duration</p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">
+                {Number(wfh.duration)} day{Number(wfh.duration) === 1 ? "" : "s"}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-slate-50 p-4">
+              <p className="text-xs font-bold uppercase text-slate-500">Reason</p>
+              <p className="mt-1 text-sm text-slate-700 leading-relaxed">{String(wfh.reason)}</p>
+            </div>
+
+            {String(wfh.rejectionReason || "") && (
+              <div className="rounded-xl bg-rose-50 p-4 border border-rose-100">
+                <p className="text-xs font-bold uppercase text-rose-600">Rejection Reason</p>
+                <p className="mt-1 text-sm text-rose-700">{String(wfh.rejectionReason)}</p>
+              </div>
+            )}
+          </div>
+
+          {canApprove && (
+            <div className="mt-8 flex gap-3">
+              <button
+                onClick={onReject}
+                className="flex-1 rounded-xl border border-rose-200 py-3 text-sm font-semibold text-rose-600 hover:bg-rose-50 transition"
+              >
+                Reject
+              </button>
+              <button
+                onClick={onApprove}
+                className="flex-1 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/20"
+              >
+                Approve
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
