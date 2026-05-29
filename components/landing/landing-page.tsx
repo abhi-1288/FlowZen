@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Layout, Users, Zap, CheckCircle, Lock, MousePointer2 } from "lucide-react";
+import { ArrowRight, Layout, Users, Zap, CheckCircle, Lock, MousePointer2, Clock, DollarSign, Building2 } from "lucide-react";
 import { motion, useScroll, useTransform, AnimatePresence, Variants } from "framer-motion";
 
 export function LandingPage() {
@@ -65,14 +65,32 @@ export function LandingPage() {
     {
       icon: Users,
       title: "Real-time Sync",
-      desc: "Watch tasks move across the board instantly. Powered by WebSockets so you never need to refresh.",
+      desc: "Watch tasks move across the board instantly. Powered by SSE and WebSockets so you never need to refresh.",
       color: "purple"
+    },
+    {
+      icon: Clock,
+      title: "Attendance & Leaves",
+      desc: "Check-in/check-out with location tracking, WFH modes, holiday management, and multi-step leave approvals.",
+      color: "amber"
+    },
+    {
+      icon: DollarSign,
+      title: "Finance & Invoicing",
+      desc: "Manage salaries, expenses, project budgets, resource requests, and generate printable client invoices.",
+      color: "emerald"
+    },
+    {
+      icon: Building2,
+      title: "Company & HR Tools",
+      desc: "Role-based onboarding, team invite codes, HR broadcasts, meeting invites, policy management, and more.",
+      color: "rose"
     },
     {
       icon: Lock,
       title: "Role-based Access",
-      desc: "Granular permissions for Managers, Employees, and QA Testers ensure everyone has exactly the right access.",
-      color: "emerald"
+      desc: "Seven user roles with granular board-level permissions — Admin, HR, Finance, PM, QA, Employee, and more.",
+      color: "cyan"
     }
   ] as const;
 
@@ -88,6 +106,18 @@ export function LandingPage() {
     emerald: {
       card: "hover:border-emerald-500/40",
       icon: "bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-500/20 group-hover:shadow-[0_0_30px_-5px_rgba(16,185,129,0.4)]",
+    },
+    amber: {
+      card: "hover:border-amber-500/40",
+      icon: "bg-amber-500/10 text-amber-400 group-hover:bg-amber-500/20 group-hover:shadow-[0_0_30px_-5px_rgba(245,158,11,0.4)]",
+    },
+    rose: {
+      card: "hover:border-rose-500/40",
+      icon: "bg-rose-500/10 text-rose-400 group-hover:bg-rose-500/20 group-hover:shadow-[0_0_30px_-5px_rgba(244,63,94,0.4)]",
+    },
+    cyan: {
+      card: "hover:border-cyan-500/40",
+      icon: "bg-cyan-500/10 text-cyan-400 group-hover:bg-cyan-500/20 group-hover:shadow-[0_0_30px_-5px_rgba(6,182,212,0.4)]",
     },
   } as const;
 
@@ -166,7 +196,7 @@ export function LandingPage() {
                 <motion.div variants={itemVariants}>
                   <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 text-indigo-300 text-sm font-medium mb-8 border border-indigo-500/20 backdrop-blur-sm hover:bg-indigo-500/20 transition-colors cursor-default">
                     <Zap className="w-4 h-4 text-indigo-400 animate-pulse" />
-                    <span>The ultimate toolkit for high-performance teams</span>
+                    <span>Kanban · Attendance · Finance · HR — all in one place</span>
                   </div>
                 </motion.div>
 
@@ -176,7 +206,7 @@ export function LandingPage() {
                 </motion.h1>
 
                 <motion.p variants={itemVariants} className="text-xl md:text-2xl text-slate-400 mb-12 max-w-3xl mx-auto leading-relaxed">
-                  FlowZen is the real-time workflow platform where teams manage tasks, approvals, and roles in one beautifully animated workspace.
+                  FlowZen is the all-in-one workflow platform where teams manage kanban boards, attendance, finance, HR, approvals, and roles in one beautifully animated workspace.
                 </motion.p>
 
                 <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto">
@@ -402,18 +432,20 @@ export function LandingPage() {
               className="flex-1 space-y-8"
             >
               <h2 className="text-4xl md:text-5xl font-bold leading-tight text-white">
-                Designed for modern, <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">fast-moving</span> teams.
+                The all-in-one workspace <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">for modern teams</span>.
               </h2>
               <p className="text-slate-400 text-xl leading-relaxed">
-                Stop juggling multiple tools. FlowZen brings your tasks, team members, and communication into one unified, beautiful workspace. Experience the speed of true real-time collaboration.
+                Stop juggling multiple tools. FlowZen brings kanban boards, attendance tracking, finance, HR, and team communication into one unified, beautiful workspace. Experience the speed of true real-time collaboration.
               </p>
               <ul className="space-y-5">
                 {[
-                  "Instant websocket-powered updates",
-                  "Role-based approvals and permissions",
-                  "Drag-and-drop boards with task workflows",
-                  "Secure auth and audit-ready notifications"
+                  "Real-time kanban boards with drag-and-drop task management",
+                  "Attendance check-in/check-out with location & WFH modes",
+                  "Finance module: salaries, expenses, budgets, and invoices",
+                  "Multi-step approval workflows for joins, leaves, and quits",
+                  "Seven user roles with granular board-level permissions",
+                  "HR tools: policies, broadcasts, meeting invites, and role changes"
                 ].map((item, i) => (
                   <motion.li
                     key={i}
@@ -497,7 +529,7 @@ export function LandingPage() {
           >
             <h2 className="text-5xl md:text-7xl font-extrabold mb-8 text-white tracking-tight">Ready to find your flow?</h2>
             <p className="text-2xl text-slate-300 mb-12 max-w-2xl mx-auto">
-              Join the high-performing teams that are already building better workflows with FlowZen.
+              Join the high-performing teams that are already managing boards, attendance, finance, and HR with FlowZen.
             </p>
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Link

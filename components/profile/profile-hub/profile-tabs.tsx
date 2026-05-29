@@ -1,10 +1,35 @@
 import { FormEvent, useEffect, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
-import { AlertTriangle, Building2, Camera, Check, Clipboard, Clock, Info, Plus, ShieldCheck, Trash2, Users, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Building2,
+  Camera,
+  Check,
+  Clipboard,
+  Clock,
+  Info,
+  Plus,
+  ShieldCheck,
+  Trash2,
+  Users,
+  X,
+} from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import { CodePanel, JoinPanel } from "./admin-tabs";
-import { AnyRecord, AvatarBadge, HistoryCard, Row, displayNested, formatRole, formatRoleWithCustom, toAdminHistoryRows, toEmployeeHistoryRows, toManagerHistoryRows } from "./shared";
+import {
+  AnyRecord,
+  AvatarBadge,
+  HistoryCard,
+  Row,
+  displayNested,
+  formatRole,
+  formatRoleWithCustom,
+  toAdminHistoryRows,
+  toEmployeeHistoryRows,
+  toManagerHistoryRows,
+} from "./shared";
 import { WfhAssignModal } from "./wfh-assign-modal";
+import { VersionPanel } from "@/components/version/version-panel";
 
 export function ProfileTab({
   profile,
@@ -48,7 +73,8 @@ export function ProfileTab({
   const effectiveRole = role || sessionRole;
   const displayRole = formatRoleWithCustom(effectiveRole, profile?.customRole);
   const inApprovedCompany =
-    Boolean(profile?.company) && String(profile?.companyStatus ?? "") === "approved";
+    Boolean(profile?.company) &&
+    String(profile?.companyStatus ?? "") === "approved";
   const effectiveBaseSalary = inApprovedCompany
     ? Math.max(Number(insights?.baseSalary ?? 0), 0)
     : 0;
@@ -60,8 +86,8 @@ export function ProfileTab({
   const displayName = profile?.name
     ? String(profile.name)
     : session?.user?.name
-    ? String(session.user.name)
-    : "User";
+      ? String(session.user.name)
+      : "User";
   const initialNotice = company?.noticePeriodDays
     ? Number(company.noticePeriodDays)
     : 30;
@@ -71,11 +97,15 @@ export function ProfileTab({
     Math.max(0, Number(company?.paidLeaveDays ?? 0)),
   );
   const [paidLeavePeriod, setPaidLeavePeriod] = useState<"monthly" | "yearly">(
-    String(company?.paidLeavePeriod ?? "monthly") === "yearly" ? "yearly" : "monthly",
+    String(company?.paidLeavePeriod ?? "monthly") === "yearly"
+      ? "yearly"
+      : "monthly",
   );
   const [savingPolicy, setSavingPolicy] = useState(false);
   // WFH settings (admin)
-  const [wfhDates, setWfhDates] = useState<{ date: string; reason: string }[]>([]);
+  const [wfhDates, setWfhDates] = useState<{ date: string; reason: string }[]>(
+    [],
+  );
   const [wfhMode, setWfhMode] = useState<"all-day" | "wfh-only">("all-day");
   const [wfhLoading, setWfhLoading] = useState(false);
   const [showWfhModal, setShowWfhModal] = useState(false);
@@ -120,7 +150,9 @@ export function ProfileTab({
       await refresh(true);
     } catch (err) {
       showToast(
-        err instanceof Error ? err.message : "Unable to request unique identity.",
+        err instanceof Error
+          ? err.message
+          : "Unable to request unique identity.",
         "error",
       );
     } finally {
@@ -188,7 +220,11 @@ export function ProfileTab({
       setSavingPolicy(true);
       await apiFetch("/api/hr/policy", {
         method: "PATCH",
-        body: JSON.stringify({ noticePeriodDays, paidLeaveDays, paidLeavePeriod }),
+        body: JSON.stringify({
+          noticePeriodDays,
+          paidLeaveDays,
+          paidLeavePeriod,
+        }),
       });
       showToast("Policy updated.");
       await refresh(true);
@@ -249,14 +285,14 @@ export function ProfileTab({
       );
       const mapped = Array.isArray(res.wfhDates)
         ? res.wfhDates.map((item: any) => {
-          if (item && typeof item === "object") {
-            return {
-              date: String(item.date),
-              reason: item.reason ? String(item.reason) : ""
-            };
-          }
-          return { date: String(item), reason: "" };
-        })
+            if (item && typeof item === "object") {
+              return {
+                date: String(item.date),
+                reason: item.reason ? String(item.reason) : "",
+              };
+            }
+            return { date: String(item), reason: "" };
+          })
         : [];
       setWfhDates(mapped);
       setWfhMode(res.wfhCheckInMode === "wfh-only" ? "wfh-only" : "all-day");
@@ -280,19 +316,22 @@ export function ProfileTab({
       );
       const mapped = Array.isArray(res.wfhDates)
         ? res.wfhDates.map((item: any) => {
-          if (item && typeof item === "object") {
-            return {
-              date: String(item.date),
-              reason: item.reason ? String(item.reason) : ""
-            };
-          }
-          return { date: String(item), reason: "" };
-        })
+            if (item && typeof item === "object") {
+              return {
+                date: String(item.date),
+                reason: item.reason ? String(item.reason) : "",
+              };
+            }
+            return { date: String(item), reason: "" };
+          })
         : [];
       setWfhDates(mapped);
       showToast("WFH date removed.", "success");
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to remove WFH date", "error");
+      showToast(
+        err instanceof Error ? err.message : "Failed to remove WFH date",
+        "error",
+      );
     } finally {
       setWfhLoading(false);
     }
@@ -301,14 +340,20 @@ export function ProfileTab({
   async function updateWfhMode(mode: "all-day" | "wfh-only") {
     try {
       setWfhLoading(true);
-      const res = await apiFetch<{ wfhCheckInMode: string }>("/api/company/wfh", {
-        method: "PATCH",
-        body: JSON.stringify({ mode }),
-      });
+      const res = await apiFetch<{ wfhCheckInMode: string }>(
+        "/api/company/wfh",
+        {
+          method: "PATCH",
+          body: JSON.stringify({ mode }),
+        },
+      );
       setWfhMode(res.wfhCheckInMode === "wfh-only" ? "wfh-only" : "all-day");
       showToast("WFH mode updated.", "success");
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to update mode", "error");
+      showToast(
+        err instanceof Error ? err.message : "Failed to update mode",
+        "error",
+      );
     } finally {
       setWfhLoading(false);
     }
@@ -352,8 +397,8 @@ export function ProfileTab({
                 profile?.name
                   ? String(profile.name)
                   : session?.user?.name
-                  ? String(session.user.name)
-                  : undefined
+                    ? String(session.user.name)
+                    : undefined
               }
             />
             <Row
@@ -362,8 +407,8 @@ export function ProfileTab({
                 profile?.email
                   ? String(profile.email)
                   : session?.user?.email
-                  ? String(session.user.email)
-                  : undefined
+                    ? String(session.user.email)
+                    : undefined
               }
             />
             <Row
@@ -420,25 +465,26 @@ export function ProfileTab({
               value={
                 profile?.company && profile?.companyJoined
                   ? new Date(
-                    profile.companyJoined as string | Date,
-                  ).toLocaleDateString()
+                      profile.companyJoined as string | Date,
+                    ).toLocaleDateString()
                   : undefined
               }
             />
-            {inApprovedCompany && !["human-resource", "admin"].includes(role) ? (
+            {inApprovedCompany &&
+            !["human-resource", "admin"].includes(role) ? (
               <Row
                 label={joinedBy?.viaHr ? "Joined By HR" : "Company approved by"}
-                value={
-                  joinedBy?.name
-                    ? String(joinedBy.name)
-                    : undefined
-                }
+                value={joinedBy?.name ? String(joinedBy.name) : undefined}
               />
             ) : null}
             {inApprovedCompany ? (
               <Row
                 label="Base Salary"
-                value={effectiveBaseSalary > 0 ? `₹${effectiveBaseSalary.toLocaleString("en-IN")}` : undefined}
+                value={
+                  effectiveBaseSalary > 0
+                    ? `₹${effectiveBaseSalary.toLocaleString("en-IN")}`
+                    : undefined
+                }
               />
             ) : null}
             <Row
@@ -452,28 +498,32 @@ export function ProfileTab({
               value={
                 profile?.team && profile?.teamJoined
                   ? new Date(
-                    profile.teamJoined as string | Date,
-                  ).toLocaleDateString()
+                      profile.teamJoined as string | Date,
+                    ).toLocaleDateString()
                   : undefined
               }
             />
           </dl>
-          {profile?.companyStatus === "approved" && !profile?.companyIdentityCode ? (
+          {profile?.companyStatus === "approved" &&
+          !profile?.companyIdentityCode ? (
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
               <p className="text-sm font-medium text-amber-800">
                 No unique company identity code has been issued yet.
               </p>
               <button
                 className="mt-3 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={identityRequesting || Boolean(insights?.pendingIdentityCodeRequest)}
+                disabled={
+                  identityRequesting ||
+                  Boolean(insights?.pendingIdentityCodeRequest)
+                }
                 onClick={requestIdentityCode}
                 type="button"
               >
                 {insights?.pendingIdentityCodeRequest
                   ? "Identity request pending"
                   : identityRequesting
-                  ? "Requesting..."
-                  : "Ask unique identity from HR"}
+                    ? "Requesting..."
+                    : "Ask unique identity from HR"}
               </button>
             </div>
           ) : null}
@@ -489,17 +539,19 @@ export function ProfileTab({
               </p>
               <button
                 className="mt-3 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={salaryRequesting || Boolean(insights?.pendingSalaryRequest)}
+                disabled={
+                  salaryRequesting || Boolean(insights?.pendingSalaryRequest)
+                }
                 onClick={requestSalary}
                 type="button"
               >
                 {insights?.pendingSalaryRequest
                   ? "Salary request pending"
                   : salaryRequesting
-                  ? "Requesting..."
-                  : role === "human-resource"
-                  ? "Request salary from admin"
-                  : "Request salary from HR"}
+                    ? "Requesting..."
+                    : role === "human-resource"
+                      ? "Request salary from admin"
+                      : "Request salary from HR"}
               </button>
             </div>
           ) : null}
@@ -558,19 +610,26 @@ export function ProfileTab({
                   max={365}
                   type="number"
                   value={paidLeaveDays}
-                  onChange={(e) => setPaidLeaveDays(Math.max(0, Number(e.target.value)))}
+                  onChange={(e) =>
+                    setPaidLeaveDays(Math.max(0, Number(e.target.value)))
+                  }
                 />
                 <select
                   className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                   value={paidLeavePeriod}
-                  onChange={(e) => setPaidLeavePeriod(e.target.value === "yearly" ? "yearly" : "monthly")}
+                  onChange={(e) =>
+                    setPaidLeavePeriod(
+                      e.target.value === "yearly" ? "yearly" : "monthly",
+                    )
+                  }
                 >
                   <option value="monthly">Monthly</option>
                   <option value="yearly">Yearly</option>
                 </select>
               </div>
               <p className="mt-2 text-xs text-slate-500">
-                Approved paid leaves remain payable in finance salary calculation.
+                Approved paid leaves remain payable in finance salary
+                calculation.
               </p>
               <button
                 className="mt-3 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
@@ -631,13 +690,20 @@ export function ProfileTab({
             />
 
             <section className={sectionClass}>
-              <h3 className="text-lg font-semibold">Work From Home (WFH) Settings</h3>
-              <p className="mt-1 text-sm text-slate-500">Configure company-wide Work From Home dates and check-in behavior.</p>
+              <h3 className="text-lg font-semibold">
+                Work From Home (WFH) Settings
+              </h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Configure company-wide Work From Home dates and check-in
+                behavior.
+              </p>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <div>
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold uppercase text-slate-500">Assigned WFH Dates</label>
+                    <label className="text-xs font-semibold uppercase text-slate-500">
+                      Assigned WFH Dates
+                    </label>
                     <button
                       onClick={() => setShowWfhModal(true)}
                       className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 transition"
@@ -649,17 +715,26 @@ export function ProfileTab({
 
                   <div className="mt-4 space-y-2 max-h-60 overflow-y-auto pr-1">
                     {wfhDates.length === 0 ? (
-                      <p className="text-sm text-slate-500">No WFH dates set.</p>
+                      <p className="text-sm text-slate-500">
+                        No WFH dates set.
+                      </p>
                     ) : (
                       wfhDates.map((wfh) => (
-                        <div key={wfh.date} className="flex flex-col gap-2 rounded-lg border border-slate-100 bg-slate-50 p-3">
+                        <div
+                          key={wfh.date}
+                          className="flex flex-col gap-2 rounded-lg border border-slate-100 bg-slate-50 p-3"
+                        >
                           <div className="flex items-center justify-between">
-                            <span className="text-sm font-semibold">{new Date(wfh.date).toLocaleDateString()}</span>
+                            <span className="text-sm font-semibold">
+                              {new Date(wfh.date).toLocaleDateString()}
+                            </span>
                             <div className="flex gap-2">
                               <button
                                 onClick={() => {
                                   if (wfh.date) {
-                                    const iso = new Date(wfh.date).toISOString().slice(0, 10);
+                                    const iso = new Date(wfh.date)
+                                      .toISOString()
+                                      .slice(0, 10);
                                     navigator.clipboard.writeText(iso);
                                     showToast("WFH date copied.");
                                   }
@@ -691,16 +766,36 @@ export function ProfileTab({
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold uppercase text-slate-500">Check-in behavior</label>
-                  <p className="mt-1 text-sm text-slate-500">Choose when the check-in button should be enabled.</p>
+                  <label className="text-xs font-semibold uppercase text-slate-500">
+                    Check-in behavior
+                  </label>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Choose when the check-in button should be enabled.
+                  </p>
                   <div className="mt-3 space-y-2">
                     <div className="flex items-center gap-2">
-                      <input id="mode-all" name="wfh-mode" type="radio" checked={wfhMode === 'all-day'} onChange={() => setWfhMode('all-day')} />
-                      <label htmlFor="mode-all" className="text-sm">Enable check-in all days</label>
+                      <input
+                        id="mode-all"
+                        name="wfh-mode"
+                        type="radio"
+                        checked={wfhMode === "all-day"}
+                        onChange={() => setWfhMode("all-day")}
+                      />
+                      <label htmlFor="mode-all" className="text-sm">
+                        Enable check-in all days
+                      </label>
                     </div>
                     <div className="flex items-center gap-2">
-                      <input id="mode-wfh" name="wfh-mode" type="radio" checked={wfhMode === 'wfh-only'} onChange={() => setWfhMode('wfh-only')} />
-                      <label htmlFor="mode-wfh" className="text-sm">Enable check-in only on WFH days</label>
+                      <input
+                        id="mode-wfh"
+                        name="wfh-mode"
+                        type="radio"
+                        checked={wfhMode === "wfh-only"}
+                        onChange={() => setWfhMode("wfh-only")}
+                      />
+                      <label htmlFor="mode-wfh" className="text-sm">
+                        Enable check-in only on WFH days
+                      </label>
                     </div>
                     <div className="mt-2">
                       <button
@@ -719,7 +814,9 @@ export function ProfileTab({
           </>
         ) : null}
 
-        {role === "project-manager" || role === "qa-tester" || role === "finance" ? (
+        {role === "project-manager" ||
+        role === "qa-tester" ||
+        role === "finance" ? (
           <section className="rounded-lg border overflow-y-auto max-h-[500px] border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center gap-2">
               <Building2 size={18} />
@@ -809,7 +906,8 @@ export function ProfileTab({
           <h3 className="text-lg font-semibold">Security</h3>
           {passwordResetRequired ? (
             <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
-              You signed in with a reset link. Create a new password to finish securing your account.
+              You signed in with a reset link. Create a new password to finish
+              securing your account.
             </p>
           ) : null}
 
@@ -845,6 +943,14 @@ export function ProfileTab({
             <Trash2 size={16} />
             Delete account
           </button>
+        </section>
+
+        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 className="text-lg font-semibold">Release Notes</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            Version, last update, and recent changes.
+          </p>
+          <VersionPanel />
         </section>
       </div>
 
@@ -1024,9 +1130,9 @@ export function OnboardingTab({
   const selfId = String(session?.user?.id ?? "");
   const hrSuffix = selfId
     ? `-HR${selfId
-      .replace(/[^a-fA-F0-9]/g, "")
-      .toUpperCase()
-      .slice(-6)}`
+        .replace(/[^a-fA-F0-9]/g, "")
+        .toUpperCase()
+        .slice(-6)}`
     : "";
   const [companyName, setCompanyName] = useState("");
   const [companyCode, setCompanyCode] = useState("");
@@ -1379,33 +1485,33 @@ export function OnboardingTab({
                 [
                   company?.managerJoinCode
                     ? {
-                      code: `${String(company.managerJoinCode)}${hrSuffix}`,
-                      label: "Manager code",
-                    }
+                        code: `${String(company.managerJoinCode)}${hrSuffix}`,
+                        label: "Manager code",
+                      }
                     : null,
                   company?.testerJoinCode
                     ? {
-                      code: `${String(company.testerJoinCode)}${hrSuffix}`,
-                      label: "Tester code",
-                    }
+                        code: `${String(company.testerJoinCode)}${hrSuffix}`,
+                        label: "Tester code",
+                      }
                     : null,
                   company?.financeJoinCode
                     ? {
-                      code: `${String(company.financeJoinCode)}${hrSuffix}`,
-                      label: "Finance code",
-                    }
+                        code: `${String(company.financeJoinCode)}${hrSuffix}`,
+                        label: "Finance code",
+                      }
                     : null,
                   company?.employeeJoinCode
                     ? {
-                      code: `${String(company.employeeJoinCode)}${hrSuffix}`,
-                      label: "Employee code",
-                    }
+                        code: `${String(company.employeeJoinCode)}${hrSuffix}`,
+                        label: "Employee code",
+                      }
                     : null,
                   company?.otherJoinCode
                     ? {
-                      code: `${String(company.otherJoinCode)}${hrSuffix}`,
-                      label: "Others code",
-                    }
+                        code: `${String(company.otherJoinCode)}${hrSuffix}`,
+                        label: "Others code",
+                      }
                     : null,
                 ].filter(Boolean) as { code: string; label: string }[]
               }
@@ -1704,7 +1810,9 @@ export function OnboardingTab({
         </div>
       ) : null}
 
-      {["project-manager", "qa-tester", "human-resource", "finance"].includes(role) ? (
+      {["project-manager", "qa-tester", "human-resource", "finance"].includes(
+        role,
+      ) ? (
         profile?.companyStatus === "approved" ? (
           <>
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -1968,7 +2076,7 @@ export function OnboardingTab({
             </div>
             <div className="mt-4 space-y-2">
               {Array.isArray(teamModal.employees) &&
-                teamModal.employees.length > 0 ? (
+              teamModal.employees.length > 0 ? (
                 (teamModal.employees as AnyRecord[]).map((emp) => (
                   <div
                     key={String(emp.id)}
