@@ -115,6 +115,8 @@ export function ApprovalsTab({
                 {displayNested(request.requester, "email", "unknown")}{" "}
                 {String(request.kind) === "quit-company-board-transfer"
                   ? "requested board transfer approval"
+                  : String(request.kind) === "role-transfer"
+                  ? "requested role transfer"
                   : String(request.kind).startsWith("quit-")
                   ? "requested to quit"
                   : String(request.kind) === "identity-code"
@@ -135,6 +137,10 @@ export function ApprovalsTab({
               {String(request.kind) === "quit-company-board-transfer" ? (
                 <p className="mt-1 text-xs text-slate-500">
                   {String(request.message ?? "").trim() || "Board transfer approval pending."}
+                </p>
+              ) : String(request.kind) === "role-transfer" ? (
+                <p className="mt-1 text-xs text-slate-500">
+                  Role transfer approval pending.
                 </p>
               ) : String(request.kind).startsWith("quit-") ? (
                 <p className="mt-1 text-xs text-slate-500">

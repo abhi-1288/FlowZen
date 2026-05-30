@@ -165,6 +165,7 @@ export function ProfileHub() {
         eventSource.addEventListener("notification:new", () => {
           if (!mounted) return;
           console.log("SSE: ProfileHub notification:new received");
+          new Audio("/sound/notification_sound.mp3").play().catch(() => {});
           void load(true);
         });
 

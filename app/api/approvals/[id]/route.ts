@@ -490,6 +490,31 @@ export async function PATCH(request: Request, { params }: Params) {
       }
     }
 
+    if (joinRequest.kind === "role-transfer") {
+      if (status === "approved") {
+        if (!joinRequest.replacementUser) {
+          return jsonError("Replacement user is required for role transfer approval.", 400);
+        }
+
+        const teamsToTransfer = await Team.find({ manager: requester._id }).select("_id name");
+        const replacementManagedCount = await Team.countDocuments({ manager: joinRequest.replacementUser });
+        const roleLimit = String(requester.role) === "human-resource" ? 2 : 5;
+        if (replacementManagedCount + teamsToTransfer.length > roleLimit) {
+          return jsonError(
+            `Replacement can manage up to ${roleLimit} teams. They currently have ${replacementManagedCount} team${replacementManagedCount === 1 ? "" : "s"} and cannot accept ${teamsToTransfer.length} more.`,
+            409,
+          );
+        }
+
+        await Team.updateMany(
+          { manager: requester._id },
+          { $set: { manager: joinRequest.replacementUser } },
+        );
+
+        await transferQuitterBoardAssignments(requester._id, joinRequest.replacementUser);
+      }
+    }
+
     if (joinRequest.kind === "quit-team") {
       if (status === "approved") {
         const teamId = joinRequest.team;
@@ -572,6 +597,12 @@ export async function PATCH(request: Request, { params }: Params) {
         status === "approved"
           ? `The salary update request for ${joinRequest.metadata?.targetUserName || "a member"} was approved by the admin.`
           : `The salary update request for ${joinRequest.metadata?.targetUserName || "a member"} was rejected.`;
+    } else if (joinRequest.kind === "role-transfer") {
+      title = status === "approved" ? "Role transfer approved" : "Role transfer rejected";
+      message =
+        status === "approved"
+          ? `Your role transfer approval for ${companyName} was approved`
+          : `Your role transfer request for ${companyName} was rejected`;
     }
 
     await Notification.create({
@@ -595,6 +626,21 @@ export async function PATCH(request: Request, { params }: Params) {
           status === "approved"
             ? `You have been assigned to the board transfer from ${requester.name}. The transfer is now complete.`
             : `The board transfer assignment from ${requester.name} was not approved.`,
+      });
+      emitNotification(String(joinRequest.replacementUser));
+    }
+
+    if (joinRequest.kind === "role-transfer" && joinRequest.replacementUser) {
+      await Notification.create({
+        user: joinRequest.replacementUser,
+        company: joinRequest.company,
+        team: joinRequest.team,
+        type: "info",
+        title: status === "approved" ? "Role transfer completed" : "Role transfer rejected",
+        message:
+          status === "approved"
+            ? `You have been assigned to take over the role from ${requester.name}. The transfer is now complete.`
+            : `The role transfer assignment from ${requester.name} was not approved.`,
       });
       emitNotification(String(joinRequest.replacementUser));
     }

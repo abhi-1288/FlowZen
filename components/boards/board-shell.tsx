@@ -93,6 +93,7 @@ export function BoardShell({ boardId }: { boardId?: string }) {
         eventSource.addEventListener("notification:new", () => {
           if (!mounted) return;
           console.log("SSE: notification:new received");
+          new Audio("/sound/notification_sound.mp3").play().catch(() => {});
           void fetchBoards(true);
           const refreshCount = async () => {
             const result = await apiFetch<{ notifications: NotificationPreview[] }>("/api/notifications").catch(() => null);

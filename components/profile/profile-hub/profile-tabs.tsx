@@ -1185,6 +1185,9 @@ export function OnboardingTab({
   const [replacementRoleUserId, setReplacementRoleUserId] = useState("");
   const [requestingHrQuit, setRequestingHrQuit] = useState(false);
   const [requestingRoleQuit, setRequestingRoleQuit] = useState(false);
+  const [roleTransferModal, setRoleTransferModal] = useState(false);
+  const [roleTransferReplacementId, setRoleTransferReplacementId] = useState("");
+  const [requestingRoleTransfer, setRequestingRoleTransfer] = useState(false);
   const [cancelQuitModal, setCancelQuitModal] = useState(false);
   const [cancelQuitReason, setCancelQuitReason] = useState("");
   const [cancellingQuit, setCancellingQuit] = useState(false);
@@ -1304,6 +1307,31 @@ export function OnboardingTab({
       );
     } finally {
       setRequestingRoleQuit(false);
+    }
+  }
+
+  async function requestRoleTransfer() {
+    if (!roleTransferReplacementId) {
+      showToast("Please select a replacement first.", "error");
+      return;
+    }
+    try {
+      setRequestingRoleTransfer(true);
+      await apiFetch("/api/company/role-transfer", {
+        method: "POST",
+        body: JSON.stringify({ replacementUserId: roleTransferReplacementId }),
+      });
+      setRoleTransferModal(false);
+      setRoleTransferReplacementId("");
+      showToast("Role transfer request sent to admin.");
+      await refresh();
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Unable to request role transfer.",
+        "error",
+      );
+    } finally {
+      setRequestingRoleTransfer(false);
     }
   }
 
@@ -1811,6 +1839,78 @@ export function OnboardingTab({
         </div>
       ) : null}
 
+      {roleTransferModal ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setRoleTransferModal(false);
+          }}
+        >
+          <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h4 className="text-lg font-semibold">
+                  Transfer Teams & Role ({formatRole(String(role))})
+                </h4>
+                <p className="mt-1 text-sm text-slate-500">
+                  Your teams and board assignments will be transferred to the
+                  replacement. Admin approval is required.
+                </p>
+              </div>
+              <button
+                aria-label="Close"
+                className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
+                type="button"
+                onClick={() => setRoleTransferModal(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="mt-4">
+              <label className="text-xs font-semibold uppercase text-slate-500">
+                Replacement
+              </label>
+              <select
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                value={roleTransferReplacementId}
+                onChange={(e) => setRoleTransferReplacementId(e.target.value)}
+              >
+                <option value="">Select replacement</option>
+                {replacementRoleCandidates.map((member) => (
+                  <option key={String(member.id)} value={String(member.id)}>
+                    {String(member.name ?? "Member")} (
+                    {String(member.email ?? "")})
+                  </option>
+                ))}
+              </select>
+              {replacementRoleCandidates.length === 0 ? (
+                <p className="mt-2 text-xs text-amber-700">
+                  No approved replacement available with this role.
+                </p>
+              ) : null}
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
+                type="button"
+                onClick={() => setRoleTransferModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                disabled={!roleTransferReplacementId || requestingRoleTransfer}
+                type="button"
+                onClick={() => void requestRoleTransfer()}
+              >
+                {requestingRoleTransfer ? "Submitting..." : "Submit transfer request"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {["project-manager", "qa-tester", "human-resource", "finance"].includes(
         role,
       ) ? (
@@ -1903,6 +2003,16 @@ export function OnboardingTab({
                 >
                   {pendingQuitText("Request Quit Company")}
                 </button>
+                {managerTeams.length > 0 ? (
+                  <button
+                    className="w-full rounded-lg border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-medium text-sky-700 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={replacementRoleCandidates.length === 0}
+                    onClick={() => setRoleTransferModal(true)}
+                    type="button"
+                  >
+                    Transfer Teams & Role
+                  </button>
+                ) : null}
                 {insights?.pendingQuit ? (
                   <button
                     className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
