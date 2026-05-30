@@ -431,6 +431,14 @@ export function ProfileTab({
               }
             />
             <Row
+              label="WFH"
+              value={
+                company
+                  ? `${Math.max(0, Number(company.wfhDays ?? 0))} day${Number(company.wfhDays ?? 0) === 1 ? "" : "s"} ${String(company.wfhPeriod ?? "monthly")}`
+                  : undefined
+              }
+            />
+            <Row
               label="Team"
               value={team?.name ? String(team.name) : undefined}
             />

@@ -295,6 +295,9 @@ export function AttendanceTab({
   const [rejectionReason, setRejectionReason] = useState("");
   const [wfhCheckInMode, setWfhCheckInMode] = useState<string>("all-day");
   const [companyWfhDates, setCompanyWfhDates] = useState<{ date: string; reason: string }[]>([]);
+  const [wfhDays, setWfhDays] = useState(0);
+  const [wfhPeriod, setWfhPeriod] = useState("monthly");
+  const [remainingWfhDays, setRemainingWfhDays] = useState(0);
   const currentMonthStart = new Date();
   currentMonthStart.setDate(1);
   const [exportFrom, setExportFrom] = useState(currentMonthStart.toISOString().slice(0, 10));
@@ -360,6 +363,9 @@ export function AttendanceTab({
     setHolidays(holRes.holidays);
     setWfhCheckInMode(wfhRes.wfhCheckInMode ?? "all-day");
     setCompanyWfhDates((wfhRes as any).wfhDates ?? []);
+    setWfhDays(wfhRes.wfhDays ?? 0);
+    setWfhPeriod(wfhRes.wfhPeriod ?? "monthly");
+    setRemainingWfhDays(Math.max(0, Number((wfhReqRes as any)?.wfhPolicy?.remainingWfhDays ?? 0)));
 
     if (hRes.today) {
       const today = new Date(hRes.today);
@@ -929,6 +935,18 @@ export function AttendanceTab({
           . Remaining:{" "}
           <span className="font-semibold text-slate-950">
             {remainingPaidLeaveDays} day{remainingPaidLeaveDays === 1 ? "" : "s"}
+          </span>
+          .
+        </div>
+
+        <div className="mb-6 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          WFH policy:{" "}
+          <span className="font-semibold text-slate-950">
+            {wfhDays} day{wfhDays === 1 ? "" : "s"} {wfhPeriod}
+          </span>
+          . Remaining:{" "}
+          <span className="font-semibold text-slate-950">
+            {remainingWfhDays} day{remainingWfhDays === 1 ? "" : "s"}
           </span>
           .
         </div>

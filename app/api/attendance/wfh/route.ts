@@ -70,7 +70,7 @@ export async function POST(req: Request) {
     if (!user.company) return jsonError("You must belong to a company to request WFH.", 400);
 
     // WFH quota check (mirrors paid leave pattern)
-    const company = await Company.findById(user.company).select("wfhDays wfhPeriod");
+    const company = await Company.findById(user.company).select("wfhDays wfhPeriod wfhDates");
     if (!company) return jsonError("Company not found.", 404);
     const wfhDays = Math.max(0, Number(company.wfhDays ?? 0));
     const wfhPeriod = String(company.wfhPeriod ?? "monthly");
@@ -90,7 +90,15 @@ export async function POST(req: Request) {
       (sum, w) => sum + overlapDuration(w, quota.start, quota.end),
       0,
     );
-    const remainingWfhDays = Math.max(0, wfhDays - usedWfhDays);
+
+    // Count company-wide WFH dates within the same period
+    const companyWfhDaysInPeriod = (company.wfhDates ?? []).filter((entry: any) => {
+      const d = new Date(entry.date);
+      return d >= quota.start && d <= quota.end;
+    }).length;
+
+    const totalUsedWfhDays = usedWfhDays + companyWfhDaysInPeriod;
+    const remainingWfhDays = Math.max(0, wfhDays - totalUsedWfhDays);
     if (diffDays > remainingWfhDays) {
       return jsonError(
         `WFH quota exceeded. Remaining ${wfhPeriod} WFH: ${remainingWfhDays} day${remainingWfhDays === 1 ? "" : "s"}.`,
@@ -227,12 +235,29 @@ export async function GET() {
   }
 
   // Compute remaining WFH quota for the requester
-  const company = await Company.findById(user.company).select("wfhDays wfhPeriod");
+  const company = await Company.findById(user.company).select("wfhDays wfhPeriod wfhDates");
   let wfhPolicy: Record<string, any> = { wfhDays: 0, wfhPeriod: "monthly", usedWfhDays: 0, remainingWfhDays: 0 };
   if (company) {
     const wfhDays = Math.max(0, Number(company.wfhDays ?? 0));
     const wfhPeriod = String(company.wfhPeriod ?? "monthly");
-    const quota = wfhWindow(new Date(), wfhPeriod);
+
+    // Pick the most relevant period: latest of today, user's WFH requests, or company WFH dates
+    let refDate = new Date();
+    const latestReq = await WfhRequest.findOne({
+      requester: userId,
+      company: user.company,
+      status: { $in: ["pending", "manager-approved", "hr-approved", "approved"] },
+    }).sort({ startDate: -1 }).select("startDate");
+    if (latestReq && latestReq.startDate > refDate) refDate = latestReq.startDate;
+    if (company.wfhDates && company.wfhDates.length > 0) {
+      const latestCompany = company.wfhDates.reduce((latest: Date, entry: any) => {
+        const d = new Date(entry.date);
+        return d > latest ? d : latest;
+      }, new Date(0));
+      if (latestCompany > refDate) refDate = latestCompany;
+    }
+
+    const quota = wfhWindow(refDate, wfhPeriod);
     const ownWfh = await WfhRequest.find({
       requester: userId,
       company: user.company,
@@ -244,7 +269,12 @@ export async function GET() {
       (sum, w) => sum + overlapDuration(w, quota.start, quota.end),
       0,
     );
-    wfhPolicy = { wfhDays, wfhPeriod, usedWfhDays, remainingWfhDays: Math.max(0, wfhDays - usedWfhDays) };
+    const companyWfhDaysInPeriod = (company.wfhDates ?? []).filter((entry: any) => {
+      const d = new Date(entry.date);
+      return d >= quota.start && d <= quota.end;
+    }).length;
+    const totalUsed = usedWfhDays + companyWfhDaysInPeriod;
+    wfhPolicy = { wfhDays, wfhPeriod, usedWfhDays: totalUsed, remainingWfhDays: Math.max(0, wfhDays - totalUsed) };
   }
 
   return NextResponse.json({ requests, wfhPolicy });

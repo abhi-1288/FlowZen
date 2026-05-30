@@ -54,6 +54,8 @@ export function FinanceTab({
   const [expenseForm, setExpenseForm] = useState({ category: "software", title: "", amount: "", reason: "", assignedTo: "" });
   const [rejectTarget, setRejectTarget] = useState<{ id: string; type: "expense" | "budget" } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [deleteSalaryId, setDeleteSalaryId] = useState<string | null>(null);
+  const [deleteSalaryEmployee, setDeleteSalaryEmployee] = useState("");
 
   // Invoice
   const [invoices, setInvoices] = useState<AnyRecord[]>([]);
@@ -215,6 +217,19 @@ export function FinanceTab({
     });
     showToast(`${type === "salary" ? "Salary" : type === "budget" ? "Budget" : type === "bill" ? "Bill" : "Expense"} ${status}.`, "success");
     await load();
+  }
+
+  async function deleteSalary() {
+    if (!deleteSalaryId) return;
+    try {
+      await apiFetch(`/api/finance/salary/${deleteSalaryId}`, { method: "DELETE" });
+      showToast("Salary record deleted.", "success");
+      setDeleteSalaryId(null);
+      setDeleteSalaryEmployee("");
+      await load();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to delete salary record.", "error");
+    }
   }
 
   async function rejectItem() {
@@ -754,15 +769,28 @@ export function FinanceTab({
                 <p className="font-medium">{displayNested(salary.employee, "name", "Employee")} - ₹{Number(salary.netSalary ?? 0).toLocaleString("en-IN")}</p>
                 <p className="text-sm text-slate-500">{String(salary.month)} • {String(salary.status)}</p>
               </div>
-              {/* {actorRole === "finance" ? (
-                <button className="rounded-lg border border-slate-200 px-3 py-2 text-sm" onClick={() => editSalary(salary)}>Edit</button>
-              ) : null} */}
-              {String(salary.status) === "pending" && actorRole === "admin" ? (
-                <button className="rounded-lg border border-slate-200 px-3 py-2 text-sm" onClick={() => updateStatus("salary", String(salary.id), "approved")}>Approve payout</button>
-              ) : null}
-              {String(salary.status) === "approved" && actorRole === "finance" ? (
-                <button className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white" onClick={() => updateStatus("salary", String(salary.id), "paid")}>Mark paid</button>
-              ) : null}
+              <div className="flex flex-wrap gap-2">
+                {String(salary.status) === "pending" && actorRole === "finance" ? (
+                  <button
+                    className="rounded-lg border border-rose-200 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50"
+                    onClick={() => {
+                      setDeleteSalaryId(String(salary.id));
+                      setDeleteSalaryEmployee(displayNested(salary.employee, "name", "Employee"));
+                    }}
+                  >
+                    Delete
+                  </button>
+                ) : null}
+                {String(salary.status) === "pending" && actorRole === "admin" ? (
+                  <>
+                    <button className="rounded-lg border border-slate-200 px-3 py-2 text-sm" onClick={() => updateStatus("salary", String(salary.id), "approved")}>Approve payout</button>
+                    <button className="rounded-lg border border-rose-200 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50" onClick={() => updateStatus("salary", String(salary.id), "rejected")}>Reject</button>
+                  </>
+                ) : null}
+                {String(salary.status) === "approved" && actorRole === "finance" ? (
+                  <button className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white" onClick={() => updateStatus("salary", String(salary.id), "paid")}>Mark paid</button>
+                ) : null}
+              </div>
             </div>
           ))}
           {data.salaries.length === 0 ? <p className="py-4 text-sm text-slate-500">No salary records for this month.</p> : null}
@@ -860,6 +888,31 @@ export function FinanceTab({
             <div className="mt-4 flex justify-end gap-3">
               <button className="rounded-lg border border-slate-200 px-4 py-2 text-sm" onClick={() => { setRejectTarget(null); setRejectReason(""); }}>Cancel</button>
               <button className="rounded-lg bg-rose-600 px-4 py-2 text-sm text-white disabled:opacity-50" disabled={!rejectReason.trim()} onClick={rejectItem}>Reject</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteSalaryId ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+            <h4 className="text-lg font-semibold">Delete salary record?</h4>
+            <p className="mt-2 text-sm text-slate-600">
+              This will permanently delete the salary record for <strong>{deleteSalaryEmployee}</strong>. This action cannot be undone.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
+                onClick={() => { setDeleteSalaryId(null); setDeleteSalaryEmployee(""); }}
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-lg bg-rose-600 px-4 py-2 text-sm text-white"
+                onClick={deleteSalary}
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>

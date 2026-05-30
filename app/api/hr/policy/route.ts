@@ -3,6 +3,8 @@ import { connectDb } from "@/lib/db";
 import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { Company } from "@/models/Company";
 import { User } from "@/models/User";
+import { Notification } from "@/models/Notification";
+import { emitNotification } from "@/lib/realtime";
 
 const ALLOWED_NOTICE_PERIOD_DAYS = new Set([5, 15, 30, 45, 60, 90]);
 const ALLOWED_PAID_LEAVE_PERIODS = new Set(["monthly", "yearly"]);
@@ -50,6 +52,26 @@ export async function PATCH(request: Request) {
   if (hasPaidLeaveDays) company.paidLeaveDays = Math.floor(paidLeaveDays);
   if (hasPaidLeavePeriod) company.paidLeavePeriod = paidLeavePeriod;
   await company.save();
+
+  if (hasPaidLeaveDays || hasPaidLeavePeriod) {
+    const targets = new Set<string>(
+      (company.members ?? []).map((member: any) => String(member))
+    );
+    targets.add(String(company.owner));
+
+    const body = `Paid leave policy updated: ${Math.floor(Number(company.paidLeaveDays ?? 0))} day(s) per ${String(company.paidLeavePeriod ?? "monthly")}`;
+
+    await Notification.insertMany(
+      Array.from(targets).map((targetUserId) => ({
+        user: targetUserId,
+        company: company._id,
+        type: "system",
+        title: "Paid Leave Policy Updated",
+        body,
+      }))
+    );
+    Array.from(targets).forEach((target) => emitNotification(target));
+  }
 
   return NextResponse.json({
     ok: true,

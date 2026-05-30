@@ -776,15 +776,21 @@ export async function PATCH(request: Request) {
   const status = String(body.status ?? "");
 
   if (type === "salary") {
-    if (!["approved", "paid"].includes(status))
+    if (!["approved", "paid", "rejected"].includes(status))
       return jsonError("Invalid salary status.");
     const existing = await FinanceSalary.findOne({
       _id: id,
       company: actor.company,
-    }).select("status employee");
+    }).select("status employee month");
     if (!existing) return jsonError("Salary record not found.", 404);
     if (status === "paid" && existing.status !== "approved")
       return jsonError("Salary must be approved before marking as paid.", 400);
+    if (status === "rejected") {
+      if (String(actor.role) !== "admin")
+        return jsonError("Only admin can reject salary payouts.", 403);
+      if (existing.status !== "pending")
+        return jsonError("Only pending salary payouts can be rejected.", 400);
+    }
 
     const salary = await FinanceSalary.findOneAndUpdate(
       { _id: id, company: actor.company },
@@ -826,6 +832,24 @@ export async function PATCH(request: Request) {
         message: `Your salary for ${salary?.month ?? ""} has been marked as paid.`,
       });
       emitNotification(String(employeeId));
+    }
+
+    if (status === "rejected") {
+      const financeUsers = await User.find({
+        company: actor.company,
+        role: "finance",
+        companyStatus: "approved",
+      }).select("_id");
+      await Notification.insertMany(
+        financeUsers.map((u) => ({
+          user: u._id,
+          company: actor.company,
+          type: "info",
+          title: "Salary payout rejected",
+          message: `Salary for ${salary?.month ?? ""} has been rejected by admin.`,
+        })),
+      );
+      financeUsers.forEach((u) => emitNotification(String(u._id)));
     }
 
     return NextResponse.json({ salary });

@@ -54,20 +54,47 @@ export async function POST(request: Request) {
 
   const { wfhDays, wfhPeriod, mode, startDate, endDate, reason } = await request.json();
 
+  let quotaUpdated = false;
+
   if (wfhDays !== undefined) {
     const days = Number(wfhDays);
     if (Number.isNaN(days) || days < 0) {
       return jsonError("Invalid WFH days value", 400);
     }
     company.wfhDays = days;
+    quotaUpdated = true;
   }
 
   if (wfhPeriod && ["monthly", "yearly"].includes(wfhPeriod)) {
     company.wfhPeriod = wfhPeriod;
+    quotaUpdated = true;
   }
 
   if (mode && ["all-day", "wfh-only"].includes(mode)) {
     company.wfhCheckInMode = mode;
+  }
+
+  if (quotaUpdated) {
+    const populatedCompany = await Company.findById(user.company).select("name owner members");
+    if (populatedCompany) {
+      const targets = new Set<string>(
+        (populatedCompany.members ?? []).map((member: any) => String(member))
+      );
+      if (populatedCompany.owner) targets.add(String(populatedCompany.owner));
+
+      const body = `WFH policy updated: ${company.wfhDays} day(s) per ${company.wfhPeriod}`;
+
+      await Notification.insertMany(
+        Array.from(targets).map((targetUserId) => ({
+          user: targetUserId,
+          company: populatedCompany._id,
+          type: "system",
+          title: "WFH Policy Updated",
+          body,
+        }))
+      );
+      Array.from(targets).forEach((target) => emitNotification(target));
+    }
   }
 
   if (startDate) {

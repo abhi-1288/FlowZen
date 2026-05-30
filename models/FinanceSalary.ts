@@ -9,7 +9,7 @@ const FinanceSalarySchema = new Schema(
     allowances: { type: Number, default: 0 },
     deductions: { type: Number, default: 0 },
     netSalary: { type: Number, default: 0 },
-    status: { type: String, enum: ["pending", "approved", "paid"], default: "pending", index: true },
+    status: { type: String, enum: ["pending", "approved", "paid", "rejected"], default: "pending", index: true },
     approvedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     paidAt: { type: Date, default: null },
   },
