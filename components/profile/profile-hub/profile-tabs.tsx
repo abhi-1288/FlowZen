@@ -52,6 +52,8 @@ export function ProfileTab({
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [avatarDeleteModal, setAvatarDeleteModal] = useState(false);
+  const [deletingAvatar, setDeletingAvatar] = useState(false);
   const [salaryRequesting, setSalaryRequesting] = useState(false);
   const [companyActionModal, setCompanyActionModal] = useState(false);
   const [companyActionType, setCompanyActionType] = useState<
@@ -219,6 +221,29 @@ export function ProfileTab({
       await refresh();
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function deleteAvatar() {
+    try {
+      setDeletingAvatar(true);
+      const response = await fetch("/api/profile/image", {
+        method: "DELETE",
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to delete avatar.");
+      }
+      showToast("Avatar deleted.");
+      setAvatarDeleteModal(false);
+      await refresh();
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Unable to delete avatar.",
+        "error",
+      );
+    } finally {
+      setDeletingAvatar(false);
     }
   }
 
@@ -400,20 +425,33 @@ export function ProfileTab({
           <h3 className="text-lg font-semibold">Account</h3>
           <div className="mt-4 flex items-center gap-4 rounded-lg border border-slate-200 p-3">
             <AvatarBadge avatarUrl={avatarUrl} name={displayName} size="lg" />
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-              <Camera size={16} />
-              {uploading ? "Uploading..." : "Upload avatar"}
-              <input
-                accept="image/png,image/jpeg,image/webp"
-                className="hidden"
-                disabled={uploading}
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) void uploadAvatar(file);
-                }}
-                type="file"
-              />
-            </label>
+            {avatarUrl ? (
+              <button
+                aria-label="Delete avatar"
+                className="inline-flex h-9 p-4 items-center justify-center rounded-lg border border-rose-200 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                onClick={() => setAvatarDeleteModal(true)}
+                title="Delete avatar"
+                type="button"
+              >
+                <Trash2 size={16} />
+                <p className="text-sm font-medium ml-2 text-slate-700">Delete Profile Image</p>
+              </button>
+            ) : (
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                <Camera size={16} />
+                {uploading ? "Uploading..." : "Upload avatar"}
+                <input
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  disabled={uploading}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) void uploadAvatar(file);
+                  }}
+                  type="file"
+                />
+              </label>
+            )}
             <button
               aria-label="Avatar upload restrictions"
               className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
@@ -1191,7 +1229,33 @@ export function ProfileTab({
         </div>
       ) : null}
 
-
+      {avatarDeleteModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-slate-900">
+              Delete avatar?
+            </h3>
+            <p className="mt-2 text-sm text-slate-600">
+              This will permanently remove your current profile picture. You can upload a new one afterwards.
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
+                onClick={() => setAvatarDeleteModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={deletingAvatar}
+                onClick={() => void deleteAvatar()}
+              >
+                {deletingAvatar ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

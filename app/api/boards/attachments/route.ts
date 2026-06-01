@@ -18,7 +18,7 @@ function extensionFromName(fileName: string) {
 }
 
 function hasUploadThingConfig() {
-  return Boolean(process.env.UPLOADTHING_TOKEN);
+  return process.env.NODE_ENV === "production" && Boolean(process.env.UPLOADTHING_TOKEN);
 }
 
 export async function POST(request: Request) {

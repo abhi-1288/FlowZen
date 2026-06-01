@@ -13,7 +13,7 @@ const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 export const runtime = "nodejs";
 
 function hasUploadThingConfig() {
-  return Boolean(process.env.UPLOADTHING_TOKEN);
+  return process.env.NODE_ENV === "production" && Boolean(process.env.UPLOADTHING_TOKEN);
 }
 
 export async function POST(request: Request) {
@@ -78,4 +78,56 @@ export async function POST(request: Request) {
   await user.save();
 
   return NextResponse.json({ avatarUrl: nextAvatarUrl });
+}
+
+export async function DELETE() {
+  const userId = await requireUserId();
+  if (!userId) return jsonError("Unauthorized", 401);
+
+  try {
+    await connectDb();
+  } catch (error) {
+    const dbError = databaseUnavailable(error);
+    if (dbError) return dbError;
+    throw error;
+  }
+
+  const user = await User.findById(userId);
+  if (!user) return jsonError("User not found.", 404);
+
+  const currentUrl = user.avatarUrl ?? "";
+  if (!currentUrl) {
+    return jsonError("No avatar to delete.", 400);
+  }
+
+  // Delete from UploadThing if it's a remote URL
+  if (!currentUrl.startsWith("/uploads/")) {
+    if (hasUploadThingConfig() || Boolean(process.env.UPLOADTHING_TOKEN)) {
+      const utapi = new UTApi();
+      try {
+        // UploadThing URLs contain the file key in the path
+        const urlObj = new URL(currentUrl);
+        const key = urlObj.pathname.split("/").pop();
+        if (key) {
+          await utapi.deleteFiles(key);
+        }
+      } catch (error) {
+        console.error("Failed to delete avatar from UploadThing:", error);
+      }
+    }
+  } else {
+    // Delete from local filesystem
+    try {
+      const relativePath = currentUrl.slice(1).split("?")[0];
+      const absolutePath = path.join(process.cwd(), "public", relativePath);
+      await fs.unlink(absolutePath);
+    } catch {
+      console.error("Failed to delete local avatar file:", currentUrl);
+    }
+  }
+
+  user.avatarUrl = "";
+  await user.save();
+
+  return NextResponse.json({ avatarUrl: "" });
 }
