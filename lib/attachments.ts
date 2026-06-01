@@ -1,25 +1,39 @@
-import ImageKit from "imagekit";
 import { promises as fs } from "fs";
 import path from "path";
+import { GridFSBucket, ObjectId } from "mongodb";
+import { connectDb } from "@/lib/db";
 
 export async function deleteAttachments(attachments: { id: string; url: string }[]) {
   if (attachments.length === 0) return;
 
-  if (process.env.NODE_ENV === "production") {
-    const imagekit = new ImageKit({
-      publicKey: process.env.IMAGEKIT_PUBLIC_KEY!,
-      privateKey: process.env.IMAGEKIT_PRIVATE_KEY!,
-      urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT!,
-    });
-    const fileIds = attachments.map(a => a.id);
+  const gridIds = attachments
+    .map((attachment) => attachment.id)
+    .filter((id) => ObjectId.isValid(id))
+    .map((id) => new ObjectId(id));
+
+  if (gridIds.length > 0) {
     try {
-      await imagekit.bulkDeleteFiles(fileIds);
+      const connection = await connectDb();
+      const db = connection.connection.db;
+      if (db) {
+        const bucket = new GridFSBucket(db, { bucketName: "taskAttachments" });
+        await Promise.all(
+          gridIds.map((id) =>
+            bucket.delete(id).catch((error) => {
+              console.error("Failed to delete GridFS attachment", String(id), error);
+            }),
+          ),
+        );
+      }
     } catch (error) {
-      console.error("Failed to delete attachments from ImageKit", error);
+      console.error("Failed to delete GridFS attachments", error);
     }
-  } else {
-    for (const attachment of attachments) {
-      if (attachment.url.startsWith("/uploads/task-attachments/")) {
+  }
+
+  await Promise.all(
+    attachments
+      .filter((attachment) => attachment.url.startsWith("/uploads/task-attachments/"))
+      .map(async (attachment) => {
         try {
           const relativePath = attachment.url.slice(1).split("?")[0];
           const absolutePath = path.join(process.cwd(), "public", relativePath);
@@ -27,7 +41,6 @@ export async function deleteAttachments(attachments: { id: string; url: string }
         } catch (error) {
           console.error("Failed to delete local attachment", attachment.url);
         }
-      }
-    }
-  }
+      }),
+  );
 }

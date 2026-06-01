@@ -1,19 +1,12 @@
-import { randomUUID } from "crypto";
-import { promises as fs } from "fs";
-import path from "path";
+import { GridFSBucket } from "mongodb";
 import { NextResponse } from "next/server";
 import { databaseUnavailable, isObjectId, jsonError, requireUserId } from "@/lib/api";
 import { findAccessibleBoard } from "@/lib/board-access";
 import { connectDb } from "@/lib/db";
-import ImageKit from "imagekit";
 
 const MAX_SIZE_BYTES = 20 * 1024 * 1024;
-const SAFE_EXTENSION_PATTERN = /^[a-z0-9]{1,12}$/i;
 
-function extensionFromName(fileName: string) {
-  const extension = path.extname(fileName).replace(".", "").toLowerCase();
-  return SAFE_EXTENSION_PATTERN.test(extension) ? extension : "bin";
-}
+export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const userId = await requireUserId();
@@ -34,8 +27,9 @@ export async function POST(request: Request) {
   if (file.size <= 0) return jsonError("Attachment file is empty.");
   if (file.size > MAX_SIZE_BYTES) return jsonError("Attachment must be 20MB or smaller.");
 
+  let connection;
   try {
-    await connectDb();
+    connection = await connectDb();
   } catch (error) {
     const dbError = databaseUnavailable(error);
     if (dbError) return dbError;
@@ -45,48 +39,32 @@ export async function POST(request: Request) {
   const board = await findAccessibleBoard(boardId, userId);
   if (!board) return jsonError("Board not found.", 404);
 
-  let fileId = "";
-  let fileUrl = "";
+  const db = connection.connection.db;
+  if (!db) return jsonError("Database connection is not ready.", 500);
 
-  if (process.env.NODE_ENV === "production") {
-    const imagekit = new ImageKit({
-      publicKey: process.env.IMAGEKIT_PUBLIC_KEY!,
-      privateKey: process.env.IMAGEKIT_PRIVATE_KEY!,
-      urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT!,
+  const bucket = new GridFSBucket(db, { bucketName: "taskAttachments" });
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const upload = bucket.openUploadStream(file.name, {
+    contentType: file.type || "application/octet-stream",
+    metadata: {
+      boardId,
+      uploadedBy: userId,
+      originalName: file.name,
+    },
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    upload.end(bytes, (error?: Error | null) => {
+      if (error) reject(error);
+      else resolve();
     });
+  });
 
-    try {
-      const bytes = await file.arrayBuffer();
-      const extension = extensionFromName(file.name);
-      const fileName = `${boardId}-${randomUUID()}.${extension}`;
-      const response = await imagekit.upload({
-        file: Buffer.from(bytes),
-        fileName,
-        folder: "/task-attachments",
-      });
-      fileId = response.fileId;
-      fileUrl = response.url;
-    } catch (err) {
-      return jsonError("Failed to upload attachment to cloud.");
-    }
-  } else {
-    const extension = extensionFromName(file.name);
-    const fileName = `${boardId}-${randomUUID()}.${extension}`;
-    const relativeDir = path.join("uploads", "task-attachments");
-    const absoluteDir = path.join(process.cwd(), "public", relativeDir);
-    const absolutePath = path.join(absoluteDir, fileName);
-
-    await fs.mkdir(absoluteDir, { recursive: true });
-    const bytes = await file.arrayBuffer();
-    await fs.writeFile(absolutePath, Buffer.from(bytes));
-
-    fileId = randomUUID();
-    fileUrl = `/${relativeDir.replaceAll("\\", "/")}/${fileName}`;
-  }
+  const fileId = String(upload.id);
 
   return NextResponse.json({
     id: fileId,
     name: file.name,
-    url: fileUrl,
+    url: `/api/boards/attachments/${fileId}`,
   });
 }
