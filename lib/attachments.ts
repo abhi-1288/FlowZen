@@ -1,32 +1,36 @@
 import { promises as fs } from "fs";
 import path from "path";
-import { GridFSBucket, ObjectId } from "mongodb";
-import { connectDb } from "@/lib/db";
+import ImageKit from "imagekit";
+
+function hasImageKitConfig() {
+  return Boolean(
+    process.env.IMAGEKIT_PUBLIC_KEY &&
+      process.env.IMAGEKIT_PRIVATE_KEY &&
+      process.env.IMAGEKIT_URL_ENDPOINT,
+  );
+}
 
 export async function deleteAttachments(attachments: { id: string; url: string }[]) {
   if (attachments.length === 0) return;
 
-  const gridIds = attachments
-    .map((attachment) => attachment.id)
-    .filter((id) => ObjectId.isValid(id))
-    .map((id) => new ObjectId(id));
+  const imageKitAttachments = attachments.filter(
+    (attachment) =>
+      attachment.id &&
+      !attachment.url.startsWith("/uploads/task-attachments/") &&
+      !attachment.url.startsWith("/api/boards/attachments/"),
+  );
 
-  if (gridIds.length > 0) {
+  if (imageKitAttachments.length > 0 && hasImageKitConfig()) {
+    const imagekit = new ImageKit({
+      publicKey: process.env.IMAGEKIT_PUBLIC_KEY!,
+      privateKey: process.env.IMAGEKIT_PRIVATE_KEY!,
+      urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT!,
+    });
+
     try {
-      const connection = await connectDb();
-      const db = connection.connection.db;
-      if (db) {
-        const bucket = new GridFSBucket(db, { bucketName: "taskAttachments" });
-        await Promise.all(
-          gridIds.map((id) =>
-            bucket.delete(id).catch((error) => {
-              console.error("Failed to delete GridFS attachment", String(id), error);
-            }),
-          ),
-        );
-      }
+      await imagekit.bulkDeleteFiles(imageKitAttachments.map((attachment) => attachment.id));
     } catch (error) {
-      console.error("Failed to delete GridFS attachments", error);
+      console.error("Failed to delete attachments from ImageKit", error);
     }
   }
 
@@ -38,7 +42,7 @@ export async function deleteAttachments(attachments: { id: string; url: string }
           const relativePath = attachment.url.slice(1).split("?")[0];
           const absolutePath = path.join(process.cwd(), "public", relativePath);
           await fs.unlink(absolutePath);
-        } catch (error) {
+        } catch {
           console.error("Failed to delete local attachment", attachment.url);
         }
       }),

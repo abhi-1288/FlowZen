@@ -1,5 +1,8 @@
-import { GridFSBucket, ObjectId } from "mongodb";
+import { randomUUID } from "crypto";
+import { promises as fs } from "fs";
+import path from "path";
 import { NextResponse } from "next/server";
+import { UTApi } from "uploadthing/server";
 import { connectDb } from "@/lib/db";
 import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { User } from "@/models/User";
@@ -9,9 +12,8 @@ const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 export const runtime = "nodejs";
 
-function avatarIdFromUrl(url: string) {
-  const match = url.match(/\/api\/profile\/image\/([a-f\d]{24})/i);
-  return match?.[1] ?? "";
+function hasUploadThingConfig() {
+  return Boolean(process.env.UPLOADTHING_TOKEN);
 }
 
 export async function POST(request: Request) {
@@ -30,9 +32,8 @@ export async function POST(request: Request) {
   if (!ALLOWED_TYPES.has(file.type)) return jsonError("Only PNG, JPG, and WEBP images are allowed.");
   if (file.size > MAX_SIZE_BYTES) return jsonError("Avatar must be 2MB or smaller.");
 
-  let connection;
   try {
-    connection = await connectDb();
+    await connectDb();
   } catch (error) {
     const dbError = databaseUnavailable(error);
     if (dbError) return dbError;
@@ -42,33 +43,39 @@ export async function POST(request: Request) {
   const user = await User.findById(userId);
   if (!user) return jsonError("User not found.", 404);
 
-  const db = connection.connection.db;
-  if (!db) return jsonError("Database connection is not ready.", 500);
+  let nextAvatarUrl = "";
 
-  const bucket = new GridFSBucket(db, { bucketName: "avatars" });
-  const bytes = Buffer.from(await file.arrayBuffer());
-  const upload = bucket.openUploadStream(file.name, {
-    contentType: file.type,
-    metadata: {
-      userId,
-      originalName: file.name,
-    },
-  });
+  if (hasUploadThingConfig()) {
+    const utapi = new UTApi();
+    try {
+      const response = await utapi.uploadFiles(file);
+      if (response.error) {
+        return jsonError(`UploadThing error: ${response.error.message}`, 500);
+      }
+      nextAvatarUrl = response.data.url;
+    } catch {
+      return jsonError("Failed to upload avatar to UploadThing.", 500);
+    }
+  } else {
+    if (process.env.NODE_ENV === "production") {
+      return jsonError("UPLOADTHING_TOKEN is required for production avatar uploads.", 500);
+    }
 
-  await new Promise<void>((resolve, reject) => {
-    upload.end(bytes, (error?: Error | null) => {
-      if (error) reject(error);
-      else resolve();
-    });
-  });
+    const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+    const fileName = `${userId}-${randomUUID()}.${extension}`;
+    const relativeDir = path.join("uploads", "avatars");
+    const absoluteDir = path.join(process.cwd(), "public", relativeDir);
+    const absolutePath = path.join(absoluteDir, fileName);
 
-  const previousAvatarId = avatarIdFromUrl(String(user.avatarUrl ?? ""));
-  user.avatarUrl = `/api/profile/image/${String(upload.id)}`;
-  await user.save();
+    await fs.mkdir(absoluteDir, { recursive: true });
+    const bytes = await file.arrayBuffer();
+    await fs.writeFile(absolutePath, Buffer.from(bytes));
 
-  if (ObjectId.isValid(previousAvatarId)) {
-    await bucket.delete(new ObjectId(previousAvatarId)).catch(() => {});
+    nextAvatarUrl = `/${relativeDir.replaceAll("\\", "/")}/${fileName}`;
   }
 
-  return NextResponse.json({ avatarUrl: user.avatarUrl });
+  user.avatarUrl = nextAvatarUrl;
+  await user.save();
+
+  return NextResponse.json({ avatarUrl: nextAvatarUrl });
 }
