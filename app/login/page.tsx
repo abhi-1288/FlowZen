@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Loader2, Mail, Eye, EyeOff } from "lucide-react";
+import { CheckCircle2, Loader2, Mail, Eye, EyeOff, ChevronDown, Database } from "lucide-react";
 import { OAuthProviderIcons } from "@/components/auth/oauth-provider-icons";
 
 export default function LoginPage() {
@@ -13,6 +13,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [seeding, setSeeding] = useState(false);
+  const [seedMsg, setSeedMsg] = useState("");
+  const [showDemo, setShowDemo] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -59,6 +62,61 @@ export default function LoginPage() {
         <div className="mt-6 flex justify-between text-sm">
           <Link className="font-medium text-emerald-700 hover:underline" href="/signup">Create account</Link>
           <Link className="font-medium text-slate-500 hover:text-slate-900" href="/forgot-password">Forgot password?</Link>
+        </div>
+
+        <div className="mt-6 border-t border-slate-200 pt-4">
+          <button
+            type="button"
+            onClick={() => setShowDemo(!showDemo)}
+            className="flex w-full items-center justify-between text-sm font-medium text-slate-500 hover:text-slate-700"
+          >
+            Demo Accounts
+            <ChevronDown size={16} className={`transition-transform ${showDemo ? "rotate-180" : ""}`} />
+          </button>
+          {showDemo && (
+            <div className="mt-3 space-y-2 text-xs text-slate-600">
+              <p className="mb-2 text-slate-400">Use any of these accounts to test the app:</p>
+              {[
+                ["Admin", "admin@flowzen.com", "admin@flowzen"],
+                ["Project Manager", "manager@flowzen.com", "manager@flowzen"],
+                ["HR", "hr@flowzen.com", "hr@flowzen"],
+                ["QA Tester", "tester@flowzen.com", "tester@flowzen"],
+                ["Employee", "employee@flowzen.com", "employee@flowzen"],
+                ["Finance", "finance@flowzen.com", "finance@flowzen"],
+                ["Others", "other@flowzen.com", "other@flowzen"],
+              ].map(([role, mail, pass]) => (
+                <div key={mail} className="flex items-center justify-between rounded-md bg-slate-50 px-3 py-2">
+                  <div>
+                    <span className="font-medium text-slate-700">{role}</span>
+                    <span className="ml-2 text-slate-400">{mail}</span>
+                  </div>
+                  <span className="font-mono text-slate-400">{pass}</span>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={async () => {
+                  setSeeding(true);
+                  setSeedMsg("");
+                  try {
+                    const res = await fetch("/api/seed/demo", { method: "POST" });
+                    const data = await res.json();
+                    setSeedMsg(data.success ? `Seeded ${data.seeded} demo accounts` : "Failed to seed");
+                  } catch {
+                    setSeedMsg("Network error");
+                  } finally {
+                    setSeeding(false);
+                  }
+                }}
+                disabled={seeding}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              >
+                {seeding ? <Loader2 className="animate-spin" size={16} /> : <Database size={16} />}
+                {seeding ? "Seeding..." : "Populate demo accounts"}
+              </button>
+              {seedMsg && <p className="text-center text-slate-500">{seedMsg}</p>}
+            </div>
+          )}
         </div>
       </section>
     </main>
