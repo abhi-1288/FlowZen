@@ -2,10 +2,10 @@ import { randomUUID } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
 import { NextResponse } from "next/server";
+import { UTApi } from "uploadthing/server";
 import { databaseUnavailable, isObjectId, jsonError, requireUserId } from "@/lib/api";
 import { findAccessibleBoard } from "@/lib/board-access";
 import { connectDb } from "@/lib/db";
-import ImageKit from "imagekit";
 
 const MAX_SIZE_BYTES = 20 * 1024 * 1024;
 const SAFE_EXTENSION_PATTERN = /^[a-z0-9]{1,12}$/i;
@@ -17,12 +17,8 @@ function extensionFromName(fileName: string) {
   return SAFE_EXTENSION_PATTERN.test(extension) ? extension : "bin";
 }
 
-function hasImageKitConfig() {
-  return Boolean(
-    process.env.IMAGEKIT_PUBLIC_KEY &&
-      process.env.IMAGEKIT_PRIVATE_KEY &&
-      process.env.IMAGEKIT_URL_ENDPOINT,
-  );
+function hasUploadThingConfig() {
+  return Boolean(process.env.UPLOADTHING_TOKEN);
 }
 
 export async function POST(request: Request) {
@@ -57,36 +53,34 @@ export async function POST(request: Request) {
 
   const extension = extensionFromName(file.name);
   const fileName = `${boardId}-${randomUUID()}.${extension}`;
-  const bytes = await file.arrayBuffer();
 
-  if (hasImageKitConfig()) {
-    const imagekit = new ImageKit({
-      publicKey: process.env.IMAGEKIT_PUBLIC_KEY!,
-      privateKey: process.env.IMAGEKIT_PRIVATE_KEY!,
-      urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT!,
+  if (hasUploadThingConfig()) {
+    const renamedFile = new File([file], fileName, {
+      type: file.type || "application/octet-stream",
+      lastModified: file.lastModified,
     });
-
+    const utapi = new UTApi();
     try {
-      const response = await imagekit.upload({
-        file: Buffer.from(bytes),
-        fileName,
-        folder: "/task-attachments",
-      });
+      const response = await utapi.uploadFiles(renamedFile);
+      if (response.error) {
+        return jsonError(`UploadThing error: ${response.error.message}`, 500);
+      }
 
       return NextResponse.json({
-        id: response.fileId,
+        id: response.data.key,
         name: file.name,
-        url: response.url,
+        url: response.data.ufsUrl || response.data.url,
       });
     } catch {
-      return jsonError("Failed to upload attachment to ImageKit.", 500);
+      return jsonError("Failed to upload attachment to UploadThing.", 500);
     }
   }
 
   if (process.env.NODE_ENV === "production") {
-    return jsonError("ImageKit environment variables are required for production attachment uploads.", 500);
+    return jsonError("UPLOADTHING_TOKEN is required for production attachment uploads.", 500);
   }
 
+  const bytes = await file.arrayBuffer();
   const relativeDir = path.join("uploads", "task-attachments");
   const absoluteDir = path.join(process.cwd(), "public", relativeDir);
   const absolutePath = path.join(absoluteDir, fileName);

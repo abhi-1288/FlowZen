@@ -1,36 +1,27 @@
 import { promises as fs } from "fs";
 import path from "path";
-import ImageKit from "imagekit";
+import { UTApi } from "uploadthing/server";
 
-function hasImageKitConfig() {
-  return Boolean(
-    process.env.IMAGEKIT_PUBLIC_KEY &&
-      process.env.IMAGEKIT_PRIVATE_KEY &&
-      process.env.IMAGEKIT_URL_ENDPOINT,
-  );
+function hasUploadThingConfig() {
+  return Boolean(process.env.UPLOADTHING_TOKEN);
 }
 
 export async function deleteAttachments(attachments: { id: string; url: string }[]) {
   if (attachments.length === 0) return;
 
-  const imageKitAttachments = attachments.filter(
+  const uploadThingAttachments = attachments.filter(
     (attachment) =>
       attachment.id &&
       !attachment.url.startsWith("/uploads/task-attachments/") &&
       !attachment.url.startsWith("/api/boards/attachments/"),
   );
 
-  if (imageKitAttachments.length > 0 && hasImageKitConfig()) {
-    const imagekit = new ImageKit({
-      publicKey: process.env.IMAGEKIT_PUBLIC_KEY!,
-      privateKey: process.env.IMAGEKIT_PRIVATE_KEY!,
-      urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT!,
-    });
-
+  if (uploadThingAttachments.length > 0 && hasUploadThingConfig()) {
+    const utapi = new UTApi();
     try {
-      await imagekit.bulkDeleteFiles(imageKitAttachments.map((attachment) => attachment.id));
+      await utapi.deleteFiles(uploadThingAttachments.map((attachment) => attachment.id));
     } catch (error) {
-      console.error("Failed to delete attachments from ImageKit", error);
+      console.error("Failed to delete attachments from UploadThing", error);
     }
   }
 
