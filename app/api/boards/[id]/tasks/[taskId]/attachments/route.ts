@@ -4,6 +4,7 @@ import { Task } from "@/models/Task";
 import { findAccessibleBoard } from "@/lib/board-access";
 import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
 import { randomUUID } from "crypto";
+import { deleteAttachments } from "@/lib/attachments";
 
 type Params = { params: Promise<{ id: string; taskId: string }> };
 
@@ -16,6 +17,7 @@ export async function POST(request: Request, { params }: Params) {
   const body = await request.json();
   const name = String(body.name ?? "").trim();
   const url = String(body.url ?? "").trim();
+  const idToUse = String(body.id ?? "").trim() || randomUUID();
   if (!name || !url) return jsonError("Attachment name and URL are required.");
 
   await connectDb();
@@ -26,7 +28,7 @@ export async function POST(request: Request, { params }: Params) {
     { _id: taskId, board: id },
     {
       $push: {
-        attachments: { id: randomUUID(), name, url },
+        attachments: { id: idToUse, name, url },
         activity: { user: userId, action: "attach", detail: `Attached ${name}` }
       }
     },
@@ -56,10 +58,16 @@ export async function DELETE(request: Request, { params }: Params) {
     {
       $pull: { attachments: { id: attachmentId } },
       $push: { activity: { user: userId, action: "attach-remove", detail: "Attachment removed" } }
-    },
-    { new: true }
+    }
   );
   if (!task) return jsonError("Task not found.", 404);
 
-  return NextResponse.json({ task: serializeDoc(task) });
+  const removedAttachment = task.attachments.find((a: any) => a.id === attachmentId);
+  if (removedAttachment) {
+    await deleteAttachments([removedAttachment]);
+  }
+
+  const updatedTask = await Task.findById(taskId);
+
+  return NextResponse.json({ task: serializeDoc(updatedTask) });
 }

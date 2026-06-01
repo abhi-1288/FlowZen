@@ -41,7 +41,7 @@ type BoardStore = {
   updateTask: (boardId: string, taskId: string, payload: Partial<TaskInput>) => Promise<void>;
   deleteTask: (boardId: string, taskId: string) => Promise<void>;
   addComment: (boardId: string, taskId: string, body: string) => Promise<void>;
-  addAttachment: (boardId: string, taskId: string, name: string, url: string) => Promise<void>;
+  addAttachment: (boardId: string, taskId: string, name: string, url: string, id?: string) => Promise<void>;
   removeAttachment: (boardId: string, taskId: string, attachmentId: string) => Promise<void>;
   moveTaskLocal: (taskId: string, toColumnId: string, overTaskId?: string) => { orderedTaskIds: string[] } | null;
   persistTaskMove: (boardId: string, taskId: string, toColumnId: string, orderedTaskIds: string[]) => Promise<void>;
@@ -222,10 +222,10 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
     });
     set((state) => ({ tasks: state.tasks.map((item) => (item.id === task.id ? task : item)) }));
   },
-  addAttachment: async (boardId, taskId, name, url) => {
+  addAttachment: async (boardId, taskId, name, url, id) => {
     const { task } = await apiFetch<{ task: Task }>(`/api/boards/${boardId}/tasks/${taskId}/attachments`, {
       method: "POST",
-      body: JSON.stringify({ name, url })
+      body: JSON.stringify({ name, url, id })
     });
     set((state) => ({ tasks: state.tasks.map((item) => (item.id === task.id ? task : item)) }));
   },

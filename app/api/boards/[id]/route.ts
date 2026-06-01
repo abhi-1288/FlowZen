@@ -6,6 +6,7 @@ import { Task } from "@/models/Task";
 import { findAccessibleBoard, findOwnedBoard } from "@/lib/board-access";
 import { isObjectId, jsonError, requireUserId, serializeDoc, serializeDocs } from "@/lib/api";
 import { emitToBoard } from "@/lib/socket-emit";
+import { deleteAttachments } from "@/lib/attachments";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -87,6 +88,12 @@ export async function DELETE(_request: Request, { params }: Params) {
   await connectDb();
   const board = await findOwnedBoard(id, userId);
   if (!board) return jsonError("Only the owner can delete this board.", 403);
+
+  const allTasks = await Task.find({ board: id });
+  const attachmentsToDelete = allTasks.flatMap(t => t.attachments || []);
+  if (attachmentsToDelete.length > 0) {
+    await deleteAttachments(attachmentsToDelete);
+  }
 
   await Promise.all([
     Task.deleteMany({ board: id }),

@@ -82,7 +82,27 @@ FlowZen is a full-stack team productivity platform built with Next.js App Router
    npm run dev
    ```
 
-5. Open `http://localhost:3000` and register a new account.
+5. Optional: create demo tester accounts:
+
+   ```bash
+   npm run seed:demo
+   ```
+
+6. Open `http://localhost:3000` and register a new account or use a demo account.
+
+## Demo Tester Accounts
+
+Run `npm run seed:demo` after setting `MONGODB_URI` to create or refresh these verified accounts:
+
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | `admin@flowzen.com` | `admin@flowzen` |
+| Project Manager | `manager@flowzen.com` | `manager@flowzen` |
+| Human Resource | `hr@flowzen.com` | `hr@flowzen` |
+| QA Tester | `tester@flowzen.com` | `tester@flowzen` |
+| Employee | `employee@flowzen.com` | `employee@flowzen` |
+| Finance | `finance@flowzen.com` | `finance@flowzen` |
+| Others | `other@flowzen.com` | `other@flowzen` |
 
 ## Scripts
 

@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { jsonError, requireUserId } from "@/lib/api";
 import { Attendance } from "@/models/Attendance";
+import { Company } from "@/models/Company";
+import { Holiday } from "@/models/Holiday";
 import { LeaveRequest } from "@/models/LeaveRequest";
 import { Team } from "@/models/Team";
 import { User } from "@/models/User";
+import { WfhRequest } from "@/models/WfhRequest";
 
 function startOfDay(value: string) {
   const date = new Date(value);
@@ -28,15 +31,20 @@ function isoDay(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
-function formatTime(value: unknown) {
-  if (!value) return "";
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleTimeString("en-IN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+function memberIdentity(value: unknown, fallback: string) {
+  const text = String(value ?? "").trim();
+  if (!text) return fallback;
+  return text.split("-").filter(Boolean).at(-1) ?? text;
+}
+
+function safeFilenamePart(value: unknown) {
+  const text = String(value ?? "company").trim();
+  return (
+    text
+      .replace(/[^a-z0-9]+/gi, "-")
+      .replace(/^-+|-+$/g, "")
+      .toLowerCase() || "company"
+  );
 }
 
 export async function GET(request: Request) {
@@ -84,9 +92,9 @@ export async function GET(request: Request) {
     memberIds = [userId];
   }
 
-  const [members, attendanceRows, leaveRows] = await Promise.all([
+  const [members, attendanceRows, leaveRows, wfhRows, holidayRows, company] = await Promise.all([
     User.find({ _id: { $in: memberIds } })
-      .select("name email role customRole")
+      .select("name email role customRole companyIdentityCode companyJoined createdAt")
       .sort({ name: 1 }),
     Attendance.find({
       user: { $in: memberIds },
@@ -98,6 +106,18 @@ export async function GET(request: Request) {
       startDate: { $lte: endOfDay(to) },
       endDate: { $gte: from },
     }).lean(),
+    WfhRequest.find({
+      requester: { $in: memberIds },
+      status: "approved",
+      startDate: { $lte: endOfDay(to) },
+      endDate: { $gte: from },
+    }).lean(),
+    Holiday.find({
+      company: actor.company,
+      startDate: { $lte: endOfDay(to) },
+      endDate: { $gte: from },
+    }).lean(),
+    Company.findById(actor.company).select("name wfhDates weekendDates").lean(),
   ]);
 
   const attendanceByUserDay = new Map<string, any>();
@@ -118,49 +138,99 @@ export async function GET(request: Request) {
     }
   });
 
-  const headers = [
-    "Date",
-    "Name",
-    "Email",
-    "Role",
-    "Status",
-    "Check In",
-    "Check Out",
-    "Leave Reason",
-  ];
+  const wfhByUserDay = new Map<string, any>();
+  wfhRows.forEach((wfh: any) => {
+    const current = startOfDay(String(wfh.startDate));
+    const last = startOfDay(String(wfh.endDate));
+    if (!current || !last) return;
+    while (current.getTime() <= last.getTime()) {
+      if (current.getTime() >= from.getTime() && current.getTime() <= to.getTime()) {
+        wfhByUserDay.set(`${String(wfh.requester)}:${isoDay(current)}`, wfh);
+      }
+      current.setDate(current.getDate() + 1);
+    }
+  });
+
+  const holidayByDay = new Map<string, any>();
+  holidayRows.forEach((holiday: any) => {
+    const current = startOfDay(String(holiday.startDate));
+    const last = startOfDay(String(holiday.endDate));
+    if (!current || !last) return;
+    while (current.getTime() <= last.getTime()) {
+      if (current.getTime() >= from.getTime() && current.getTime() <= to.getTime()) {
+        holidayByDay.set(isoDay(current), holiday);
+      }
+      current.setDate(current.getDate() + 1);
+    }
+  });
+
+  const companyWfhDays = new Set<string>();
+  ((company as any)?.wfhDates ?? []).forEach((entry: any) => {
+    const date = startOfDay(String(entry.date));
+    if (!date) return;
+    if (date.getTime() >= from.getTime() && date.getTime() <= to.getTime()) {
+      companyWfhDays.add(isoDay(date));
+    }
+  });
+
+  const assignedWeekendsByMonth = new Map<string, boolean>();
+  ((company as any)?.weekendDates ?? []).forEach((entry: any) => {
+    const date = startOfDay(String(entry.date));
+    if (date) {
+      assignedWeekendsByMonth.set(date.toISOString().slice(0, 7), true);
+    }
+  });
+
+  const companyWeekendDays = new Set<string>();
+  ((company as any)?.weekendDates ?? []).forEach((entry: any) => {
+    const date = startOfDay(String(entry.date));
+    if (!date) return;
+    if (date.getTime() >= from.getTime() && date.getTime() <= to.getTime()) {
+      companyWeekendDays.add(isoDay(date));
+    }
+  });
+
+  const dates = Array.from({ length: dayCount }, (_, offset) => {
+    const date = new Date(from);
+    date.setDate(from.getDate() + offset);
+    return date;
+  });
+
+  const headers = ["S.No", "ID", "Name", ...dates.map(isoDay)];
   const lines = [headers.map(csvCell).join(",")];
 
-  for (const member of members as any[]) {
-    for (let offset = 0; offset < dayCount; offset += 1) {
-      const date = new Date(from);
-      date.setDate(from.getDate() + offset);
+  (members as any[]).forEach((member, index) => {
+    const joinedAt = startOfDay(String(member.companyJoined || member.createdAt));
+    const memberId = String(member._id);
+    const identity = memberIdentity(member.companyIdentityCode, memberId);
+
+    const statuses = dates.map((date) => {
+      if (joinedAt && date.getTime() < joinedAt.getTime()) return "Not Joined";
+
+      const dateText = isoDay(date);
       const key = `${String(member._id)}:${isoDay(date)}`;
       const attendance = attendanceByUserDay.get(key);
       const leave = leaveByUserDay.get(key);
-      const status = attendance ? "Present" : leave ? "Leave" : "Absent";
-      const roleLabel =
-        String(member.role ?? "") === "others" && member.customRole
-          ? `Others | ${String(member.customRole)}`
-          : String(member.role ?? "");
+      const wfh = wfhByUserDay.get(key);
+      const holiday = holidayByDay.get(dateText);
 
-      lines.push(
-        [
-          isoDay(date),
-          member.name ?? "",
-          member.email ?? "",
-          roleLabel,
-          status,
-          formatTime(attendance?.checkIn),
-          formatTime(attendance?.checkOut),
-          leave?.reason ?? "",
-        ]
-          .map(csvCell)
-          .join(","),
-      );
-    }
-  }
+      if (attendance) return "Present";
+      if (leave) return "Leave";
+      if (wfh || companyWfhDays.has(dateText)) return "WFH";
+      if (holiday) return "Holiday";
+      if (companyWeekendDays.has(dateText) || (!assignedWeekendsByMonth.has(dateText.slice(0, 7)) && date.getDay() === 0)) return "Weekend";
+      return "Absent";
+    });
 
-  const filename = `attendance-${isoDay(from)}-to-${isoDay(to)}.csv`;
+    lines.push(
+      [index + 1, identity, member.name ?? "", ...statuses]
+        .map(csvCell)
+        .join(","),
+    );
+  });
+
+  const companyName = safeFilenamePart((company as any)?.name);
+  const filename = `${companyName}-${isoDay(from)}-to-${isoDay(to)}.csv`;
   return new NextResponse(lines.join("\n"), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

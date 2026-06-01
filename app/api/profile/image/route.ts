@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { User } from "@/models/User";
+import { UTApi } from "uploadthing/server";
 
 const MAX_SIZE_BYTES = 2 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
@@ -36,17 +37,31 @@ export async function POST(request: Request) {
   const user = await User.findById(userId);
   if (!user) return jsonError("User not found.", 404);
 
-  const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-  const fileName = `${userId}-${randomUUID()}.${extension}`;
-  const relativeDir = path.join("uploads", "avatars");
-  const absoluteDir = path.join(process.cwd(), "public", relativeDir);
-  const absolutePath = path.join(absoluteDir, fileName);
+  let nextAvatarUrl = "";
+  if (process.env.NODE_ENV === "production") {
+    const utapi = new UTApi();
+    try {
+      const response = await utapi.uploadFiles(file);
+      if (response.error) {
+        return jsonError("UploadThing error: " + response.error.message);
+      }
+      nextAvatarUrl = response.data.url;
+    } catch (err) {
+      return jsonError("Failed to upload avatar to cloud.");
+    }
+  } else {
+    const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+    const fileName = `${userId}-${randomUUID()}.${extension}`;
+    const relativeDir = path.join("uploads", "avatars");
+    const absoluteDir = path.join(process.cwd(), "public", relativeDir);
+    const absolutePath = path.join(absoluteDir, fileName);
 
-  await fs.mkdir(absoluteDir, { recursive: true });
-  const bytes = await file.arrayBuffer();
-  await fs.writeFile(absolutePath, Buffer.from(bytes));
+    await fs.mkdir(absoluteDir, { recursive: true });
+    const bytes = await file.arrayBuffer();
+    await fs.writeFile(absolutePath, Buffer.from(bytes));
 
-  const nextAvatarUrl = `/${relativeDir.replaceAll("\\", "/")}/${fileName}`;
+    nextAvatarUrl = `/${relativeDir.replaceAll("\\", "/")}/${fileName}`;
+  }
   user.avatarUrl = nextAvatarUrl;
   await user.save();
 

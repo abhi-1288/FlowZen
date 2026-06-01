@@ -7,6 +7,7 @@ import { LeaveRequest } from "@/models/LeaveRequest";
 import { WfhRequest } from "@/models/WfhRequest";
 import { FinanceSalary } from "@/models/FinanceSalary";
 import { Holiday } from "@/models/Holiday";
+import { Company } from "@/models/Company";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -30,7 +31,7 @@ export async function GET(request: Request, { params }: Params) {
   const monthStart = new Date(year, mon - 1, 1);
   const monthEnd = new Date(year, mon, 1);
 
-  const [attendanceRecords, leaveRecords, wfhRecords, holidays, salary] = await Promise.all([
+  const [attendanceRecords, leaveRecords, wfhRecords, holidays, salary, company] = await Promise.all([
     Attendance.find({
       user: memberId,
       date: { $gte: monthStart, $lt: monthEnd },
@@ -49,7 +50,23 @@ export async function GET(request: Request, { params }: Params) {
     }).sort({ startDate: 1 }),
     Holiday.find({ company: actor.company, startDate: { $lt: monthEnd }, endDate: { $gte: monthStart } }).sort({ startDate: 1 }),
     FinanceSalary.findOne({ company: actor.company, employee: memberId, month }).select("netSalary baseSalary"),
+    Company.findById(actor.company).select("weekendDates"),
   ]);
+
+  const manualWeekendsThisMonth = ((company as any)?.weekendDates ?? []).filter((entry: any) => {
+    const date = new Date(entry.date);
+    return date.getFullYear() === year && date.getMonth() === mon - 1;
+  });
+
+  const hasManualWeekendsThisMonth = manualWeekendsThisMonth.length > 0;
+
+  const weekendDateTimes = new Set(
+    manualWeekendsThisMonth.map((entry: any) => {
+      const date = new Date(entry.date);
+      date.setHours(0, 0, 0, 0);
+      return date.getTime();
+    }),
+  );
 
   const daysInMonth = new Date(year, mon, 0).getDate();
   const calendar: {
@@ -99,7 +116,9 @@ export async function GET(request: Request, { params }: Params) {
       checkDate.setHours(12, 0, 0, 0);
       return checkDate >= start && checkDate <= end;
     });
-    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+    const isWeekend = hasManualWeekendsThisMonth
+      ? weekendDateTimes.has(new Date(year, mon - 1, d).setHours(0, 0, 0, 0))
+      : date.getDay() === 0;
 
     const wfh = wfhRecords.find((w: any) => {
       const start = new Date(w.startDate);

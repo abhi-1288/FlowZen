@@ -8,15 +8,18 @@
     "start": "node node_modules/next/dist/bin/next start",
     "lint": "node node_modules/eslint/bin/eslint.js .",
     "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
+    "seed:demo": "node scripts/seed-demo-users.js",
     "doctor": "npx react-doctor@latest"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
     "@imagekit/next": "^2.1.5",
+    "@uploadthing/react": "^7.3.3",
     "bcryptjs": "^3.0.2",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.38.0",
+    "imagekit": "^5.2.0",
     "lint": "^1.2.2",
     "lucide-react": "^0.468.0",
     "mongoose": "^8.9.2",
@@ -29,6 +32,7 @@
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.3",
     "tailwind-merge": "^2.6.0",
+    "uploadthing": "^7.7.4",
     "zod": "^4.4.3",
     "zustand": "^5.0.2"
   },

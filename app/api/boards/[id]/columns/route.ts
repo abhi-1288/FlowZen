@@ -5,6 +5,7 @@ import { Task } from "@/models/Task";
 import { findAccessibleBoard, findOwnedBoard } from "@/lib/board-access";
 import { isObjectId, jsonError, requireUserId, serializeDoc, serializeDocs } from "@/lib/api";
 import { emitToBoard } from "@/lib/socket-emit";
+import { deleteAttachments } from "@/lib/attachments";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -80,6 +81,12 @@ export async function DELETE(request: Request, { params }: Params) {
   await connectDb();
   const board = await findAccessibleBoard(id, userId);
   if (!board) return jsonError("Board not found.", 404);
+
+  const tasksInColumn = await Task.find({ board: id, column: columnId });
+  const attachmentsToDelete = tasksInColumn.flatMap(t => t.attachments || []);
+  if (attachmentsToDelete.length > 0) {
+    await deleteAttachments(attachmentsToDelete);
+  }
 
   await Promise.all([
     Task.deleteMany({ board: id, column: columnId }),

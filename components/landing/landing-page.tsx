@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Layout, Users, Zap, CheckCircle, Lock, MousePointer2, Clock, DollarSign, Building2 } from "lucide-react";
+import { FaGithub } from "react-icons/fa";
 import { motion, useScroll, useTransform, AnimatePresence, Variants } from "framer-motion";
 
 export function LandingPage() {
@@ -167,6 +168,17 @@ export function LandingPage() {
             <span className="font-bold text-2xl tracking-tight text-white group-hover:text-indigo-200 transition-colors">FlowZen</span>
           </Link>
           <div className="flex items-center gap-6">
+            <motion.a
+              href="https://github.com/abhi-1288/FlowZen"
+              target="_blank"
+              rel="noopener noreferrer"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              className="text-slate-400 hover:text-white transition-colors"
+              aria-label="View source on GitHub"
+            >
+              <FaGithub size={20} />
+            </motion.a>
             <Link href="/login" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">
               Log in
             </Link>
@@ -552,6 +564,26 @@ export function LandingPage() {
           <span className="font-semibold text-slate-300 text-lg tracking-tight">FlowZen</span>
         </div>
         <p className="text-sm font-medium">© {new Date().getFullYear()} FlowZen. All rights reserved.</p>
+        <p className="text-xs mt-3 flex items-center justify-center gap-4">
+          Build By:-
+          <a
+            href="https://github.com/abhi-1288"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-indigo-400 hover:text-indigo-300 transition-colors font-medium"
+          >
+            GitHub
+          </a>
+          <span className="text-slate-600">·</span>
+          <a
+            href="https://portfolio-abhijeet.vercel.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-indigo-400 hover:text-indigo-300 transition-colors font-medium"
+          >
+            Portfolio
+          </a>
+        </p>
       </footer>
     </div>
   );

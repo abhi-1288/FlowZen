@@ -584,6 +584,8 @@ export function TaskModal({ boardId, columnId, taskId }: { boardId: string; colu
   const [comment, setComment] = useState("");
   const [attachmentName, setAttachmentName] = useState("");
   const [attachmentUrl, setAttachmentUrl] = useState("");
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [attachmentUploading, setAttachmentUploading] = useState(false);
   const [subTaskTitle, setSubTaskTitle] = useState("");
   const [subTasks, setSubTasks] = useState(task?.subTasks ?? []);
 
@@ -623,10 +625,40 @@ export function TaskModal({ boardId, columnId, taskId }: { boardId: string; colu
 
   async function submitAttachment() {
     if (!task || !attachmentName.trim()) return;
-    const safeUrl = attachmentUrl.trim() || `file://${encodeURIComponent(attachmentName.trim())}`;
-    await addAttachment(boardId, task.id, attachmentName, safeUrl);
-    setAttachmentName("");
-    setAttachmentUrl("");
+    setAttachmentUploading(true);
+    try {
+      let nextName = attachmentName.trim();
+      let nextUrl = attachmentUrl.trim();
+      let nextId = "";
+
+      if (attachmentFile) {
+        const formData = new FormData();
+        formData.append("boardId", boardId);
+        formData.append("file", attachmentFile);
+
+        const response = await fetch("/api/boards/attachments", {
+          method: "POST",
+          body: formData,
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Unable to upload attachment.");
+        }
+
+        nextId = String(payload.id ?? "");
+        nextName = String(payload.name ?? nextName);
+        nextUrl = String(payload.url ?? "");
+      }
+
+      if (!nextUrl) return;
+
+      await addAttachment(boardId, task.id, nextName, nextUrl, nextId || undefined);
+      setAttachmentName("");
+      setAttachmentUrl("");
+      setAttachmentFile(null);
+    } finally {
+      setAttachmentUploading(false);
+    }
   }
 
   async function removeExistingAttachment(attachmentId: string) {
@@ -708,7 +740,13 @@ export function TaskModal({ boardId, columnId, taskId }: { boardId: string; colu
               <div className="mt-2 space-y-1">
                 {task.attachments.map((attachment) => (
                   <div className="flex items-center justify-between gap-2" key={attachment.id}>
-                    <a className="block min-w-0 truncate text-sm text-emerald-700 hover:underline" href={attachment.url} target="_blank">
+                    <a
+                      className="block min-w-0 truncate text-sm text-emerald-700 hover:underline"
+                      download={attachment.name}
+                      href={attachment.url}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
                       {attachment.name}
                     </a>
                     <button
@@ -728,6 +766,7 @@ export function TaskModal({ boardId, columnId, taskId }: { boardId: string; colu
                   type="file"
                   onChange={(event) => {
                     const file = event.target.files?.[0];
+                    setAttachmentFile(file ?? null);
                     if (file && !attachmentName) setAttachmentName(file.name);
                   }}
                 />
@@ -744,8 +783,13 @@ export function TaskModal({ boardId, columnId, taskId }: { boardId: string; colu
                   onChange={(event) => setAttachmentUrl(event.target.value)}
                 />
               </div>
-              <button className="mt-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:text-slate-950" onClick={submitAttachment} type="button">
-                Add attachment
+              <button
+                className="mt-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={attachmentUploading || !attachmentName.trim() || (!attachmentFile && !attachmentUrl.trim())}
+                onClick={submitAttachment}
+                type="button"
+              >
+                {attachmentUploading ? "Uploading..." : "Add attachment"}
               </button>
             </div>
 

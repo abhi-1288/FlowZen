@@ -295,6 +295,7 @@ export function AttendanceTab({
   const [rejectionReason, setRejectionReason] = useState("");
   const [wfhCheckInMode, setWfhCheckInMode] = useState<string>("all-day");
   const [companyWfhDates, setCompanyWfhDates] = useState<{ date: string; reason: string }[]>([]);
+  const [companyWeekendDates, setCompanyWeekendDates] = useState<{ date: string; reason?: string }[]>([]);
   const [wfhDays, setWfhDays] = useState(0);
   const [wfhPeriod, setWfhPeriod] = useState("monthly");
   const [remainingWfhDays, setRemainingWfhDays] = useState(0);
@@ -349,8 +350,8 @@ export function AttendanceTab({
       apiFetch<{ holidays: AnyRecord[] }>("/api/attendance/holidays").catch(
         () => ({ holidays: [] as AnyRecord[] }),
       ),
-      apiFetch<{ wfhDays: number; wfhPeriod: string; wfhCheckInMode?: string; wfhDates?: { date: string; reason: string }[] }>("/api/company/wfh").catch(
-        () => ({ wfhDays: 0, wfhPeriod: "monthly" as string, wfhCheckInMode: "all-day", wfhDates: [] }),
+      apiFetch<{ wfhDays: number; wfhPeriod: string; wfhCheckInMode?: string; wfhDates?: { date: string; reason: string }[]; weekendDates?: { date: string; reason?: string }[] }>("/api/company/wfh").catch(
+        () => ({ wfhDays: 0, wfhPeriod: "monthly" as string, wfhCheckInMode: "all-day", wfhDates: [], weekendDates: [] }),
       ),
       apiFetch<{ requests: AnyRecord[] }>("/api/attendance/wfh").catch(
         () => ({ requests: [] as AnyRecord[] }),
@@ -363,6 +364,7 @@ export function AttendanceTab({
     setHolidays(holRes.holidays);
     setWfhCheckInMode(wfhRes.wfhCheckInMode ?? "all-day");
     setCompanyWfhDates((wfhRes as any).wfhDates ?? []);
+    setCompanyWeekendDates((wfhRes as any).weekendDates ?? []);
     setWfhDays(wfhRes.wfhDays ?? 0);
     setWfhPeriod(wfhRes.wfhPeriod ?? "monthly");
     setRemainingWfhDays(Math.max(0, Number((wfhReqRes as any)?.wfhPolicy?.remainingWfhDays ?? 0)));
@@ -634,7 +636,21 @@ export function AttendanceTab({
 
   const isWeekend = (day: number | null) => {
     const date = getDateForDay(day);
-    return date ? date.getDay() === 0 || date.getDay() === 6 : false;
+    if (!date) return false;
+    
+    const manualWeekendsThisMonth = companyWeekendDates.filter((item) => {
+      const weekendDate = normalizeDate(new Date(item.date));
+      return weekendDate.getFullYear() === year && weekendDate.getMonth() === month;
+    });
+
+    if (manualWeekendsThisMonth.length === 0) {
+      return date.getDay() === 0;
+    }
+
+    return manualWeekendsThisMonth.some((item) => {
+      const weekendDate = normalizeDate(new Date(item.date));
+      return weekendDate.getTime() === date.getTime();
+    });
   };
 
   const isOnLeave = (day: number | null) => {

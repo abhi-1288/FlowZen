@@ -14,6 +14,20 @@ import { FinanceTab } from "./profile-hub/finance-tab";
 import { OnboardingTab, ProfileTab, TimelineTab } from "./profile-hub/profile-tabs";
 import { AnyRecord, AvatarBadge, formatRoleWithCustom } from "./profile-hub/shared";
 
+type ProfileHubCache = {
+  profile: AnyRecord | null;
+  insights: AnyRecord | null;
+  approvals: AnyRecord[];
+  notifications: AnyRecord[];
+  attendanceHistory: AnyRecord[];
+  leaveRequests: AnyRecord[];
+  wfhRequests: AnyRecord[];
+  financeCount: number;
+  fetchedAt: number;
+};
+
+const PROFILE_CACHE_TTL_MS = 30_000;
+let profileHubCache: ProfileHubCache | null = null;
 
 export type Tab =
   | "profile"
@@ -63,6 +77,21 @@ export function ProfileHub() {
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
 
+  useEffect(() => {
+    if (!profileHubCache) return;
+    if (Date.now() - profileHubCache.fetchedAt > PROFILE_CACHE_TTL_MS) return;
+
+    setProfile(profileHubCache.profile);
+    setInsights(profileHubCache.insights);
+    setApprovals(profileHubCache.approvals);
+    setNotifications(profileHubCache.notifications);
+    setAttendanceHistory(profileHubCache.attendanceHistory);
+    setLeaveRequests(profileHubCache.leaveRequests);
+    setWfhRequests(profileHubCache.wfhRequests);
+    setFinanceCount(profileHubCache.financeCount);
+    setLoading(false);
+  }, []);
+
   const role = session?.user?.role ?? String(profile?.role ?? "employee");
   const displayRole = formatRoleWithCustom(String(role), profile?.customRole);
   const displayName = String(profile?.name ?? session?.user?.name ?? "User");
@@ -101,6 +130,26 @@ export function ProfileHub() {
 
   async function load(silent = false) {
     try {
+      const cached = profileHubCache;
+      const canUseCache =
+        !silent &&
+        cached &&
+        Date.now() - cached.fetchedAt < PROFILE_CACHE_TTL_MS;
+
+      if (canUseCache && cached) {
+        setProfile(cached.profile);
+        setInsights(cached.insights);
+        setApprovals(cached.approvals);
+        setNotifications(cached.notifications);
+        setAttendanceHistory(cached.attendanceHistory);
+        setLeaveRequests(cached.leaveRequests);
+        setWfhRequests(cached.wfhRequests);
+        setFinanceCount(cached.financeCount);
+        setLoading(false);
+        void load(true);
+        return;
+      }
+
       if (!silent) setLoading(true);
 
       const [profileResult, approvalsResult, notificationResult] =
@@ -124,26 +173,55 @@ export function ProfileHub() {
       setApprovals(approvalsResult?.requests ?? []);
       setNotifications(notificationResult?.notifications ?? []);
 
-      apiFetch<{ history: AnyRecord[] }>("/api/attendance/checkin")
-        .then((res) => setAttendanceHistory(res.history))
-        .catch(() => { });
-      apiFetch<{ requests: AnyRecord[] }>("/api/attendance/leave")
-        .then((res) => setLeaveRequests(res.requests))
-        .catch(() => { });
-      apiFetch<{ requests: AnyRecord[] }>("/api/attendance/wfh")
-        .then((res) => setWfhRequests(res.requests))
-        .catch(() => { });
+      const nextProfile = profileResult?.user ?? profile;
+      const nextInsights = profileResult?.insights ?? insights;
+      const nextApprovals = approvalsResult?.requests ?? [];
+      const nextNotifications = notificationResult?.notifications ?? [];
+
+      const [attendanceResult, leaveResult, wfhResult] = await Promise.all([
+        apiFetch<{ history: AnyRecord[] }>("/api/attendance/checkin").catch(
+          () => ({ history: attendanceHistory }),
+        ),
+        apiFetch<{ requests: AnyRecord[] }>("/api/attendance/leave").catch(
+          () => ({ requests: leaveRequests }),
+        ),
+        apiFetch<{ requests: AnyRecord[] }>("/api/attendance/wfh").catch(
+          () => ({ requests: wfhRequests }),
+        ),
+      ]);
+
+      const nextAttendanceHistory = attendanceResult.history;
+      const nextLeaveRequests = leaveResult.requests;
+      const nextWfhRequests = wfhResult.requests;
+      let nextFinanceCount = financeCount;
+
+      setAttendanceHistory(nextAttendanceHistory);
+      setLeaveRequests(nextLeaveRequests);
+      setWfhRequests(nextWfhRequests);
+
       if (["finance", "admin"].includes(String(role)) && hasCompany) {
         const month = new Date().toISOString().slice(0, 7);
-        apiFetch<{ pendingSalaryApproval: number; pendingSalaryPayment: number; pendingExpenseApproval: number; forwardedExpenseApproval: number; pendingExpenseAcceptance: number; pendingAssignedExpenses: number; pendingBills: number; pendingBudgets: number }>(`/api/finance?counts=true&month=${month}`)
-          .then((res) => {
-            const count = String(role) === "admin"
-              ? res.pendingSalaryApproval + res.pendingExpenseApproval + res.forwardedExpenseApproval + res.pendingBills + res.pendingBudgets
-              : res.pendingSalaryPayment + res.pendingExpenseAcceptance + res.pendingAssignedExpenses + res.pendingBudgets;
-            setFinanceCount(count);
-          })
-          .catch(() => { });
+        const financeCounts = await apiFetch<{ pendingSalaryApproval: number; pendingSalaryPayment: number; pendingExpenseApproval: number; forwardedExpenseApproval: number; pendingExpenseAcceptance: number; pendingAssignedExpenses: number; pendingBills: number; pendingBudgets: number }>(`/api/finance?counts=true&month=${month}`)
+          .catch(() => null);
+        if (financeCounts) {
+          nextFinanceCount = String(role) === "admin"
+            ? financeCounts.pendingSalaryApproval + financeCounts.pendingExpenseApproval + financeCounts.forwardedExpenseApproval + financeCounts.pendingBills + financeCounts.pendingBudgets
+            : financeCounts.pendingSalaryPayment + financeCounts.pendingExpenseAcceptance + financeCounts.pendingAssignedExpenses + financeCounts.pendingBudgets;
+          setFinanceCount(nextFinanceCount);
+        }
       }
+
+      profileHubCache = {
+        profile: nextProfile,
+        insights: nextInsights,
+        approvals: nextApprovals,
+        notifications: nextNotifications,
+        attendanceHistory: nextAttendanceHistory,
+        leaveRequests: nextLeaveRequests,
+        wfhRequests: nextWfhRequests,
+        financeCount: nextFinanceCount,
+        fetchedAt: Date.now(),
+      };
     } finally {
       if (!silent) setLoading(false);
     }

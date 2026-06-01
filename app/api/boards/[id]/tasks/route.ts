@@ -6,6 +6,7 @@ import { Notification } from "@/models/Notification";
 import { findAccessibleBoard, findOwnedBoard } from "@/lib/board-access";
 import { isObjectId, jsonError, requireUserId, serializeDoc, serializeDocs } from "@/lib/api";
 import { emitToBoard, emitToUser } from "@/lib/socket-emit";
+import { deleteAttachments } from "@/lib/attachments";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -183,6 +184,11 @@ export async function DELETE(request: Request, { params }: Params) {
   await connectDb();
   const board = await findOwnedBoard(id, userId);
   if (!board) return jsonError("Only the board owner can delete tasks.", 403);
+
+  const task = await Task.findOne({ _id: taskId, board: id });
+  if (task && task.attachments && task.attachments.length > 0) {
+    await deleteAttachments(task.attachments);
+  }
 
   await Task.deleteOne({ _id: taskId, board: id });
   emitToBoard(board, "board:update", id);

@@ -24,6 +24,12 @@ const CompanySchema = new Schema(
         reason: { type: String }
       }
     ],
+    weekendDates: [
+      {
+        date: { type: Date, index: true },
+        reason: { type: String }
+      }
+    ],
     wfhCheckInMode: { type: String, enum: ["all-day", "wfh-only"], default: "all-day" }
   },
   { timestamps: true }

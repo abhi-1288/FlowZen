@@ -33,6 +33,7 @@ export async function GET() {
     wfhPeriod: company.wfhPeriod ?? "monthly",
     wfhCheckInMode: company.wfhCheckInMode || "all-day",
     wfhDates: company.wfhDates || [],
+    weekendDates: company.weekendDates || [],
   });
 }
 
@@ -143,6 +144,7 @@ export async function POST(request: Request) {
     wfhPeriod: company.wfhPeriod,
     wfhCheckInMode: company.wfhCheckInMode,
     wfhDates: company.wfhDates || [],
+    weekendDates: company.weekendDates || [],
   });
 }
 

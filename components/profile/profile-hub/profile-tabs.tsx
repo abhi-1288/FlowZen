@@ -1,7 +1,8 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import {
   AlertTriangle,
+  BarChart3,
   Building2,
   Camera,
   Check,
@@ -110,6 +111,9 @@ export function ProfileTab({
   const [wfhMode, setWfhMode] = useState<"all-day" | "wfh-only">("all-day");
   const [wfhLoading, setWfhLoading] = useState(false);
   const [wfhDates, setWfhDates] = useState<{ date: string; reason: string }[]>([]);
+  const [weekendDates, setWeekendDates] = useState<{ date: string; reason?: string }[]>([]);
+  const [weekendMonth, setWeekendMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [weekendDays, setWeekendDays] = useState({ saturday: false, sunday: true });
   const [showWfhAssignModal, setShowWfhAssignModal] = useState(false);
   const [showManageWfhModal, setShowManageWfhModal] = useState(false);
   const [identityRequesting, setIdentityRequesting] = useState(false);
@@ -283,13 +287,14 @@ export function ProfileTab({
     if (!company) return;
     try {
       setWfhLoading(true);
-      const res = await apiFetch<{ wfhDays: number; wfhPeriod: string; wfhCheckInMode: string; wfhDates: { date: string; reason: string }[] }>(
+      const res = await apiFetch<{ wfhDays: number; wfhPeriod: string; wfhCheckInMode: string; wfhDates: { date: string; reason: string }[]; weekendDates?: { date: string; reason?: string }[] }>(
         "/api/company/wfh",
       );
       setWfhDays(res.wfhDays ?? 0);
       setWfhPeriod(res.wfhPeriod === "yearly" ? "yearly" : "monthly");
       setWfhMode(res.wfhCheckInMode === "wfh-only" ? "wfh-only" : "all-day");
       setWfhDates(res.wfhDates || []);
+      setWeekendDates(res.weekendDates || []);
     } catch (err) {
       // ignore
     } finally {
@@ -336,6 +341,53 @@ export function ProfileTab({
         err instanceof Error ? err.message : "Failed to update mode",
         "error",
       );
+    } finally {
+      setWfhLoading(false);
+    }
+  }
+
+  const visibleWeekendDates = useMemo(() => {
+    return [...weekendDates]
+      .filter((item) => String(item.date ?? "").startsWith(weekendMonth))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [weekendDates, weekendMonth]);
+
+  async function assignWeekends() {
+    const days = [
+      weekendDays.sunday ? 0 : null,
+      weekendDays.saturday ? 6 : null,
+    ].filter((day): day is number => typeof day === "number");
+    if (!days.length) {
+      showToast("Select Saturday, Sunday, or both.", "error");
+      return;
+    }
+
+    try {
+      setWfhLoading(true);
+      const res = await apiFetch<{ weekendDates: { date: string; reason?: string }[] }>("/api/company/weekends", {
+        method: "POST",
+        body: JSON.stringify({ month: weekendMonth, days }),
+      });
+      setWeekendDates(res.weekendDates || []);
+      showToast("Weekend dates assigned.", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to assign weekends", "error");
+    } finally {
+      setWfhLoading(false);
+    }
+  }
+
+  async function deleteWeekend(date: string) {
+    try {
+      setWfhLoading(true);
+      const res = await apiFetch<{ weekendDates: { date: string; reason?: string }[] }>("/api/company/weekends", {
+        method: "DELETE",
+        body: JSON.stringify({ date }),
+      });
+      setWeekendDates(res.weekendDates || []);
+      showToast("Weekend date removed.", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to remove weekend", "error");
     } finally {
       setWfhLoading(false);
     }
@@ -753,6 +805,82 @@ export function ProfileTab({
                   </div>
                 </div>
 
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
+                  <label className="text-xs font-semibold uppercase text-slate-500">
+                    Manual Weekends
+                  </label>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Mark Saturdays or Sundays as company weekends for a month.
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <input
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                      type="month"
+                      value={weekendMonth}
+                      onChange={(event) => setWeekendMonth(event.target.value)}
+                    />
+                    <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={weekendDays.saturday}
+                        onChange={(event) =>
+                          setWeekendDays((current) => ({
+                            ...current,
+                            saturday: event.target.checked,
+                          }))
+                        }
+                      />
+                      Saturday
+                    </label>
+                    <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={weekendDays.sunday}
+                        onChange={(event) =>
+                          setWeekendDays((current) => ({
+                            ...current,
+                            sunday: event.target.checked,
+                          }))
+                        }
+                      />
+                      Sunday
+                    </label>
+                    <button
+                      className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                      disabled={wfhLoading}
+                      type="button"
+                      onClick={() => void assignWeekends()}
+                    >
+                      Assign weekends
+                    </button>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {visibleWeekendDates.map((item) => (
+                      <span
+                        className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700"
+                        key={String(item.date)}
+                      >
+                        {new Date(item.date).toLocaleDateString()}
+                        <button
+                          className="text-rose-600 hover:text-rose-800 disabled:opacity-50"
+                          disabled={wfhLoading}
+                          type="button"
+                          onClick={() => void deleteWeekend(item.date)}
+                          aria-label="Delete weekend date"
+                        >
+                          <X size={13} />
+                        </button>
+                      </span>
+                    ))}
+                    {visibleWeekendDates.length === 0 ? (
+                      <p className="text-sm text-slate-400">
+                        No manual weekends assigned for this month.
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+
                 <div>
                   <label className="text-xs font-semibold uppercase text-slate-500">
                     Check-in behavior
@@ -824,7 +952,7 @@ export function ProfileTab({
         {role === "project-manager" ||
         role === "qa-tester" ||
         role === "finance" ? (
-          <section className="rounded-lg border overflow-y-auto max-h-[500px] border-slate-200 bg-white p-5 shadow-sm">
+          <section className="rounded-lg border overflow-y-auto h-auto max-h-[500px] border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center gap-2">
               <Building2 size={18} />
               <h3 className="text-lg font-semibold uppercase tracking-wide text-slate-700">
@@ -959,6 +1087,8 @@ export function ProfileTab({
           </p>
           <VersionPanel />
         </section>
+
+        <MonthlyCheckBox sectionClass={sectionClass} showToast={showToast} />
       </div>
 
       {/* Modal */}
@@ -1063,6 +1193,161 @@ export function ProfileTab({
 
 
     </>
+  );
+}
+
+type MonthlyCheckItem = {
+  key: string;
+  label: string;
+  value: number;
+};
+
+type MonthlyCheckResponse = {
+  month: string;
+  counts: {
+    activeDays: number;
+    present: number;
+    leave: number;
+    wfh: number;
+    holidays: number;
+    weekends: number;
+    absent: number;
+  };
+  items: MonthlyCheckItem[];
+};
+
+const monthlyCheckColors: Record<string, string> = {
+  present: "bg-emerald-500",
+  leave: "bg-amber-500",
+  wfh: "bg-sky-500",
+  holidays: "bg-fuchsia-500",
+  weekends: "bg-slate-400",
+  absent: "bg-rose-500",
+};
+
+function MonthlyCheckBox({
+  sectionClass,
+  showToast,
+}: {
+  sectionClass: string;
+  showToast: (text: string, type?: "success" | "error") => void;
+}) {
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [summary, setSummary] = useState<MonthlyCheckResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const maxValue = useMemo(() => {
+    const values = summary?.items.map((item) => item.value) ?? [];
+    return Math.max(1, ...values);
+  }, [summary]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadMonthlyCheck() {
+      try {
+        setLoading(true);
+        const result = await apiFetch<MonthlyCheckResponse>(
+          `/api/profile/monthly-check?month=${encodeURIComponent(month)}`,
+        );
+        if (!ignore) setSummary(result);
+      } catch (err) {
+        if (!ignore) {
+          showToast(
+            err instanceof Error ? err.message : "Unable to load monthly check.",
+            "error",
+          );
+        }
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    }
+
+    void loadMonthlyCheck();
+    return () => {
+      ignore = true;
+    };
+  }, [month, showToast]);
+
+  return (
+    <section className={sectionClass}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-slate-700" />
+            <h3 className="text-lg font-semibold">Monthly Check</h3>
+          </div>
+          <p className="mt-1 text-sm text-slate-500">
+            Compare your attendance, leave, WFH, holidays, weekends, and absences.
+          </p>
+        </div>
+        <input
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700"
+          type="month"
+          value={month}
+          onChange={(event) => setMonth(event.target.value)}
+        />
+      </div>
+
+      <div className="mt-5 space-y-5">
+        <div className="space-y-3">
+          {(summary?.items ?? []).map((item) => {
+            const width = `${Math.max(4, Math.round((item.value / maxValue) * 100))}%`;
+            return (
+              <div key={item.key}>
+                <div className="mb-1 flex items-center justify-between gap-3 text-sm">
+                  <span className="font-medium text-slate-700">{item.label}</span>
+                  <span className="font-semibold text-slate-900">
+                    {item.value} day{item.value === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className={`h-full rounded-full ${monthlyCheckColors[item.key] ?? "bg-slate-500"} transition-all`}
+                    style={{ width }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+
+          {!summary && !loading ? (
+            <p className="rounded-lg bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">
+              Select a month to view your attendance comparison.
+            </p>
+          ) : null}
+          {loading ? (
+            <p className="rounded-lg bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">
+              Loading monthly check...
+            </p>
+          ) : null}
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase text-slate-500">
+                Active days
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Counted after your join date.
+              </p>
+            </div>
+            <p className="text-3xl font-semibold text-slate-950">
+              {summary?.counts.activeDays ?? 0}
+            </p>
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+            {summary?.items.map((item) => (
+              <div className="rounded-md bg-white px-2 py-2" key={`stat-${item.key}`}>
+                <p className="text-slate-500">{item.label}</p>
+                <p className="font-semibold text-slate-900">{item.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
