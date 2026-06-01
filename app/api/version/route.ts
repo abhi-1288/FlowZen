@@ -85,11 +85,39 @@ function formatDate(raw: string): string {
 
 export async function GET() {
   try {
-    const fs = require('fs/promises');
-    const path = require('path');
-    const data = await fs.readFile(path.join(process.cwd(), 'public', 'release-notes.json'), 'utf-8');
-    return NextResponse.json(JSON.parse(data));
+    const hash = execSync("git log -1 --format=%H", { encoding: "utf-8" }).trim();
+    const date = execSync("git log -1 --format=%cd --date=short", { encoding: "utf-8" }).trim();
+    const commits = execSync("git log --oneline -30", { encoding: "utf-8" }).trim().split("\n").filter(Boolean);
+    const total = execSync("git rev-list --count HEAD", { encoding: "utf-8" }).trim();
+    const tag = execSync("git describe --tags --always 2>nul", { encoding: "utf-8" }).trim();
+
+    const entries: ReleaseEntry[] = commits.map((line: string) => {
+      const match = line.match(/^[a-f0-9]+\s(.+)$/);
+      return aiCategorize(match ? match[1] : line);
+    });
+
+    const releaseNotes = aiSummarize(entries);
+
+    const knownIssues: string[] = [];
+
+    return NextResponse.json({
+      version: `v1.0.0-build.${total}`,
+      tag: tag === hash ? null : tag,
+      lastUpdate: formatDate(date),
+      rawDate: date,
+      commitHash: hash.slice(0, 7),
+      totalCommits: Number(total),
+      releaseNotes,
+      knownIssues,
+    });
   } catch {
-    return NextResponse.json({ version: "v1.0.0", releaseNotes: [] });
+    return NextResponse.json({
+      version: "v1.0.0",
+      lastUpdate: "N/A",
+      rawDate: new Date().toISOString().slice(0, 10),
+      totalCommits: 0,
+      releaseNotes: [],
+      knownIssues: [],
+    });
   }
 }
