@@ -1090,16 +1090,31 @@ export function MessagesTab({
         {members.map((member) => {
           const memberId = String(member.id ?? member._id ?? "");
           const name = String(member.name ?? "Member");
-          const role = formatRole(String(member.role ?? "employee"));
+          const roleRaw = String(member.role ?? "employee");
+          const role = formatRole(roleRaw);
           const email = String(member.email ?? "");
-          const teamObj =
-            member.team && typeof member.team === "object" ? member.team : null;
-          const teamLabel =
-            teamObj && (teamObj as any).name
+          const isHighProfile = ["admin", "human-resource", "finance"].includes(roleRaw);
+          const joinDateStr = member.companyJoined
+            ? new Date(String(member.companyJoined)).toLocaleDateString()
+            : member.createdAt
+              ? new Date(String(member.createdAt)).toLocaleDateString()
+              : null;
+          let label: string;
+          if (isHighProfile) {
+            const companyName =
+              member.company && typeof member.company === "object"
+                ? String((member.company as any).name ?? "")
+                : "";
+            label = companyName || "No company";
+          } else {
+            const teamObj =
+              member.team && typeof member.team === "object" ? member.team : null;
+            label = teamObj && (teamObj as any).name
               ? String((teamObj as any).name)
               : Array.isArray(member.teams) && member.teams.length
                 ? member.teams.map(String).join(", ")
                 : "No team joined";
+          }
           const isSelected = !!bulkSelected[memberId];
 
           return (
@@ -1150,9 +1165,10 @@ export function MessagesTab({
                       ? "border-white/20 bg-white/10 text-white"
                       : "border-slate-200 bg-white text-slate-700"
                       }`}
-                    title={teamLabel}
+                    title={isHighProfile ? label : `Team: ${label}`}
                   >
-                    Team: {teamLabel}
+                    {isHighProfile ? `Company: ${label}` : `Team: ${label}`}
+                    {joinDateStr ? ` · ${joinDateStr}` : ""}
                   </span>
 
                   {mode === "normal" ? (

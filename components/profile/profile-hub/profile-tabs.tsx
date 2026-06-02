@@ -287,12 +287,17 @@ export function ProfileTab({
         companyActionType === "hold"
           ? "/api/company/hold-freeze"
           : "/api/company/takedown";
-      await apiFetch(endpoint, { method: "POST" });
-      showToast(
-        companyActionType === "hold"
-          ? "Hold & Freeze request submitted."
-          : "TakeDown request submitted.",
-      );
+      const res = await apiFetch<{ status?: string }>(endpoint, { method: "POST" });
+      const newStatus = res?.status;
+      if (companyActionType === "hold") {
+        showToast(
+          newStatus === "frozen"
+            ? "Company has been frozen."
+            : "Company has been un-frozen.",
+        );
+      } else {
+        showToast("Company has been taken down.");
+      }
       setCompanyActionModal(false);
       setCompanyActionConfirm("");
       await refresh(true);
@@ -764,37 +769,47 @@ export function ProfileTab({
               <div>
                 <h3 className="text-lg font-semibold">Company controls</h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  No approved members besides you remain in the company. Use
-                  these controls carefully.
+                  {company?.status === "taken-down"
+                    ? "This company has been taken down."
+                    : "No approved members besides you remain in the company. Use these controls carefully."}
                 </p>
               </div>
             </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                className="rounded-lg border border-amber-200 bg-amber-100 px-4 py-3 text-sm font-semibold text-amber-900 hover:bg-amber-200"
-                onClick={() => {
-                  setCompanyActionType("hold");
-                  setCompanyActionModal(true);
-                }}
-              >
-                Hold & Freeze Company
-              </button>
-              <button
-                type="button"
-                className="rounded-lg border border-rose-200 bg-rose-100 px-4 py-3 text-sm font-semibold text-rose-900 hover:bg-rose-200"
-                onClick={() => {
-                  setCompanyActionType("takedown");
-                  setCompanyActionModal(true);
-                }}
-              >
-                TakeDown Company
-              </button>
-            </div>
+            {company?.status !== "taken-down" ? (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  className={
+                    "rounded-lg border px-4 py-3 text-sm font-semibold " +
+                    (company?.status === "frozen"
+                      ? "border-emerald-200 bg-emerald-100 text-emerald-900 hover:bg-emerald-200"
+                      : "border-amber-200 bg-amber-100 text-amber-900 hover:bg-amber-200")
+                  }
+                  onClick={() => {
+                    setCompanyActionType("hold");
+                    setCompanyActionModal(true);
+                  }}
+                >
+                  {company?.status === "frozen"
+                    ? "Un-freeze Company"
+                    : "Hold & Freeze Company"}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-rose-200 bg-rose-100 px-4 py-3 text-sm font-semibold text-rose-900 hover:bg-rose-200"
+                  onClick={() => {
+                    setCompanyActionType("takedown");
+                    setCompanyActionModal(true);
+                  }}
+                >
+                  TakeDown Company
+                </button>
+              </div>
+            ) : null}
           </section>
         ) : null}
 
-        {role === "admin" && company?.joinCode ? (
+        {role === "admin" && company?.joinCode && company?.status !== "taken-down" ? (
           <>
             <CodePanel
               title="HR Onboarding"
@@ -1181,7 +1196,9 @@ export function ProfileTab({
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             <h3 className="text-lg font-semibold text-slate-900">
               {companyActionType === "hold"
-                ? "Hold & Freeze Company?"
+                ? company?.status === "frozen"
+                  ? "Un-freeze Company?"
+                  : "Hold & Freeze Company?"
                 : "TakeDown Company?"}
             </h3>
 
@@ -1192,8 +1209,10 @@ export function ProfileTab({
             </p>
             <p className="mt-2 text-sm text-slate-600">
               {companyActionType === "hold"
-                ? "Freezing a company preserves its settings and prevents new activity."
-                : "Taking down a company marks it for removal and locks access."}
+                ? company?.status === "frozen"
+                  ? "Un-freezing re-activates the company so members can work, join, and process finance again."
+                  : "Freezing stops all joining, finance, and work activity. Use Un-freeze to restore later."
+                : "This permanently deletes the company, all teams, boards, tasks, notifications, and related data. This cannot be undone."}
             </p>
 
             <input
@@ -1827,7 +1846,7 @@ export function OnboardingTab({
 
   return (
     <div className="grid gap-5 xl:grid-cols-2">
-      {role === "admin" ? (
+      {role === "admin" && company?.status !== "taken-down" ? (
         <CodePanel
           title="HR Onboarding"
           code={company?.joinCode ? String(company.joinCode) : undefined}
@@ -1851,7 +1870,7 @@ export function OnboardingTab({
         </CodePanel>
       ) : null}
 
-      {role === "human-resource" ? (
+      {role === "human-resource" && company?.status !== "taken-down" ? (
         profile?.companyStatus === "approved" ? (
           <>
             <CodePanel

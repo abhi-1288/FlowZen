@@ -59,7 +59,12 @@ export default function SignupPage() {
       return;
     }
 
-    await signIn("credentials-login", { email, password, redirect: false });
+    await signIn("credentials-login", { email, password, rememberMe: "true", redirect: false });
+    await fetch("/api/auth/session-mode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rememberMe: true })
+    });
     router.push("/profile");
     router.refresh();
   }

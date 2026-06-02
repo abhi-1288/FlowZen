@@ -167,6 +167,13 @@ export async function PATCH(request: Request, { params }: Params) {
     if (!canDecide) return jsonError("Forbidden", 403);
     if (!["pending", "hr-approved"].includes(joinRequest.status)) return jsonError("Approval request already processed.", 409);
 
+    if (status !== "rejected" && joinRequest.company) {
+      const frozenCheck = await Company.findById(joinRequest.company).select("status");
+      if (frozenCheck?.status === "frozen") {
+        return jsonError("Company is frozen. No approvals can be processed.", 409);
+      }
+    }
+
     if (status === "approved" && joinRequest.kind === "quit-company") {
       if (["project-manager", "qa-tester"].includes(String(requester.role ?? "")) && joinRequest.replacementUser) {
         const pendingBoardTransfer = await JoinRequest.findOne({
@@ -216,10 +223,8 @@ export async function PATCH(request: Request, { params }: Params) {
             type: "increment",
           });
         }
+        await ensureCompanyIdentityCode(requester, joinRequest.company);
         const approver = await User.findById(joinRequest.approver).select("role");
-        if (String(approver?.role ?? "") === "human-resource") {
-          await ensureCompanyIdentityCode(requester, joinRequest.company);
-        }
         const meta = (joinRequest.metadata ?? {}) as { enrollingHrId?: unknown };
         let historyInviterId = joinRequest.approver;
         if (meta.enrollingHrId) {

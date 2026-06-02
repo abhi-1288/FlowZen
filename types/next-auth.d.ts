@@ -4,6 +4,7 @@ declare module "next-auth" {
   interface User {
     role?: "employee" | "project-manager" | "qa-tester" | "human-resource" | "finance" | "admin" | "others";
     passwordResetRequired?: boolean;
+    rememberMe?: boolean;
   }
 
   interface Session {
@@ -18,6 +19,7 @@ declare module "next-auth" {
       teamId?: string | null;
       managedTeamCount?: number;
       passwordResetRequired?: boolean;
+      rememberMe?: boolean;
     };
   }
 }

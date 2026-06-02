@@ -27,8 +27,9 @@ export async function GET() {
     companyStatus: "approved",
     _id: { $ne: user._id },
   })
-    .select("name email role teamStatus team activeTeams")
+    .select("name email role teamStatus team activeTeams companyJoined")
     .populate({ path: "team", select: "name" })
+    .populate({ path: "company", select: "name" })
     .sort({ role: 1, name: 1 });
 
   return NextResponse.json({ members: serializeDocs(members) });

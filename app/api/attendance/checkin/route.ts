@@ -13,8 +13,8 @@ export async function POST() {
   
   const user = await User.findById(userId);
   if (!user) return jsonError("User not found", 404);
+  if (!user.company) return jsonError("You must belong to a company to check in.", 400);
 
-  // Get user's company
   const company = await Company.findById(user.company);
   
   const today = new Date();

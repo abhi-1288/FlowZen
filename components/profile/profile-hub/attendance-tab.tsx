@@ -307,6 +307,8 @@ export function AttendanceTab({
   const [wfhRequests, setWfhRequests] = useState<AnyRecord[]>([]);
   const [showWfhFormModal, setShowWfhFormModal] = useState(false);
   const [showWfhRequestsModal, setShowWfhRequestsModal] = useState(false);
+  const [showAskModal, setShowAskModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
   const [wfhRejectingId, setWfhRejectingId] = useState<string | null>(null);
   const [wfhRejectionReason, setWfhRejectionReason] = useState("");
 
@@ -836,42 +838,30 @@ export function AttendanceTab({
           ) : null}
           <div className="flex gap-2 flex-wrap">
             <button
-              onClick={() => setShowRequestsModal(true)}
+              onClick={() => setShowAskModal(true)}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+            >
+              Ask
+            </button>
+            <button
+              onClick={() => setShowViewModal(true)}
               className="relative rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
             >
               Requests
-              {requests.filter(
-                (r) =>
-                  ["pending", "hr-approved", "manager-approved"].includes(String(r.status)),
-              ).length > 0 && (
+              {(() => {
+                const totalPending =
+                  requests.filter((r) =>
+                    ["pending", "hr-approved", "manager-approved"].includes(String(r.status))
+                  ).length +
+                  wfhRequests.filter((r) =>
+                    ["pending", "manager-approved", "hr-approved"].includes(String(r.status))
+                  ).length;
+                return totalPending > 0 ? (
                   <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] text-white">
-                    {
-                      requests.filter(
-                        (r) =>
-                          ["pending", "hr-approved", "manager-approved"].includes(String(r.status)),
-                      ).length
-                    }
+                    {totalPending}
                   </span>
-                )}
-            </button>
-            <button
-              onClick={() => setShowWfhRequestsModal(true)}
-              className="relative rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
-            >
-              WFH
-              {wfhRequests.filter(
-                (r) =>
-                  ["pending", "manager-approved", "hr-approved"].includes(String(r.status)),
-              ).length > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] text-white">
-                    {
-                      wfhRequests.filter(
-                        (r) =>
-                          ["pending", "manager-approved", "hr-approved"].includes(String(r.status)),
-                      ).length
-                    }
-                  </span>
-                )}
+                ) : null;
+              })()}
             </button>
             {profile?.role === "admin" && (
               <button
@@ -881,35 +871,7 @@ export function AttendanceTab({
                 Manage Holidays
               </button>
             )}
-            {profile?.role === "admin" ? (
-              <button
-                onClick={() => setShowHolidayModal(true)}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
-              >
-                Add Holiday
-              </button>
-            ) : (
-              <button
-                disabled={!canAskPaidLeave}
-                onClick={() => {
-                  if (!canAskPaidLeave) {
-                    showToast("Paid leave quota is used up. Missed dates will count as absent.", "error");
-                    return;
-                  }
-                  setShowLeaveModal(true);
-                }}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition disabled:cursor-not-allowed disabled:opacity-50"
-                title={!canAskPaidLeave ? "Paid leave quota used up." : "Request paid leave."}
-              >
-                Ask Leave
-              </button>
-            )}
-            <button
-              onClick={() => setShowWfhFormModal(true)}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
-            >
-              Request WFH
-            </button>
+
             {(wfhCheckInMode === "all-day" || isTodayWfh) && (
               todayAttendance && !todayAttendance.checkOut ? (
                 <button
@@ -967,6 +929,80 @@ export function AttendanceTab({
           .
         </div>
 
+        {showAskModal && (
+          <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-slate-900">Ask</h3>
+                <button onClick={() => setShowAskModal(false)} className="rounded-lg p-1 text-slate-400 hover:text-slate-600 transition">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="flex gap-3">
+                {profile?.role !== "admin" && (
+                  <button
+                    onClick={() => {
+                      if (!canAskPaidLeave) {
+                        showToast("Paid leave quota is used up. Missed dates will count as absent.", "error");
+                        return;
+                      }
+                      setShowAskModal(false);
+                      setShowLeaveModal(true);
+                    }}
+                    disabled={!canAskPaidLeave}
+                    className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={!canAskPaidLeave ? "Paid leave quota used up." : "Request paid leave."}
+                  >
+                    Leave
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setShowAskModal(false);
+                    setShowWfhFormModal(true);
+                  }}
+                  className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+                >
+                  WFH
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showViewModal && (
+          <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-slate-900">Requests</h3>
+                <button onClick={() => setShowViewModal(false)} className="rounded-lg p-1 text-slate-400 hover:text-slate-600 transition">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowViewModal(false);
+                    setShowRequestsModal(true);
+                  }}
+                  className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+                >
+                  Leave
+                </button>
+                <button
+                  onClick={() => {
+                    setShowViewModal(false);
+                    setShowWfhRequestsModal(true);
+                  }}
+                  className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+                >
+                  WFH
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {showLeaveModal && (
           <LeaveModal
             onClose={() => setShowLeaveModal(false)}
@@ -992,6 +1028,10 @@ export function AttendanceTab({
               setShowEditHolidayModal(true);
             }}
             onDeleteHoliday={requestHolidayDelete}
+            onAddHoliday={() => {
+              setShowLeaveHistoryModal(false);
+              setShowHolidayModal(true);
+            }}
           />
         )}
         {showEditHolidayModal && selectedHoliday && (
@@ -1849,12 +1889,14 @@ function AdminLeaveHistoryModal({
   onClose,
   onEditHoliday,
   onDeleteHoliday,
+  onAddHoliday,
 }: {
   requests: AnyRecord[];
   holidays: AnyRecord[];
   onClose: () => void;
   onEditHoliday: (holiday: AnyRecord) => void;
   onDeleteHoliday: (holiday: AnyRecord) => void;
+  onAddHoliday: () => void;
 }) {
   return (
     <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/40 p-4 backdrop-blur-sm">
@@ -1868,12 +1910,20 @@ function AdminLeaveHistoryModal({
               Create, update, or remove company holidays from one place.
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
-          >
-            Close
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={onAddHoliday}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition"
+            >
+              Add Holiday
+            </button>
+            <button
+              onClick={onClose}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+            >
+              Close
+            </button>
+          </div>
         </div>
 
         <div className="max-h-[70vh] overflow-y-auto p-6">

@@ -16,13 +16,14 @@ export default function LoginPage() {
   const [seeding, setSeeding] = useState(false);
   const [seedMsg, setSeedMsg] = useState("");
   const [showDemo, setShowDemo] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setLoading(true);
     setError("");
 
-    const result = await signIn("credentials-login", { email, password, redirect: false });
+    const result = await signIn("credentials-login", { email, password, rememberMe: String(rememberMe), redirect: false });
     setLoading(false);
     if (result?.error) {
       setError(
@@ -33,6 +34,11 @@ export default function LoginPage() {
       return;
     }
 
+    await fetch("/api/auth/session-mode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rememberMe })
+    });
     router.push("/profile");
     router.refresh();
   }
@@ -44,8 +50,12 @@ export default function LoginPage() {
         <form className="space-y-4" onSubmit={submit}>
           <Field label="Email" value={email} onChange={setEmail} type="email" />
           <Field label="Password" value={password} onChange={setPassword} type="password" />
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input suppressHydrationWarning type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+            <span className="text-sm text-slate-600">Remember me</span>
+          </label>
           {error ? <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p> : null}
-          <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 font-medium text-white hover:bg-slate-800 disabled:opacity-60" disabled={loading}>
+          <button suppressHydrationWarning className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 font-medium text-white hover:bg-slate-800 disabled:opacity-60" disabled={loading}>
             {loading ? <Loader2 className="animate-spin" size={18} /> : <Mail size={18} />}
             Login
           </button>
@@ -65,7 +75,7 @@ export default function LoginPage() {
         </div>
 
         <div className="mt-6 border-t border-slate-200 pt-4">
-          <button
+          <button suppressHydrationWarning
             type="button"
             onClick={() => setShowDemo(!showDemo)}
             className="flex w-full items-center justify-between text-sm font-medium text-slate-500 hover:text-slate-700"
@@ -143,8 +153,8 @@ function Field({ label, value, onChange, type }: { label: string; value: string;
   return (
     <label className="block relative">
       <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
-      <input className={`w-full rounded-lg border border-slate-200 px-3 py-2.5 ${isPassword ? "pr-10" : ""} outline-none ring-emerald-500 focus:ring-2`} type={isPassword && showPassword ? "text" : type} value={value} onChange={(event) => onChange(event.target.value)} required />
-      {isPassword && (<button type="button" onClick={() => setShowPassword((prev) => !prev)} className="absolute right-3 top-[38px] text-slate-500 hover:text-slate-800"> {showPassword ? <EyeOff size={18} /> : <Eye size={18} />} </button> )}
+      <input suppressHydrationWarning className={`w-full rounded-lg border border-slate-200 px-3 py-2.5 ${isPassword ? "pr-10" : ""} outline-none ring-emerald-500 focus:ring-2`} type={isPassword && showPassword ? "text" : type} value={value} onChange={(event) => onChange(event.target.value)} required />
+      {isPassword && (<button suppressHydrationWarning type="button" onClick={() => setShowPassword((prev) => !prev)} className="absolute right-3 top-[38px] text-slate-500 hover:text-slate-800"> {showPassword ? <EyeOff size={18} /> : <Eye size={18} />} </button> )}
     </label>
   );
 }

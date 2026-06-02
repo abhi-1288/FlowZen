@@ -57,7 +57,8 @@ const oauthProviders = [
 
 export const authOptions: NextAuthOptions = {
   session: {
-    strategy: "jwt"
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60
   },
   pages: {
     signIn: "/login"
@@ -68,7 +69,8 @@ export const authOptions: NextAuthOptions = {
       name: "Email and password",
       credentials: {
         email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
+        password: { label: "Password", type: "password" },
+        rememberMe: { label: "Remember Me", type: "text" }
       },
       async authorize(credentials) {
         const email = credentials?.email?.trim().toLowerCase();
@@ -90,7 +92,8 @@ export const authOptions: NextAuthOptions = {
           id: user._id.toString(),
           name: user.name,
           email: user.email,
-          role: user.role
+          role: user.role,
+          rememberMe: credentials?.rememberMe === "true"
         };
       }
     }),
@@ -181,6 +184,7 @@ export const authOptions: NextAuthOptions = {
       if (user?.id) token.sub = user.id;
       if (user?.role) token.role = user.role;
       if ((user as any)?.passwordResetRequired) token.passwordResetRequired = true;
+      if (typeof (user as any)?.rememberMe === "boolean") token.rememberMe = (user as any).rememberMe;
       return token;
     },
     async session({ session, token }) {
@@ -188,6 +192,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.sub;
         session.user.role = token.role as "employee" | "project-manager" | "qa-tester" | "human-resource" | "finance" | "admin" | "others" | undefined;
         session.user.passwordResetRequired = Boolean(token.passwordResetRequired);
+        if (typeof token.rememberMe !== "undefined") session.user.rememberMe = token.rememberMe;
         
         try {
           await connectDb();

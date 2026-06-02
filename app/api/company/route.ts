@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { databaseUnavailable, jsonError, requireUserId, serializeDoc } from "@/lib/api";
 import { createJoinCode, createRoleJoinCode } from "@/lib/codes";
+import { generateCompanyIdentityCode } from "@/lib/company-identity";
 import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 import { Notification } from "@/models/Notification";
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
 
   user.company = company._id;
   user.companyStatus = "approved";
+  user.companyIdentityCode = await generateCompanyIdentityCode(company._id);
   await user.save();
 
   await Notification.create({
