@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -8,6 +8,8 @@ import { CheckCircle2, Loader2, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { OAuthProviderIcons } from "@/components/auth/oauth-provider-icons";
 import { apiFetch } from "@/lib/client-utils";
 import type { UserRole } from "@/lib/types";
+
+const PENDING_EMAIL_KEY = "flowzen_pending_email";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -20,6 +22,39 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    const savedEmail = localStorage.getItem(PENDING_EMAIL_KEY);
+    if (!savedEmail) {
+      setChecking(false);
+      return;
+    }
+    setEmail(savedEmail);
+    apiFetch<{ pending: boolean }>(`/api/auth/check-pending?email=${encodeURIComponent(savedEmail)}`)
+      .then((res) => {
+        if (res?.pending) {
+          setStep("otp");
+        } else {
+          localStorage.removeItem(PENDING_EMAIL_KEY);
+        }
+      })
+      .catch(() => {
+        localStorage.removeItem(PENDING_EMAIL_KEY);
+      })
+      .finally(() => setChecking(false));
+  }, []);
+
+  function startOver() {
+    localStorage.removeItem(PENDING_EMAIL_KEY);
+    setStep("details");
+    setEmail("");
+    setName("");
+    setPassword("");
+    setOtp(new Array(6).fill(""));
+    setError("");
+    setNotice("");
+  }
 
   async function register(event: FormEvent) {
     event.preventDefault();
@@ -36,6 +71,7 @@ export default function SignupPage() {
     });
     setLoading(false);
     if (!result) return;
+    localStorage.setItem(PENDING_EMAIL_KEY, email);
     setNotice(result.message);
     setStep("otp");
   }
@@ -44,10 +80,12 @@ export default function SignupPage() {
     event.preventDefault();
     setLoading(true);
     setError("");
+    const verifyEmail = email;
+    const verifyPassword = password;
     const result = await apiFetch("/api/auth/verify-otp", {
       method: "POST",
       body: JSON.stringify({
-        email,
+        email: verifyEmail,
         otp: otp.join(""),
       }),
     }).catch((err) => {
@@ -59,7 +97,8 @@ export default function SignupPage() {
       return;
     }
 
-    await signIn("credentials-login", { email, password, rememberMe: "true", redirect: false });
+    localStorage.removeItem(PENDING_EMAIL_KEY);
+    await signIn("credentials-login", { email: verifyEmail, password: verifyPassword, rememberMe: "true", redirect: false });
     await fetch("/api/auth/session-mode", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -67,6 +106,16 @@ export default function SignupPage() {
     });
     router.push("/profile");
     router.refresh();
+  }
+
+  if (checking) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#f7f8fb] px-4 py-8">
+        <section className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-8 shadow-soft">
+          <p className="text-center text-sm text-slate-500">Loading...</p>
+        </section>
+      </main>
+    );
   }
 
   return (
@@ -136,7 +185,6 @@ export default function SignupPage() {
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
               Enter the OTP sent to {email}.
             </div>
-            {/* <Field label="6-digit OTP" value={otp} onChange={setOtp} inputMode="numeric" pattern="\d{6}" /> */}
             <div className="flex items-center justify-between gap-2">
               {otp.map((digit, index) => (
                 <input
@@ -189,8 +237,21 @@ export default function SignupPage() {
                 />
               ))}
             </div>
+            <Field
+              label="Password (for sign in)"
+              value={password}
+              onChange={setPassword}
+              type="password"
+            />
             <Notice error={error} notice={notice} />
             <Submit loading={loading} label="Verify account" />
+            <button
+              className="mt-2 w-full text-center text-sm font-medium text-slate-500 hover:text-slate-900"
+              type="button"
+              onClick={startOver}
+            >
+              Use a different email
+            </button>
           </form>
         )}
 
