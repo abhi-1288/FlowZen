@@ -147,10 +147,18 @@ export const authOptions: NextAuthOptions = {
 
       await connectDb();
       const provider = account.provider === "azure-ad" ? "microsoft" : account.provider;
-      const existing = await User.findOne({ email: user.email.toLowerCase() });
+      let existing = await User.findOne({ email: user.email.toLowerCase() });
 
-      if (existing && existing.role !== "project-manager" && existing.role !== "qa-tester" && existing.role !== "human-resource" && existing.role !== "finance") {
-        return false;
+      // Auto-delete unverified OAuth accounts older than 15 days
+      if (
+        existing &&
+        existing.role === "others" &&
+        !existing.emailVerified &&
+        existing.authProvider !== "credentials" &&
+        existing.createdAt < new Date(Date.now() - 15 * 24 * 60 * 60 * 1000)
+      ) {
+        await User.deleteOne({ _id: existing._id });
+        existing = null;
       }
 
       const savedUser = existing
@@ -159,7 +167,6 @@ export const authOptions: NextAuthOptions = {
             {
               $set: {
                 name: user.name || existing.name,
-                emailVerified: true,
                 authProvider: provider,
                 avatarUrl: user.image || existing.avatarUrl || ""
               }
@@ -169,8 +176,8 @@ export const authOptions: NextAuthOptions = {
         : await User.create({
             name: user.name || user.email.split("@")[0],
             email: user.email.toLowerCase(),
-            role: "project-manager",
-            emailVerified: true,
+            role: "others",
+            emailVerified: false,
             authProvider: provider,
             avatarUrl: user.image || ""
           });
@@ -198,6 +205,7 @@ export const authOptions: NextAuthOptions = {
           await connectDb();
           const user = await User.findById(token.sub).populate("company", "name").populate("team", "name");
           if (user) {
+            session.user.role = user.role as "employee" | "project-manager" | "qa-tester" | "human-resource" | "finance" | "admin" | "others";
             const team = user.team as any;
             session.user.company = (user.company as any)?.name || null;
             session.user.team = team?.name || null;

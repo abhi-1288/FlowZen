@@ -282,6 +282,94 @@ export function MembersTab({
   const [salaryDrafts, setSalaryDrafts] = useState<Record<string, string>>({});
   const [savingSalaryFor, setSavingSalaryFor] = useState<string | null>(null);
   const [selectedOtherRole, setSelectedOtherRole] = useState("all");
+  const [salaryModalMember, setSalaryModalMember] = useState<AnyRecord | null>(null);
+  const [salaryInput, setSalaryInput] = useState("");
+  const [savingSalaryModal, setSavingSalaryModal] = useState(false);
+  const [roleModalMember, setRoleModalMember] = useState<AnyRecord | null>(null);
+  const [newRoleValue, setNewRoleValue] = useState("");
+  const [savingRoleModal, setSavingRoleModal] = useState(false);
+  const [customRoleModalMember, setCustomRoleModalMember] = useState<AnyRecord | null>(null);
+  const [customRoleInput, setCustomRoleInput] = useState("");
+  const [savingCustomRoleModal, setSavingCustomRoleModal] = useState(false);
+
+  function openSalaryModal(member: AnyRecord) {
+    setSalaryInput(String(Math.max(0, Number(member.baseSalary ?? 0)) > 0 ? Number(member.baseSalary) : ""));
+    setSalaryModalMember(member);
+  }
+
+  function openRoleModal(member: AnyRecord) {
+    setNewRoleValue(String(member.role ?? ""));
+    setRoleModalMember(member);
+  }
+
+  function openCustomRoleModal(member: AnyRecord) {
+    setCustomRoleInput(String(member.customRole ?? ""));
+    setCustomRoleModalMember(member);
+  }
+
+  async function saveSalaryModal() {
+    const member = salaryModalMember;
+    const memberId = String(member?.id ?? "");
+    const baseSalary = Number(salaryInput);
+    if (!memberId || !(baseSalary > 0)) {
+      showToast("Enter a valid base salary.", "error");
+      return;
+    }
+    try {
+      setSavingSalaryModal(true);
+      await apiFetch(`/api/hr/member-salary/${memberId}`, {
+        method: "POST",
+        body: JSON.stringify({ baseSalary }),
+      });
+      showToast("Base salary saved.");
+      setSalaryModalMember(null);
+      await refresh(true);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to save base salary.", "error");
+    } finally {
+      setSavingSalaryModal(false);
+    }
+  }
+
+  async function saveRoleModal() {
+    const member = roleModalMember;
+    const memberId = String(member?.id ?? "");
+    if (!memberId || !newRoleValue) return;
+    try {
+      setSavingRoleModal(true);
+      await apiFetch("/api/hr/member-role", {
+        method: "PATCH",
+        body: JSON.stringify({ memberId, role: newRoleValue }),
+      });
+      showToast("Role updated.");
+      setRoleModalMember(null);
+      await refresh(true);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to update role.", "error");
+    } finally {
+      setSavingRoleModal(false);
+    }
+  }
+
+  async function saveCustomRoleModal() {
+    const member = customRoleModalMember;
+    const memberId = String(member?.id ?? "");
+    if (!memberId || !String(customRoleInput ?? "").trim()) return;
+    try {
+      setSavingCustomRoleModal(true);
+      await apiFetch("/api/hr/member-role", {
+        method: "PATCH",
+        body: JSON.stringify({ memberId, customRole: customRoleInput }),
+      });
+      showToast("Custom role label updated.");
+      setCustomRoleModalMember(null);
+      await refresh(true);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to update custom role.", "error");
+    } finally {
+      setSavingCustomRoleModal(false);
+    }
+  }
 
   const otherRoleOptions = useMemo(() => {
     const labels = new Set<string>();
@@ -670,85 +758,40 @@ export function MembersTab({
                             </span>
                           </div>
 
-                          {String(member.role ?? "") === "others" &&
-                            canEditOthersRole ? (
-                            <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 sm:col-span-3">
-                              <p className="text-xs font-semibold uppercase text-slate-500">
-                                Role label
-                              </p>
-
-                              <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
-                                <input
-                                  type="text"
-                                  list={`roles-${memberId}`}
-                                  placeholder="Select or enter custom role"
-                                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-900"
-                                  value={roleDraftFor(member)}
-                                  onChange={(event) =>
-                                    setRoleDrafts((current) => ({
-                                      ...current,
-                                      [memberId]: event.target.value,
-                                    }))
-                                  }
-                                />
-
-                                <datalist id={`roles-${memberId}`}>
-                                  {otherRoleSelectOptions.map((option) => (
-                                    <option key={option} value={option} />
-                                  ))}
-
-                                  {roleDraftFor(member) &&
-                                    !otherRoleSelectOptions.includes(
-                                      roleDraftFor(member),
-                                    ) ? (
-                                    <option value={roleDraftFor(member)} />
-                                  ) : null}
-                                </datalist>
-
+                          <div className="flex flex-wrap gap-2 sm:col-span-3">
+                            <button
+                              className="rounded-lg bg-slate-950 px-3 py-2 text-sm font-medium text-white"
+                              type="button"
+                              onClick={() => openSalaryModal(member)}
+                            >
+                              Base Salary
+                            </button>
+                            {canEditOthersRole && String(member.role ?? "") === "others" ? (
+                              <>
                                 <button
-                                  className="rounded-lg bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-                                  disabled={
-                                    savingRoleFor === memberId ||
-                                    !String(roleDraftFor(member)).trim()
-                                  }
+                                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                                   type="button"
-                                  onClick={() => void saveCustomRole(member)}
+                                  onClick={() => openCustomRoleModal(member)}
                                 >
-                                  {savingRoleFor === memberId
-                                    ? "Saving..."
-                                    : "Save role"}
+                                  Change Custom Role
                                 </button>
-                              </div>
-                            </div>
-                          ) : null}
-
-                          <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 sm:col-span-3">
-                            <p className="text-xs font-semibold uppercase text-slate-500">
-                              Base salary
-                            </p>
-                            <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
-                              <input
-                                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-900"
-                                min={0}
-                                placeholder="Monthly base salary"
-                                type="number"
-                                value={salaryDraftFor(member)}
-                                onChange={(event) =>
-                                  setSalaryDrafts((current) => ({
-                                    ...current,
-                                    [memberId]: event.target.value,
-                                  }))
-                                }
-                              />
+                                <button
+                                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                  type="button"
+                                  onClick={() => openRoleModal(member)}
+                                >
+                                  Change to Company Role
+                                </button>
+                              </>
+                            ) : canEditOthersRole ? (
                               <button
-                                className="rounded-lg bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-                                disabled={savingSalaryFor === memberId || !(Number(salaryDraftFor(member)) > 0)}
+                                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                                 type="button"
-                                onClick={() => void saveMemberSalary(member)}
+                                onClick={() => openRoleModal(member)}
                               >
-                                {savingSalaryFor === memberId ? "Saving..." : "Save salary"}
+                                Change Role
                               </button>
-                            </div>
+                            ) : null}
                           </div>
 
                           <div className="flex shrink-0 flex-col gap-2 sm:items-end">
@@ -863,6 +906,130 @@ export function MembersTab({
                     : "Confirm fire"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {salaryModalMember ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-slate-900">Set base salary</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Set monthly base salary for{" "}
+              <strong>{String(salaryModalMember.name ?? "")}</strong>.
+            </p>
+            <input
+              className="mt-4 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
+              min={0}
+              placeholder="Monthly base salary"
+              type="number"
+              value={salaryInput}
+              onChange={(e) => setSalaryInput(e.target.value)}
+            />
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
+                onClick={() => setSalaryModalMember(null)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                disabled={savingSalaryModal || !(Number(salaryInput) > 0)}
+                onClick={() => void saveSalaryModal()}
+                type="button"
+              >
+                {savingSalaryModal ? "Saving..." : "Save salary"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {roleModalMember ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-slate-900">Change role</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Change role for{" "}
+              <strong>{String(roleModalMember.name ?? "")}</strong>.
+            </p>
+            <select
+              className="mt-4 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm"
+              value={newRoleValue}
+              onChange={(e) => setNewRoleValue(e.target.value)}
+            >
+              <option value="employee">Employee</option>
+              <option value="project-manager">Project Manager</option>
+              <option value="qa-tester">QA Tester</option>
+              <option value="human-resource">Human Resource</option>
+              <option value="finance">Finance</option>
+              <option value="admin">Admin</option>
+              <option value="others">Others</option>
+            </select>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
+                onClick={() => setRoleModalMember(null)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                disabled={savingRoleModal || !newRoleValue}
+                onClick={() => void saveRoleModal()}
+                type="button"
+              >
+                {savingRoleModal ? "Saving..." : "Save role"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {customRoleModalMember ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-slate-900">Change custom role</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Set a custom role label for{" "}
+              <strong>{String(customRoleModalMember.name ?? "")}</strong>.
+            </p>
+            <input
+              className="mt-4 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
+              list={`custom-role-${String(customRoleModalMember.id ?? "")}`}
+              placeholder="Select or enter custom role"
+              type="text"
+              value={customRoleInput}
+              onChange={(e) => setCustomRoleInput(e.target.value)}
+            />
+            <datalist id={`custom-role-${String(customRoleModalMember.id ?? "")}`}>
+              {otherRoleSelectOptions.map((option) => (
+                <option key={option} value={option} />
+              ))}
+              {customRoleInput && !otherRoleSelectOptions.includes(customRoleInput) ? (
+                <option value={customRoleInput} />
+              ) : null}
+            </datalist>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
+                onClick={() => setCustomRoleModalMember(null)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                disabled={savingCustomRoleModal || !String(customRoleInput ?? "").trim()}
+                onClick={() => void saveCustomRoleModal()}
+                type="button"
+              >
+                {savingCustomRoleModal ? "Saving..." : "Save role"}
+              </button>
             </div>
           </div>
         </div>

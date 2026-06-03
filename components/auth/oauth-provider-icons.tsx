@@ -5,10 +5,10 @@ import { FaApple, FaDiscord, FaGithub, FaGoogle, FaMicrosoft } from "react-icons
 
 const providers = [
   { id: "google", label: "Google", icon: FaGoogle },
-  { id: "azure-ad", label: "Microsoft", icon: FaMicrosoft },
-  { id: "apple", label: "Apple", icon: FaApple },
+  // { id: "azure-ad", label: "Microsoft", icon: FaMicrosoft },
+  // { id: "apple", label: "Apple", icon: FaApple },
   { id: "github", label: "GitHub", icon: FaGithub },
-  { id: "discord", label: "Discord", icon: FaDiscord }
+  // { id: "discord", label: "Discord", icon: FaDiscord }
 ];
 
 export function OAuthProviderIcons({ callbackUrl = "/board" }: { callbackUrl?: string }) {

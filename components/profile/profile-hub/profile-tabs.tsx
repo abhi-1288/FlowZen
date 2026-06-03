@@ -423,8 +423,123 @@ export function ProfileTab({
     }
   }
 
+  const { update: updateSession } = useSession();
+  const [setupModal, setSetupModal] = useState(false);
+  const [setupStep, setSetupStep] = useState<"send-otp" | "verify-otp" | "password" | "done">("send-otp");
+  const [otpValue, setOtpValue] = useState(new Array(6).fill(""));
+  const [setupRole, setSetupRole] = useState<string>("employee");
+  const [setupPassword, setSetupPassword] = useState("");
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [setupError, setSetupError] = useState("");
+  const [setupBannerDismissed, setSetupBannerDismissed] = useState(false);
+
+  const isOAuthUnverified = effectiveRole === "others" && profile?.authProvider && String(profile.authProvider) !== "credentials" && !profile?.emailVerified;
+  const showSetupBanner = isOAuthUnverified && !setupBannerDismissed;
+
+  const accountAgeDays = profile?.createdAt
+    ? Math.floor((Date.now() - new Date(String(profile.createdAt)).getTime()) / (1000 * 60 * 60 * 24))
+    : 0;
+  const daysRemaining = Math.max(0, 15 - accountAgeDays);
+
+  function openSetupModal() {
+    setSetupStep("send-otp");
+    setOtpValue(new Array(6).fill(""));
+    setSetupRole("employee");
+    setSetupPassword("");
+    setSetupError("");
+    setSetupModal(true);
+  }
+
+  async function sendOtp() {
+    try {
+      setSetupLoading(true);
+      setSetupError("");
+      await apiFetch("/api/auth/oauth/send-otp", { method: "POST" });
+      setSetupStep("verify-otp");
+      showToast("OTP sent to your email.");
+    } catch (err) {
+      setSetupError(err instanceof Error ? err.message : "Unable to send OTP.");
+    } finally {
+      setSetupLoading(false);
+    }
+  }
+
+  async function verifyOtp() {
+    try {
+      setSetupLoading(true);
+      setSetupError("");
+      await apiFetch("/api/auth/oauth/verify-otp", {
+        method: "POST",
+        body: JSON.stringify({ otp: otpValue.join("") }),
+      });
+      setSetupStep("password");
+    } catch (err) {
+      setSetupError(err instanceof Error ? err.message : "Invalid OTP.");
+    } finally {
+      setSetupLoading(false);
+    }
+  }
+
+  async function completeSetup() {
+    try {
+      setSetupLoading(true);
+      setSetupError("");
+      const res = await apiFetch<{ ok: boolean; role: string }>("/api/profile", {
+        method: "PATCH",
+        body: JSON.stringify({ role: setupRole, newPassword: setupPassword }),
+      });
+      if (res?.ok) {
+        setSetupStep("done");
+        showToast(`Role updated to ${formatRole(setupRole)}.`);
+        await refresh();
+        await updateSession();
+      }
+    } catch (err) {
+      setSetupError(err instanceof Error ? err.message : "Unable to complete setup.");
+    } finally {
+      setSetupLoading(false);
+    }
+  }
+
+  function closeSetupModal() {
+    setSetupModal(false);
+    if (isOAuthUnverified) setSetupBannerDismissed(true);
+  }
+
   return (
     <>
+      {showSetupBanner ? (
+        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-semibold text-amber-900">
+                {daysRemaining > 0 ? "Account setup required" : "Critical: Account will be deleted"}
+              </h3>
+              <p className="mt-1 text-sm text-amber-700">
+                {daysRemaining > 0
+                  ? `Your account needs OTP verification and a password to be fully set up. ${daysRemaining} day${daysRemaining === 1 ? "" : "s"} remaining before auto-deletion.`
+                  : "Your account has not been verified within 15 days and will be automatically deleted on next sign-in."}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                className="rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-100"
+                onClick={() => setSetupBannerDismissed(true)}
+                type="button"
+              >
+                Dismiss
+              </button>
+              <button
+                className="rounded-lg bg-amber-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-800"
+                onClick={openSetupModal}
+                type="button"
+              >
+                Complete setup
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="grid gap-5 xl:grid-cols-2">
         <section className={sectionClass}>
           <h3 className="text-lg font-semibold">Account</h3>
@@ -1272,6 +1387,214 @@ export function ProfileTab({
                 {deletingAvatar ? "Deleting..." : "Delete"}
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {setupModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            {setupStep === "send-otp" ? (
+              <>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Verify your email
+                </h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  We'll send a 6-digit OTP to{" "}
+                  <strong>{String(profile?.email ?? "")}</strong> to verify your
+                  account.
+                </p>
+                {setupError ? (
+                  <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                    {setupError}
+                  </p>
+                ) : null}
+                <div className="mt-5 flex justify-end gap-3">
+                  <button
+                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
+                    onClick={closeSetupModal}
+                    type="button"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                    disabled={setupLoading}
+                    onClick={() => void sendOtp()}
+                    type="button"
+                  >
+                    {setupLoading ? "Sending..." : "Send OTP"}
+                  </button>
+                </div>
+              </>
+            ) : null}
+
+            {setupStep === "verify-otp" ? (
+              <>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Enter OTP
+                </h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  Enter the 6-digit code sent to{" "}
+                  <strong>{String(profile?.email ?? "")}</strong>.
+                </p>
+                {setupError ? (
+                  <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                    {setupError}
+                  </p>
+                ) : null}
+                <div className="mt-4 flex items-center justify-between gap-2">
+                  {otpValue.map((digit, index) => (
+                    <input
+                      key={index}
+                      className="h-12 w-12 rounded-xl border border-slate-300 text-center text-lg font-semibold outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                      id={`setup-otp-${index}`}
+                      maxLength={1}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (!/^\d?$/.test(value)) return;
+                        const newOtp = [...otpValue];
+                        newOtp[index] = value;
+                        setOtpValue(newOtp);
+                        if (value && index < 5) {
+                          const next = document.getElementById(`setup-otp-${index + 1}`);
+                          next?.focus();
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Backspace" && !otpValue[index] && index > 0) {
+                          const prev = document.getElementById(`setup-otp-${index - 1}`);
+                          prev?.focus();
+                        }
+                      }}
+                      onPaste={(e) => {
+                        const paste = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+                        if (paste.length === 6) {
+                          const newOtp = paste.split("");
+                          setOtpValue(newOtp);
+                          setTimeout(() => {
+                            const last = document.getElementById("setup-otp-5");
+                            last?.focus();
+                          }, 0);
+                        }
+                        e.preventDefault();
+                      }}
+                      type="text"
+                      inputMode="numeric"
+                      value={digit}
+                    />
+                  ))}
+                </div>
+                <div className="mt-5 flex justify-end gap-3">
+                  <button
+                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
+                    onClick={closeSetupModal}
+                    type="button"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                    disabled={setupLoading || otpValue.join("").length !== 6}
+                    onClick={() => void verifyOtp()}
+                    type="button"
+                  >
+                    {setupLoading ? "Verifying..." : "Verify OTP"}
+                  </button>
+                </div>
+              </>
+            ) : null}
+
+            {setupStep === "password" ? (
+              <>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Set password & choose role
+                </h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  Create a password and select your role to complete setup.
+                </p>
+                {setupError ? (
+                  <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                    {setupError}
+                  </p>
+                ) : null}
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <label className="text-xs font-semibold uppercase text-slate-500">
+                      Role
+                    </label>
+                    <select
+                      className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                      value={setupRole}
+                      onChange={(e) => setSetupRole(e.target.value)}
+                    >
+                      <option value="employee">Employee</option>
+                      <option value="project-manager">Project Manager</option>
+                      <option value="qa-tester">QA Tester</option>
+                      <option value="human-resource">Human Resource</option>
+                      <option value="finance">Finance</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase text-slate-500">
+                      Password
+                    </label>
+                    <input
+                      className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                      minLength={8}
+                      placeholder="At least 8 characters"
+                      type="password"
+                      value={setupPassword}
+                      onChange={(e) => setSetupPassword(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="mt-5 flex justify-end gap-3">
+                  <button
+                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
+                    onClick={closeSetupModal}
+                    type="button"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                    disabled={setupLoading || setupPassword.length < 8}
+                    onClick={() => void completeSetup()}
+                    type="button"
+                  >
+                    {setupLoading ? "Saving..." : "Complete setup"}
+                  </button>
+                </div>
+              </>
+            ) : null}
+
+            {setupStep === "done" ? (
+              <>
+                <div className="flex flex-col items-center py-4">
+                  <div className="grid h-14 w-14 place-items-center rounded-full bg-emerald-100 text-emerald-600">
+                    <Check size={28} />
+                  </div>
+                  <h3 className="mt-4 text-lg font-semibold text-slate-900">
+                    Setup complete!
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Your role has been set to{" "}
+                    <strong>{formatRole(setupRole)}</strong>.
+                  </p>
+                </div>
+                <div className="mt-5 flex justify-end">
+                  <button
+                    className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white"
+                    onClick={() => setSetupModal(false)}
+                    type="button"
+                  >
+                    Done
+                  </button>
+                </div>
+              </>
+            ) : null}
           </div>
         </div>
       ) : null}

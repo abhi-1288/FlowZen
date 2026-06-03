@@ -283,9 +283,6 @@ export async function PATCH(request: Request) {
   if (!userId) return jsonError("Unauthorized", 401);
 
   const body = await request.json();
-  const currentPassword = String(body.currentPassword ?? "");
-  const newPassword = String(body.newPassword ?? "");
-  if (newPassword.length < 8) return jsonError("New password must be at least 8 characters.");
 
   try {
     await connectDb();
@@ -297,6 +294,28 @@ export async function PATCH(request: Request) {
 
   const user = await User.findById(userId).select("+passwordHash");
   if (!user) return jsonError("User not found.", 404);
+
+  const newRole = String(body.role ?? "");
+  const newPassword = String(body.newPassword ?? "");
+
+  if (newRole && user.role === "others") {
+    if (user.authProvider !== "credentials" && !user.emailVerified) {
+      return jsonError("Please verify your email with OTP before setting a role.", 400);
+    }
+    const validRoles = ["employee", "project-manager", "qa-tester", "human-resource", "finance", "admin"];
+    if (!validRoles.includes(newRole)) return jsonError("Invalid role.", 400);
+    user.role = newRole;
+    if (newPassword.length >= 8) {
+      user.passwordHash = await bcrypt.hash(newPassword, 12);
+      user.passwordResetRequired = false;
+    }
+    await user.save();
+    return NextResponse.json({ ok: true, role: user.role });
+  }
+
+  const currentPassword = String(body.currentPassword ?? "");
+  if (newPassword.length < 8) return jsonError("New password must be at least 8 characters.");
+
   if (user.authProvider !== "credentials") return jsonError("OAuth accounts do not have a local password.", 400);
   if (!user.passwordHash) return jsonError("No local password is set for this account.", 400);
 

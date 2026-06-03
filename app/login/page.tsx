@@ -61,13 +61,13 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-wide text-slate-400">
+        <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-wide text-slate-400">
           <span className="h-px flex-1 bg-slate-200" />
-          Project manager OAuth
+          OAuth Accounts
           <span className="h-px flex-1 bg-slate-200" />
         </div>
 
-        <OAuthProviderIcons /> */}
+        <OAuthProviderIcons />
 
         <div className="mt-6 flex justify-between text-sm">
           <Link className="font-medium text-emerald-700 hover:underline" href="/signup">Create account</Link>
