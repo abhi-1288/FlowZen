@@ -247,6 +247,7 @@ const HR_MEMBER_ROLE_KEYS = [
   "project-manager",
   "qa-tester",
   "finance",
+  "admin",
   "employee",
   "others",
 ] as const;

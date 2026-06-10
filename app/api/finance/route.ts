@@ -12,6 +12,9 @@ import { emitNotification } from "@/lib/realtime";
 import { LeaveRequest } from "@/models/LeaveRequest";
 import { Attendance } from "@/models/Attendance";
 import { Holiday } from "@/models/Holiday";
+import { JoinRequest } from "@/models/JoinRequest";
+import { CompanyPolicy } from "@/models/CompanyPolicy";
+import { Company } from "@/models/Company";
 
 const FINANCE_ROLES = new Set(["finance", "admin"]);
 
@@ -115,7 +118,11 @@ async function computeSalaryBreakdown(params: {
   const joinedRef = employee.companyJoined ?? employee.createdAt;
   const companyJoined = joinedRef ? startOfDay(new Date(joinedRef)) : null;
   let effectiveStart = startOfDay(requestedStart);
-  const effectiveEnd = startOfDay(requestedEnd);
+  const today = startOfDay(new Date());
+  let effectiveEnd = startOfDay(requestedEnd);
+  if (effectiveEnd > today) {
+    effectiveEnd = today;
+  }
   if (
     companyJoined &&
     companyJoined > effectiveStart &&
@@ -196,11 +203,23 @@ async function computeSalaryBreakdown(params: {
     }
   }
 
+  const companyDoc = await Company.findById(actorCompany).select("weekendDates");
+  const manualWeekendsKeys = new Set((companyDoc?.weekendDates ?? []).map((item: any) => toDateKey(new Date(item.date))));
+  const monthsWithManualWeekends = new Set((companyDoc?.weekendDates ?? []).map((item: any) => {
+    const wd = new Date(item.date);
+    return `${wd.getFullYear()}-${wd.getMonth()}`;
+  }));
+
   let absentDays = 0;
   for (let i = 0; i < totalDays; i += 1) {
     const day = new Date(effectiveStart.getTime() + i * DAY_MS);
     const dayKey = toDateKey(day);
-    const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+    
+    const hasManualWeekendsThisMonth = monthsWithManualWeekends.has(`${day.getFullYear()}-${day.getMonth()}`);
+    const isWeekend = hasManualWeekendsThisMonth 
+      ? manualWeekendsKeys.has(dayKey)
+      : day.getDay() === 0;
+
     const isHoliday = holidayDays.has(dayKey);
     const hasPresent = presentDays.has(dayKey);
     const hasLeave =
@@ -223,7 +242,26 @@ async function computeSalaryBreakdown(params: {
   const leaveDeduction = roundCurrency(dailySalary * totalUnpaidDays);
   const grossSalary = roundCurrency(dailySalary * payableDays);
   const totalDeductions = leaveDeduction + manualDeductions;
-  const finalSalary = Math.max(0, grossSalary + allowances - manualDeductions);
+  let finalSalary = Math.max(0, grossSalary + allowances - manualDeductions);
+
+  const policy = await CompanyPolicy.findOne({ company: actorCompany });
+  let foodDeduction = 0;
+  let travelDeduction = 0;
+  if (policy) {
+    const isFoodOptedOut = policy.foodOptedOutMembers?.some(
+      (id: any) => String(id) === employeeId,
+    );
+    const isTravelOptedOut = policy.travelOptedOutMembers?.some(
+      (id: any) => String(id) === employeeId,
+    );
+    if (!isFoodOptedOut) {
+      foodDeduction = Math.max(0, Number(policy.foodAmount ?? 0));
+    }
+    if (!isTravelOptedOut) {
+      travelDeduction = Math.max(0, Number(policy.travelAccommodationAmount ?? 0));
+    }
+    finalSalary = Math.max(0, finalSalary - foodDeduction - travelDeduction);
+  }
 
   return {
     breakdown: {
@@ -237,6 +275,8 @@ async function computeSalaryBreakdown(params: {
       allowances,
       manualDeductions,
       totalDeductions,
+      foodDeduction,
+      travelDeduction,
       grossSalary,
       finalSalary,
       periodStart: toDateKey(effectiveStart),
@@ -286,6 +326,7 @@ export async function GET(request: Request) {
       ExpenseRequest.countDocuments({
         company: actor.company,
         status: "forwarded",
+        ...(role === "admin" ? { adminApprover: userId } : {}),
       }),
       ExpenseRequest.countDocuments({
         company: actor.company,
@@ -317,6 +358,107 @@ export async function GET(request: Request) {
 
   const month = monthKey(url.searchParams.get("month"));
 
+  const now = new Date();
+  const dayOfMonth = now.getDate();
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const isMonthEnd = dayOfMonth >= Math.min(28, lastDay) && dayOfMonth <= lastDay;
+
+  let monthEndGenerated = false;
+
+  if (canManage && isMonthEnd) {
+    const existingSalaries = await FinanceSalary.countDocuments({
+      company: actor.company,
+      month,
+    });
+    if (existingSalaries === 0) {
+      const approvedMembers = await User.find({
+        company: actor.company,
+        companyStatus: "approved",
+      }).select("_id name");
+      const periodStart = `${month}-01`;
+      const periodEnd = `${month}-${String(lastDay).padStart(2, "0")}`;
+      const generatedSalaries: any[] = [];
+      for (const member of approvedMembers) {
+        const computed = await computeSalaryBreakdown({
+          actorCompany: actor.company,
+          employeeId: String(member._id),
+          periodStart,
+          periodEnd,
+          allowances: 0,
+          manualDeductions: 0,
+        });
+        if ("error" in computed) continue;
+        const { breakdown } = computed;
+        const salary = await FinanceSalary.findOneAndUpdate(
+          { company: actor.company, employee: member._id, month },
+          {
+            $set: {
+              baseSalary: breakdown.grossSalary,
+              allowances: 0,
+              deductions: breakdown.totalDeductions,
+              netSalary: breakdown.finalSalary,
+            },
+            $setOnInsert: { status: "pending" },
+          },
+          { new: true, upsert: true },
+        );
+        generatedSalaries.push({ ...salary.toObject?.() ?? salary, employee: member });
+      }
+      if (generatedSalaries.length > 0) {
+        monthEndGenerated = true;
+        const admins = await User.find({
+          company: actor.company,
+          role: "admin",
+          companyStatus: "approved",
+        }).select("_id");
+        const approvalCounts = await Promise.all(
+          admins.map(async (a) => {
+            const count = await JoinRequest.countDocuments({
+              approver: a._id,
+              company: actor.company,
+              kind: "salary",
+              status: "pending",
+            });
+            return { id: String(a._id), count };
+          }),
+        );
+        approvalCounts.sort((a, b) => a.count - b.count);
+        const targetAdminId = approvalCounts[0]?.id;
+        if (targetAdminId) {
+          const targetAdmin = admins.find((a) => String(a._id) === targetAdminId);
+          if (targetAdmin) {
+            for (const salary of generatedSalaries) {
+              const assignedAdmin = await User.findById(targetAdminId).select("_id");
+              if (assignedAdmin) {
+                await JoinRequest.findOneAndUpdate(
+                  { company: actor.company, kind: "salary", status: "pending", approver: targetAdminId },
+                  { $set: { approver: targetAdminId } },
+                  { upsert: false },
+                );
+              }
+            }
+            await Notification.create({
+              user: targetAdminId,
+              company: actor.company,
+              type: "approval",
+              title: "Monthly salaries pending approval",
+              message: `${generatedSalaries.length} salary record(s) were auto-generated for ${month}. Admin approval required.`,
+            });
+            emitNotification(targetAdminId);
+          }
+        }
+        await Notification.create({
+          user: userId,
+          company: actor.company,
+          type: "info",
+          title: "Salaries auto-generated",
+          message: `${generatedSalaries.length} salary record(s) were auto-generated for ${month}.`,
+        });
+        emitNotification(userId);
+      }
+    }
+  }
+
   const [salaries, expenses, budgets, boards, members, financeMembers, bills] =
     await Promise.all([
       canManage
@@ -340,6 +482,7 @@ export async function GET(request: Request) {
         ? ExpenseRequest.find({ company: actor.company })
             .populate("requester", "name email role")
             .populate("assignedTo", "name email role")
+            .populate("adminApprover", "name email role")
             .populate("forwardedBy", "name email role")
             .populate("acceptedBy", "name email role")
             .sort({ createdAt: -1 })
@@ -347,6 +490,7 @@ export async function GET(request: Request) {
         : ExpenseRequest.find({ company: actor.company, requester: userId })
             .populate("requester", "name email role")
             .populate("assignedTo", "name email role")
+            .populate("adminApprover", "name email role")
             .populate("forwardedBy", "name email role")
             .populate("acceptedBy", "name email role")
             .sort({ createdAt: -1 })
@@ -448,6 +592,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     month,
     canManage,
+    monthEndGenerated,
     dashboard: { totalPayroll, pendingSalaries, paidSalaries },
     salaries: serializeDocs(salaries as any),
     expenses: serializeDocs(expenses as any),
@@ -474,6 +619,7 @@ export async function POST(request: Request) {
     const category = String(body.category ?? "");
     const title = String(body.title ?? "").trim();
     const amount = Number(body.amount ?? 0);
+    const quantity = Math.max(1, Math.floor(Number(body.quantity ?? 1)));
     const reason = String(body.reason ?? "").trim();
     if (!title) return jsonError("Expense title is required.");
     if (
@@ -507,6 +653,7 @@ export async function POST(request: Request) {
       category,
       title,
       amount: Number.isFinite(amount) ? amount : 0,
+      quantity: Number.isFinite(quantity) ? quantity : 1,
       reason,
       ...(assignedTo ? { assignedTo } : {}),
     });
@@ -859,7 +1006,7 @@ export async function PATCH(request: Request) {
     const existing = await ExpenseRequest.findOne({
       _id: id,
       company: actor.company,
-    }).select("status requester assignedTo title");
+    }).select("status requester assignedTo adminApprover title amount quantity");
     if (!existing) return jsonError("Expense request not found.", 404);
 
     const isAssigned =
@@ -872,26 +1019,30 @@ export async function PATCH(request: Request) {
         return jsonError("This expense is not assigned to you.", 403);
       if (existing.status !== "pending")
         return jsonError("Expense request already processed.", 409);
-      const expense = await ExpenseRequest.findOneAndUpdate(
-        { _id: id, company: actor.company },
-        { $set: { status, forwardedBy: userId } },
-        { new: true },
-      );
-      const admins = await User.find({
+      const adminApprover = String(body.adminApprover ?? "");
+      if (!adminApprover)
+        return jsonError("Please select an admin to approve this expense.", 400);
+      const targetAdmin = await User.findOne({
+        _id: adminApprover,
         company: actor.company,
         role: "admin",
         companyStatus: "approved",
       }).select("_id");
-      await Notification.insertMany(
-        admins.map((u) => ({
-          user: u._id,
-          company: actor.company,
-          type: "approval",
-          title: "Expense forwarded for admin approval",
-          message: `${actor.name ?? "Finance"} forwarded expense "${existing.title}" for your approval.`,
-        })),
+      if (!targetAdmin)
+        return jsonError("Selected admin is not available for this company.", 400);
+      const expense = await ExpenseRequest.findOneAndUpdate(
+        { _id: id, company: actor.company },
+        { $set: { status, forwardedBy: userId, adminApprover: targetAdmin._id } },
+        { new: true },
       );
-      admins.forEach((u) => emitNotification(String(u._id)));
+      await Notification.create({
+        user: targetAdmin._id,
+        company: actor.company,
+        type: "approval",
+        title: "Expense forwarded for admin approval",
+        message: `${actor.name ?? "Finance"} forwarded expense "${existing.title}" for your approval.`,
+      });
+      emitNotification(String(targetAdmin._id));
       return NextResponse.json({ expense });
     }
 
@@ -904,6 +1055,12 @@ export async function PATCH(request: Request) {
       } else if (String(actor.role) === "admin") {
         if (existing.status !== "pending" && existing.status !== "forwarded")
           return jsonError("Expense request already processed.", 409);
+        if (
+          existing.status === "forwarded" &&
+          existing.adminApprover &&
+          String(existing.adminApprover) !== userId
+        )
+          return jsonError("This expense is assigned to another admin.", 403);
       } else {
         return jsonError(
           "You are not allowed to reject expense requests.",
@@ -935,6 +1092,12 @@ export async function PATCH(request: Request) {
         return jsonError("Only admin can approve expense requests.", 403);
       if (existing.status !== "pending" && existing.status !== "forwarded")
         return jsonError("Expense request already processed.", 409);
+      if (
+        existing.status === "forwarded" &&
+        existing.adminApprover &&
+        String(existing.adminApprover) !== userId
+      )
+        return jsonError("This expense is assigned to another admin.", 403);
       const expense = await ExpenseRequest.findOneAndUpdate(
         { _id: id, company: actor.company },
         { $set: { status, decidedBy: userId } },
@@ -1017,7 +1180,7 @@ export async function PATCH(request: Request) {
         company: actor.company,
         type: "info",
         title: "Expense disbursed",
-        message: `Your expense request "${existing.title}" for ₹${existing.amount ?? 0} has been disbursed by finance.`,
+        message: `Your expense request "${existing.title}" x ${existing.quantity ?? 1} for ₹${existing.amount ?? 0} has been disbursed by finance.`,
       });
       emitNotification(String(requesterId));
       return NextResponse.json({ expense });

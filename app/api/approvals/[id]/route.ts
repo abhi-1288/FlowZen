@@ -164,6 +164,13 @@ export async function PATCH(request: Request, { params }: Params) {
         String(actor.role) === "admin" &&
         String(actor.company ?? "") === String(joinRequest.company);
     }
+    if (!canDecide && joinRequest.kind === "company" && String(requester.role) === "admin") {
+      const actor = await User.findById(userId).select("role company companyStatus");
+      canDecide =
+        !!actor &&
+        String(actor.role) === "admin" &&
+        String(actor.company ?? "") === String(joinRequest.company);
+    }
     if (!canDecide) return jsonError("Forbidden", 403);
     if (!["pending", "hr-approved"].includes(joinRequest.status)) return jsonError("Approval request already processed.", 409);
 
@@ -255,8 +262,7 @@ export async function PATCH(request: Request, { params }: Params) {
           at: new Date(),
         });
         await Company.updateOne({ _id: joinRequest.company }, { $addToSet: { members: requester._id } });
-        const approverRole = String(approver?.role ?? "");
-        if (approverRole === "human-resource") {
+        if (salaryAmount > 0) {
           const currentMonth = new Date().toISOString().slice(0, 7);
           await FinanceSalary.findOneAndUpdate(
             { company: joinRequest.company, employee: requester._id, month: currentMonth },

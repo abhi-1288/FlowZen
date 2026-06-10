@@ -9,7 +9,6 @@ import { emitNotification } from "@/lib/realtime";
 function normalizeDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  date.setHours(0, 0, 0, 0);
   return date;
 }
 
@@ -22,14 +21,12 @@ function monthDates(month: string, days: number[]) {
 
   const allowedDays = new Set(days);
   const result: Date[] = [];
-  const date = new Date(year, monthIndex, 1);
-  while (date.getMonth() === monthIndex) {
-    if (allowedDays.has(date.getDay())) {
-      const next = new Date(date);
-      next.setHours(0, 0, 0, 0);
-      result.push(next);
+  const date = new Date(Date.UTC(year, monthIndex, 1));
+  while (date.getUTCMonth() === monthIndex) {
+    if (allowedDays.has(date.getUTCDay())) {
+      result.push(new Date(date));
     }
-    date.setDate(date.getDate() + 1);
+    date.setUTCDate(date.getUTCDate() + 1);
   }
   return result;
 }
@@ -56,6 +53,28 @@ export async function POST(request: Request) {
   if (error) return error;
 
   const body = await request.json();
+
+  // Single date mode
+  if (body.date) {
+    const target = normalizeDate(String(body.date));
+    if (!target) return jsonError("Valid date is required.");
+
+    const existing = new Set(
+      ((company as any).weekendDates ?? []).map((item: any) => {
+        const date = normalizeDate(String(item.date));
+        return date ? date.getTime() : 0;
+      }),
+    );
+
+    if (!existing.has(target.getTime())) {
+      (company as any).weekendDates.push({ date: target, reason: "Manual weekend" });
+      await company.save();
+    }
+
+    return NextResponse.json({ weekendDates: (company as any).weekendDates || [] });
+  }
+
+  // Bulk mode — assign all Saturdays/Sundays in a month
   const month = String(body.month ?? "");
   const days = Array.isArray(body.days)
     ? body.days.map(Number).filter((day: number) => day === 0 || day === 6)

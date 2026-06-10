@@ -252,6 +252,14 @@ export async function GET() {
     };
   }
 
+  if (safeRole === "admin" && user.company && user.companyStatus === "approved") {
+    const company = await Company.findById(userCompanyId);
+    if (company && !company.adminJoinCode) {
+      company.adminJoinCode = createRoleJoinCode(String(company.joinCode));
+      await company.save();
+    }
+  }
+
   if (safeRole === "admin" && user.company) {
     const teams = await Team.find({ company: userCompanyId }).populate("manager", "name email").sort({ createdAt: -1 });
     const company = await Company.findById(userCompanyId).select("name");

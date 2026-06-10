@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, UtensilsCrossed, Bus, X } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import { AnyRecord, formatRoleWithCustom } from "./shared";
+
+type PolicyData = {
+  foodAmount: number;
+  travelAccommodationAmount: number;
+  foodOptedOutMembers: { _id: string; name: string; email: string; role: string }[];
+  travelOptedOutMembers: { _id: string; name: string; email: string; role: string }[];
+};
 
 type MemberAttendance = {
   member: { id: string; name: string; email: string; role: string; baseSalary?: number };
@@ -54,6 +61,12 @@ export function FinanceMembersView({
   const [isEditingSalary, setIsEditingSalary] = useState(false);
   const [newSalary, setNewSalary] = useState("");
   const [savingSalary, setSavingSalary] = useState(false);
+
+  const [policyModal, setPolicyModal] = useState(false);
+  const [policyData, setPolicyData] = useState<PolicyData | null>(null);
+  const [policySaving, setPolicySaving] = useState(false);
+  const [foodAmount, setFoodAmount] = useState("");
+  const [travelAmount, setTravelAmount] = useState("");
 
   async function selectMember(
     memberId: string,
@@ -148,6 +161,60 @@ export function FinanceMembersView({
     setSavingSalary(false);
   }
 
+  async function loadPolicy() {
+    try {
+      const res = await apiFetch<PolicyData>("/api/finance/policy");
+      setPolicyData({
+        foodAmount: res.foodAmount,
+        travelAccommodationAmount: res.travelAccommodationAmount,
+        foodOptedOutMembers: res.foodOptedOutMembers ?? [],
+        travelOptedOutMembers: res.travelOptedOutMembers ?? [],
+      });
+      setFoodAmount(String(res.foodAmount ?? 0));
+      setTravelAmount(String(res.travelAccommodationAmount ?? 0));
+    } catch {
+      showToast("Unable to load policy.", "error");
+    }
+  }
+
+  async function savePolicy() {
+    setPolicySaving(true);
+    try {
+      const res = await apiFetch<PolicyData>("/api/finance/policy", {
+        method: "POST",
+        body: JSON.stringify({
+          foodAmount: Math.max(0, Number(foodAmount)),
+          travelAccommodationAmount: Math.max(0, Number(travelAmount)),
+        }),
+      });
+      setPolicyData(res);
+      showToast("Policy saved.", "success");
+    } catch {
+      showToast("Unable to save policy.", "error");
+    } finally {
+      setPolicySaving(false);
+    }
+  }
+
+  async function togglePolicyOptOut(memberId: string, type: "food" | "travel") {
+    try {
+      const res = await apiFetch<PolicyData & { nowOptedOut: boolean }>("/api/finance/policy", {
+        method: "PATCH",
+        body: JSON.stringify({ memberId, type }),
+      });
+      setPolicyData({
+        foodAmount: res.foodAmount,
+        travelAccommodationAmount: res.travelAccommodationAmount,
+        foodOptedOutMembers: res.foodOptedOutMembers ?? [],
+        travelOptedOutMembers: res.travelOptedOutMembers ?? [],
+      });
+      const label = type === "food" ? "Food Allowance" : "Travel Accommodation";
+      showToast(res.nowOptedOut ? `Member opted out of ${label}.` : `Member opted in for ${label}.`, "success");
+    } catch {
+      showToast("Unable to toggle policy opt-out.", "error");
+    }
+  }
+
   function changeMonth(delta: number) {
     if (!data) return;
 
@@ -166,8 +233,20 @@ export function FinanceMembersView({
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="text-xl font-semibold">Members</h3>
-      <p className="mt-1 text-sm text-slate-500">View employee attendance, check-ins, leaves, holidays, and salary.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-xl font-semibold">Members</h3>
+          <p className="mt-1 text-sm text-slate-500">View employee attendance, check-ins, leaves, holidays, and salary.</p>
+        </div>
+        <button
+          className="flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+          onClick={() => { void loadPolicy(); setPolicyModal(true); }}
+          type="button"
+        >
+          <UtensilsCrossed size={16} />
+          Policies
+        </button>
+      </div>
 
       <ul className="mt-6 space-y-4">
         {membersState.map((member) => {
@@ -510,6 +589,109 @@ export function FinanceMembersView({
           </div>
         </div>
       )}
+
+      {policyModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setPolicyModal(false); }}>
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between mb-6">
+              <div>
+                <h4 className="text-2xl font-bold text-slate-900">Company Policies</h4>
+                <p className="text-sm text-slate-500 mt-1">Set fixed deductions and manage member opt-outs.</p>
+              </div>
+              <button className="text-slate-400 hover:text-slate-800 bg-slate-100 rounded-full p-2" onClick={() => setPolicyModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">Food Allowance Deduction (₹)</label>
+                <input
+                  type="number"
+                  min="0"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
+                  value={foodAmount}
+                  onChange={(e) => setFoodAmount(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">Travel Accommodation Deduction (₹)</label>
+                <input
+                  type="number"
+                  min="0"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
+                  value={travelAmount}
+                  onChange={(e) => setTravelAmount(e.target.value)}
+                />
+              </div>
+              <button
+                className="w-full rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={policySaving}
+                onClick={() => void savePolicy()}
+                type="button"
+              >
+                {policySaving ? "Saving..." : "Save Policy"}
+              </button>
+            </div>
+
+            {policyData ? (
+              <div>
+                <h5 className="font-semibold text-slate-800 mb-3">Member Policy Status</h5>
+                <p className="text-xs text-slate-500 mb-3">Policies apply by default. Toggle each accommodation type separately.</p>
+                <div className="space-y-2">
+                  {membersState.map((member) => {
+                    const memberId = String(member.id);
+                    const isFoodOptedOut = policyData.foodOptedOutMembers.some(
+                      (om) => String(om._id ?? "") === memberId,
+                    );
+                    const isTravelOptedOut = policyData.travelOptedOutMembers.some(
+                      (om) => String(om._id ?? "") === memberId,
+                    );
+                    const showFood = policyData.foodAmount > 0;
+                    const showTravel = policyData.travelAccommodationAmount > 0;
+                    return (
+                      <div key={memberId} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                        <div>
+                          <p className="text-sm font-medium text-slate-800">{String(member.name)}</p>
+                          <p className="text-xs text-slate-500">{String(member.email)}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          {showFood ? (
+                            <button
+                              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                                isFoodOptedOut
+                                  ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                                  : "bg-rose-100 text-rose-700 hover:bg-rose-200"
+                              }`}
+                              onClick={() => void togglePolicyOptOut(memberId, "food")}
+                              type="button"
+                            >
+                              {isFoodOptedOut ? "Food: Opted Out" : "Food: Active"}
+                            </button>
+                          ) : null}
+                          {showTravel ? (
+                            <button
+                              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                                isTravelOptedOut
+                                  ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                                  : "bg-rose-100 text-rose-700 hover:bg-rose-200"
+                              }`}
+                              onClick={() => void togglePolicyOptOut(memberId, "travel")}
+                              type="button"
+                            >
+                              {isTravelOptedOut ? "Travel: Opted Out" : "Travel: Active"}
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

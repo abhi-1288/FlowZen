@@ -2,6 +2,7 @@
 export * from "./Attendance";
 export * from "./Board";
 export * from "./ClientInvoice";
+export * from "./CompanyPolicy";
 export * from "./ExpenseBill";
 export * from "./Column";
 export * from "./Company";

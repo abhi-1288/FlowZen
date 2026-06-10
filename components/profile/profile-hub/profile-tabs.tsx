@@ -55,12 +55,19 @@ export function ProfileTab({
   const [avatarDeleteModal, setAvatarDeleteModal] = useState(false);
   const [deletingAvatar, setDeletingAvatar] = useState(false);
   const [salaryRequesting, setSalaryRequesting] = useState(false);
+  const [policyInfo, setPolicyInfo] = useState<{
+    foodAmount: number;
+    travelAccommodationAmount: number;
+    foodOptedOutMembers?: any[];
+    travelOptedOutMembers?: any[];
+  } | null>(null);
   const [companyActionModal, setCompanyActionModal] = useState(false);
   const [companyActionType, setCompanyActionType] = useState<
     "hold" | "takedown" | null
   >(null);
   const [companyActionConfirm, setCompanyActionConfirm] = useState("");
   const [companyActionLoading, setCompanyActionLoading] = useState(false);
+  const [adminJoinCode, setAdminJoinCode] = useState("");
 
   const company =
     typeof profile?.company === "object" && profile.company
@@ -118,6 +125,11 @@ export function ProfileTab({
   const [weekendDays, setWeekendDays] = useState({ saturday: false, sunday: true });
   const [showWfhAssignModal, setShowWfhAssignModal] = useState(false);
   const [showManageWfhModal, setShowManageWfhModal] = useState(false);
+  const [showWeekendModal, setShowWeekendModal] = useState(false);
+  const [showDateConfirm, setShowDateConfirm] = useState(false);
+  const [confirmDateStr, setConfirmDateStr] = useState("");
+  const [confirmDateIsWeekend, setConfirmDateIsWeekend] = useState(false);
+  const [confirmDateDay, setConfirmDateDay] = useState(0);
   const [identityRequesting, setIdentityRequesting] = useState(false);
   const managerTeams = Array.isArray(
     (insights?.manager as AnyRecord | undefined)?.teams,
@@ -151,6 +163,23 @@ export function ProfileTab({
     showToast("Password updated.");
   }
 
+  async function joinAsAdmin(event: FormEvent) {
+    event.preventDefault();
+    try {
+      await apiFetch("/api/company/join", {
+        method: "POST",
+        body: JSON.stringify({ code: adminJoinCode }),
+      });
+      showToast("Admin join request sent.");
+      await refresh();
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Unable to send join request.",
+        "error",
+      );
+    }
+  }
+
   async function requestIdentityCode() {
     try {
       setIdentityRequesting(true);
@@ -176,7 +205,9 @@ export function ProfileTab({
       showToast(
         role === "human-resource"
           ? "Salary request sent to admin."
-          : "Salary request sent to HR.",
+          : role === "admin"
+            ? "Salary request sent to admin/HR."
+            : "Salary request sent to HR.",
       );
       await refresh(true);
     } catch (err) {
@@ -336,6 +367,18 @@ export function ProfileTab({
     void loadWfh();
   }, [company?.id]);
 
+  useEffect(() => {
+    if (!inApprovedCompany) return;
+    apiFetch<{
+      foodAmount: number;
+      travelAccommodationAmount: number;
+      foodOptedOutMembers: any[];
+      travelOptedOutMembers: any[];
+    }>("/api/finance/policy")
+      .then(setPolicyInfo)
+      .catch(() => { });
+  }, [inApprovedCompany]);
+
   async function saveWfhQuota() {
     try {
       setWfhLoading(true);
@@ -383,12 +426,8 @@ export function ProfileTab({
   }, [weekendDates, weekendMonth]);
 
   async function assignWeekends() {
-    const days = [
-      weekendDays.sunday ? 0 : null,
-      weekendDays.saturday ? 6 : null,
-    ].filter((day): day is number => typeof day === "number");
-    if (!days.length) {
-      showToast("Select Saturday, Sunday, or both.", "error");
+    if (!weekendDays.saturday) {
+      showToast("Select Saturday.", "error");
       return;
     }
 
@@ -396,7 +435,7 @@ export function ProfileTab({
       setWfhLoading(true);
       const res = await apiFetch<{ weekendDates: { date: string; reason?: string }[] }>("/api/company/weekends", {
         method: "POST",
-        body: JSON.stringify({ month: weekendMonth, days }),
+        body: JSON.stringify({ month: weekendMonth, days: [6] }),
       });
       setWeekendDates(res.weekendDates || []);
       showToast("Weekend dates assigned.", "success");
@@ -418,6 +457,43 @@ export function ProfileTab({
       showToast("Weekend date removed.", "success");
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Failed to remove weekend", "error");
+    } finally {
+      setWfhLoading(false);
+    }
+  }
+
+  async function excludeDefaultSunday(dateStr: string) {
+    try {
+      setWfhLoading(true);
+      const res = await apiFetch<{ weekendDates: { date: string; reason?: string }[] }>("/api/company/weekends", {
+        method: "POST",
+        body: JSON.stringify({ month: weekendMonth, days: [0] }),
+      });
+      setWeekendDates(res.weekendDates || []);
+      const res2 = await apiFetch<{ weekendDates: { date: string; reason?: string }[] }>("/api/company/weekends", {
+        method: "DELETE",
+        body: JSON.stringify({ date: dateStr }),
+      });
+      setWeekendDates(res2.weekendDates || []);
+      showToast("Weekend date removed.", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to remove weekend", "error");
+    } finally {
+      setWfhLoading(false);
+    }
+  }
+
+  async function assignWeekendDate(dateStr: string) {
+    try {
+      setWfhLoading(true);
+      const res = await apiFetch<{ weekendDates: { date: string; reason?: string }[] }>("/api/company/weekends", {
+        method: "POST",
+        body: JSON.stringify({ date: dateStr }),
+      });
+      setWeekendDates(res.weekendDates || []);
+      showToast("Weekend date assigned.", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to assign weekend", "error");
     } finally {
       setWfhLoading(false);
     }
@@ -625,6 +701,26 @@ export function ProfileTab({
               value={company?.name ? String(company.name) : undefined}
             />
             <Row
+              label="Food Accomodation"
+              value={
+                policyInfo
+                  ? policyInfo.foodOptedOutMembers?.some((m) => String(m._id || m.id || m) === String(profile?.id ?? profile?._id ?? session?.user?.id))
+                    ? "₹0/mo"
+                    : `₹${policyInfo.foodAmount.toLocaleString("en-IN")}/mo`
+                  : undefined
+              }
+            />
+            <Row
+              label="Travel Accomodation"
+              value={
+                policyInfo
+                  ? policyInfo.travelOptedOutMembers?.some((m) => String(m._id || m.id || m) === String(profile?.id ?? profile?._id ?? session?.user?.id))
+                    ? "₹0/mo"
+                    : `₹${policyInfo.travelAccommodationAmount.toLocaleString("en-IN")}/mo`
+                  : undefined
+              }
+            />
+            <Row
               label="Notice Period"
               value={
                 company?.noticePeriodDays
@@ -665,13 +761,13 @@ export function ProfileTab({
               value={
                 profile?.company && profile?.companyJoined
                   ? new Date(
-                      profile.companyJoined as string | Date,
-                    ).toLocaleDateString()
+                    profile.companyJoined as string | Date,
+                  ).toLocaleDateString()
                   : undefined
               }
             />
             {inApprovedCompany &&
-            !["human-resource", "admin"].includes(role) ? (
+              !["human-resource", "admin"].includes(role) ? (
               <Row
                 label={joinedBy?.viaHr ? "Joined By HR" : "Company approved by"}
                 value={joinedBy?.name ? String(joinedBy.name) : undefined}
@@ -698,14 +794,14 @@ export function ProfileTab({
               value={
                 profile?.team && profile?.teamJoined
                   ? new Date(
-                      profile.teamJoined as string | Date,
-                    ).toLocaleDateString()
+                    profile.teamJoined as string | Date,
+                  ).toLocaleDateString()
                   : undefined
               }
             />
           </dl>
           {profile?.companyStatus === "approved" &&
-          !profile?.companyIdentityCode ? (
+            !profile?.companyIdentityCode ? (
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
               <p className="text-sm font-medium text-amber-800">
                 No unique company identity code has been issued yet.
@@ -727,7 +823,7 @@ export function ProfileTab({
               </button>
             </div>
           ) : null}
-          {inApprovedCompany && role !== "admin" && !insights?.hasSalary ? (
+          {inApprovedCompany && !insights?.hasSalary ? (
             <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
               <p className="text-sm font-medium text-slate-700">
                 Salary not assigned yet?
@@ -735,7 +831,9 @@ export function ProfileTab({
               <p className="mt-1 text-xs text-slate-500">
                 {role === "human-resource"
                   ? "Request admin to set up your salary record."
-                  : "Request the HR who enrolled you to set up your salary."}
+                  : role === "admin"
+                    ? "Request another admin or HR to set up your salary record."
+                    : "Request the HR who enrolled you to set up your salary."}
               </p>
               <button
                 className="mt-3 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
@@ -751,7 +849,9 @@ export function ProfileTab({
                     ? "Requesting..."
                     : role === "human-resource"
                       ? "Request salary from admin"
-                      : "Request salary from HR"}
+                      : role === "admin"
+                        ? "Request salary from admin/HR"
+                        : "Request salary from HR"}
               </button>
             </div>
           ) : null}
@@ -926,13 +1026,33 @@ export function ProfileTab({
 
         {role === "admin" && company?.joinCode && company?.status !== "taken-down" ? (
           <>
-            <CodePanel
-              title="HR Onboarding"
-              code={String(company.joinCode)}
-              label="HR code"
-              empty="Register a company to generate an HR onboarding code."
-              showToast={showToast}
-            />
+            {profile?.companyStatus === "approved" ? (
+              <CodePanel
+                title="Onboarding"
+                code={company?.adminJoinCode ? String(company.adminJoinCode) : undefined}
+                label="Admin code"
+                empty="Register a company to generate onboarding codes."
+                showToast={showToast}
+                secondaryCodes={
+                  company?.joinCode
+                    ? [{ code: String(company.joinCode), label: "HR code" }]
+                    : []
+                }
+              />
+            ) : (
+              <JoinPanel
+                title="Join company as Admin"
+                placeholder="Admin company code"
+                value={adminJoinCode}
+                onChange={setAdminJoinCode}
+                onSubmit={joinAsAdmin}
+                status={String(profile?.companyStatus ?? "none")}
+                onCancelRequest={async () => {
+                  await apiFetch("/api/join/cancel", { method: "POST" });
+                  await refresh();
+                }}
+              />
+            )}
 
             <section className={sectionClass}>
               <h3 className="text-lg font-semibold">
@@ -978,75 +1098,20 @@ export function ProfileTab({
                     Manual Weekends
                   </label>
                   <p className="mt-1 text-sm text-slate-500">
-                    Mark Saturdays or Sundays as company weekends for a month.
+                    View and manage company weekend dates.
                   </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
-                    <input
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-                      type="month"
-                      value={weekendMonth}
-                      onChange={(event) => setWeekendMonth(event.target.value)}
-                    />
-                    <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                      <input
-                        type="checkbox"
-                        checked={weekendDays.saturday}
-                        onChange={(event) =>
-                          setWeekendDays((current) => ({
-                            ...current,
-                            saturday: event.target.checked,
-                          }))
-                        }
-                      />
-                      Saturday
-                    </label>
-                    <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                      <input
-                        type="checkbox"
-                        checked={weekendDays.sunday}
-                        onChange={(event) =>
-                          setWeekendDays((current) => ({
-                            ...current,
-                            sunday: event.target.checked,
-                          }))
-                        }
-                      />
-                      Sunday
-                    </label>
-                    <button
-                      className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-                      disabled={wfhLoading}
-                      type="button"
-                      onClick={() => void assignWeekends()}
-                    >
-                      Assign weekends
-                    </button>
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {visibleWeekendDates.map((item) => (
-                      <span
-                        className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700"
-                        key={String(item.date)}
-                      >
-                        {new Date(item.date).toLocaleDateString()}
-                        <button
-                          className="text-rose-600 hover:text-rose-800 disabled:opacity-50"
-                          disabled={wfhLoading}
-                          type="button"
-                          onClick={() => void deleteWeekend(item.date)}
-                          aria-label="Delete weekend date"
-                        >
-                          <X size={13} />
-                        </button>
+                  <button
+                    onClick={() => setShowWeekendModal(true)}
+                    className="mt-3 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition"
+                    type="button"
+                  >
+                    Manage Weekend
+                    {weekendDates.length > 0 && (
+                      <span className="ml-1.5 rounded-full bg-white/20 px-1.5 py-0.5 text-xs text-white">
+                        {weekendDates.length}
                       </span>
-                    ))}
-                    {visibleWeekendDates.length === 0 ? (
-                      <p className="text-sm text-slate-400">
-                        No manual weekends assigned for this month.
-                      </p>
-                    ) : null}
-                  </div>
+                    )}
+                  </button>
                 </div>
 
                 <div>
@@ -1114,12 +1179,194 @@ export function ProfileTab({
                 showToast={showToast}
               />
             )}
+            {showWeekendModal ? (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) setShowWeekendModal(false);
+                }}
+              >
+                <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+                  <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+                    <div>
+                      <h4 className="text-xl font-semibold">
+                        Manage Weekends
+                      </h4>
+                      <p className="mt-0.5 text-sm text-slate-500">
+                        {weekendDates.length} weekend
+                        {weekendDates.length === 1 ? "" : "s"} assigned
+                      </p>
+                    </div>
+                    <button
+                      className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
+                      type="button"
+                      onClick={() => setShowWeekendModal(false)}
+                      aria-label="Close"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <div className="border-b border-slate-100 px-6 py-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <input
+                        className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                        type="month"
+                        value={weekendMonth}
+                        onChange={(event) => setWeekendMonth(event.target.value)}
+                      />
+                      <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={weekendDays.saturday}
+                          onChange={(event) =>
+                            setWeekendDays((current) => ({
+                              ...current,
+                              saturday: event.target.checked,
+                            }))
+                          }
+                        />
+                        Saturday
+                      </label>
+                      <button
+                        className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                        disabled={wfhLoading}
+                        type="button"
+                        onClick={() => void assignWeekends()}
+                      >
+                        Assign
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="px-6 py-4">
+                    <div className="grid grid-cols-7 gap-1 mb-2">
+                      {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+                        <div key={d} className="text-center text-xs font-bold uppercase text-slate-500 py-1">
+                          {d}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-7 gap-1">
+                      {(() => {
+                        const [y, m] = weekendMonth.split("-");
+                        const year = Number(y);
+                        const month = Number(m) - 1;
+                        const daysInMonth = new Date(year, month + 1, 0).getDate();
+                        const firstDay = new Date(year, month, 1).getDay();
+                        const hasManualWeekends = visibleWeekendDates.length > 0;
+                        const cells: React.ReactNode[] = [];
+                        for (let i = 0; i < firstDay; i++) {
+                          cells.push(<div key={`e${i}`} />);
+                        }
+                        for (let day = 1; day <= daysInMonth; day++) {
+                          const date = new Date(year, month, day);
+                          const dateStr = `${weekendMonth}-${String(day).padStart(2, "0")}`;
+                          const wd = visibleWeekendDates.find((item) =>
+                            String(item.date).startsWith(dateStr)
+                          );
+                          const isDefaultSunday = !hasManualWeekends && date.getDay() === 0;
+                          const isWeekend = !!(wd || isDefaultSunday);
+                          cells.push(
+                            <div
+                              key={day}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => {
+                                const utcStr = `${weekendMonth}-${String(day).padStart(2, "0")}T00:00:00.000Z`;
+                                setConfirmDateStr(utcStr);
+                                setConfirmDateIsWeekend(isWeekend);
+                                setConfirmDateDay(day);
+                                setShowDateConfirm(true);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  const utcStr = `${weekendMonth}-${String(day).padStart(2, "0")}T00:00:00.000Z`;
+                                  setConfirmDateStr(utcStr);
+                                  setConfirmDateIsWeekend(isWeekend);
+                                  setConfirmDateDay(day);
+                                  setShowDateConfirm(true);
+                                }
+                              }}
+                              className={`relative min-h-[80px] cursor-pointer rounded-lg border p-1.5 transition hover:shadow-sm ${isWeekend
+                                ? "border-indigo-200 bg-indigo-50"
+                                : "border-slate-100 bg-white hover:border-slate-300"
+                                }`}
+                            >
+                              <span className="text-xs font-semibold text-slate-600">{day}</span>
+                              {isWeekend && (
+                                <div className="mt-1 flex items-center justify-between gap-1 rounded-md bg-indigo-100 px-1.5 py-1 text-[11px] font-medium text-indigo-700">
+                                  <span>Weekend</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+                        return cells;
+                      })()}
+                    </div>
+                  </div>
+
+                  {showDateConfirm && (
+                    <div
+                      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4"
+                      onClick={(e) => {
+                        if (e.target === e.currentTarget) setShowDateConfirm(false);
+                      }}
+                    >
+                      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
+                        <h4 className="text-lg font-semibold text-slate-900">
+                          {confirmDateIsWeekend ? "Remove weekend" : "Set as weekend"}
+                        </h4>
+                        <p className="mt-2 text-sm text-slate-600">
+                          {confirmDateIsWeekend
+                            ? `Remove weekend for ${weekendMonth}-${String(confirmDateDay).padStart(2, "0")}?`
+                            : `Set ${weekendMonth}-${String(confirmDateDay).padStart(2, "0")} as a weekend?`}
+                        </p>
+                        <div className="mt-5 flex justify-end gap-3">
+                          <button
+                            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                            type="button"
+                            onClick={() => setShowDateConfirm(false)}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                            type="button"
+                            disabled={wfhLoading}
+                            onClick={() => {
+                              setShowDateConfirm(false);
+                              if (confirmDateIsWeekend) {
+                                const wd = visibleWeekendDates.find((item) =>
+                                  String(item.date).startsWith(confirmDateStr.slice(0, 10))
+                                );
+                                if (wd) {
+                                  void deleteWeekend(wd.date);
+                                } else {
+                                  void excludeDefaultSunday(confirmDateStr);
+                                }
+                              } else {
+                                void assignWeekendDate(confirmDateStr);
+                              }
+                            }}
+                          >
+                            Confirm
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
           </>
         ) : null}
 
         {role === "project-manager" ||
-        role === "qa-tester" ||
-        role === "finance" ? (
+          role === "qa-tester" ||
+          role === "finance" ? (
           <section className="rounded-lg border overflow-y-auto h-auto max-h-[500px] border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center gap-2">
               <Building2 size={18} />
@@ -1822,9 +2069,9 @@ export function OnboardingTab({
   const selfId = String(session?.user?.id ?? "");
   const hrSuffix = selfId
     ? `-HR${selfId
-        .replace(/[^a-fA-F0-9]/g, "")
-        .toUpperCase()
-        .slice(-6)}`
+      .replace(/[^a-fA-F0-9]/g, "")
+      .toUpperCase()
+      .slice(-6)}`
     : "";
   const [companyName, setCompanyName] = useState("");
   const [companyCode, setCompanyCode] = useState("");
@@ -2170,27 +2417,56 @@ export function OnboardingTab({
   return (
     <div className="grid gap-5 xl:grid-cols-2">
       {role === "admin" && company?.status !== "taken-down" ? (
-        <CodePanel
-          title="HR Onboarding"
-          code={company?.joinCode ? String(company.joinCode) : undefined}
-          label="HR code"
-          empty="Register a company to generate an HR onboarding code."
-          showToast={showToast}
-        >
-          {!company ? (
-            <form className="mt-4 flex gap-2" onSubmit={createCompany}>
-              <input
-                className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2.5"
-                placeholder="Company name"
-                value={companyName}
-                onChange={(event) => setCompanyName(event.target.value)}
-              />
-              <button className="rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white">
-                Register
-              </button>
-            </form>
-          ) : null}
-        </CodePanel>
+        profile?.companyStatus === "approved" ? (
+          <CodePanel
+            title="Onboarding"
+            code={company?.adminJoinCode ? String(company.adminJoinCode) : undefined}
+            label="Admin code"
+            empty="Register a company to generate onboarding codes."
+            showToast={showToast}
+            secondaryCodes={
+              company?.joinCode
+                ? [{ code: String(company.joinCode), label: "HR code" }]
+                : []
+            }
+          />
+        ) : (
+          <>
+            {company ? null : (
+              <CodePanel
+                title="Create a company"
+                code={undefined}
+                label="HR code"
+                empty="Register a company to generate onboarding codes."
+                showToast={showToast}
+              >
+                <form className="mt-4 flex gap-2" onSubmit={createCompany}>
+                  <input
+                    className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2.5"
+                    placeholder="Company name"
+                    value={companyName}
+                    onChange={(event) => setCompanyName(event.target.value)}
+                  />
+                  <button className="rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white">
+                    Register
+                  </button>
+                </form>
+              </CodePanel>
+            )}
+            <JoinPanel
+              title="Join company as Admin"
+              placeholder="Admin company code"
+              value={companyCode}
+              onChange={setCompanyCode}
+              onSubmit={joinCompany}
+              status={String(profile?.companyStatus ?? "none")}
+              onCancelRequest={async () => {
+                await apiFetch("/api/join/cancel", { method: "POST" });
+                await refresh();
+              }}
+            />
+          </>
+        )
       ) : null}
 
       {role === "human-resource" && company?.status !== "taken-down" ? (
@@ -2205,33 +2481,33 @@ export function OnboardingTab({
                 [
                   company?.managerJoinCode
                     ? {
-                        code: `${String(company.managerJoinCode)}${hrSuffix}`,
-                        label: "Manager code",
-                      }
+                      code: `${String(company.managerJoinCode)}${hrSuffix}`,
+                      label: "Manager code",
+                    }
                     : null,
                   company?.testerJoinCode
                     ? {
-                        code: `${String(company.testerJoinCode)}${hrSuffix}`,
-                        label: "Tester code",
-                      }
+                      code: `${String(company.testerJoinCode)}${hrSuffix}`,
+                      label: "Tester code",
+                    }
                     : null,
                   company?.financeJoinCode
                     ? {
-                        code: `${String(company.financeJoinCode)}${hrSuffix}`,
-                        label: "Finance code",
-                      }
+                      code: `${String(company.financeJoinCode)}${hrSuffix}`,
+                      label: "Finance code",
+                    }
                     : null,
                   company?.employeeJoinCode
                     ? {
-                        code: `${String(company.employeeJoinCode)}${hrSuffix}`,
-                        label: "Employee code",
-                      }
+                      code: `${String(company.employeeJoinCode)}${hrSuffix}`,
+                      label: "Employee code",
+                    }
                     : null,
                   company?.otherJoinCode
                     ? {
-                        code: `${String(company.otherJoinCode)}${hrSuffix}`,
-                        label: "Others code",
-                      }
+                      code: `${String(company.otherJoinCode)}${hrSuffix}`,
+                      label: "Others code",
+                    }
                     : null,
                 ].filter(Boolean) as { code: string; label: string }[]
               }
@@ -2878,7 +3154,7 @@ export function OnboardingTab({
             </div>
             <div className="mt-4 space-y-2">
               {Array.isArray(teamModal.employees) &&
-              teamModal.employees.length > 0 ? (
+                teamModal.employees.length > 0 ? (
                 (teamModal.employees as AnyRecord[]).map((emp) => (
                   <div
                     key={String(emp.id)}

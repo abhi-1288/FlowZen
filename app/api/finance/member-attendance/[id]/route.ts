@@ -68,6 +68,8 @@ export async function GET(request: Request, { params }: Params) {
     }),
   );
 
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
   const daysInMonth = new Date(year, mon, 0).getDate();
   const calendar: {
     day: number;
@@ -138,7 +140,7 @@ export async function GET(request: Request, { params }: Params) {
       leave: isBeforeJoined ? false : !!leave,
       leaveReason: isBeforeJoined ? "" : leave ? String(leave.reason ?? "") : "",
       leaveStatus: isBeforeJoined ? "Not Joined" : leave ? String(leave.status ?? "") : "",
-      absent: isBeforeJoined ? false : (!att && !leave && !wfh && !isWeekend && !holiday),
+      absent: isBeforeJoined ? false : date > today ? false : (!att && !leave && !wfh && !isWeekend && !holiday),
       holiday: !!holiday,
       holidayTitle: holiday ? String(holiday.title ?? "") : "",
       notJoined: isBeforeJoined,

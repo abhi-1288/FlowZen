@@ -12,6 +12,7 @@ const CompanySchema = new Schema(
     financeJoinCode: { type: String, unique: true, sparse: true, index: true },
     employeeJoinCode: { type: String, unique: true, sparse: true, index: true },
     otherJoinCode: { type: String, unique: true, sparse: true, index: true },
+    adminJoinCode: { type: String, unique: true, sparse: true, index: true },
     noticePeriodDays: { type: Number, default: 30 },
     paidLeaveDays: { type: Number, default: 0 },
     paidLeavePeriod: { type: String, enum: ["monthly", "yearly"], default: "monthly" },

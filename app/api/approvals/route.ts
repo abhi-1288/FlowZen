@@ -82,6 +82,9 @@ export async function GET() {
         if (String(request.kind) === "identity-code") {
           return requesterRole === "human-resource";
         }
+        if (requesterRole === "admin") {
+          return true;
+        }
         return requesterRole === "human-resource";
       });
 

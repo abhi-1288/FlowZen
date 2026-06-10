@@ -15,6 +15,7 @@ function roleForCompanyCode(company: any, code: string, baseCode: string) {
     return code === value || baseCode === value || code.startsWith(`${value}-HR`);
   };
 
+  if (matches(company.adminJoinCode)) return "admin";
   if (matches(company.managerJoinCode)) return "project-manager";
   if (matches(company.testerJoinCode)) return "qa-tester";
   if (matches(company.financeJoinCode)) return "finance";
@@ -25,6 +26,7 @@ function roleForCompanyCode(company: any, code: string, baseCode: string) {
 }
 
 function joinTitleForRole(role: string) {
+  if (role === "admin") return "Admin join request";
   if (role === "human-resource") return "HR join request";
   if (role === "project-manager") return "Manager join request";
   if (role === "qa-tester") return "Tester join request";
@@ -64,6 +66,7 @@ export async function POST(request: Request) {
         { financeJoinCode: withoutHrSuffix },
         { employeeJoinCode: withoutHrSuffix },
         { otherJoinCode: withoutHrSuffix },
+        { adminJoinCode: withoutHrSuffix },
       ]
     })
   ]);
@@ -91,9 +94,10 @@ export async function POST(request: Request) {
       : null;
   const approverId = invitedHrId ?? (await resolveCompanyJoinApproverId(company, codeRole));
   const approvalNotifier: "hr" | "admin" =
+    codeRole === "admin" ? "admin" :
     approverId === String(company.owner) ? "admin" : "hr";
   const enrollingHrId =
-    invitedHrId ?? (approvalNotifier === "hr" ? approverId : null);
+    invitedHrId ?? (codeRole !== "admin" && approvalNotifier === "hr" ? approverId : null);
 
   if (existingPendingRequest) {
     user.company = company._id;

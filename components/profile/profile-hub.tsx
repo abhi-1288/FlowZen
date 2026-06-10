@@ -115,7 +115,7 @@ export function ProfileHub() {
       ? (["members"] as Tab[])
       : []),
     ...(hasCompany ? (["messages"] as Tab[]) : []),
-    ...(hasCompany && ["finance", "admin"].includes(String(role)) ? (["finance"] as Tab[]) : []),
+    ...(hasCompany ? (["finance"] as Tab[]) : []),
     "approvals",
     "notifications",
     "attendance",

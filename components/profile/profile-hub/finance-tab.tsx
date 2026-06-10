@@ -5,6 +5,7 @@ import { AnyRecord, displayNested, formatRoleWithCustom } from "./shared";
 type FinanceData = {
   month: string;
   canManage: boolean;
+  monthEndGenerated: boolean;
   dashboard: { totalPayroll: number; pendingSalaries: number; paidSalaries: number };
   salaries: AnyRecord[];
   expenses: AnyRecord[];
@@ -41,6 +42,8 @@ export function FinanceTab({
     allowances: number;
     manualDeductions: number;
     totalDeductions: number;
+    foodDeduction: number;
+    travelDeduction: number;
     grossSalary: number;
     finalSalary: number;
     periodStart: string;
@@ -51,7 +54,8 @@ export function FinanceTab({
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
   const [showExpiredBudgets, setShowExpiredBudgets] = useState(false);
-  const [expenseForm, setExpenseForm] = useState({ category: "software", title: "", amount: "", reason: "", assignedTo: "" });
+  const [expenseForm, setExpenseForm] = useState({ category: "software", title: "", amount: "", quantity: "1", reason: "", assignedTo: "" });
+  const [forwardAdminByExpense, setForwardAdminByExpense] = useState<Record<string, string>>({});
   const [rejectTarget, setRejectTarget] = useState<{ id: string; type: "expense" | "budget" } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [deleteSalaryId, setDeleteSalaryId] = useState<string | null>(null);
@@ -69,10 +73,13 @@ export function FinanceTab({
   const [leaveImpacts, setLeaveImpacts] = useState<{ employeeName: string; leaves: number; deduction: number }[]>([]);
 
 
-  // Resource requests
-  const [resourceRequests, setResourceRequests] = useState<AnyRecord[]>([]);
-  const [showResourceForm, setShowResourceForm] = useState(false);
-  const [resourceForm, setResourceForm] = useState({ items: [{ name: "", quantity: 1, reason: "" }], notes: "" });
+  // Policies
+  const [policyData, setPolicyData] = useState<{
+    foodAmount: number;
+    travelAccommodationAmount: number;
+    foodOptedOutMembers: { _id: string; name: string; email: string; role: string }[];
+    travelOptedOutMembers: { _id: string; name: string; email: string; role: string }[];
+  } | null>(null);
 
   async function load() {
     const result = await apiFetch<FinanceData>(`/api/finance?month=${month}`);
@@ -107,16 +114,18 @@ export function FinanceTab({
       .catch(() => { });
   }, [data, month]);
 
-  // Load resource requests
+  // Load policy data
   useEffect(() => {
     if (!data) return;
-    const url = actorRole === "finance" || actorRole === "admin"
-      ? "/api/finance/resource-request"
-      : "/api/finance/resource-request";
-    apiFetch<{ requests: AnyRecord[] }>(url)
-      .then((res) => setResourceRequests(res.requests))
+    apiFetch<{ foodAmount: number; travelAccommodationAmount: number; foodOptedOutMembers: { _id: string; name: string; email: string; role: string }[]; travelOptedOutMembers: { _id: string; name: string; email: string; role: string }[] }>("/api/finance/policy")
+      .then((res) => setPolicyData({
+        foodAmount: res.foodAmount,
+        travelAccommodationAmount: res.travelAccommodationAmount,
+        foodOptedOutMembers: res.foodOptedOutMembers ?? [],
+        travelOptedOutMembers: res.travelOptedOutMembers ?? [],
+      }))
       .catch(() => { });
-  }, [data, actorRole]);
+  }, [data]);
 
   async function calculateSalary(event: FormEvent) {
     event.preventDefault();
@@ -205,15 +214,40 @@ export function FinanceTab({
       method: "POST",
       body: JSON.stringify({ action: "request-expense", ...expenseForm }),
     });
-    setExpenseForm({ category: "software", title: "", amount: "", reason: "", assignedTo: "" });
+    setExpenseForm({ category: "software", title: "", amount: "", quantity: "1", reason: "", assignedTo: "" });
     showToast("Expense request submitted.", "success");
     await load();
   }
 
-  async function updateStatus(type: "salary" | "expense" | "budget" | "bill", id: string, status: string) {
+  async function togglePolicyOptOut(type: "food" | "travel") {
+    try {
+      const res = await apiFetch<{
+        foodAmount: number;
+        travelAccommodationAmount: number;
+        foodOptedOutMembers: { _id: string; name: string; email: string; role: string }[];
+        travelOptedOutMembers: { _id: string; name: string; email: string; role: string }[];
+        nowOptedOut: boolean;
+      }>("/api/finance/policy", {
+        method: "PATCH",
+        body: JSON.stringify({ memberId: profileId, type }),
+      });
+      setPolicyData({
+        foodAmount: res.foodAmount,
+        travelAccommodationAmount: res.travelAccommodationAmount,
+        foodOptedOutMembers: res.foodOptedOutMembers,
+        travelOptedOutMembers: res.travelOptedOutMembers,
+      });
+      const label = type === "food" ? "Food Allowance" : "Travel Accommodation";
+      showToast(res.nowOptedOut ? `You opted out of ${label} deductions.` : `You opted back into ${label} deductions.`, "success");
+    } catch {
+      showToast("Unable to update policy opt-out.", "error");
+    }
+  }
+
+  async function updateStatus(type: "salary" | "expense" | "budget" | "bill", id: string, status: string, extra: Record<string, string> = {}) {
     await apiFetch("/api/finance", {
       method: "PATCH",
-      body: JSON.stringify({ type, id, status }),
+      body: JSON.stringify({ type, id, status, ...extra }),
     });
     showToast(`${type === "salary" ? "Salary" : type === "budget" ? "Budget" : type === "bill" ? "Bill" : "Expense"} ${status}.`, "success");
     await load();
@@ -275,47 +309,6 @@ export function FinanceTab({
     setInvoices(res.invoices);
   }
 
-  // --- Resource request handlers ---
-  async function createResourceRequest(event: FormEvent) {
-    event.preventDefault();
-    await apiFetch("/api/finance/resource-request", {
-      method: "POST",
-      body: JSON.stringify(resourceForm),
-    });
-    setShowResourceForm(false);
-    setResourceForm({ items: [{ name: "", quantity: 1, reason: "" }], notes: "" });
-    showToast("Resource request submitted.", "success");
-    const res = await apiFetch<{ requests: AnyRecord[] }>("/api/finance/resource-request");
-    setResourceRequests(res.requests);
-  }
-
-  async function processResourceRequest(id: string, status: string) {
-    const reason = status === "rejected" ? prompt("Rejection reason:") : "";
-    if (status === "rejected" && !reason) { showToast("A rejection reason is required.", "error"); return; }
-    await apiFetch("/api/finance/resource-request", {
-      method: "PATCH",
-      body: JSON.stringify({ id, status, rejectionReason: reason ?? "" }),
-    });
-    showToast(`Resource request ${status}.`, "success");
-    const res = await apiFetch<{ requests: AnyRecord[] }>("/api/finance/resource-request");
-    setResourceRequests(res.requests);
-  }
-
-  function addResourceItem() {
-    setResourceForm({ ...resourceForm, items: [...resourceForm.items, { name: "", quantity: 1, reason: "" }] });
-  }
-
-  function updateResourceItem(index: number, field: string, value: string | number) {
-    const items = [...resourceForm.items];
-    (items[index] as any)[field] = value;
-    setResourceForm({ ...resourceForm, items });
-  }
-
-  function removeResourceItem(index: number) {
-    if (resourceForm.items.length <= 1) return;
-    setResourceForm({ ...resourceForm, items: resourceForm.items.filter((_, i) => i !== index) });
-  }
-
   // Salary edit (removed in favor of regenerate)
   const salaryFormRef = useRef<HTMLDivElement>(null);
 
@@ -326,6 +319,7 @@ export function FinanceTab({
   }
 
   const isFinanceOrAdmin = actorRole === "finance" || actorRole === "admin";
+  const adminOptions = data.members.filter((m) => String(m.role) === "admin");
 
   return (
     <div className="space-y-5">
@@ -341,6 +335,17 @@ export function FinanceTab({
           onChange={(event) => setMonth(event.target.value)}
         />
       </div>
+
+      {data.monthEndGenerated ? (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+          <p className="text-sm font-medium text-emerald-800">
+            Salaries auto-generated for {data.month}
+          </p>
+          <p className="mt-1 text-xs text-emerald-600">
+            {data.dashboard.pendingSalaries} salary record(s) are pending admin approval. The least-loaded admin has been notified.
+          </p>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-3">
         <FinanceCard label="Total payroll this month" value={`₹${Number(data.dashboard.totalPayroll).toLocaleString("en-IN")}`} />
@@ -417,6 +422,15 @@ export function FinanceTab({
                       {salaryBreakdown.periodStart !== salaryPeriod.start && (
                         <p className="text-xs text-amber-600 bg-amber-50 rounded px-2 py-1">⚠ Period adjusted — employee joined on {salaryBreakdown.periodStart}</p>
                       )}
+                      <div className="flex justify-between">
+                        <span>Employee:</span>
+                        <span className="font-medium text-slate-900">
+                          {(() => {
+                            const m = data.members.find((x: any) => String(x.id) === salaryEmployeeId);
+                            return m ? `${m.name} (${formatRoleWithCustom(String(m.role), m.customRole)})` : "-";
+                          })()}
+                        </span>
+                      </div>
                       <div className="flex justify-between"><span>Total Days:</span> <span>{salaryBreakdown.totalDays}</span></div>
                       <div className="flex justify-between text-rose-600"><span>Absent Days:</span> <span>{salaryBreakdown.absentDays}</span></div>
                       <div className="flex justify-between text-emerald-600"><span>Paid Leave Days:</span> <span>{salaryBreakdown.paidLeaveDays}</span></div>
@@ -425,6 +439,13 @@ export function FinanceTab({
                       <div className="flex justify-between"><span>Daily Salary:</span> <span>₹{salaryBreakdown.dailySalary.toLocaleString("en-IN")}</span></div>
                       <div className="flex justify-between"><span>Gross Salary:</span> <span>₹{salaryBreakdown.grossSalary.toLocaleString("en-IN")}</span></div>
                       <div className="flex justify-between text-rose-600"><span>Attendance/Leave Deduction:</span> <span>- ₹{salaryBreakdown.leaveDeduction.toLocaleString("en-IN")}</span></div>
+                      {salaryBreakdown.foodDeduction > 0 ? (
+                        <div className="flex justify-between text-rose-600"><span>Food Deduction:</span> <span>- ₹{salaryBreakdown.foodDeduction.toLocaleString("en-IN")}</span></div>
+                      ) : null}
+                      {salaryBreakdown.travelDeduction > 0 ? (
+                        <div className="flex justify-between text-rose-600"><span>Travel Accommodation Deduction:</span> <span>- ₹{salaryBreakdown.travelDeduction.toLocaleString("en-IN")}</span></div>
+                      ) : null}
+                      <div className="flex justify-between text-emerald-600"><span>Total In Hand:</span> <span>₹{Math.max(salaryBreakdown.grossSalary + Number(salaryAllowances || 0) - (salaryBreakdown.leaveDeduction + Number(salaryDeductions || 0) + (salaryBreakdown.foodDeduction ?? 0) + (salaryBreakdown.travelDeduction ?? 0))).toLocaleString("en-IN")}</span> </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -438,7 +459,7 @@ export function FinanceTab({
                     </div>
                     <div className="rounded-lg bg-emerald-50 p-3 flex justify-between font-bold text-emerald-700 text-lg mt-2">
                       <span>Net Salary:</span>
-                      <span>₹{Math.max(0, salaryBreakdown.grossSalary + Number(salaryAllowances || 0) - (salaryBreakdown.leaveDeduction + Number(salaryDeductions || 0))).toLocaleString("en-IN")}</span>
+                      <span>₹{Math.max(0, salaryBreakdown.grossSalary + Number(salaryAllowances || 0) - (salaryBreakdown.leaveDeduction + Number(salaryDeductions || 0) + (salaryBreakdown.foodDeduction ?? 0) + (salaryBreakdown.travelDeduction ?? 0))).toLocaleString("en-IN")}</span>
                     </div>
                     <div className="flex justify-between mt-2">
                       <button type="button" className="rounded-lg border border-slate-200 px-4 py-2 text-sm" onClick={() => setSalaryStep(2)}>Back</button>
@@ -461,9 +482,9 @@ export function FinanceTab({
               {data.expenses.filter((e) => String(e.status) === "accepted").map((expense) => (
                 <div className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2" key={String(expense.id)}>
                   <div>
-                    <p className="text-sm font-medium">{String(expense.title)}</p>
+                    <p className="text-sm font-medium">{String(expense.title)} x {Number(expense.quantity ?? 1)}</p>
                     <p className="text-xs text-slate-500">
-                      {displayNested(expense.requester, "name", "Member")} • {String(expense.category)} • ₹{Number(expense.amount ?? 0).toLocaleString("en-IN")}
+                      {displayNested(expense.requester, "name", "Member")} • {String(expense.category)} • Qty: {Number(expense.quantity ?? 1)} • ₹{Number(expense.amount ?? 0).toLocaleString("en-IN")}
                     </p>
                   </div>
                   <button className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs text-white" onClick={() => updateStatus("expense", String(expense.id), "disbursed")}>Disburse</button>
@@ -475,7 +496,7 @@ export function FinanceTab({
                 <p className="mb-2 text-xs font-medium text-slate-500">Disbursed</p>
                 {data.expenses.filter((e) => String(e.status) === "disbursed").map((expense) => (
                   <div className="flex items-center justify-between py-1.5 text-sm" key={String(expense.id)}>
-                    <span>₹{Number(expense.amount ?? 0).toLocaleString("en-IN")} — {String(expense.title)} <span className="ml-2 inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">disbursed</span></span>
+                    <span>₹{Number(expense.amount ?? 0).toLocaleString("en-IN")} — {String(expense.title)} x {Number(expense.quantity ?? 1)} <span className="ml-2 inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">disbursed</span></span>
                   </div>
                 ))}
               </div>
@@ -519,48 +540,6 @@ export function FinanceTab({
               <button className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white" onClick={() => openBudgetModal()}>Allocate Budget</button>
             </div>
             <p className="mt-1 text-xs text-slate-400">Set project budgets and submit for approval.</p>
-          </section>
-          {/* Resource Purchase Approval */}
-          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <h4 className="font-semibold">Resource Purchase
-                {resourceRequests.filter((r) => String(r.status) === "pending").length > 0 ? (
-                  <span className="ml-2 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                    {resourceRequests.filter((r) => String(r.status) === "pending").length} pending
-                  </span>
-                ) : null}
-              </h4>
-              {!isFinanceOrAdmin ? (
-                <button className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white" onClick={() => setShowResourceForm(true)}>Request Resource</button>
-              ) : null}
-            </div>
-            <p className="mt-1 text-xs text-slate-400">{isFinanceOrAdmin ? "Approve or reject resource purchase requests." : "Request resources for your team."}</p>
-            <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
-              {resourceRequests.length === 0 ? <p className="py-2 text-sm text-slate-500">No resource requests.</p> : null}
-              {resourceRequests.map((req) => {
-                const items = Array.isArray(req.items) ? req.items : [];
-                const itemSummary = items.map((i: any) => `${i.quantity ?? 1} x ${i.name}`).join(", ");
-                return (
-                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 px-3 py-2" key={String(req.id)}>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{itemSummary || "Resources"}</p>
-                      <p className="text-xs text-slate-500 truncate">
-                        {displayNested(req.requester, "name", "User")} • {String(req.status)}
-                        {req.rejectionReason ? <> • Reason: {String(req.rejectionReason)}</> : null}
-                      </p>
-                    </div>
-                    <div className="flex gap-2 shrink-0">
-                      {String(req.status) === "pending" && isFinanceOrAdmin ? (
-                        <>
-                          <button className="rounded-lg bg-emerald-600 px-2 py-1 text-xs text-white" onClick={() => processResourceRequest(String(req.id), "approved")}>Approve</button>
-                          <button className="rounded-lg border border-rose-200 px-2 py-1 text-xs text-rose-600" onClick={() => processResourceRequest(String(req.id), "rejected")}>Reject</button>
-                        </>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
           </section>
         </div>
           <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -706,34 +685,6 @@ export function FinanceTab({
               </div>
             </div>
           ) : null}
-          {/* Resource request form modal */}
-          {showResourceForm ? (
-            <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
-              <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
-                <h4 className="text-lg font-semibold">Request Resource</h4>
-                <form className="mt-4 grid gap-3" onSubmit={createResourceRequest}>
-                  {resourceForm.items.map((item, idx) => (
-                    <div className="flex gap-2 items-start" key={idx}>
-                      <div className="flex-1 grid gap-2">
-                        <input className="rounded-lg border border-slate-200 px-3 py-2" required placeholder="Item name" value={item.name} onChange={(e) => updateResourceItem(idx, "name", e.target.value)} />
-                        <div className="flex gap-2">
-                          <input className="w-24 rounded-lg border border-slate-200 px-3 py-2" required placeholder="Qty" type="number" min={1} value={item.quantity} onChange={(e) => updateResourceItem(idx, "quantity", Number(e.target.value))} />
-                          <input className="flex-1 rounded-lg border border-slate-200 px-3 py-2" placeholder="Reason" value={item.reason} onChange={(e) => updateResourceItem(idx, "reason", e.target.value)} />
-                        </div>
-                      </div>
-                      <button type="button" className="mt-2 rounded-lg border border-rose-200 px-2 py-1 text-xs text-rose-600" onClick={() => removeResourceItem(idx)}>X</button>
-                    </div>
-                  ))}
-                  <button type="button" className="text-sm text-blue-600 underline text-left" onClick={addResourceItem}>+ Add item</button>
-                  <textarea className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Additional notes (optional)" value={resourceForm.notes} onChange={(e) => setResourceForm({ ...resourceForm, notes: e.target.value })} />
-                  <div className="flex justify-end gap-3">
-                    <button type="button" className="rounded-lg border border-slate-200 px-4 py-2 text-sm" onClick={() => { setShowResourceForm(false); setResourceForm({ items: [{ name: "", quantity: 1, reason: "" }], notes: "" }); }}>Cancel</button>
-                    <button className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white">Submit</button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          ) : null}
         </>) : null}
 
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -747,6 +698,7 @@ export function FinanceTab({
           </select>
           <input className="rounded-lg border border-slate-200 px-3 py-2" required placeholder="Title" value={expenseForm.title} onChange={(e) => setExpenseForm({ ...expenseForm, title: e.target.value })} />
           <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Amount" type="number" value={expenseForm.amount} onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })} />
+          <input className="rounded-lg border border-slate-200 px-3 py-2" required min={1} placeholder="Quantity" type="number" value={expenseForm.quantity} onChange={(e) => setExpenseForm({ ...expenseForm, quantity: e.target.value })} />
           {actorRole !== "finance" ? (
             <select className="rounded-lg border border-slate-200 px-3 py-2" required value={expenseForm.assignedTo} onChange={(e) => setExpenseForm({ ...expenseForm, assignedTo: e.target.value })}>
               <option value="">Assign finance user</option>
@@ -798,6 +750,55 @@ export function FinanceTab({
       </section>
 
       {/* Leave Impact on Payroll */}
+      {policyData && (policyData.foodAmount > 0 || policyData.travelAccommodationAmount > 0) ? (
+        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <h4 className="font-semibold">Company Policies</h4>
+          <p className="mt-1 text-xs text-slate-400">Fixed deductions configured by finance. Opt in/out separately below.</p>
+          <div className="mt-3 space-y-2">
+            {policyData.foodAmount > 0 ? (
+              <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium text-slate-800">Food Allowance</p>
+                  <p className="text-xs text-slate-500">₹{policyData.foodAmount.toLocaleString("en-IN")} per month</p>
+                </div>
+                <button
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${policyData.foodOptedOutMembers?.some((om) => String(om._id) === profileId)
+                      ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                      : "bg-rose-100 text-rose-700 hover:bg-rose-200"
+                    }`}
+                  onClick={() => void togglePolicyOptOut("food")}
+                  type="button"
+                >
+                  {policyData.foodOptedOutMembers?.some((om) => String(om._id) === profileId)
+                    ? "Opt In"
+                    : "Opt Out"}
+                </button>
+              </div>
+            ) : null}
+            {policyData.travelAccommodationAmount > 0 ? (
+              <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium text-slate-800">Travel Accommodation</p>
+                  <p className="text-xs text-slate-500">₹{policyData.travelAccommodationAmount.toLocaleString("en-IN")} per month</p>
+                </div>
+                <button
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${policyData.travelOptedOutMembers?.some((om) => String(om._id) === profileId)
+                      ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                      : "bg-rose-100 text-rose-700 hover:bg-rose-200"
+                    }`}
+                  onClick={() => void togglePolicyOptOut("travel")}
+                  type="button"
+                >
+                  {policyData.travelOptedOutMembers?.some((om) => String(om._id) === profileId)
+                    ? "Opt In"
+                    : "Opt Out"}
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
       {leaveImpacts.length > 0 ? (
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <h4 className="font-semibold">Leave Impact on Payroll</h4>
@@ -836,42 +837,52 @@ export function FinanceTab({
         <h4 className="font-semibold">Expense Requests</h4>
         <div className="mt-4 divide-y divide-slate-200">
           {data.expenses.map((expense) => {
+            const expenseId = String(expense.id);
             const assignedToId = expense.assignedTo ? String((expense.assignedTo as AnyRecord)._id ?? (expense.assignedTo as AnyRecord).id ?? "") : "";
+            const adminApproverId = expense.adminApprover ? String((expense.adminApprover as AnyRecord)._id ?? (expense.adminApprover as AnyRecord).id ?? "") : "";
             const isAssignedToMe = assignedToId === String(profileId);
+            const isAssignedAdmin = adminApproverId === String(profileId);
             const noAssignment = !expense.assignedTo;
             const hasAssigned = !!expense.assignedTo;
             const expStatus = String(expense.status);
 
             const canForward = actorRole === "finance" && expStatus === "pending" && isAssignedToMe;
-            const canAdminApprove = actorRole === "admin" && (expStatus === "forwarded" || (expStatus === "pending" && noAssignment));
+            const canAdminApprove = actorRole === "admin" && ((expStatus === "forwarded" && isAssignedAdmin) || (expStatus === "pending" && noAssignment));
             const canAccept = actorRole === "finance" && expStatus === "approved" && (noAssignment || isAssignedToMe);
             return (
-              <div className="flex flex-wrap items-center justify-between gap-3 py-3" key={String(expense.id)}>
+              <div className="flex flex-wrap items-center justify-between gap-3 py-3" key={expenseId}>
                 <div>
-                  <p className="font-medium">{String(expense.title)} - ₹{Number(expense.amount ?? 0).toLocaleString("en-IN")}</p>
+                  <p className="font-medium">{String(expense.title)} x {Number(expense.quantity ?? 1)} - ₹{Number(expense.amount ?? 0).toLocaleString("en-IN")}</p>
                   <p className="text-sm text-slate-500">
                     {displayNested(expense.requester, "name", "Requester")} • {String(expense.category)} • {String(expense.status)}
                     {expense.assignedTo ? <> • Assigned: {displayNested(expense.assignedTo, "name", "Finance")}</> : null}
                     {expense.forwardedBy ? <> • Forwarded: {displayNested(expense.forwardedBy, "name", "Finance")}</> : null}
                     {expense.rejectionReason ? <> • Reason: {String(expense.rejectionReason)}</> : null}
+                    {expense.adminApprover ? <> • Admin: {displayNested(expense.adminApprover, "name", "Admin")}</> : null}
                     {expense.acceptedBy ? <> • Accepted: {displayNested(expense.acceptedBy, "name", "Finance")}</> : null}
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {canForward ? (
                     <>
-                      <button className="rounded-lg border border-rose-200 px-3 py-2 text-sm text-rose-600" onClick={() => setRejectTarget({ id: String(expense.id), type: "expense" })}>Reject</button>
-                      <button className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white" onClick={() => updateStatus("expense", String(expense.id), "forwarded")}>Forward to admin</button>
+                      <button className="rounded-lg border border-rose-200 px-3 py-2 text-sm text-rose-600" onClick={() => setRejectTarget({ id: expenseId, type: "expense" })}>Reject</button>
+                      <select className="rounded-lg border border-slate-200 px-3 py-2 text-sm" required value={forwardAdminByExpense[expenseId] ?? ""} onChange={(e) => setForwardAdminByExpense({ ...forwardAdminByExpense, [expenseId]: e.target.value })}>
+                        <option value="">Select admin</option>
+                        {adminOptions.map((admin) => (
+                          <option key={String(admin.id)} value={String(admin.id)}>{String(admin.name ?? admin.email ?? "Admin")}</option>
+                        ))}
+                      </select>
+                      <button className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white disabled:opacity-50" disabled={!forwardAdminByExpense[expenseId]} onClick={() => updateStatus("expense", expenseId, "forwarded", { adminApprover: forwardAdminByExpense[expenseId] })}>Forward to admin</button>
                     </>
                   ) : null}
                   {canAdminApprove ? (
                     <>
-                      <button className="rounded-lg border border-rose-200 px-3 py-2 text-sm text-rose-600" onClick={() => setRejectTarget({ id: String(expense.id), type: "expense" })}>Reject</button>
-                      <button className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white" onClick={() => updateStatus("expense", String(expense.id), "approved")}>Approve</button>
+                      <button className="rounded-lg border border-rose-200 px-3 py-2 text-sm text-rose-600" onClick={() => setRejectTarget({ id: expenseId, type: "expense" })}>Reject</button>
+                      <button className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white" onClick={() => updateStatus("expense", expenseId, "approved")}>Approve</button>
                     </>
                   ) : null}
                   {canAccept ? (
-                    <button className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white" onClick={() => updateStatus("expense", String(expense.id), "accepted")}>Accept</button>
+                    <button className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white" onClick={() => updateStatus("expense", expenseId, "accepted")}>Accept</button>
                   ) : null}
                 </div>
               </div>

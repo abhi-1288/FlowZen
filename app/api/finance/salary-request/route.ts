@@ -24,7 +24,27 @@ export async function POST() {
   const requesterRole = String(user.role ?? "");
   let approverId = "";
 
-  if (requesterRole === "human-resource") {
+  if (requesterRole === "admin") {
+    const otherAdmin = await User.findOne({
+      _id: { $ne: userId },
+      company: user.company,
+      role: "admin",
+      companyStatus: "approved",
+    }).select("_id");
+    approverId = otherAdmin ? String(otherAdmin._id) : "";
+    if (!approverId) {
+      const hr = await User.findOne({
+        _id: { $ne: userId },
+        company: user.company,
+        role: "human-resource",
+        companyStatus: "approved",
+      }).select("_id");
+      approverId = hr ? String(hr._id) : "";
+    }
+    if (!approverId) {
+      return jsonError("No other admin or HR is available to assign your salary.", 404);
+    }
+  } else if (requesterRole === "human-resource") {
     const admin = await User.findOne({
       _id: { $ne: userId },
       company: user.company,
@@ -51,7 +71,9 @@ export async function POST() {
     return jsonError(
       requesterRole === "human-resource"
         ? "No admin is available for this company."
-        : "No HR is available to assign your salary.",
+        : requesterRole === "admin"
+          ? "No other admin or HR is available for this company."
+          : "No HR is available to assign your salary.",
       404,
     );
   }

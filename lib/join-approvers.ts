@@ -84,17 +84,47 @@ export async function findApprovedHrUserIdByInviteSuffix(
   return match ? String(match._id) : null;
 }
 
+export async function findApprovedAdminUserId(
+  companyId: Types.ObjectId | string,
+  excludeUserId?: string,
+): Promise<string | null> {
+  const filter: Record<string, any> = {
+    company: companyId,
+    role: "admin",
+    companyStatus: "approved",
+  };
+  if (excludeUserId) {
+    filter._id = { $ne: excludeUserId };
+  }
+  const admin = await User.findOne(filter).select("_id").sort({ createdAt: 1 });
+  return admin ? String(admin._id) : null;
+}
+
+export async function listApprovedAdminUserIds(
+  companyId: Types.ObjectId | string,
+): Promise<string[]> {
+  const admins = await User.find({
+    company: companyId,
+    role: "admin",
+    companyStatus: "approved",
+  }).select("_id");
+  return admins.map((a) => String(a._id));
+}
+
 export async function resolveCompanyJoinApproverId(
   company: { _id: Types.ObjectId | string; owner: Types.ObjectId | string },
   codeRole: string,
 ): Promise<string> {
+  if (codeRole === "admin") {
+    const admin = await findApprovedAdminUserId(company._id);
+    if (admin) return admin;
+    const hr = await findApprovedHrUserId(company._id);
+    if (hr) return hr;
+    return String(company.owner);
+  }
   if (codeRole === "human-resource") {
-    const admin = await User.findOne({
-      company: company._id,
-      role: "admin",
-      companyStatus: "approved",
-    }).select("_id");
-    if (admin) return String(admin._id);
+    const admin = await findApprovedAdminUserId(company._id);
+    if (admin) return String(admin);
   }
   if (companyJoinUsesHrApprover(codeRole)) {
     const hrId = await findApprovedHrUserId(company._id);
