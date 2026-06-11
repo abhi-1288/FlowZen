@@ -11,6 +11,7 @@ export function CalendarTab() {
   const [requests, setRequests] = useState<AnyRecord[]>([]);
   const [leavePolicy, setLeavePolicy] = useState<AnyRecord | null>(null);
   const [holidays, setHolidays] = useState<AnyRecord[]>([]);
+  const [minWorkHours, setMinWorkHours] = useState(8);
 
   const month = viewDate.getMonth();
   const year = viewDate.getFullYear();
@@ -61,15 +62,27 @@ export function CalendarTab() {
     return normalizeDate(new Date(year, month, day));
   };
 
-  const isCheckedIn = (day: number | null) => {
-    if (!day) return false;
+  const getAttendanceStatus = (day: number | null): 'present' | 'half-day' | 'absent' | null => {
+    if (!day) return null;
     const date = getDateForDay(day);
-    if (!date) return false;
-    return history.some(
-      (entry) =>
-        normalizeDate(new Date(String(entry.date))).getTime() ===
-        date.getTime(),
+    if (!date) return null;
+    const entry = history.find(
+      (e) =>
+        normalizeDate(new Date(String(e.date))).getTime() === date.getTime(),
     );
+    if (!entry) return null;
+    if (!entry.checkIn || !entry.checkOut) return 'present';
+    const diff = new Date(String(entry.checkOut)).getTime() - new Date(String(entry.checkIn)).getTime();
+    const hrs = diff / 3600000;
+    const threshold = minWorkHours / 2;
+    if (hrs < threshold) return 'absent';
+    if (hrs < minWorkHours) return 'half-day';
+    return 'present';
+  };
+
+  const isCheckedIn = (day: number | null) => {
+    const status = getAttendanceStatus(day);
+    return status === 'present' || status === 'half-day';
   };
 
   const isOnLeave = (day: number | null) => {
@@ -107,7 +120,7 @@ export function CalendarTab() {
 
   const loadData = async () => {
     const [historyRes, requestsRes, holidaysRes] = await Promise.all([
-      apiFetch<{ history: AnyRecord[] }>("/api/attendance/checkin").catch(
+      apiFetch<{ history: AnyRecord[]; minWorkHours?: number }>("/api/attendance/checkin").catch(
         () => ({ history: [] as AnyRecord[] }),
       ),
       apiFetch<{ requests: AnyRecord[]; leavePolicy?: AnyRecord }>("/api/attendance/leave").catch(
@@ -119,6 +132,7 @@ export function CalendarTab() {
     ]);
 
     setHistory(historyRes.history ?? []);
+    setMinWorkHours(historyRes.minWorkHours ?? 8);
     setRequests(requestsRes.requests ?? []);
     setHolidays(holidaysRes.holidays ?? []);
   };
@@ -187,10 +201,13 @@ export function CalendarTab() {
                   if (day === undefined) return null;
 
                   const today = isToday(day);
-                  const checkedIn = isCheckedIn(day);
+                  const status = day ? getAttendanceStatus(day) : null;
+                  const checkedIn = status === 'present' || status === 'half-day';
                   const leave = isOnLeave(day);
                   const holiday = isHoliday(day);
                   const past = isPastDay(day);
+                  const attAbsent = status === 'absent';
+                  const halfDay = status === 'half-day';
                   return (
                     <div
                       key={rowIndex}
@@ -210,17 +227,21 @@ export function CalendarTab() {
                       className={`relative cursor-pointer grid h-10 w-full place-items-center rounded-xl text-xs font-bold sm:h-14 sm:text-sm transition-all ${day
                         ? holiday
                           ? "bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 shadow-sm hover:border-fuchsia-300 hover:bg-fuchsia-50"
-                          : today
-                            ? checkedIn
-                              ? "bg-sky-100 text-sky-700 border border-sky-200 shadow-inner"
-                              : "bg-white text-rose-600 border border-rose-200 shadow-sm hover:border-rose-300 hover:bg-rose-50"
-                            : checkedIn
-                              ? "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm hover:border-emerald-300 hover:bg-emerald-50"
-                              : leave
-                                ? "bg-emerald-100 text-rose-600 border border-emerald-200 shadow-sm hover:border-emerald-300 hover:bg-emerald-50"
-                                : past
-                                  ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm"
-                                  : "bg-white shadow-sm border border-slate-100 text-slate-700 hover:border-slate-200 hover:bg-slate-50"
+                          : halfDay
+                            ? "bg-amber-100 text-amber-700 border border-amber-200 shadow-sm hover:border-amber-300 hover:bg-amber-50"
+                            : attAbsent
+                              ? "bg-rose-50 text-rose-600 border border-rose-200 shadow-sm hover:border-rose-300 hover:bg-rose-100"
+                              : today
+                                ? checkedIn
+                                  ? "bg-sky-100 text-sky-700 border border-sky-200 shadow-inner"
+                                  : "bg-white text-rose-600 border border-rose-200 shadow-sm hover:border-rose-300 hover:bg-rose-50"
+                                : checkedIn
+                                  ? "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm hover:border-emerald-300 hover:bg-emerald-50"
+                                  : leave
+                                    ? "bg-emerald-100 text-rose-600 border border-emerald-200 shadow-sm hover:border-emerald-300 hover:bg-emerald-50"
+                                    : past
+                                      ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm"
+                                      : "bg-white shadow-sm border border-slate-100 text-slate-700 hover:border-slate-200 hover:bg-slate-50"
                         : "opacity-0"
                         }`}
                     >
@@ -229,10 +250,14 @@ export function CalendarTab() {
                         (holiday ||
                           checkedIn ||
                           leave ||
-                          (today && !checkedIn)) && (
+                          attAbsent ||
+                          halfDay ||
+                          (today && !checkedIn && !attAbsent)) && (
                           <span className="absolute right-1 top-1 rounded-full bg-white/90 p-0.5">
                             {holiday ? (
                               <Calendar className="h-3.5 w-3.5 text-fuchsia-600" />
+                            ) : attAbsent ? (
+                              <X className="h-3.5 w-3.5 text-rose-600" />
                             ) : checkedIn || leave ? (
                               <Check className="h-3.5 w-3.5 text-emerald-600" />
                             ) : (
@@ -256,6 +281,7 @@ export function CalendarTab() {
           history={history}
           requests={requests}
           holidays={holidays}
+          minWorkHours={minWorkHours}
         />
       )}
     </section>
@@ -305,12 +331,16 @@ export function AttendanceTab({
   const [exportTo, setExportTo] = useState(new Date().toISOString().slice(0, 10));
   const [leavePolicy, setLeavePolicy] = useState<AnyRecord | null>(null);
   const [wfhRequests, setWfhRequests] = useState<AnyRecord[]>([]);
+  const [checkOutRequests, setCheckOutRequests] = useState<AnyRecord[]>([]);
+  const [showCheckOutRequestsModal, setShowCheckOutRequestsModal] = useState(false);
   const [showWfhFormModal, setShowWfhFormModal] = useState(false);
   const [showWfhRequestsModal, setShowWfhRequestsModal] = useState(false);
   const [showAskModal, setShowAskModal] = useState(false);
+  const [showCheckOutRequestModal, setShowCheckOutRequestModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [wfhRejectingId, setWfhRejectingId] = useState<string | null>(null);
   const [wfhRejectionReason, setWfhRejectionReason] = useState("");
+  const [minWorkHours, setMinWorkHours] = useState(8);
 
   const normalizeDate = (date: Date) => {
     const normalized = new Date(date);
@@ -329,19 +359,13 @@ export function AttendanceTab({
     const teamJoined = parseDate(profile?.teamJoined);
     const createdAt = parseDate(profile?.createdAt);
 
-    if (companyJoined && teamJoined) {
-      return companyJoined.getTime() > teamJoined.getTime()
-        ? companyJoined
-        : teamJoined;
-    }
-
     return (
       companyJoined || teamJoined || createdAt || normalizeDate(new Date(0))
     );
   }, [profile]);
 
   const loadData = async () => {
-    const [hRes, cRes, rRes, holRes, wfhRes, wfhReqRes] = await Promise.all([
+    const [hRes, cRes, rRes, holRes, wfhRes, wfhReqRes, coRes] = await Promise.all([
       apiFetch<{ history: AnyRecord[]; today?: string }>(
         "/api/attendance/checkin",
       ).catch(() => ({ history: [] as AnyRecord[], today: undefined })),
@@ -358,10 +382,15 @@ export function AttendanceTab({
       apiFetch<{ requests: AnyRecord[] }>("/api/attendance/wfh").catch(
         () => ({ requests: [] as AnyRecord[] }),
       ),
+      apiFetch<{ requests: AnyRecord[] }>("/api/attendance/checkout-request").catch(
+        () => ({ requests: [] as AnyRecord[] }),
+      ),
     ]);
     setHistory(hRes.history);
+    setMinWorkHours((hRes as any).minWorkHours ?? 8);
     setRequests(rRes.requests);
     setWfhRequests(wfhReqRes?.requests ?? []);
+    setCheckOutRequests(coRes?.requests ?? []);
     setLeavePolicy((rRes as { leavePolicy?: AnyRecord | null }).leavePolicy ?? null);
     setHolidays(holRes.holidays);
     setWfhCheckInMode(wfhRes.wfhCheckInMode ?? "all-day");
@@ -441,11 +470,11 @@ export function AttendanceTab({
     }
   };
 
-  const handleApprove = async (id: string) => {
+  const handleApprove = async (id: string, assignedAdmin?: string) => {
     try {
       await apiFetch(`/api/attendance/leave/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ action: "approve" }),
+        body: JSON.stringify({ action: "approve", ...(assignedAdmin ? { assignedAdmin } : {}) }),
       });
       loadData();
       showToast("Request approved.");
@@ -506,6 +535,38 @@ export function AttendanceTab({
     } catch (err) {
       showToast(
         err instanceof Error ? err.message : "Failed to reject WFH",
+        "error",
+      );
+    }
+  };
+
+  const handleRevoke = async (id: string) => {
+    try {
+      await apiFetch(`/api/attendance/leave/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: "revoke" }),
+      });
+      loadData();
+      showToast("Leave request revoked.");
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Failed to revoke",
+        "error",
+      );
+    }
+  };
+
+  const handleWfhRevoke = async (id: string) => {
+    try {
+      await apiFetch(`/api/attendance/wfh/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: "revoke" }),
+      });
+      loadData();
+      showToast("WFH request revoked.");
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Failed to revoke WFH",
         "error",
       );
     }
@@ -620,14 +681,27 @@ export function AttendanceTab({
     );
   };
 
-  const isCheckedIn = (day: number | null) => {
-    if (!day) return false;
+  const getAttendanceStatus = (day: number | null): 'present' | 'half-day' | 'absent' | null => {
+    if (!day) return null;
     const date = getDateForDay(day);
-    if (!date) return false;
-    return history.some((entry: any) => {
-      const entryDate = normalizeDate(new Date(entry.date));
+    if (!date) return null;
+    const entry = history.find((e: any) => {
+      const entryDate = normalizeDate(new Date(e.date));
       return entryDate.getTime() === date.getTime();
     });
+    if (!entry) return null;
+    if (!entry.checkIn || !entry.checkOut) return 'present';
+    const diff = new Date(String(entry.checkOut)).getTime() - new Date(String(entry.checkIn)).getTime();
+    const hrs = diff / 3600000;
+    const threshold = minWorkHours / 2;
+    if (hrs < threshold) return 'absent';
+    if (hrs < minWorkHours) return 'half-day';
+    return 'present';
+  };
+
+  const isCheckedIn = (day: number | null) => {
+    const status = getAttendanceStatus(day);
+    return status === 'present' || status === 'half-day';
   };
 
   const isPastDay = (day: number | null) => {
@@ -655,11 +729,16 @@ export function AttendanceTab({
     });
   };
 
+  const currentUserId = session?.user?.id;
+
+  const isOwnRequest = (req: any) =>
+    String(req.requester?._id || req.requester) === currentUserId;
+
   const isOnLeave = (day: number | null) => {
     if (!day) return false;
     const date = new Date(year, month, day);
     return requests.some((req: any) => {
-      if (req.status !== "approved") return false;
+      if (req.status !== "approved" || !isOwnRequest(req)) return false;
       const start = new Date(req.startDate);
       const end = new Date(req.endDate);
       start.setHours(0, 0, 0, 0);
@@ -672,7 +751,7 @@ export function AttendanceTab({
     if (!day) return false;
     const date = new Date(year, month, day);
     return wfhRequests.some((req: any) => {
-      if (req.status !== "approved") return false;
+      if (req.status !== "approved" || !isOwnRequest(req)) return false;
       const start = new Date(req.startDate);
       const end = new Date(req.endDate);
       start.setHours(0, 0, 0, 0);
@@ -685,7 +764,7 @@ export function AttendanceTab({
     if (!day) return false;
     const date = new Date(year, month, day);
     return requests.some((req: any) => {
-      if (!["pending", "hr-approved", "manager-approved"].includes(String(req.status))) return false;
+      if (!["pending", "hr-approved", "manager-approved"].includes(String(req.status)) || !isOwnRequest(req)) return false;
       const start = new Date(req.startDate);
       const end = new Date(req.endDate);
       start.setHours(0, 0, 0, 0);
@@ -736,7 +815,7 @@ export function AttendanceTab({
   };
 
   const todayLeave = requests.some((req: any) => {
-    if (req.status !== "approved") return false;
+    if (req.status !== "approved" || !isOwnRequest(req)) return false;
     const start = new Date(req.startDate);
     const end = new Date(req.endDate);
     start.setHours(0, 0, 0, 0);
@@ -793,9 +872,85 @@ export function AttendanceTab({
             features. Right now only the current date is shown.
           </p>
         </div>
-      </section>
-    );
-  }
+    </section>
+  );
+}
+
+function CheckOutRequestsListModal({
+  requests,
+  onClose,
+}: {
+  requests: AnyRecord[];
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200">
+        <div className="flex items-center justify-between border-b border-slate-100 p-6">
+          <div>
+            <h3 className="text-xl font-bold text-slate-900">Check-Out Requests</h3>
+            <p className="text-sm text-slate-500">Your check-out requests and their status.</p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-2 hover:bg-slate-50 text-slate-400">
+            <Trash2 size={20} />
+          </button>
+        </div>
+
+        <div className="max-h-[60vh] overflow-y-auto p-6">
+          {requests.length === 0 ? (
+            <div className="py-12 text-center">
+              <p className="text-sm text-slate-400">No check-out requests found.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {requests.map((req: any) => {
+                const att = req.attendance as any;
+                return (
+                  <div key={req._id} className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900">
+                            {new Date(req.date).toLocaleDateString()}
+                          </span>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                              req.status === "approved"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : req.status === "rejected"
+                                  ? "bg-rose-100 text-rose-700"
+                                  : "bg-amber-100 text-amber-700"
+                            }`}
+                          >
+                            {req.status}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm text-slate-600">
+                          Check-in at {att?.checkIn ? new Date(att.checkIn).toLocaleTimeString() : "--"}
+                          {req.requestedCheckOut ? ` → Check-out at ${new Date(req.requestedCheckOut).toLocaleTimeString()}` : ""}
+                        </p>
+                        {req.reason ? (
+                          <p className="mt-1 text-sm text-slate-500">
+                            <span className="font-medium">Reason:</span> {req.reason}
+                          </p>
+                        ) : null}
+                        {req.rejectionReason ? (
+                          <p className="mt-1 text-sm text-rose-600">
+                            <span className="font-medium">Rejected:</span> {req.rejectionReason}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
   return (
     <>
@@ -938,32 +1093,43 @@ export function AttendanceTab({
                   <X size={20} />
                 </button>
               </div>
-              <div className="flex gap-3">
-                {profile?.role !== "admin" && (
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-3">
+                  {profile?.role !== "admin" && (
+                    <button
+                      onClick={() => {
+                        if (!canAskPaidLeave) {
+                          showToast("Paid leave quota is used up. Missed dates will count as absent.", "error");
+                          return;
+                        }
+                        setShowAskModal(false);
+                        setShowLeaveModal(true);
+                      }}
+                      disabled={!canAskPaidLeave}
+                      className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={!canAskPaidLeave ? "Paid leave quota used up." : "Request paid leave."}
+                    >
+                      Leave
+                    </button>
+                  )}
                   <button
                     onClick={() => {
-                      if (!canAskPaidLeave) {
-                        showToast("Paid leave quota is used up. Missed dates will count as absent.", "error");
-                        return;
-                      }
                       setShowAskModal(false);
-                      setShowLeaveModal(true);
+                      setShowWfhFormModal(true);
                     }}
-                    disabled={!canAskPaidLeave}
-                    className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    title={!canAskPaidLeave ? "Paid leave quota used up." : "Request paid leave."}
+                    className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
                   >
-                    Leave
+                    WFH
                   </button>
-                )}
+                </div>
                 <button
                   onClick={() => {
                     setShowAskModal(false);
-                    setShowWfhFormModal(true);
+                    setShowCheckOutRequestModal(true);
                   }}
-                  className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
                 >
-                  WFH
+                  Check-out
                 </button>
               </div>
             </div>
@@ -979,26 +1145,46 @@ export function AttendanceTab({
                   <X size={20} />
                 </button>
               </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowViewModal(false);
-                    setShowRequestsModal(true);
-                  }}
-                  className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
-                >
-                  Leave
-                </button>
-                <button
-                  onClick={() => {
-                    setShowViewModal(false);
-                    setShowWfhRequestsModal(true);
-                  }}
-                  className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
-                >
-                  WFH
-                </button>
-              </div>
+              {(() => {
+                const pendingLeave = requests.filter((r) =>
+                  ["pending", "hr-approved", "manager-approved"].includes(String(r.status)),
+                ).length;
+                const pendingWfh = wfhRequests.filter((r) =>
+                  ["pending", "manager-approved", "hr-approved"].includes(String(r.status)),
+                ).length;
+                const checkOutCount = checkOutRequests.filter((r: any) => r.status === "pending").length;
+                return (
+                  <div className="flex flex-col gap-3">
+                    <button
+                      onClick={() => {
+                        setShowViewModal(false);
+                        setShowRequestsModal(true);
+                      }}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+                    >
+                      {`Leave${pendingLeave ? ` (${pendingLeave})` : ""}`}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowViewModal(false);
+                        setShowWfhRequestsModal(true);
+                      }}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+                    >
+                      {`WFH${pendingWfh ? ` (${pendingWfh})` : ""}`}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowViewModal(false);
+                        setShowCheckOutRequestsModal(true);
+                      }}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+                    >
+                      {`Check-out${checkOutCount ? ` (${checkOutCount})` : ""}`}
+                    </button>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}
@@ -1096,6 +1282,7 @@ export function AttendanceTab({
             onClose={() => setShowRequestsModal(false)}
             onApprove={handleApprove}
             onReject={(id) => setRejectingId(id)}
+            onRevoke={handleRevoke}
             currentUserId={session?.user?.id}
             userRole={String(profile?.role ?? "")}
             onViewDay={(dateStr) => {
@@ -1149,6 +1336,22 @@ export function AttendanceTab({
           </div>
         )}
 
+        {showCheckOutRequestModal && (
+          <CheckOutRequestModal
+            history={history}
+            onClose={() => setShowCheckOutRequestModal(false)}
+            onRefresh={loadData}
+            showToast={showToast}
+          />
+        )}
+
+        {showCheckOutRequestsModal && (
+          <CheckOutRequestsListModal
+            requests={checkOutRequests}
+            onClose={() => setShowCheckOutRequestsModal(false)}
+          />
+        )}
+
         {showWfhFormModal && (
           <WfhRequestModal
             onClose={() => setShowWfhFormModal(false)}
@@ -1163,6 +1366,7 @@ export function AttendanceTab({
             onClose={() => setShowWfhRequestsModal(false)}
             onApprove={handleWfhApprove}
             onReject={(id) => setWfhRejectingId(id)}
+            onRevoke={handleWfhRevoke}
             currentUserId={session?.user?.id}
             userRole={String(profile?.role ?? "")}
           />
@@ -1256,7 +1460,10 @@ export function AttendanceTab({
                     if (day === undefined) return null;
 
                     const today = isToday(day);
-                    const checkedIn = isCheckedIn(day);
+                    const attStatus = getAttendanceStatus(day);
+                    const checkedIn = attStatus === 'present' || attStatus === 'half-day';
+                    const attAbsentStatus = attStatus === 'absent';
+                    const halfDayStatus = attStatus === 'half-day';
                     const leave = isOnLeave(day);
                     const wfh = isOnWfh(day);
                     const companyWfh = isCompanyWfh(day);
@@ -1298,23 +1505,27 @@ export function AttendanceTab({
                               ? "bg-amber-50 text-amber-900 border border-amber-200 shadow-sm"
                               : holiday
                                 ? "bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 shadow-sm"
-                                : today
-                                  ? checkedIn
-                                    ? "bg-sky-100 text-sky-700 border border-sky-200 shadow-inner"
-                                    : "bg-white text-rose-600 border border-rose-200 shadow-sm"
-                                  : checkedIn
-                                    ? "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm"
-                                      : companyWfh
-                                        ? "bg-teal-100 text-teal-700 border border-teal-200 shadow-sm"
-                                        : wfh
-                                          ? "bg-blue-100 text-blue-700 border border-blue-200 shadow-sm"
-                                          : leave
-                                        ? "bg-amber-100 text-amber-900 border border-amber-200 shadow-sm"
-                                        : weekend
-                                        ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm"
-                                        : missed
-                                          ? "bg-white text-rose-600 border border-rose-200 shadow-sm"
-                                          : "bg-white shadow-sm border border-slate-100 text-slate-700"
+                                : halfDayStatus
+                                  ? "bg-amber-100 text-amber-700 border border-amber-200 shadow-sm"
+                                  : attAbsentStatus
+                                    ? "bg-rose-50 text-rose-600 border border-rose-200 shadow-sm"
+                                    : today
+                                      ? checkedIn
+                                        ? "bg-sky-100 text-sky-700 border border-sky-200 shadow-inner"
+                                        : "bg-white text-rose-600 border border-rose-200 shadow-sm"
+                                      : checkedIn
+                                        ? "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm"
+                                        : companyWfh
+                                          ? "bg-teal-100 text-teal-700 border border-teal-200 shadow-sm"
+                                          : wfh
+                                            ? "bg-blue-100 text-blue-700 border border-blue-200 shadow-sm"
+                                            : leave
+                                          ? "bg-amber-100 text-amber-900 border border-amber-200 shadow-sm"
+                                          : weekend
+                                          ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm"
+                                          : missed
+                                            ? "bg-white text-rose-600 border border-rose-200 shadow-sm"
+                                            : "bg-white shadow-sm border border-slate-100 text-slate-700"
                           : "opacity-0"
                           }`}
                       >
@@ -1328,6 +1539,8 @@ export function AttendanceTab({
                           (pendingLeave ||
                             holiday ||
                             leave ||
+                            halfDayStatus ||
+                            attAbsentStatus ||
                             (today && !checkedIn) ||
                             (past && checkedIn) ||
                             missed) && (
@@ -1336,7 +1549,9 @@ export function AttendanceTab({
                                 <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
                               ) : holiday ? (
                                 <Calendar className="h-3.5 w-3.5 text-fuchsia-600" />
-                              ) : leave ? (
+                              ) : attAbsentStatus ? (
+                                <X className="h-3.5 w-3.5 text-rose-600" />
+                              ) : leave || halfDayStatus ? (
                                 <Check className="h-3.5 w-3.5 text-amber-600" />
                               ) : today && !checkedIn ? (
                                 <X className="h-3.5 w-3.5 text-rose-600" />
@@ -1366,6 +1581,7 @@ export function AttendanceTab({
           holidays={holidays}
           wfhRequests={wfhRequests}
           companyWfhDates={companyWfhDates}
+          minWorkHours={minWorkHours}
         />
       )}
     </>
@@ -1390,6 +1606,14 @@ function LeaveModal({
     attachmentUrl: "",
   });
   const [loading, setLoading] = useState(false);
+  const [hrUsers, setHrUsers] = useState<{ _id: string; name: string }[]>([]);
+  const [selectedHr, setSelectedHr] = useState("");
+
+  useEffect(() => {
+    apiFetch<{ users: { _id: string; name: string }[] }>("/api/users?role=human-resource")
+      .then((res) => setHrUsers(res.users ?? []))
+      .catch(() => {});
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1411,7 +1635,7 @@ function LeaveModal({
     try {
       await apiFetch("/api/attendance/leave", {
         method: "POST",
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, ...(selectedHr ? { hrApprover: selectedHr } : {}) }),
       });
       onRefresh();
       showToast("Leave request submitted!");
@@ -1487,6 +1711,23 @@ function LeaveModal({
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
             />
           </div>
+          {hrUsers.length > 0 && (
+            <div className="space-y-1">
+              <label className="text-xs font-bold uppercase text-slate-500">
+                Assign HR
+              </label>
+              <select
+                value={selectedHr}
+                onChange={(e) => setSelectedHr(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+              >
+                <option value="">Auto-assign any HR</option>
+                {hrUsers.map((hr) => (
+                  <option key={hr._id} value={hr._id}>{hr.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="space-y-1">
             <label className="text-xs font-bold uppercase text-slate-500">
               Attachment (Optional)
@@ -1999,14 +2240,16 @@ function RequestsListModal({
   onClose,
   onApprove,
   onReject,
+  onRevoke,
   currentUserId,
   onViewDay,
   userRole,
 }: {
   requests: AnyRecord[];
   onClose: () => void;
-  onApprove: (id: string) => void;
+  onApprove: (id: string, assignedAdmin?: string) => void;
   onReject: (id: string) => void;
+  onRevoke?: (id: string) => void;
   currentUserId?: string;
   onViewDay?: (dateStr: string) => void;
   userRole?: string;
@@ -2018,12 +2261,16 @@ function RequestsListModal({
       <LeaveDetailsModal
         leave={selectedLeave}
         onClose={() => setSelectedLeave(null)}
-        onApprove={() => {
-          onApprove(String(selectedLeave._id));
+        onApprove={(assignedAdmin) => {
+          onApprove(String(selectedLeave._id), assignedAdmin);
           setSelectedLeave(null);
         }}
         onReject={() => {
           onReject(String(selectedLeave._id));
+          setSelectedLeave(null);
+        }}
+        onRevoke={() => {
+          onRevoke?.(String(selectedLeave._id));
           setSelectedLeave(null);
         }}
         currentUserId={currentUserId}
@@ -2133,14 +2380,16 @@ function LeaveDetailsModal({
   onClose,
   onApprove,
   onReject,
+  onRevoke,
   currentUserId,
   onViewDay,
   userRole,
 }: {
   leave: AnyRecord;
   onClose: () => void;
-  onApprove: () => void;
+  onApprove: (assignedAdmin?: string) => void;
   onReject: () => void;
+  onRevoke?: () => void;
   currentUserId?: string;
   onViewDay?: (dateStr: string) => void;
   userRole?: string;
@@ -2157,6 +2406,25 @@ function LeaveDetailsModal({
       (step === "admin" && String(userRole ?? "") === "admin") ||
       (step === "hr" && ["human-resource", "admin"].includes(String(userRole ?? "")))
     );
+
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const canRevoke =
+    isRequester &&
+    leave.status !== "pending" &&
+    leave.status !== "rejected" &&
+    new Date(String(leave.startDate)) > now;
+
+  const [adminUsers, setAdminUsers] = useState<{ _id: string; name: string }[]>([]);
+  const [selectedAdmin, setSelectedAdmin] = useState("");
+
+  useEffect(() => {
+    if (canApprove && step === "hr") {
+      apiFetch<{ users: { _id: string; name: string }[] }>("/api/users?role=admin")
+        .then((res) => setAdminUsers(res.users ?? []))
+        .catch(() => {});
+    }
+  }, [canApprove, step]);
 
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-md">
@@ -2264,24 +2532,57 @@ function LeaveDetailsModal({
           </div>
 
           {canApprove && (
-            <div className="mt-10 flex gap-4">
+            <div className="mt-10 space-y-4">
+              {step === "hr" && adminUsers.length > 0 && (
+                <div className="space-y-1">
+                  <label className="text-xs font-bold uppercase text-slate-500">
+                    Assign Admin (for final approval)
+                  </label>
+                  <select
+                    value={selectedAdmin}
+                    onChange={(e) => setSelectedAdmin(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+                  >
+                    <option value="">Auto-assign any admin</option>
+                    {adminUsers.map((au) => (
+                      <option key={au._id} value={au._id}>{au.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="flex gap-4">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onReject();
+                  }}
+                  className="flex-1 rounded-2xl border border-rose-200 py-4 text-sm font-bold text-rose-600 hover:bg-rose-50 transition shadow-sm"
+                >
+                  Reject
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onApprove(selectedAdmin || undefined);
+                  }}
+                  className="flex-1 rounded-2xl bg-emerald-600 py-4 text-sm font-bold text-white hover:bg-emerald-700 transition shadow-xl shadow-emerald-600/20"
+                >
+                  Approve
+                </button>
+              </div>
+            </div>
+          )}
+
+          {canRevoke && onRevoke && (
+            <div className="mt-6">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onReject();
+                  onRevoke();
                 }}
-                className="flex-1 rounded-2xl border border-rose-200 py-4 text-sm font-bold text-rose-600 hover:bg-rose-50 transition shadow-sm"
+                className="w-full rounded-2xl border border-rose-200 py-4 text-sm font-bold text-rose-600 hover:bg-rose-50 transition shadow-sm"
               >
-                Reject
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onApprove();
-                }}
-                className="flex-1 rounded-2xl bg-emerald-600 py-4 text-sm font-bold text-white hover:bg-emerald-700 transition shadow-xl shadow-emerald-600/20"
-              >
-                Approve
+                Revoke Request
               </button>
             </div>
           )}
@@ -2326,6 +2627,7 @@ function DayDetailsModal({
   holidays,
   wfhRequests = [],
   companyWfhDates = [],
+  minWorkHours = 8,
 }: {
   date: Date;
   onClose: () => void;
@@ -2334,6 +2636,7 @@ function DayDetailsModal({
   holidays: AnyRecord[];
   wfhRequests?: AnyRecord[];
   companyWfhDates?: { date: string; reason: string }[];
+  minWorkHours?: number;
 }) {
   const attendance = history.find((h: any) => {
     const d = new Date(h.date);
@@ -2435,6 +2738,36 @@ function DayDetailsModal({
                   {attendance.checkOut ? new Date(String(attendance.checkOut)).toLocaleTimeString() : "--"}
                 </p>
               </div>
+              {attendance.checkOut && (() => {
+                const diff = new Date(String(attendance.checkOut)).getTime() - new Date(String(attendance.checkIn)).getTime();
+                const mins = Math.round(diff / 60000);
+                const display = mins < 60 ? `${mins} min` : `${(mins / 60).toFixed(1).replace(/\.0$/, '')} hrs`;
+                const hrs = diff / 3600000;
+                const threshold = minWorkHours / 2;
+                const statusInfo = hrs < threshold
+                  ? { label: 'Absent', className: 'text-rose-600 bg-rose-50 border border-rose-200' }
+                  : hrs < minWorkHours
+                    ? { label: 'Half-Day', className: 'text-amber-600 bg-amber-50 border border-amber-200' }
+                    : { label: 'Present', className: 'text-emerald-600 bg-emerald-50 border border-emerald-200' };
+                return (
+                  <>
+                    <br />
+                    <hr />
+                    <br />
+                    <div className="flex justify-between">
+                      <p className="text-sm font-bold text-slate-900">Hours</p>
+                      <p className="text-sm font-semibold text-emerald-600">{display}</p>
+                    </div>
+                    <br />
+                    <hr />
+                    <br />
+                    <div className="flex justify-between items-center">
+                      <p className="text-sm font-bold text-slate-900">Status</p>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${statusInfo.className}`}>{statusInfo.label}</span>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           ) : (
             <div className="rounded-xl border border-slate-100 p-4">
@@ -2505,6 +2838,14 @@ function WfhRequestModal({
     reason: "",
   });
   const [loading, setLoading] = useState(false);
+  const [hrUsers, setHrUsers] = useState<{ _id: string; name: string }[]>([]);
+  const [selectedHr, setSelectedHr] = useState("");
+
+  useEffect(() => {
+    apiFetch<{ users: { _id: string; name: string }[] }>("/api/users?role=human-resource")
+      .then((res) => setHrUsers(res.users ?? []))
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -2512,7 +2853,7 @@ function WfhRequestModal({
     try {
       await apiFetch("/api/attendance/wfh", {
         method: "POST",
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, ...(selectedHr ? { hrApprover: selectedHr } : {}) }),
       });
       onRefresh();
       showToast("WFH request submitted!");
@@ -2568,6 +2909,23 @@ function WfhRequestModal({
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
             />
           </div>
+          {hrUsers.length > 0 && (
+            <div className="space-y-1">
+              <label className="text-xs font-bold uppercase text-slate-500">
+                Assign HR
+              </label>
+              <select
+                value={selectedHr}
+                onChange={(e) => setSelectedHr(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+              >
+                <option value="">Auto-assign any HR</option>
+                {hrUsers.map((hr) => (
+                  <option key={hr._id} value={hr._id}>{hr.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
@@ -2595,6 +2953,7 @@ function WfhRequestsListModal({
   onClose,
   onApprove,
   onReject,
+  onRevoke,
   currentUserId,
   userRole,
 }: {
@@ -2602,6 +2961,7 @@ function WfhRequestsListModal({
   onClose: () => void;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
+  onRevoke?: (id: string) => void;
   currentUserId?: string;
   userRole?: string;
 }) {
@@ -2618,6 +2978,10 @@ function WfhRequestsListModal({
         }}
         onReject={() => {
           onReject(String(selectedWfh._id));
+          setSelectedWfh(null);
+        }}
+        onRevoke={() => {
+          onRevoke?.(String(selectedWfh._id));
           setSelectedWfh(null);
         }}
         currentUserId={currentUserId}
@@ -2724,6 +3088,7 @@ function WfhDetailsModal({
   onClose,
   onApprove,
   onReject,
+  onRevoke,
   currentUserId,
   userRole,
 }: {
@@ -2731,6 +3096,7 @@ function WfhDetailsModal({
   onClose: () => void;
   onApprove: () => void;
   onReject: () => void;
+  onRevoke?: () => void;
   currentUserId?: string;
   userRole?: string;
 }) {
@@ -2750,6 +3116,14 @@ function WfhDetailsModal({
       (step === "hr" && isHrRole) ||
       (step === "admin" && isAdmin)
     );
+
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const canRevoke =
+    isRequester &&
+    wfh.status !== "pending" &&
+    wfh.status !== "rejected" &&
+    new Date(String(wfh.startDate)) > now;
 
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-md">
@@ -2842,6 +3216,154 @@ function WfhDetailsModal({
               </button>
             </div>
           )}
+
+          {canRevoke && onRevoke && (
+            <div className="mt-6">
+              <button
+                onClick={onRevoke}
+                className="w-full rounded-xl border border-rose-200 py-3 text-sm font-semibold text-rose-600 hover:bg-rose-50 transition"
+              >
+                Revoke Request
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CheckOutRequestModal({
+  history,
+  onClose,
+  onRefresh,
+  showToast,
+}: {
+  history: AnyRecord[];
+  onClose: () => void;
+  onRefresh: () => void;
+  showToast: (text: string, type?: "success" | "error") => void;
+}) {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const recordsWithoutCheckOut = history.filter(
+    (h: any) => {
+      if (h.checkOut || !h.checkIn) return false;
+      const d = new Date(h.date);
+      d.setHours(0, 0, 0, 0);
+      return d.getTime() !== todayStart.getTime();
+    },
+  );
+
+  const [selectedId, setSelectedId] = useState("");
+  const [reason, setReason] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [financeUsers, setFinanceUsers] = useState<{ _id: string; name: string }[]>([]);
+  const [selectedFinance, setSelectedFinance] = useState("");
+
+  useEffect(() => {
+    apiFetch<{ users: { _id: string; name: string }[] }>("/api/users?role=finance")
+      .then((res) => setFinanceUsers(res.users ?? []))
+      .catch(() => {});
+  }, []);
+
+  const handleSubmit = async () => {
+    if (!selectedId) {
+      showToast("Please select a date.", "error");
+      return;
+    }
+    if (!reason.trim()) {
+      showToast("Please provide a reason.", "error");
+      return;
+    }
+    setLoading(true);
+    try {
+      await apiFetch("/api/attendance/checkout-request", {
+        method: "POST",
+        body: JSON.stringify({ attendanceId: selectedId, reason: reason.trim(), ...(selectedFinance ? { assignedTo: selectedFinance } : {}) }),
+      });
+      showToast("Check-out request sent to finance.");
+      onRefresh();
+      onClose();
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Failed to submit request",
+        "error",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-slate-900">Request Check-Out</h3>
+          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:text-slate-600 transition">
+            <X size={20} />
+          </button>
+        </div>
+        <p className="text-sm text-slate-500 mb-4">
+          Select a day you forgot to check out. Finance will mark check-out at 8 hours from check-in.
+        </p>
+        {recordsWithoutCheckOut.length === 0 ? (
+          <p className="text-sm text-slate-500 py-4 text-center">No pending check-outs found.</p>
+        ) : (
+          <select
+            value={selectedId}
+            onChange={(e) => setSelectedId(e.target.value)}
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm mb-4"
+          >
+            <option value="">Select a date...</option>
+            {recordsWithoutCheckOut.map((h: any) => (
+              <option key={String(h._id)} value={String(h._id)}>
+                {new Date(h.date).toLocaleDateString()} — Checked in at{" "}
+                {new Date(h.checkIn).toLocaleTimeString()}
+              </option>
+            ))}
+          </select>
+        )}
+        {recordsWithoutCheckOut.length > 0 && (
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Reason for requesting check-out..."
+            className="mb-4 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            rows={3}
+          />
+        )}
+        {financeUsers.length > 0 && (
+          <div className="space-y-1 mb-4">
+            <label className="text-xs font-bold uppercase text-slate-500">
+              Assign Finance User
+            </label>
+            <select
+              value={selectedFinance}
+              onChange={(e) => setSelectedFinance(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+            >
+              <option value="">Auto-assign any finance</option>
+              {financeUsers.map((fu) => (
+                <option key={fu._id} value={fu._id}>{fu.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={loading || !selectedId}
+            className="rounded-lg bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+          >
+            {loading ? "Sending..." : "Request"}
+          </button>
         </div>
       </div>
     </div>

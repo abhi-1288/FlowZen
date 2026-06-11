@@ -50,7 +50,7 @@ export async function POST(req: Request) {
     const userId = await requireUserId();
     if (!userId) return jsonError("Unauthorized", 401);
 
-    const { startDate, endDate, reason, attachmentUrl } = await req.json();
+    const { startDate, endDate, reason, attachmentUrl, hrApprover } = await req.json();
     if (!startDate || !endDate || !reason) return jsonError("All fields are required.");
 
     const start = new Date(startDate);
@@ -111,7 +111,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const leave = await LeaveRequest.create({
+    const leaveData: any = {
       requester: userId,
       company: user.company,
       startDate: start,
@@ -123,40 +123,58 @@ export async function POST(req: Request) {
       attachmentUrl: attachmentUrl || "",
       status: "pending",
       currentStep: "hr"
-    });
+    };
+    if (hrApprover) {
+      leaveData.hrApprover = hrApprover;
+    }
 
-    const hrs = String(user.role) === "human-resource"
-      ? await User.find({
-        _id: { $ne: userId },
-        role: "human-resource",
-        company: user.company,
-        companyStatus: "approved",
-      })
-      : await User.find({ role: "human-resource", company: user.company, companyStatus: "approved" });
+    const leave = await LeaveRequest.create(leaveData);
 
-    if (hrs.length > 0) {
-      for (const hr of hrs) {
+    if (hrApprover) {
+      const assignedHr = await User.findById(hrApprover).select("_id");
+      if (assignedHr) {
         await Notification.create({
-          user: hr._id,
+          user: assignedHr._id,
           title: "Paid Leave Request",
-          body: notificationBody,
+          body: `${notificationBody} (Assigned to you)`,
           link: "/profile?tab=attendance"
         });
-        emitToUser(String(hr._id), "notification:new", {});
+        emitToUser(String(assignedHr._id), "notification:new", {});
       }
     } else {
-      const admins = await User.find({ role: "admin", company: user.company, companyStatus: "approved" });
-      for (const admin of admins) {
-        await Notification.create({
-          user: admin._id,
-          title: "Paid Leave Request",
-          body: `${notificationBody} No HR is available, admin approval required.`,
-          link: "/profile?tab=attendance"
-        });
-        emitToUser(String(admin._id), "notification:new", {});
+      const hrs = String(user.role) === "human-resource"
+        ? await User.find({
+          _id: { $ne: userId },
+          role: "human-resource",
+          company: user.company,
+          companyStatus: "approved",
+        })
+        : await User.find({ role: "human-resource", company: user.company, companyStatus: "approved" });
+
+      if (hrs.length > 0) {
+        for (const hr of hrs) {
+          await Notification.create({
+            user: hr._id,
+            title: "Paid Leave Request",
+            body: notificationBody,
+            link: "/profile?tab=attendance"
+          });
+          emitToUser(String(hr._id), "notification:new", {});
+        }
+      } else {
+        const admins = await User.find({ role: "admin", company: user.company, companyStatus: "approved" });
+        for (const admin of admins) {
+          await Notification.create({
+            user: admin._id,
+            title: "Paid Leave Request",
+            body: `${notificationBody} No HR is available, admin approval required.`,
+            link: "/profile?tab=attendance"
+          });
+          emitToUser(String(admin._id), "notification:new", {});
+        }
+        leave.currentStep = "admin";
+        await leave.save();
       }
-      leave.currentStep = "admin";
-      await leave.save();
     }
 
     return NextResponse.json({ leave });

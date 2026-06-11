@@ -30,9 +30,12 @@ export function BoardShell({ boardId }: { boardId?: string }) {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   const [filter, setFilter] = useState<"all" | "self" | "assigned" | "invited">("all");
+  const [boardSearchQuery, setBoardSearchQuery] = useState("");
+  const [boardSearchInput, setBoardSearchInput] = useState("");
 
   const filteredBoards = useMemo(() => {
-    return boards.filter((board) => {
+    const query = boardSearchQuery.toLowerCase().trim();
+    const roleFiltered = boards.filter((board) => {
       if (filter === "all") return true;
       const isOwner = board.owner === session?.user?.id;
       if (filter === "self") return isOwner;
@@ -47,7 +50,9 @@ export function BoardShell({ boardId }: { boardId?: string }) {
       if (filter === "invited") return !isOwner && !isAssignedMember;
       return true;
     });
-  }, [boards, filter, session?.user?.id]);
+    if (!query) return roleFiltered;
+    return roleFiltered.filter((board) => board.title.toLowerCase().includes(query));
+  }, [boards, filter, boardSearchQuery, session?.user?.id]);
 
   useEffect(() => {
     void fetchBoards();
@@ -66,6 +71,15 @@ export function BoardShell({ boardId }: { boardId?: string }) {
     }
 
     void fetchNotificationCount();
+  }, []);
+
+  // Unlock audio on first user interaction (browsers block autoplay)
+  useEffect(() => {
+    const unlock = () => {
+      try { new AudioContext().resume(); } catch {}
+      document.removeEventListener("click", unlock);
+    };
+    document.addEventListener("click", unlock, { once: true });
   }, []);
 
   useEffect(() => {
@@ -93,7 +107,7 @@ export function BoardShell({ boardId }: { boardId?: string }) {
         eventSource.addEventListener("notification:new", () => {
           if (!mounted) return;
           console.log("SSE: notification:new received");
-          new Audio("/sound/notification_sound.mp3").play().catch(() => {});
+          new Audio("/sound/notification_sound.mp3").play().catch((err) => console.warn("Notification sound unavailable:", err));
           void fetchBoards(true);
           const refreshCount = async () => {
             const result = await apiFetch<{ notifications: NotificationPreview[] }>("/api/notifications").catch(() => null);
@@ -175,9 +189,20 @@ export function BoardShell({ boardId }: { boardId?: string }) {
               <LogOut size={18} />
             </button>
           </div>
-          <div className="mt-5 flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-500">
-            <Search size={16} />
-            <span>Search boards</span>
+          <div className="mt-5 flex gap-2">
+            <input
+              value={boardSearchInput}
+              onChange={(e) => setBoardSearchInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") setBoardSearchQuery(boardSearchInput.trim()); }}
+              placeholder="Search boards..."
+              className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-950 focus:ring-0"
+            />
+            <button
+              onClick={() => setBoardSearchQuery(boardSearchInput.trim())}
+              className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            >
+              <Search size={16} />
+            </button>
           </div>
           <Link className="mt-3 block rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-950" href="/profile">
             Profile center{unreadNotifications ? ` (${unreadNotifications})` : ""}
@@ -242,7 +267,33 @@ export function BoardShell({ boardId }: { boardId?: string }) {
           </div>
         ) : null}
 
-        {error ? <div className="m-4 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div> : null}
+        {error ? (
+          <div className="grid h-screen place-items-center px-4">
+            <div className="max-w-md text-center">
+              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-rose-100">
+                <svg className="h-10 w-10 text-rose-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900">Something went wrong</h2>
+              <p className="mt-2 text-sm text-slate-500">{error}</p>
+              <div className="mt-8 flex items-center justify-center gap-3">
+                <button
+                  onClick={() => { useBoardStore.getState().setError(null); void fetchBoards(); }}
+                  className="rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+                >
+                  Try again
+                </button>
+                <button
+                  onClick={() => router.push("/board")}
+                  className="rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Back to boards
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
         {boardId && activeBoard ? <BoardCanvas boardId={boardId} /> : null}
         {loading && !activeBoard ? (
           <div className="flex h-screen flex-col animate-pulse bg-[#f7f8fb]">

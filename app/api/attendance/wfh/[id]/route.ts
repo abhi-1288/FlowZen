@@ -15,7 +15,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (!userId) return jsonError("Unauthorized", 401);
 
     const { action, reason: rejectionReason } = await req.json();
-    if (!["approve", "reject"].includes(action)) return jsonError("Invalid action.");
+    if (!["approve", "reject", "revoke"].includes(action)) return jsonError("Invalid action.");
 
     await connectDb();
     const approver = await User.findById(userId);
@@ -26,6 +26,27 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const requesterId =
       typeof wfh.requester === "object" ? (wfh.requester as any)._id : wfh.requester;
     const isRequester = String(requesterId) === String(userId);
+
+    if (action === "revoke") {
+      if (!isRequester) return jsonError("Only the requester can revoke this request.", 403);
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      if (new Date(wfh.startDate) <= now) return jsonError("Cannot revoke a request that has already started.", 400);
+      if (wfh.status === "rejected") return jsonError("Cannot revoke a rejected request.", 400);
+      wfh.status = "rejected";
+      wfh.rejectionReason = "Revoked by requester.";
+      await wfh.save();
+
+      await Notification.create({
+        user: requesterId,
+        title: "WFH Revoked",
+        body: "Your WFH request has been revoked successfully.",
+        link: "/profile?tab=attendance",
+      });
+      emitToUser(String(requesterId), "notification:new", {});
+      return NextResponse.json({ wfh });
+    }
+
     if (isRequester) return jsonError("You cannot approve your own WFH request.", 403);
 
     if (action === "reject") {

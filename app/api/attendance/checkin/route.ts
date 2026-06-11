@@ -60,5 +60,11 @@ export async function GET() {
   today.setHours(0, 0, 0, 0);
 
   const history = await Attendance.find({ user: userId }).sort({ date: -1 }).limit(30);
-  return NextResponse.json({ history, today: today.toISOString() });
+  const user = await User.findById(userId).select("company");
+  let minWorkHours = 8;
+  if (user?.company) {
+    const company = await Company.findById(user.company).select("minWorkHours");
+    if (company) minWorkHours = company.minWorkHours ?? 8;
+  }
+  return NextResponse.json({ history, today: today.toISOString(), minWorkHours });
 }

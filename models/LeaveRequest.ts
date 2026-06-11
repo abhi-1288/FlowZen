@@ -20,6 +20,7 @@ const LeaveRequestSchema = new Schema(
     hrApprover: { type: Schema.Types.ObjectId, ref: "User" },
     managerApprover: { type: Schema.Types.ObjectId, ref: "User" },
     adminApprover: { type: Schema.Types.ObjectId, ref: "User" },
+    assignedAdmin: { type: Schema.Types.ObjectId, ref: "User" },
     currentStep: { type: String, enum: ["hr", "manager", "admin"], default: "hr" }
   },
   { timestamps: true }

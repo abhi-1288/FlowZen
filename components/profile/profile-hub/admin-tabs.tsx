@@ -292,6 +292,8 @@ export function MembersTab({
   const [customRoleModalMember, setCustomRoleModalMember] = useState<AnyRecord | null>(null);
   const [customRoleInput, setCustomRoleInput] = useState("");
   const [savingCustomRoleModal, setSavingCustomRoleModal] = useState(false);
+  const [modalSearchQuery, setModalSearchQuery] = useState("");
+  const [modalSearchInput, setModalSearchInput] = useState("");
 
   function openSalaryModal(member: AnyRecord) {
     setSalaryInput(String(Math.max(0, Number(member.baseSalary ?? 0)) > 0 ? Number(member.baseSalary) : ""));
@@ -607,6 +609,8 @@ export function MembersTab({
               onClick={() => {
                 setModalRole(roleName);
                 setMeetingDuration(30);
+                setModalSearchQuery("");
+                setModalSearchInput("");
               }}
             >
               <p className="text-xs font-medium text-slate-500">
@@ -670,7 +674,7 @@ export function MembersTab({
                   aria-label="Close"
                   className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
                   type="button"
-                  onClick={() => setModalRole(null)}
+                  onClick={() => { setModalRole(null); setModalSearchQuery(""); setModalSearchInput(""); }}
                 >
                   <X size={18} />
                 </button>
@@ -700,14 +704,39 @@ export function MembersTab({
               </div>
             ) : null}
 
+            <div className="px-6 pt-4">
+              <div className="flex gap-2">
+                <input
+                  value={modalSearchInput}
+                  onChange={(e) => setModalSearchInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") setModalSearchQuery(modalSearchInput.trim()); }}
+                  placeholder="Search members..."
+                  className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-950 focus:ring-0"
+                />
+                <button
+                  onClick={() => setModalSearchQuery(modalSearchInput.trim())}
+                  className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                >
+                  Search
+                </button>
+              </div>
+            </div>
             <div className="max-h-[min(55vh,420px)] overflow-y-auto px-6 py-4">
-              {modalMembers.length === 0 ? (
-                <p className="py-8 text-center text-sm text-slate-500">
-                  No members in this role.
-                </p>
-              ) : (
-                <ul className="space-y-4">
-                  {modalMembers.map((member) => {
+              {(() => {
+                const query = modalSearchQuery.toLowerCase().trim();
+                const filtered = query
+                  ? modalMembers.filter((m) => {
+                      const name = String(m.name ?? "").toLowerCase();
+                      const email = String(m.email ?? "").toLowerCase();
+                      return name.includes(query) || email.includes(query);
+                    })
+                  : modalMembers;
+                if (filtered.length === 0) {
+                  return <p className="py-8 text-center text-sm text-slate-500">No members match your search.</p>;
+                }
+                return (
+                  <ul className="space-y-4">
+                    {filtered.map((member) => {
                     const memberId = String(member.id);
                     const teams = Array.isArray(member.teams)
                       ? member.teams.map(String)
@@ -820,7 +849,8 @@ export function MembersTab({
                     );
                   })}
                 </ul>
-              )}
+              );
+            })()}
             </div>
           </div>
         </div>
@@ -1053,6 +1083,8 @@ export function MessagesTab({
   const [bulkMessage, setBulkMessage] = useState("");
   const [bulkSelected, setBulkSelected] = useState<Record<string, boolean>>({});
   const [sendingBulk, setSendingBulk] = useState(false);
+  const [messageSearchQuery, setMessageSearchQuery] = useState("");
+  const [messageSearchInput, setMessageSearchInput] = useState("");
   const { data: session } = useSession();
 
   useEffect(() => {
@@ -1254,8 +1286,37 @@ export function MessagesTab({
         </div>
       ) : null}
 
-      <div className="mt-5 space-y-3">
-        {members.map((member) => {
+      <div className="mt-5 flex gap-2">
+        <input
+          value={messageSearchInput}
+          onChange={(e) => setMessageSearchInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") setMessageSearchQuery(messageSearchInput.trim()); }}
+          placeholder="Search members by name, email, or role..."
+          className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-950 focus:ring-0"
+        />
+        <button
+          onClick={() => setMessageSearchQuery(messageSearchInput.trim())}
+          className="rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+        >
+          Search
+        </button>
+      </div>
+
+      <div className="mt-4 space-y-3">
+        {(() => {
+          const query = messageSearchQuery.toLowerCase().trim();
+          const filtered = query
+            ? members.filter((m) => {
+                const name = String(m.name ?? "").toLowerCase();
+                const email = String(m.email ?? "").toLowerCase();
+                const role = String(m.role ?? "").toLowerCase();
+                return name.includes(query) || email.includes(query) || role.includes(query);
+              })
+            : members;
+          if (filtered.length === 0) {
+            return <p className="py-8 text-center text-sm text-slate-500 bg-slate-50 rounded-xl border border-slate-100">No members match your search.</p>;
+          }
+          return filtered.map((member) => {
           const memberId = String(member.id ?? member._id ?? "");
           const name = String(member.name ?? "Member");
           const roleRaw = String(member.role ?? "employee");
@@ -1357,9 +1418,9 @@ export function MessagesTab({
               </div>
             </button>
           );
-        })}
+        });})()}
 
-        {!loading && members.length === 0 ? (
+        {!loading && messageSearchQuery === "" && members.length === 0 ? (
           <p className="rounded-lg bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">
             No other approved company members yet.
           </p>

@@ -484,7 +484,7 @@ export function FinanceTab({
                   <div>
                     <p className="text-sm font-medium">{String(expense.title)} x {Number(expense.quantity ?? 1)}</p>
                     <p className="text-xs text-slate-500">
-                      {displayNested(expense.requester, "name", "Member")} • {String(expense.category)} • Qty: {Number(expense.quantity ?? 1)} • ₹{Number(expense.amount ?? 0).toLocaleString("en-IN")}
+                      {displayNested(expense.requester, "name", "Member")} <span className="text-[10px] uppercase text-slate-400">({displayNested(expense.requester, "role", "–")})</span> • {String(expense.category)} • Qty: {Number(expense.quantity ?? 1)} • ₹{Number(expense.amount ?? 0).toLocaleString("en-IN")}
                     </p>
                   </div>
                   <button className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs text-white" onClick={() => updateStatus("expense", String(expense.id), "disbursed")}>Disburse</button>
@@ -495,8 +495,17 @@ export function FinanceTab({
               <div className="mt-3 border-t border-slate-200 pt-3">
                 <p className="mb-2 text-xs font-medium text-slate-500">Disbursed</p>
                 {data.expenses.filter((e) => String(e.status) === "disbursed").map((expense) => (
-                  <div className="flex items-center justify-between py-1.5 text-sm" key={String(expense.id)}>
-                    <span>₹{Number(expense.amount ?? 0).toLocaleString("en-IN")} — {String(expense.title)} x {Number(expense.quantity ?? 1)} <span className="ml-2 inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">disbursed</span></span>
+                  <div key={String(expense.id)}>
+                  <div className="flex items-center justify-between py-1.5 text-sm">
+                    <div className="flex items-center justify-between w-full gap-3">
+                      <span>₹{Number(expense.amount ?? 0).toLocaleString("en-IN")} — {String(expense.title)} x {Number(expense.quantity ?? 1)} <span className="ml-2 inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">disbursed</span></span>
+                      <div className="ml-2 inline-block rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-medium text-cyan-700">
+                        <div>{displayNested(expense.requester, "name", "Member")}</div>
+                        <div>{displayNested(expense.requester, "role", "Member")}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <hr />
                   </div>
                 ))}
               </div>
@@ -854,7 +863,7 @@ export function FinanceTab({
                 <div>
                   <p className="font-medium">{String(expense.title)} x {Number(expense.quantity ?? 1)} - ₹{Number(expense.amount ?? 0).toLocaleString("en-IN")}</p>
                   <p className="text-sm text-slate-500">
-                    {displayNested(expense.requester, "name", "Requester")} • {String(expense.category)} • {String(expense.status)}
+                    {displayNested(expense.requester, "name", "Requester")} • {String(expense.category)} • <span className={expStatus === "accepted" ? "text-amber-600 font-semibold" : ""}>{String(expense.status)}{expStatus === "accepted" ? " (Not Disbursed)" : ""}</span>
                     {expense.assignedTo ? <> • Assigned: {displayNested(expense.assignedTo, "name", "Finance")}</> : null}
                     {expense.forwardedBy ? <> • Forwarded: {displayNested(expense.forwardedBy, "name", "Finance")}</> : null}
                     {expense.rejectionReason ? <> • Reason: {String(expense.rejectionReason)}</> : null}

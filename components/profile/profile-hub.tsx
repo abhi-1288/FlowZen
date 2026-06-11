@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { AlertCircle, CheckCircle2, LogOut } from "lucide-react";
@@ -23,6 +23,7 @@ type ProfileHubCache = {
   leaveRequests: AnyRecord[];
   wfhRequests: AnyRecord[];
   financeCount: number;
+  checkOutRequestCount: number;
   fetchedAt: number;
 };
 
@@ -40,23 +41,41 @@ export type Tab =
   | "finance"
   | "attendance";
 
+const VALID_TABS = new Set<string>(["profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance"]);
+
 
 export function ProfileHub() {
   const { data: session } = useSession();
   const router = useRouter();
-  const params = useParams();
-  const routeTab = (Array.isArray(params?.tab) ? params.tab[0] : params?.tab) as Tab | undefined;
+
+  // Parse tab from window location directly (reliable, not dependent on router)
+  const getTabFromPath = (): { tab: Tab | undefined; showInvalid: boolean } => {
+    const pathParts = window.location.pathname.replace(/\/profile\/?/, "").split("/").filter(Boolean);
+    const raw = pathParts[0] ?? "";
+    if (!raw) return { tab: undefined, showInvalid: false };
+    if (VALID_TABS.has(raw)) return { tab: raw as Tab, showInvalid: false };
+    return { tab: undefined, showInvalid: true };
+  };
+
+  const initialRoute = typeof window !== "undefined" ? getTabFromPath() : { tab: undefined as Tab | undefined, showInvalid: false };
+  const [showInvalidRoute, setShowInvalidRoute] = useState(initialRoute.showInvalid);
   
-  const [tab, setTabState] = useState<Tab>(routeTab || "profile");
+  const [tab, setTabState] = useState<Tab>(initialRoute.tab || "profile");
   
+  // Sync tab from URL on popstate (browser back/forward)
   useEffect(() => {
-    if (routeTab && routeTab !== tab) {
-      setTabState(routeTab);
-    }
-  }, [routeTab]);
+    const onPop = () => {
+      const { tab: t, showInvalid } = getTabFromPath();
+      setShowInvalidRoute(showInvalid);
+      if (t) setTabState(t);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   const setTab = (newTab: Tab) => {
     setTabState(newTab);
+    setShowInvalidRoute(false);
     window.history.pushState(null, "", `/profile/${newTab}`);
   };
 
@@ -73,6 +92,7 @@ export function ProfileHub() {
   const [leaveRequests, setLeaveRequests] = useState<AnyRecord[]>([]);
   const [wfhRequests, setWfhRequests] = useState<AnyRecord[]>([]);
   const [financeCount, setFinanceCount] = useState(0);
+  const [checkOutRequestCount, setCheckOutRequestCount] = useState(0);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
@@ -89,6 +109,7 @@ export function ProfileHub() {
     setLeaveRequests(profileHubCache.leaveRequests);
     setWfhRequests(profileHubCache.wfhRequests);
     setFinanceCount(profileHubCache.financeCount);
+    setCheckOutRequestCount(profileHubCache.checkOutRequestCount);
     setLoading(false);
   }, []);
 
@@ -145,6 +166,7 @@ export function ProfileHub() {
         setLeaveRequests(cached.leaveRequests);
         setWfhRequests(cached.wfhRequests);
         setFinanceCount(cached.financeCount);
+        setCheckOutRequestCount(cached.checkOutRequestCount);
         setLoading(false);
         void load(true);
         return;
@@ -178,6 +200,10 @@ export function ProfileHub() {
       const nextApprovals = approvalsResult?.requests ?? [];
       const nextNotifications = notificationResult?.notifications ?? [];
 
+      // Use the freshly fetched profile to determine role/company, avoids stale closure
+      const actualRole = session?.user?.role ?? String(nextProfile?.role ?? "employee");
+      const actualHasCompany = Boolean(nextProfile?.company && nextProfile?.companyStatus === "approved");
+
       const [attendanceResult, leaveResult, wfhResult] = await Promise.all([
         apiFetch<{ history: AnyRecord[] }>("/api/attendance/checkin").catch(
           () => ({ history: attendanceHistory }),
@@ -194,20 +220,29 @@ export function ProfileHub() {
       const nextLeaveRequests = leaveResult.requests;
       const nextWfhRequests = wfhResult.requests;
       let nextFinanceCount = financeCount;
+      let nextCheckOutRequestCount = checkOutRequestCount;
 
       setAttendanceHistory(nextAttendanceHistory);
       setLeaveRequests(nextLeaveRequests);
       setWfhRequests(nextWfhRequests);
 
-      if (["finance", "admin"].includes(String(role)) && hasCompany) {
+      if (["finance", "admin"].includes(String(actualRole)) && actualHasCompany) {
         const month = new Date().toISOString().slice(0, 7);
-        const financeCounts = await apiFetch<{ pendingSalaryApproval: number; pendingSalaryPayment: number; pendingExpenseApproval: number; forwardedExpenseApproval: number; pendingExpenseAcceptance: number; pendingAssignedExpenses: number; pendingBills: number; pendingBudgets: number }>(`/api/finance?counts=true&month=${month}`)
-          .catch(() => null);
+        const [financeCounts, checkOutResult] = await Promise.all([
+          apiFetch<{ pendingSalaryApproval: number; pendingSalaryPayment: number; pendingExpenseApproval: number; forwardedExpenseApproval: number; pendingExpenseAcceptance: number; pendingAssignedExpenses: number; pendingBills: number; pendingBudgets: number }>(`/api/finance?counts=true&month=${month}`)
+            .catch(() => null),
+          apiFetch<{ requests: AnyRecord[] }>("/api/attendance/checkout-request")
+            .catch(() => null),
+        ]);
         if (financeCounts) {
-          nextFinanceCount = String(role) === "admin"
+          nextFinanceCount = String(actualRole) === "admin"
             ? financeCounts.pendingSalaryApproval + financeCounts.pendingExpenseApproval + financeCounts.forwardedExpenseApproval + financeCounts.pendingBills + financeCounts.pendingBudgets
-            : financeCounts.pendingSalaryPayment + financeCounts.pendingExpenseAcceptance + financeCounts.pendingAssignedExpenses + financeCounts.pendingBudgets;
+            : financeCounts.pendingSalaryPayment + financeCounts.pendingExpenseApproval + financeCounts.pendingExpenseAcceptance + financeCounts.pendingBudgets;
           setFinanceCount(nextFinanceCount);
+        }
+        if (String(actualRole) === "finance" && checkOutResult) {
+          nextCheckOutRequestCount = checkOutResult.requests.filter((r: any) => r.status === "pending").length;
+          setCheckOutRequestCount(nextCheckOutRequestCount);
         }
       }
 
@@ -220,12 +255,22 @@ export function ProfileHub() {
         leaveRequests: nextLeaveRequests,
         wfhRequests: nextWfhRequests,
         financeCount: nextFinanceCount,
+        checkOutRequestCount: nextCheckOutRequestCount,
         fetchedAt: Date.now(),
       };
     } finally {
       if (!silent) setLoading(false);
     }
   }
+
+  // Unlock audio on first user interaction (browsers block autoplay)
+  useEffect(() => {
+    const unlock = () => {
+      try { new AudioContext().resume(); } catch {}
+      document.removeEventListener("click", unlock);
+    };
+    document.addEventListener("click", unlock, { once: true });
+  }, []);
 
   useEffect(() => {
     void load();
@@ -243,7 +288,8 @@ export function ProfileHub() {
         eventSource.addEventListener("notification:new", () => {
           if (!mounted) return;
           console.log("SSE: ProfileHub notification:new received");
-          new Audio("/sound/notification_sound.mp3").play().catch(() => {});
+          const snd = new Audio("/sound/notification_sound.mp3");
+          snd.play().catch((err) => console.warn("Notification sound unavailable:", err));
           void load(true);
         });
 
@@ -417,7 +463,7 @@ export function ProfileHub() {
           {["human-resource", "admin", "finance"].includes(String(role)) ? (
             <NavButton
               active={tab === "members"}
-              label="Members"
+              label={`Members${checkOutRequestCount ? ` (${checkOutRequestCount})` : ""}`}
               onClick={() => setTab("members")}
             />
           ) : null}
@@ -482,9 +528,9 @@ export function ProfileHub() {
                 item === "attendance" &&
                   pendingAttendanceCount > 0
                   ? `attendance (${pendingAttendanceCount})`
-                  : item === "finance" && financeCount > 0
-                    ? `finance (${financeCount})`
-                    : item;
+                  : item === "members" && checkOutRequestCount > 0
+                      ? `members (${checkOutRequestCount})`
+                      : item;
 
               return (
                 <button
@@ -526,6 +572,25 @@ export function ProfileHub() {
                 </div>
               )}
 
+              {showInvalidRoute ? (
+                <div className="grid min-h-[60vh] place-items-center px-4">
+                  <div className="max-w-md text-center">
+                    <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-amber-100">
+                      <svg className="h-10 w-10 text-amber-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                      </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-900">Page not found</h2>
+                    <p className="mt-2 text-sm text-slate-500">The route <span className="font-medium text-slate-700">/profile/{window.location.pathname.replace("/profile/", "")}</span> doesn't exist.</p>
+                    <button
+                      onClick={() => { router.push("/profile"); setShowInvalidRoute(false); }}
+                      className="mt-8 rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+                    >
+                      Go to profile
+                    </button>
+                  </div>
+                </div>
+              ) : <>
               {tab === "profile" ? (
                 <ProfileTab
                   profile={profile}
@@ -587,7 +652,8 @@ export function ProfileHub() {
               {tab === "attendance" ? (
                 <AttendanceTab profile={profile} showToast={showToast} />
               ) : null}
-            </>
+            </>}
+          </>
           )}
         </div>
       </section>

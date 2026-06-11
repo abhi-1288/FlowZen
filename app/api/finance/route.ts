@@ -143,7 +143,7 @@ async function computeSalaryBreakdown(params: {
     Attendance.find({
       user: employeeId,
       date: { $gte: effectiveStart, $lte: endOfDay(effectiveEnd) },
-    }).select("date"),
+    }).select("date checkIn checkOut"),
     LeaveRequest.find({
       requester: employeeId,
       status: "approved",
@@ -158,8 +158,23 @@ async function computeSalaryBreakdown(params: {
   ]);
 
   const presentDays = new Set<string>();
+  const halfDayAttendance = new Set<string>();
+  const companyDoc = await Company.findById(actorCompany).select("weekendDates minWorkHours");
+  const minWorkHours = Math.max(1, Number((companyDoc as any)?.minWorkHours ?? 8));
+  const halfDayThreshold = minWorkHours / 2;
   for (const record of attendanceRecords as any[]) {
-    presentDays.add(toDateKey(new Date(record.date)));
+    const dayKey = toDateKey(new Date(record.date));
+    if (record.checkIn && record.checkOut) {
+      const diff = new Date(record.checkOut).getTime() - new Date(record.checkIn).getTime();
+      const hours = diff / 3600000;
+      if (hours >= minWorkHours) {
+        presentDays.add(dayKey);
+      } else if (hours >= halfDayThreshold) {
+        halfDayAttendance.add(dayKey);
+      }
+    } else {
+      presentDays.add(dayKey);
+    }
   }
 
   const paidLeaveMap = new Map<string, number>();
@@ -203,7 +218,6 @@ async function computeSalaryBreakdown(params: {
     }
   }
 
-  const companyDoc = await Company.findById(actorCompany).select("weekendDates");
   const manualWeekendsKeys = new Set((companyDoc?.weekendDates ?? []).map((item: any) => toDateKey(new Date(item.date))));
   const monthsWithManualWeekends = new Set((companyDoc?.weekendDates ?? []).map((item: any) => {
     const wd = new Date(item.date);
@@ -211,6 +225,7 @@ async function computeSalaryBreakdown(params: {
   }));
 
   let absentDays = 0;
+  let halfDayCount = 0;
   for (let i = 0; i < totalDays; i += 1) {
     const day = new Date(effectiveStart.getTime() + i * DAY_MS);
     const dayKey = toDateKey(day);
@@ -222,10 +237,15 @@ async function computeSalaryBreakdown(params: {
 
     const isHoliday = holidayDays.has(dayKey);
     const hasPresent = presentDays.has(dayKey);
+    const isHalfDay = halfDayAttendance.has(dayKey);
     const hasLeave =
       (paidLeaveMap.get(dayKey) ?? 0) + (unpaidLeaveMap.get(dayKey) ?? 0) > 0;
-    if (!isWeekend && !isHoliday && !hasPresent && !hasLeave) {
-      absentDays += 1;
+    if (!isWeekend && !isHoliday && !hasLeave) {
+      if (isHalfDay) {
+        halfDayCount += 1;
+      } else if (!hasPresent) {
+        absentDays += 1;
+      }
     }
   }
 
@@ -237,7 +257,7 @@ async function computeSalaryBreakdown(params: {
     (sum, value) => sum + value,
     0,
   );
-  const totalUnpaidDays = absentDays + unpaidLeaveDays;
+  const totalUnpaidDays = absentDays + unpaidLeaveDays + halfDayCount * 0.5;
   const payableDays = Math.max(0, totalDays - totalUnpaidDays);
   const leaveDeduction = roundCurrency(dailySalary * totalUnpaidDays);
   const grossSalary = roundCurrency(dailySalary * payableDays);
@@ -267,6 +287,7 @@ async function computeSalaryBreakdown(params: {
     breakdown: {
       totalDays,
       absentDays,
+      halfDayCount,
       paidLeaveDays,
       unpaidLeaveDays,
       payableDays,

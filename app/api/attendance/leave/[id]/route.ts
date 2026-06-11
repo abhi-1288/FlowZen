@@ -12,8 +12,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const userId = await requireUserId();
     if (!userId) return jsonError("Unauthorized", 401);
 
-    const { action, reason: rejectionReason } = await req.json();
-    if (!["approve", "reject"].includes(action)) return jsonError("Invalid action.");
+    const { action, reason: rejectionReason, assignedAdmin } = await req.json();
+    if (!["approve", "reject", "revoke"].includes(action)) return jsonError("Invalid action.");
 
     await connectDb();
     const approver = await User.findById(userId);
@@ -23,6 +23,27 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const approverRole = String(approver?.role ?? "");
     const requesterId = typeof leave.requester === "object" ? leave.requester._id : leave.requester;
     const isRequester = String(requesterId) === String(userId);
+
+    if (action === "revoke") {
+      if (!isRequester) return jsonError("Only the requester can revoke this request.", 403);
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      if (new Date(leave.startDate) <= now) return jsonError("Cannot revoke a request that has already started.", 400);
+      if (leave.status === "rejected") return jsonError("Cannot revoke a rejected request.", 400);
+      leave.status = "rejected";
+      leave.rejectionReason = "Revoked by requester.";
+      await leave.save();
+
+      await Notification.create({
+        user: requesterId,
+        title: "Leave Revoked",
+        body: "Your leave request has been revoked successfully.",
+        link: "/profile?tab=attendance",
+      });
+      emitToUser(String(requesterId), "notification:new", {});
+      return NextResponse.json({ leave });
+    }
+
     if (isRequester) return jsonError("You cannot approve your own leave request.", 403);
 
     if (leave.currentStep === "admin") {
@@ -43,6 +64,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         leave.status = "hr-approved";
         leave.hrApprover = approver?._id;
         leave.currentStep = "admin";
+        if (assignedAdmin) {
+          leave.assignedAdmin = assignedAdmin;
+        }
       } else {
         leave.status = "approved";
         leave.adminApprover = approver?._id;
@@ -52,15 +76,25 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     await leave.save();
 
     if (leave.status === "hr-approved") {
-      const admins = await User.find({ role: "admin", company: leave.company });
-      for (const admin of admins) {
+      if (leave.assignedAdmin) {
         await Notification.create({
-          user: admin._id,
+          user: leave.assignedAdmin,
           title: "Paid Leave Final Approval",
-          body: `A paid leave request from ${leave.requester.name} needs your final approval.`,
+          body: `A paid leave request from ${leave.requester.name} needs your final approval. (Assigned to you)`,
           link: "/profile?tab=attendance"
         });
-        emitToUser(String(admin._id), "notification:new", {});
+        emitToUser(String(leave.assignedAdmin), "notification:new", {});
+      } else {
+        const admins = await User.find({ role: "admin", company: leave.company });
+        for (const admin of admins) {
+          await Notification.create({
+            user: admin._id,
+            title: "Paid Leave Final Approval",
+            body: `A paid leave request from ${leave.requester.name} needs your final approval.`,
+            link: "/profile?tab=attendance"
+          });
+          emitToUser(String(admin._id), "notification:new", {});
+        }
       }
     } else {
       const requesterId = leave.requester._id || leave.requester;

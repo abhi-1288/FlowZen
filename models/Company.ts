@@ -31,7 +31,8 @@ const CompanySchema = new Schema(
         reason: { type: String }
       }
     ],
-    wfhCheckInMode: { type: String, enum: ["all-day", "wfh-only"], default: "all-day" }
+    wfhCheckInMode: { type: String, enum: ["all-day", "wfh-only"], default: "all-day" },
+    minWorkHours: { type: Number, default: 8 }
   },
   { timestamps: true }
 );

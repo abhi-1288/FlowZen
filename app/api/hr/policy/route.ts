@@ -17,9 +17,11 @@ export async function PATCH(request: Request) {
   const hasNoticePeriod = Object.prototype.hasOwnProperty.call(body, "noticePeriodDays");
   const hasPaidLeaveDays = Object.prototype.hasOwnProperty.call(body, "paidLeaveDays");
   const hasPaidLeavePeriod = Object.prototype.hasOwnProperty.call(body, "paidLeavePeriod");
+  const hasMinWorkHours = Object.prototype.hasOwnProperty.call(body, "minWorkHours");
   const noticePeriodDays = Number((body as any).noticePeriodDays);
   const paidLeaveDays = Number((body as any).paidLeaveDays);
   const paidLeavePeriod = String((body as any).paidLeavePeriod ?? "");
+  const minWorkHours = Number((body as any).minWorkHours);
 
   if (hasNoticePeriod && (!Number.isFinite(noticePeriodDays) || !ALLOWED_NOTICE_PERIOD_DAYS.has(noticePeriodDays))) {
     return jsonError("Invalid notice period.", 400);
@@ -29,6 +31,9 @@ export async function PATCH(request: Request) {
   }
   if (hasPaidLeavePeriod && !ALLOWED_PAID_LEAVE_PERIODS.has(paidLeavePeriod)) {
     return jsonError("Invalid paid leave period.", 400);
+  }
+  if (hasMinWorkHours && (!Number.isFinite(minWorkHours) || minWorkHours < 1 || minWorkHours > 24)) {
+    return jsonError("Invalid minimum work hours.", 400);
   }
 
   try {
@@ -51,6 +56,7 @@ export async function PATCH(request: Request) {
   if (hasNoticePeriod) company.noticePeriodDays = noticePeriodDays;
   if (hasPaidLeaveDays) company.paidLeaveDays = Math.floor(paidLeaveDays);
   if (hasPaidLeavePeriod) company.paidLeavePeriod = paidLeavePeriod;
+  if (hasMinWorkHours) company.minWorkHours = Math.floor(minWorkHours);
   await company.save();
 
   if (hasPaidLeaveDays || hasPaidLeavePeriod) {
@@ -78,6 +84,7 @@ export async function PATCH(request: Request) {
     noticePeriodDays: company.noticePeriodDays,
     paidLeaveDays: company.paidLeaveDays,
     paidLeavePeriod: company.paidLeavePeriod,
+    minWorkHours: company.minWorkHours,
   });
 }
 

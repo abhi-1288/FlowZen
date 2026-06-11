@@ -114,6 +114,9 @@ export function ProfileTab({
   );
   const [savingPolicy, setSavingPolicy] = useState(false);
   // WFH quota (HR)
+  const [minWorkHours, setMinWorkHours] = useState<number>(
+    Math.max(1, Math.min(24, Number(company?.minWorkHours ?? 8))),
+  );
   const [wfhDays, setWfhDays] = useState(0);
   const [wfhPeriod, setWfhPeriod] = useState<"monthly" | "yearly">("monthly");
   // WFH mode & dates (Admin)
@@ -287,6 +290,7 @@ export function ProfileTab({
           noticePeriodDays,
           paidLeaveDays,
           paidLeavePeriod,
+          minWorkHours,
         }),
       });
       showToast("Policy updated.");
@@ -745,6 +749,12 @@ export function ProfileTab({
               }
             />
             <Row
+              label="Work-Hours Policy"
+              value={company
+                ? `${Math.max(1, Number(company.minWorkHours ?? 8))} hrs / day`
+                : "No minimum work hours"}
+            />
+            <Row
               label="Team"
               value={team?.name ? String(team.name) : undefined}
             />
@@ -974,6 +984,37 @@ export function ProfileTab({
                   {wfhLoading ? "Saving..." : "Save"}
                 </button>
               </div>
+            </div>
+
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <label className="text-xs font-semibold uppercase text-slate-500">
+                Day-Hour Working
+              </label>
+              <p className="mt-1 mb-3 text-sm text-slate-500">
+                Set the minimum working hours per day. Affects attendance status and salary calculation.
+              </p>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min="1"
+                  max="24"
+                  value={minWorkHours}
+                  onChange={(e) => setMinWorkHours(Math.max(1, Math.min(24, Number(e.target.value))))}
+                  className="w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+                <span className="text-sm text-slate-600">hours per day</span>
+                <button
+                  onClick={() => void savePolicy()}
+                  disabled={savingPolicy}
+                  className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 transition"
+                  type="button"
+                >
+                  {savingPolicy ? "Saving..." : "Save"}
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Attendance rules: &lt; {Math.floor(minWorkHours / 2)} hrs = absent, &ge; {Math.floor(minWorkHours / 2)} hrs and &lt; {minWorkHours} hrs = half-day, &ge; {minWorkHours} hrs = present
+              </p>
             </div>
           </section>
         ) : null}

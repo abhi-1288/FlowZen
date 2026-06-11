@@ -50,7 +50,7 @@ export async function GET(request: Request, { params }: Params) {
     }).sort({ startDate: 1 }),
     Holiday.find({ company: actor.company, startDate: { $lt: monthEnd }, endDate: { $gte: monthStart } }).sort({ startDate: 1 }),
     FinanceSalary.findOne({ company: actor.company, employee: memberId, month }).select("netSalary baseSalary"),
-    Company.findById(actor.company).select("weekendDates"),
+    Company.findById(actor.company).select("weekendDates minWorkHours"),
   ]);
 
   const manualWeekendsThisMonth = ((company as any)?.weekendDates ?? []).filter((entry: any) => {
@@ -132,15 +132,34 @@ export async function GET(request: Request, { params }: Params) {
       return checkDate >= start && checkDate <= end;
     });
 
+    const rawCheckIn = att ? new Date(att.checkIn) : null;
+    const rawCheckOut = att?.checkOut ? new Date(att.checkOut) : null;
+    const minWorkHours = Math.max(1, Number((company as any)?.minWorkHours ?? 8));
+    const halfDayThreshold = minWorkHours / 2;
+    let workHours: number | null = null;
+    let halfDay = false;
+    let isAbsent = isBeforeJoined ? false : date > today ? false : (!att && !leave && !wfh && !isWeekend && !holiday);
+    if (rawCheckIn && rawCheckOut) {
+      workHours = (rawCheckOut.getTime() - rawCheckIn.getTime()) / 3600000;
+      if (workHours < halfDayThreshold) {
+        isAbsent = true;
+      } else if (workHours < minWorkHours) {
+        halfDay = true;
+      }
+    }
     calendar.push({
       day: d,
       date: dateStr,
-      checkIn: att ? new Date(att.checkIn).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : null,
-      checkOut: att?.checkOut ? new Date(att.checkOut).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : null,
+      checkIn: rawCheckIn ? rawCheckIn.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : null,
+      checkOut: rawCheckOut ? rawCheckOut.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : null,
+      checkInTime: rawCheckIn?.toISOString() ?? null,
+      checkOutTime: rawCheckOut?.toISOString() ?? null,
       leave: isBeforeJoined ? false : !!leave,
       leaveReason: isBeforeJoined ? "" : leave ? String(leave.reason ?? "") : "",
       leaveStatus: isBeforeJoined ? "Not Joined" : leave ? String(leave.status ?? "") : "",
-      absent: isBeforeJoined ? false : date > today ? false : (!att && !leave && !wfh && !isWeekend && !holiday),
+      absent: isAbsent,
+      halfDay,
+      workHours: workHours !== null ? Math.round(workHours * 10) / 10 : null,
       holiday: !!holiday,
       holidayTitle: holiday ? String(holiday.title ?? "") : "",
       notJoined: isBeforeJoined,
