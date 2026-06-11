@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Calendar, Camera, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, Info, LogOut, Pen, Plus, Trash2, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { apiFetch } from "@/lib/client-utils";
-import { AnyRecord } from "./shared";
+import { ActionButton, AnyRecord } from "./shared";
 
 export function CalendarTab() {
   const [viewDate, setViewDate] = useState(new Date());
@@ -121,7 +121,7 @@ export function CalendarTab() {
   const loadData = async () => {
     const [historyRes, requestsRes, holidaysRes] = await Promise.all([
       apiFetch<{ history: AnyRecord[]; minWorkHours?: number }>("/api/attendance/checkin").catch(
-        () => ({ history: [] as AnyRecord[] }),
+        () => ({ history: [] as AnyRecord[], minWorkHours: undefined }),
       ),
       apiFetch<{ requests: AnyRecord[]; leavePolicy?: AnyRecord }>("/api/attendance/leave").catch(
         () => ({ requests: [] as AnyRecord[], leavePolicy: null }),
@@ -154,14 +154,11 @@ export function CalendarTab() {
   const weekDays = ["SUN.", "Mon.", "Tue.", "Wed.", "Thr.", "Fri.", "Sat."];
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
       <div className="mb-8 flex items-center justify-center gap-4">
-        <button
-          onClick={prevMonth}
-          className="grid h-10 w-12 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm"
-        >
+        <ActionButton onClick={prevMonth} variant="secondary" className="h-10 w-12" aria-label="Previous month">
           <ChevronLeft size={20} />
-        </button>
+        </ActionButton>
 
         <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 shadow-sm">
           <div className="border-r border-slate-200 bg-slate-50 px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-600">
@@ -172,12 +169,9 @@ export function CalendarTab() {
           </div>
         </div>
 
-        <button
-          onClick={nextMonth}
-          className="grid h-10 w-12 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm"
-        >
+        <ActionButton onClick={nextMonth} variant="secondary" className="h-10 w-12" aria-label="Next month">
           <ChevronRight size={20} />
-        </button>
+        </ActionButton>
       </div>
 
       <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4">
@@ -862,7 +856,7 @@ export function AttendanceTab({
 
   if (!isAttendanceEnabled) {
     return (
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
         <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
           <p className="text-4xl font-extrabold tracking-tight text-slate-900">
             {todayDate.toLocaleDateString()}
@@ -891,9 +885,9 @@ function CheckOutRequestsListModal({
             <h3 className="text-xl font-bold text-slate-900">Check-Out Requests</h3>
             <p className="text-sm text-slate-500">Your check-out requests and their status.</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 hover:bg-slate-50 text-slate-400">
+          <ActionButton variant="ghost" className="p-2" onClick={onClose} aria-label="Close">
             <Trash2 size={20} />
-          </button>
+          </ActionButton>
         </div>
 
         <div className="max-h-[60vh] overflow-y-auto p-6">
@@ -954,7 +948,7 @@ function CheckOutRequestsListModal({
 
   return (
     <>
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
         <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
           <div>
             <h3 className="text-xl font-semibold">Attendance Tracker</h3>
@@ -982,25 +976,27 @@ function CheckOutRequestsListModal({
                   onChange={(event) => setExportTo(event.target.value)}
                 />
               </label>
-              <button
-                className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+              <ActionButton
+                variant="approve"
+                className="px-3"
                 onClick={exportAttendance}
                 type="button"
               >
                 Export Excel
-              </button>
+              </ActionButton>
             </div>
           ) : null}
           <div className="flex gap-2 flex-wrap">
-            <button
+            <ActionButton
+              variant="secondary"
               onClick={() => setShowAskModal(true)}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
             >
               Ask
-            </button>
-            <button
+            </ActionButton>
+            <ActionButton
+              variant="secondary"
               onClick={() => setShowViewModal(true)}
-              className="relative rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+              className="relative"
             >
               Requests
               {(() => {
@@ -1017,31 +1013,31 @@ function CheckOutRequestsListModal({
                   </span>
                 ) : null;
               })()}
-            </button>
+            </ActionButton>
             {profile?.role === "admin" && (
-              <button
+              <ActionButton
+                variant="secondary"
                 onClick={() => setShowLeaveHistoryModal(true)}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
               >
                 Manage Holidays
-              </button>
+              </ActionButton>
             )}
 
             {(wfhCheckInMode === "all-day" || isTodayWfh) && (
               todayAttendance && !todayAttendance.checkOut ? (
-                <button
+                <ActionButton
+                  variant="primary"
                   disabled={isCheckingIn}
                   onClick={handleCheckOut}
-                  className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 transition shadow-sm disabled:opacity-50"
                   title="Check out for today"
                 >
                   {isCheckingIn ? "Processing..." : "Check Out"}
-                </button>
+                </ActionButton>
               ) : (!todayAttendance && !isHoliday(todayDate.getDate())) ? (
-                <button
+                <ActionButton
+                  variant="approve"
                   disabled={isCheckingIn || todayLeave || isHoliday(todayDate.getDate())}
                   onClick={handleCheckIn}
-                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition shadow-sm disabled:opacity-50"
                   title={
                     todayLeave
                       ? "Today is approved leave, check-in disabled."
@@ -1055,7 +1051,7 @@ function CheckOutRequestsListModal({
                     : todayLeave
                       ? "On Leave"
                       : "Check In"}
-                </button>
+                </ActionButton>
               ) : null
             )}
           </div>
@@ -1089,14 +1085,16 @@ function CheckOutRequestsListModal({
             <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-slate-900">Ask</h3>
-                <button onClick={() => setShowAskModal(false)} className="rounded-lg p-1 text-slate-400 hover:text-slate-600 transition">
+                <ActionButton variant="ghost" className="p-1" onClick={() => setShowAskModal(false)} aria-label="Close">
                   <X size={20} />
-                </button>
+                </ActionButton>
               </div>
               <div className="flex flex-col gap-2">
                 <div className="flex gap-3">
                   {profile?.role !== "admin" && (
-                    <button
+                    <ActionButton
+                      variant="secondary"
+                      className="flex-1"
                       onClick={() => {
                         if (!canAskPaidLeave) {
                           showToast("Paid leave quota is used up. Missed dates will count as absent.", "error");
@@ -1106,31 +1104,32 @@ function CheckOutRequestsListModal({
                         setShowLeaveModal(true);
                       }}
                       disabled={!canAskPaidLeave}
-                      className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
                       title={!canAskPaidLeave ? "Paid leave quota used up." : "Request paid leave."}
                     >
                       Leave
-                    </button>
+                    </ActionButton>
                   )}
-                  <button
+                  <ActionButton
+                    variant="secondary"
+                    className="flex-1"
                     onClick={() => {
                       setShowAskModal(false);
                       setShowWfhFormModal(true);
                     }}
-                    className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
                   >
                     WFH
-                  </button>
+                  </ActionButton>
                 </div>
-                <button
+                <ActionButton
+                  variant="secondary"
+                  className="w-full"
                   onClick={() => {
                     setShowAskModal(false);
                     setShowCheckOutRequestModal(true);
                   }}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
                 >
                   Check-out
-                </button>
+                </ActionButton>
               </div>
             </div>
           </div>
@@ -1141,9 +1140,9 @@ function CheckOutRequestsListModal({
             <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-slate-900">Requests</h3>
-                <button onClick={() => setShowViewModal(false)} className="rounded-lg p-1 text-slate-400 hover:text-slate-600 transition">
+                <ActionButton variant="ghost" className="p-1" onClick={() => setShowViewModal(false)} aria-label="Close">
                   <X size={20} />
-                </button>
+                </ActionButton>
               </div>
               {(() => {
                 const pendingLeave = requests.filter((r) =>
@@ -1155,33 +1154,36 @@ function CheckOutRequestsListModal({
                 const checkOutCount = checkOutRequests.filter((r: any) => r.status === "pending").length;
                 return (
                   <div className="flex flex-col gap-3">
-                    <button
+                    <ActionButton
+                      variant="secondary"
+                      className="w-full"
                       onClick={() => {
                         setShowViewModal(false);
                         setShowRequestsModal(true);
                       }}
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
                     >
                       {`Leave${pendingLeave ? ` (${pendingLeave})` : ""}`}
-                    </button>
-                    <button
+                    </ActionButton>
+                    <ActionButton
+                      variant="secondary"
+                      className="w-full"
                       onClick={() => {
                         setShowViewModal(false);
                         setShowWfhRequestsModal(true);
                       }}
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
                     >
                       {`WFH${pendingWfh ? ` (${pendingWfh})` : ""}`}
-                    </button>
-                    <button
+                    </ActionButton>
+                    <ActionButton
+                      variant="secondary"
+                      className="w-full"
                       onClick={() => {
                         setShowViewModal(false);
                         setShowCheckOutRequestsModal(true);
                       }}
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
                     >
                       {`Check-out${checkOutCount ? ` (${checkOutCount})` : ""}`}
-                    </button>
+                    </ActionButton>
                   </div>
                 );
               })()}
@@ -1253,13 +1255,14 @@ function CheckOutRequestsListModal({
                 cannot be undone.
               </p>
               <div className="mt-6 flex gap-3">
-                <button
+                <ActionButton
+                  variant="secondary"
+                  className="flex-1"
                   type="button"
                   onClick={() => setShowDeleteHolidayConfirm(false)}
-                  className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                 >
                   Cancel
-                </button>
+                </ActionButton>
                 <button
                   type="button"
                   onClick={async () => {
@@ -1314,15 +1317,16 @@ function CheckOutRequestsListModal({
                 />
 
                 <div className="flex gap-3 pt-2">
-                  <button
+                  <ActionButton
+                    variant="secondary"
+                    className="flex-1"
                     onClick={() => {
                       setRejectingId(null);
                       setRejectionReason("");
                     }}
-                    className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition"
                   >
                     Cancel
-                  </button>
+                  </ActionButton>
                   <button
                     disabled={!rejectionReason.trim()}
                     onClick={handleReject}
@@ -1391,15 +1395,16 @@ function CheckOutRequestsListModal({
                   className="w-full rounded-xl border border-slate-200 p-4 text-sm focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all resize-none"
                 />
                 <div className="flex gap-3 pt-2">
-                  <button
+                  <ActionButton
+                    variant="secondary"
+                    className="flex-1"
                     onClick={() => {
                       setWfhRejectingId(null);
                       setWfhRejectionReason("");
                     }}
-                    className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition"
                   >
                     Cancel
-                  </button>
+                  </ActionButton>
                   <button
                     disabled={!wfhRejectionReason.trim()}
                     onClick={handleWfhReject}
@@ -1415,12 +1420,9 @@ function CheckOutRequestsListModal({
 
         <div className="mb-8 flex flex-col items-center justify-center gap-4">
           <div className="flex items-center gap-4">
-            <button
-              onClick={prevMonth}
-              className="grid h-10 w-12 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm"
-            >
+            <ActionButton onClick={prevMonth} variant="secondary" className="h-10 w-12" aria-label="Previous month">
               <ChevronLeft size={20} />
-            </button>
+            </ActionButton>
 
             <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 shadow-sm">
               <div className="border-r border-slate-200 bg-slate-50 px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-600">
@@ -1431,12 +1433,9 @@ function CheckOutRequestsListModal({
               </div>
             </div>
 
-            <button
-              onClick={nextMonth}
-              className="grid h-10 w-12 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm"
-            >
+            <ActionButton onClick={nextMonth} variant="secondary" className="h-10 w-12" aria-label="Next month">
               <ChevronRight size={20} />
-            </button>
+            </ActionButton>
           </div>
         </div>
 
@@ -2290,12 +2289,14 @@ function RequestsListModal({
               Manage pending leave approvals and view status.
             </p>
           </div>
-          <button
+          <ActionButton
+            variant="ghost"
+            className="p-2"
             onClick={onClose}
-            className="rounded-lg p-2 hover:bg-slate-50 text-slate-400"
+            aria-label="Close"
           >
             <Trash2 size={20} />
-          </button>
+          </ActionButton>
         </div>
 
         <div className="max-h-[60vh] overflow-y-auto p-6">
@@ -2363,12 +2364,12 @@ function RequestsListModal({
           )}
         </div>
         <div className="border-t border-slate-100 p-4 flex justify-end">
-          <button
+          <ActionButton
+            variant="secondary"
             onClick={onClose}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
           >
             Close
-          </button>
+          </ActionButton>
         </div>
       </div>
     </div>
@@ -2738,7 +2739,7 @@ function DayDetailsModal({
                   {attendance.checkOut ? new Date(String(attendance.checkOut)).toLocaleTimeString() : "--"}
                 </p>
               </div>
-              {attendance.checkOut && (() => {
+              {Boolean(attendance.checkOut) && (() => {
                 const diff = new Date(String(attendance.checkOut)).getTime() - new Date(String(attendance.checkIn)).getTime();
                 const mins = Math.round(diff / 60000);
                 const display = mins < 60 ? `${mins} min` : `${(mins / 60).toFixed(1).replace(/\.0$/, '')} hrs`;

@@ -2,7 +2,7 @@ import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import { Bell, Building2, Check, Clipboard, Trash2, Users, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { apiFetch } from "@/lib/client-utils";
-import { AnyRecord, AvatarBadge, displayNested, formatRole, formatRoleWithCustom } from "./shared";
+import { ActionButton, AnyRecord, AvatarBadge, displayNested, formatRole, formatRoleWithCustom } from "./shared";
 import { FinanceMembersView } from "./finance-members-tab";
 
 export function ApprovalsTab({
@@ -94,8 +94,11 @@ export function ApprovalsTab({
   );
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="text-xl font-semibold">Pending Approvals</h3>
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+      <div className="mb-5 border-l-4 border-indigo-500 pl-4">
+        <h3 className="text-base font-semibold text-slate-900">Pending Approvals</h3>
+        <p className="mt-0.5 text-sm text-slate-500">Review and manage approval requests</p>
+      </div>
       <div className="mt-5 divide-y divide-slate-200">
         {visibleApprovals.map((request) => {
           const requestId = requestIdOf(request);
@@ -166,13 +169,14 @@ export function ApprovalsTab({
               ) : null}
             </div>
             <div className="flex gap-2">
-              <button
-                className="rounded-lg px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50"
-                disabled={isDeciding}
-                onClick={() => decide(requestId, "rejected", false, String(request.kind ?? ""))}
-              >
-                {isDeciding ? "Working..." : "Decline"}
-              </button>
+                <ActionButton
+                  variant="danger"
+                  className="px-3"
+                  disabled={isDeciding}
+                  onClick={() => decide(requestId, "rejected", false, String(request.kind ?? ""))}
+                >
+                  {isDeciding ? "Working..." : "Decline"}
+                </ActionButton>
               {["company", "salary"].includes(String(request.kind ?? "")) ? (
                 <div className="flex items-center gap-2">
                   <input
@@ -183,25 +187,28 @@ export function ApprovalsTab({
                     value={salaryAmounts[requestId] ?? ""}
                     onChange={(e) => setSalaryAmounts((a) => ({ ...a, [requestId]: e.target.value }))}
                   />
-                  <button
-                    className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={isDeciding || (String(request.kind ?? "") === "salary" && !(Number(salaryAmounts[requestId] ?? 0) > 0))}
-                    onClick={() => decide(requestId, "approved", false, String(request.kind ?? ""))}
-                  >
-                    {isDeciding ? "Working..." : "Approve"}
-                  </button>
+                <ActionButton
+                  variant="approve"
+                  className="px-3"
+                  disabled={isDeciding || (String(request.kind ?? "") === "salary" && !(Number(salaryAmounts[requestId] ?? 0) > 0))}
+                  onClick={() => decide(requestId, "approved", false, String(request.kind ?? ""))}
+                >
+                  {isDeciding ? "Working..." : "Approve"}
+                </ActionButton>
                 </div>
               ) : String(request.kind ?? "") === "salary-increment" ? (
-                <button
-                  className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                <ActionButton
+                  variant="approve"
+                  className="px-3"
                   disabled={isDeciding}
                   onClick={() => decide(requestId, "approved", false, String(request.kind ?? ""))}
                 >
                   {isDeciding ? "Working..." : "Approve Update"}
-                </button>
+                </ActionButton>
               ) : (
-                <button
-                  className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                <ActionButton
+                  variant="approve"
+                  className="px-3"
                   disabled={(() => {
                     const info = quitNoticeInfo(request);
                     return isDeciding || (!!info && !info.canApprove);
@@ -209,7 +216,7 @@ export function ApprovalsTab({
                   onClick={() => decide(requestId, "approved", false, String(request.kind ?? ""))}
                 >
                   {isDeciding ? "Working..." : "Approve"}
-                </button>
+                </ActionButton>
               )}
               {String(request.kind).startsWith("quit-") ? (
                 <button
@@ -574,25 +581,17 @@ export function MembersTab({
   }
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h3 className="text-xl font-semibold">Members</h3>
-          <p className="mt-1 text-sm text-slate-500">
-            Click a role to view people and send a meeting invite. Invites
-            notify the member in Notifications.
-          </p>
-          {actorRole === "admin" ? (
-            <p className="mt-1 text-xs text-slate-400">
-              Admin view uses the same member tools as HR.
-            </p>
-          ) : null}
-        </div>
-        <div className="rounded-lg bg-slate-50 px-4 py-3 text-right">
-          <p className="text-xs font-semibold uppercase text-slate-500">
-            Total members
-          </p>
-          <p className="text-2xl font-semibold">
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+      <div className="mb-5 border-l-4 border-indigo-500 pl-4">
+        <h3 className="text-base font-semibold text-slate-900">Members</h3>
+        <p className="mt-0.5 text-sm text-slate-500">
+          Click a role to view people and send a meeting invite.
+        </p>
+      </div>
+      <div className="mb-5 flex items-center gap-2">
+        <div className="rounded-xl bg-slate-50 px-5 py-3 ring-1 ring-slate-100">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Total members</p>
+          <p className="mt-0.5 text-2xl font-bold text-slate-900">
             {Number(hr?.totalMembers ?? members.length)}
           </p>
         </div>
@@ -670,14 +669,15 @@ export function MembersTab({
                     ))}
                   </select>
                 </div>
-                <button
-                  aria-label="Close"
-                  className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
-                  type="button"
-                  onClick={() => { setModalRole(null); setModalSearchQuery(""); setModalSearchInput(""); }}
-                >
-                  <X size={18} />
-                </button>
+            <ActionButton
+              aria-label="Close"
+              variant="ghost"
+              className="h-10 w-10"
+              type="button"
+              onClick={() => { setModalRole(null); setModalSearchQuery(""); setModalSearchInput(""); }}
+            >
+              <X size={18} />
+            </ActionButton>
               </div>
             </div>
             {modalRole === "others" ? (
@@ -713,12 +713,12 @@ export function MembersTab({
                   placeholder="Search members..."
                   className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-950 focus:ring-0"
                 />
-                <button
-                  onClick={() => setModalSearchQuery(modalSearchInput.trim())}
-                  className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-                >
-                  Search
-                </button>
+                  <ActionButton
+                    variant="primary"
+                    onClick={() => setModalSearchQuery(modalSearchInput.trim())}
+                  >
+                    Search
+                  </ActionButton>
               </div>
             </div>
             <div className="max-h-[min(55vh,420px)] overflow-y-auto px-6 py-4">
@@ -789,44 +789,49 @@ export function MembersTab({
                           </div>
 
                           <div className="flex flex-wrap gap-2 sm:col-span-3">
-                            <button
-                              className="rounded-lg bg-slate-950 px-3 py-2 text-sm font-medium text-white"
-                              type="button"
-                              onClick={() => openSalaryModal(member)}
-                            >
-                              Base Salary
-                            </button>
+                  <ActionButton
+                    variant="primary"
+                    className="px-3"
+                    type="button"
+                    onClick={() => openSalaryModal(member)}
+                  >
+                    Base Salary
+                  </ActionButton>
                             {canEditOthersRole && String(member.role ?? "") === "others" ? (
                               <>
-                                <button
-                                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                <ActionButton
+                                  variant="secondary"
+                                  className="px-3"
                                   type="button"
                                   onClick={() => openCustomRoleModal(member)}
                                 >
                                   Change Custom Role
-                                </button>
-                                <button
-                                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                </ActionButton>
+                                <ActionButton
+                                  variant="secondary"
+                                  className="px-3"
                                   type="button"
                                   onClick={() => openRoleModal(member)}
                                 >
                                   Change to Company Role
-                                </button>
+                                </ActionButton>
                               </>
                             ) : canEditOthersRole ? (
-                              <button
-                                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                              <ActionButton
+                                variant="secondary"
+                                className="px-3"
                                 type="button"
                                 onClick={() => openRoleModal(member)}
                               >
                                 Change Role
-                              </button>
+                              </ActionButton>
                             ) : null}
                           </div>
 
                           <div className="flex shrink-0 flex-col gap-2 sm:items-end">
-                            <button
-                              className="rounded-lg bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                            <ActionButton
+                              variant="primary"
+                              className="px-3"
                               disabled={!!isSelf || invitingFor === memberId}
                               type="button"
                               onClick={() => void sendMeetingInvite(memberId)}
@@ -834,15 +839,16 @@ export function MembersTab({
                               {invitingFor === memberId
                                 ? "Sending…"
                                 : "Invite to meet"}
-                            </button>
-                            <button
-                              className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            </ActionButton>
+                            <ActionButton
+                              variant="danger"
+                              className="px-3"
                               disabled={!!isSelf || firingFor === memberId}
                               type="button"
                               onClick={() => requestFire(member)}
                             >
                               {firingFor === memberId ? "Removing…" : "Fire"}
-                            </button>
+                            </ActionButton>
                           </div>
                         </div>
                       </li>
@@ -883,14 +889,15 @@ export function MembersTab({
                   boards.
                 </p>
               </div>
-              <button
+              <ActionButton
                 aria-label="Close"
-                className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
+                variant="ghost"
+                className="h-10 w-10"
                 type="button"
                 onClick={() => setFireConfirmMember(null)}
               >
                 <X size={18} />
-              </button>
+              </ActionButton>
             </div>
 
             <div className="px-6 py-5">
@@ -914,13 +921,13 @@ export function MembersTab({
               />
 
               <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
-                <button
-                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                <ActionButton
+                  variant="secondary"
                   type="button"
                   onClick={() => setFireConfirmMember(null)}
                 >
                   Cancel
-                </button>
+                </ActionButton>
                 <button
                   className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={
@@ -944,7 +951,7 @@ export function MembersTab({
 
       {salaryModalMember ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <h3 className="text-lg font-semibold text-slate-900">Set base salary</h3>
             <p className="mt-1 text-sm text-slate-500">
               Set monthly base salary for{" "}
@@ -959,21 +966,21 @@ export function MembersTab({
               onChange={(e) => setSalaryInput(e.target.value)}
             />
             <div className="mt-5 flex justify-end gap-3">
-              <button
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
+              <ActionButton
+                variant="secondary"
                 onClick={() => setSalaryModalMember(null)}
                 type="button"
               >
                 Cancel
-              </button>
-              <button
-                className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              </ActionButton>
+              <ActionButton
+                variant="primary"
                 disabled={savingSalaryModal || !(Number(salaryInput) > 0)}
                 onClick={() => void saveSalaryModal()}
                 type="button"
               >
                 {savingSalaryModal ? "Saving..." : "Save salary"}
-              </button>
+              </ActionButton>
             </div>
           </div>
         </div>
@@ -981,7 +988,7 @@ export function MembersTab({
 
       {roleModalMember ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <h3 className="text-lg font-semibold text-slate-900">Change role</h3>
             <p className="mt-1 text-sm text-slate-500">
               Change role for{" "}
@@ -1001,21 +1008,21 @@ export function MembersTab({
               <option value="others">Others</option>
             </select>
             <div className="mt-5 flex justify-end gap-3">
-              <button
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
+              <ActionButton
+                variant="secondary"
                 onClick={() => setRoleModalMember(null)}
                 type="button"
               >
                 Cancel
-              </button>
-              <button
-                className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              </ActionButton>
+              <ActionButton
+                variant="primary"
                 disabled={savingRoleModal || !newRoleValue}
                 onClick={() => void saveRoleModal()}
                 type="button"
               >
                 {savingRoleModal ? "Saving..." : "Save role"}
-              </button>
+              </ActionButton>
             </div>
           </div>
         </div>
@@ -1023,7 +1030,7 @@ export function MembersTab({
 
       {customRoleModalMember ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <h3 className="text-lg font-semibold text-slate-900">Change custom role</h3>
             <p className="mt-1 text-sm text-slate-500">
               Set a custom role label for{" "}
@@ -1046,21 +1053,21 @@ export function MembersTab({
               ) : null}
             </datalist>
             <div className="mt-5 flex justify-end gap-3">
-              <button
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
+              <ActionButton
+                variant="secondary"
                 onClick={() => setCustomRoleModalMember(null)}
                 type="button"
               >
                 Cancel
-              </button>
-              <button
-                className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              </ActionButton>
+              <ActionButton
+                variant="primary"
                 disabled={savingCustomRoleModal || !String(customRoleInput ?? "").trim()}
                 onClick={() => void saveCustomRoleModal()}
                 type="button"
               >
                 {savingCustomRoleModal ? "Saving..." : "Save role"}
-              </button>
+              </ActionButton>
             </div>
           </div>
         </div>
@@ -1197,15 +1204,15 @@ export function MessagesTab({
   }
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="text-xl font-semibold">Messages</h3>
-          <p className="mt-1 text-sm text-slate-500">
-            Send a message to anyone in your company.
-          </p>
-        </div>
-        <span className="rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600">
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+      <div className="mb-5 border-l-4 border-sky-500 pl-4">
+        <h3 className="text-base font-semibold text-slate-900">Messages</h3>
+        <p className="mt-0.5 text-sm text-slate-500">
+          Send a message to anyone in your company.
+        </p>
+      </div>
+      <div className="mb-4">
+        <span className="rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 ring-1 ring-slate-100">
           {members.length} members
         </span>
       </div>
@@ -1242,14 +1249,15 @@ export function MessagesTab({
                 {bulkSelectedIds.length}
               </span>
             </span>
-            <button
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            <ActionButton
+              variant="secondary"
+              className="px-3"
               disabled={bulkSelectedIds.length === 0}
               type="button"
               onClick={() => setBulkSelected({})}
             >
               Clear
-            </button>
+            </ActionButton>
           </div>
         ) : null}
       </div>
@@ -1270,8 +1278,8 @@ export function MessagesTab({
             <p className="text-xs text-slate-500">
               Tip: click user cards to select/unselect.
             </p>
-            <button
-              className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+            <ActionButton
+              variant="primary"
               disabled={
                 sendingBulk ||
                 bulkSelectedIds.length === 0 ||
@@ -1281,7 +1289,7 @@ export function MessagesTab({
               onClick={() => void sendBulk()}
             >
               {sendingBulk ? "Sending…" : "Send to selected"}
-            </button>
+            </ActionButton>
           </div>
         </div>
       ) : null}
@@ -1348,11 +1356,11 @@ export function MessagesTab({
 
           return (
             <button
-              className={`w-full rounded-lg border p-4 text-left transition ${mode === "bulk"
+              className={`w-full rounded-xl border p-4 text-left transition-all duration-200 ${mode === "bulk"
                 ? isSelected
-                  ? "border-slate-900 bg-slate-950 text-white"
-                  : "border-slate-200 bg-white hover:bg-slate-50"
-                : "border-slate-200 bg-white hover:bg-slate-50"
+                  ? "border-slate-900 bg-slate-950 text-white shadow-md"
+                  : "border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-slate-300"
+                : "border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-slate-300"
                 }`}
               key={memberId}
               type="button"
@@ -1441,7 +1449,7 @@ export function MessagesTab({
           }}
         >
           <div
-            className="w-full max-w-lg overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
+            className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
             role="dialog"
             aria-modal="true"
             aria-labelledby="chat-modal-title"
@@ -1459,14 +1467,15 @@ export function MessagesTab({
                   • {formatRole(String(chatMember.role ?? "employee"))}
                 </p>
               </div>
-              <button
+              <ActionButton
                 aria-label="Close"
-                className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
+                variant="ghost"
+                className="h-9 w-9"
                 type="button"
                 onClick={() => setChatMember(null)}
               >
                 <X size={18} />
-              </button>
+              </ActionButton>
             </div>
 
             <div className="px-5 py-4">
@@ -1477,15 +1486,15 @@ export function MessagesTab({
                 onChange={(e) => setChatMessage(e.target.value)}
               />
               <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-                <button
-                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                <ActionButton
+                  variant="secondary"
                   type="button"
                   onClick={() => setChatMember(null)}
                 >
                   Cancel
-                </button>
-                <button
-                  className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                </ActionButton>
+                <ActionButton
+                  variant="primary"
                   disabled={
                     sendingChat || String(chatMessage ?? "").trim().length === 0
                   }
@@ -1493,7 +1502,7 @@ export function MessagesTab({
                   onClick={() => void sendChat()}
                 >
                   {sendingChat ? "Sending…" : "Send"}
-                </button>
+                </ActionButton>
               </div>
             </div>
           </div>
@@ -1516,85 +1525,119 @@ export function NotificationsTab({
   markRead: (id: string) => Promise<void>;
   deleteOne: (id: string) => Promise<void>;
 }) {
+  function getNotificationGroup(date: Date): string {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today.getTime() - 86400000);
+    const weekStart = new Date(today.getTime() - today.getDay() * 86400000);
+    if (date >= today) return "Today";
+    if (date >= yesterday) return "Yesterday";
+    if (date >= weekStart) return "This Week";
+    return "Earlier";
+  }
+
+  const grouped = notifications.reduce<Record<string, AnyRecord[]>>((acc, item) => {
+    const group = getNotificationGroup(item.createdAt ? new Date(String(item.createdAt)) : new Date());
+    if (!acc[group]) acc[group] = [];
+    acc[group].push(item);
+    return acc;
+  }, {});
+
+  const groupOrder = ["Today", "Yesterday", "This Week", "Earlier"];
+
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h3 className="text-xl font-semibold">Notifications</h3>
-          <p className="text-sm text-slate-500">
-            Join requests, project updates, and deadline notices.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium"
-            onClick={markAllRead}
-          >
-            <Check size={16} /> Mark all read
-          </button>
-          <button
-            className="inline-flex items-center gap-2 rounded-lg border border-rose-200 px-3 py-2 text-sm font-medium text-rose-600"
-            onClick={deleteAll}
-          >
-            <Trash2 size={16} /> Delete all
-          </button>
-        </div>
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+      <div className="mb-5 border-l-4 border-violet-500 pl-4">
+        <h3 className="text-base font-semibold text-slate-900">Notifications</h3>
+        <p className="mt-0.5 text-sm text-slate-500">
+          Join requests, project updates, and deadline notices.
+        </p>
       </div>
-      <div className="mt-5 space-y-3">
-        {notifications.map((item) => (
-          <div
-            className={`rounded-lg border p-4 ${item.readAt ? "border-slate-200 bg-slate-50 text-slate-500" : "border-emerald-200 bg-white shadow-sm"}`}
-            key={String(item.id)}
-          >
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex gap-3">
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-700">
-                  <Bell size={18} />
-                </div>
-                <div>
-                  <p className="font-medium">
-                    {String(item.title ?? "Notification")}
-                  </p>
-                  <p className="text-sm">
-                    {String(item.body || item.message || "")}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    {item.createdAt
-                      ? new Date(String(item.createdAt)).toLocaleString()
-                      : ""}
-                  </p>
-                </div>
-              </div>
-              <div className="flex shrink-0 gap-2 sm:flex-col">
-                {!item.readAt ? (
-                  <button
-                    aria-label="Mark notification as read"
-                    className="grid h-10 w-10 place-items-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
-                    onClick={() => markRead(String(item.id))}
-                    title="Mark as read"
-                    type="button"
-                  >
-                    <Check size={17} />
-                  </button>
-                ) : null}
-                {!item.readAt ? (
-                  <button
-                    aria-label="Delete notification"
-                    className="grid h-10 w-10 place-items-center rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50"
-                    onClick={() => deleteOne(String(item.id))}
-                    title="Delete"
-                    type="button"
-                  >
-                    <Trash2 size={17} />
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        ))}
+      <div className="mb-5 flex gap-2">
+        <ActionButton
+          variant="secondary"
+          className="px-3"
+          onClick={markAllRead}
+        >
+          <Check size={16} /> Mark all read
+        </ActionButton>
+        <ActionButton
+          variant="danger"
+          className="px-3"
+          onClick={deleteAll}
+        >
+          <Trash2 size={16} /> Delete all
+        </ActionButton>
+      </div>
+      <div className="space-y-5">
         {notifications.length === 0 ? (
           <p className="py-6 text-sm text-slate-500">No notifications yet.</p>
-        ) : null}
+        ) : (
+          groupOrder.map((group) => {
+            const items = grouped[group];
+            if (!items || items.length === 0) return null;
+            return (
+              <div key={group}>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">{group}</p>
+                <div className="space-y-3">
+                  {items.map((item) => (
+                    <div
+                      className={`rounded-xl border p-4 transition-all duration-200 hover:shadow-sm ${item.readAt ? "border-slate-200 bg-slate-50 text-slate-500" : "border-emerald-200 bg-white shadow-sm hover:shadow-md"}`}
+                      key={String(item.id)}
+                    >
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex gap-3">
+                          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-700">
+                            <Bell size={18} />
+                          </div>
+                          <div>
+                            <p className="font-medium">
+                              {String(item.title ?? "Notification")}
+                            </p>
+                            <p className="text-sm">
+                              {String(item.body || item.message || "")}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-400">
+                              {item.createdAt
+                                ? new Date(String(item.createdAt)).toLocaleString()
+                                : ""}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 gap-2 sm:flex-col">
+                          {!item.readAt ? (
+                            <ActionButton
+                              aria-label="Mark notification as read"
+                              variant="secondary"
+                              className="h-10 w-10"
+                              onClick={() => markRead(String(item.id))}
+                              title="Mark as read"
+                              type="button"
+                            >
+                              <Check size={17} />
+                            </ActionButton>
+                          ) : null}
+                          {!item.readAt ? (
+                            <ActionButton
+                              aria-label="Delete notification"
+                              variant="danger"
+                              className="h-10 w-10"
+                              onClick={() => deleteOne(String(item.id))}
+                              title="Delete"
+                              type="button"
+                            >
+                              <Trash2 size={17} />
+                            </ActionButton>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </section>
   );
@@ -1626,7 +1669,7 @@ export function CodePanel({
   ) as { code: string; label: string }[];
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)]">
       <div className="mb-4 flex items-center gap-2">
         <Building2 size={18} />
         <h3 className="text-lg font-semibold uppercase tracking-wide text-slate-700">
@@ -1650,9 +1693,10 @@ export function CodePanel({
                     <p className="min-w-0 truncate font-mono text-sm font-semibold text-indigo-700">
                       {item.code}
                     </p>
-                    <button
+                    <ActionButton
                       aria-label={`Copy ${item.label}`}
-                      className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                      variant="secondary"
+                      className="h-9 w-9"
                       onClick={() => {
                         navigator.clipboard.writeText(item.code);
                         showToast?.(`${item.label} copied.`);
@@ -1661,7 +1705,7 @@ export function CodePanel({
                       type="button"
                     >
                       <Clipboard size={16} />
-                    </button>
+                    </ActionButton>
                   </div>
                 </div>
                 <button
@@ -1709,11 +1753,11 @@ export function JoinPanel({
 }) {
   const isPending = String(status ?? "") === "pending";
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="text-lg font-semibold">{title}</h3>
-      <p className="mt-1 text-sm text-slate-500">
-        Enter the code and wait for approval.
-      </p>
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+      <div className="mb-5 border-l-4 border-sky-400 pl-4">
+        <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+        <p className="mt-0.5 text-sm text-slate-500">Enter the code and wait for approval.</p>
+      </div>
       <form className="mt-4 space-y-3" onSubmit={onSubmit}>
         <input
           className="w-full rounded-lg border border-slate-200 px-3 py-2.5"
@@ -1721,21 +1765,23 @@ export function JoinPanel({
           value={value}
           onChange={(event) => onChange(event.target.value)}
         />
-        <button
-          className="w-full rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+        <ActionButton
+          variant="primary"
+          className="w-full"
           disabled={isPending}
         >
           {isPending ? "Requested" : "Request approval"}
-        </button>
+        </ActionButton>
       </form>
       {isPending && onCancelRequest ? (
-        <button
-          className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        <ActionButton
+          variant="secondary"
+          className="mt-2 w-full"
           type="button"
           onClick={onCancelRequest}
         >
           Cancel Request
-        </button>
+        </ActionButton>
       ) : null}
       {status && status !== "none" ? (
         <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">

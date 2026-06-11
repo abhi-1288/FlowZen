@@ -18,10 +18,12 @@ import {
 import { apiFetch } from "@/lib/client-utils";
 import { CodePanel, JoinPanel } from "./admin-tabs";
 import {
+  ActionButton,
   AnyRecord,
   AvatarBadge,
   HistoryCard,
   Row,
+  SectionHeader,
   displayNested,
   formatRole,
   formatRoleWithCustom,
@@ -92,7 +94,7 @@ export function ProfileTab({
   const joinedBy = (insights?.joinedBy as AnyRecord | undefined) ?? null;
   const passwordResetRequired = Boolean(profile?.passwordResetRequired);
   const sectionClass =
-    "rounded-lg border border-slate-200 bg-white p-5 shadow-sm";
+    "rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]";
   const avatarUrl = profile?.avatarUrl ? String(profile.avatarUrl) : "";
   const displayName = profile?.name
     ? String(profile.name)
@@ -621,9 +623,10 @@ export function ProfileTab({
         </div>
       ) : null}
       <div className="grid gap-5 xl:grid-cols-2">
+        {/* ── Personal Info ── */}
         <section className={sectionClass}>
-          <h3 className="text-lg font-semibold">Account</h3>
-          <div className="mt-4 flex items-center gap-4 rounded-lg border border-slate-200 p-3">
+          <SectionHeader title="Personal Info" description="Basic details and identity" accent="indigo" />
+          <div className="flex items-center gap-4 rounded-xl border border-slate-100 bg-slate-50/50 p-4">
             <AvatarBadge avatarUrl={avatarUrl} name={displayName} size="lg" />
             {avatarUrl ? (
               <button
@@ -700,10 +703,92 @@ export function ProfileTab({
                   : undefined
               }
             />
+          </dl>
+        </section>
+
+        {/* ── Company & Team ── */}
+        <section className={sectionClass}>
+          <SectionHeader title="Company & Team" description="Organizational structure" accent="emerald" />
+          <dl className="mt-4 space-y-3 text-sm">
             <Row
               label="Company"
               value={company?.name ? String(company.name) : undefined}
             />
+            <Row
+              label="Team"
+              value={team?.name ? String(team.name) : undefined}
+            />
+            <Row
+              label="Company status"
+              value={
+                profile?.companyStatus
+                  ? String(profile.companyStatus)
+                  : undefined
+              }
+            />
+            <Row
+              label="Team status"
+              value={
+                profile?.teamStatus ? String(profile.teamStatus) : undefined
+              }
+            />
+            <Row
+              label="Company Joined"
+              value={
+                profile?.company && profile?.companyJoined
+                  ? new Date(
+                    profile.companyJoined as string | Date,
+                  ).toLocaleDateString()
+                  : undefined
+              }
+            />
+            <Row
+              label="Team Joined"
+              value={
+                profile?.team && profile?.teamJoined
+                  ? new Date(
+                    profile.teamJoined as string | Date,
+                  ).toLocaleDateString()
+                  : undefined
+              }
+            />
+            {inApprovedCompany &&
+              !["human-resource", "admin"].includes(role) ? (
+              <Row
+                label={joinedBy?.viaHr ? "Joined By HR" : "Company approved by"}
+                value={joinedBy?.name ? String(joinedBy.name) : undefined}
+              />
+            ) : null}
+          </dl>
+          {profile?.companyStatus === "approved" &&
+            !profile?.companyIdentityCode ? (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-medium text-amber-800">
+                No unique company identity code has been issued yet.
+              </p>
+              <button
+                className="mt-3 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={
+                  identityRequesting ||
+                  Boolean(insights?.pendingIdentityCodeRequest)
+                }
+                onClick={requestIdentityCode}
+                type="button"
+              >
+                {insights?.pendingIdentityCodeRequest
+                  ? "Identity request pending"
+                  : identityRequesting
+                    ? "Requesting..."
+                    : "Ask unique identity from HR"}
+              </button>
+            </div>
+          ) : null}
+        </section>
+
+        {/* ── Policy & Quotas ── */}
+        <section className={sectionClass}>
+          <SectionHeader title="Policy & Quotas" description="Benefits and entitlements" accent="amber" />
+          <dl className="mt-4 space-y-3 text-sm">
             <Row
               label="Food Accomodation"
               value={
@@ -754,35 +839,13 @@ export function ProfileTab({
                 ? `${Math.max(1, Number(company.minWorkHours ?? 8))} hrs / day`
                 : "No minimum work hours"}
             />
-            <Row
-              label="Team"
-              value={team?.name ? String(team.name) : undefined}
-            />
-            <Row
-              label="Company status"
-              value={
-                profile?.companyStatus
-                  ? String(profile.companyStatus)
-                  : undefined
-              }
-            />
-            <Row
-              label="Company Joined"
-              value={
-                profile?.company && profile?.companyJoined
-                  ? new Date(
-                    profile.companyJoined as string | Date,
-                  ).toLocaleDateString()
-                  : undefined
-              }
-            />
-            {inApprovedCompany &&
-              !["human-resource", "admin"].includes(role) ? (
-              <Row
-                label={joinedBy?.viaHr ? "Joined By HR" : "Company approved by"}
-                value={joinedBy?.name ? String(joinedBy.name) : undefined}
-              />
-            ) : null}
+          </dl>
+        </section>
+
+        {/* ── Compensation ── */}
+        <section className={sectionClass}>
+          <SectionHeader title="Compensation" description="Salary details" accent="rose" />
+          <dl className="mt-4 space-y-3 text-sm">
             {inApprovedCompany ? (
               <Row
                 label="Base Salary"
@@ -793,46 +856,7 @@ export function ProfileTab({
                 }
               />
             ) : null}
-            <Row
-              label="Team status"
-              value={
-                profile?.teamStatus ? String(profile.teamStatus) : undefined
-              }
-            />
-            <Row
-              label="Team Joined"
-              value={
-                profile?.team && profile?.teamJoined
-                  ? new Date(
-                    profile.teamJoined as string | Date,
-                  ).toLocaleDateString()
-                  : undefined
-              }
-            />
           </dl>
-          {profile?.companyStatus === "approved" &&
-            !profile?.companyIdentityCode ? (
-            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
-              <p className="text-sm font-medium text-amber-800">
-                No unique company identity code has been issued yet.
-              </p>
-              <button
-                className="mt-3 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={
-                  identityRequesting ||
-                  Boolean(insights?.pendingIdentityCodeRequest)
-                }
-                onClick={requestIdentityCode}
-                type="button"
-              >
-                {insights?.pendingIdentityCodeRequest
-                  ? "Identity request pending"
-                  : identityRequesting
-                    ? "Requesting..."
-                    : "Ask unique identity from HR"}
-              </button>
-            </div>
-          ) : null}
           {inApprovedCompany && !insights?.hasSalary ? (
             <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
               <p className="text-sm font-medium text-slate-700">
@@ -869,10 +893,12 @@ export function ProfileTab({
 
         {role === "human-resource" && profile?.companyStatus === "approved" ? (
           <section className={sectionClass}>
-            <h3 className="text-lg font-semibold">Policy</h3>
-            <p className="mt-1 text-sm text-slate-500">
-              Configure notice period for your company.
-            </p>
+            <div className="mb-5 border-l-4 border-emerald-500 pl-4">
+              <h3 className="text-base font-semibold text-slate-900">Policy</h3>
+              <p className="mt-0.5 text-sm text-slate-500">
+                Configure company-wide policies
+              </p>
+            </div>
 
             <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
               <label
@@ -1021,15 +1047,13 @@ export function ProfileTab({
 
         {canUseEmptyCompanyControls ? (
           <section className={sectionClass}>
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-semibold">Company controls</h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  {company?.status === "taken-down"
-                    ? "This company has been taken down."
-                    : "No approved members besides you remain in the company. Use these controls carefully."}
-                </p>
-              </div>
+            <div className="mb-5 border-l-4 border-rose-500 pl-4">
+              <h3 className="text-base font-semibold text-slate-900">Company controls</h3>
+              <p className="mt-0.5 text-sm text-slate-500">
+                {company?.status === "taken-down"
+                  ? "This company has been taken down."
+                  : "No approved members besides you remain in the company. Use these controls carefully."}
+              </p>
             </div>
             {company?.status !== "taken-down" ? (
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -1096,12 +1120,14 @@ export function ProfileTab({
             )}
 
             <section className={sectionClass}>
-              <h3 className="text-lg font-semibold">
-                Work From Home (WFH) Settings
-              </h3>
-              <p className="mt-1 text-sm text-slate-500">
-                Assign company-wide WFH dates and configure check-in behavior.
-              </p>
+              <div className="mb-5 border-l-4 border-sky-500 pl-4">
+                <h3 className="text-base font-semibold text-slate-900">
+                  Work From Home Settings
+                </h3>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  Assign company-wide WFH dates and configure check-in behavior.
+                </p>
+              </div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -1222,7 +1248,7 @@ export function ProfileTab({
             )}
             {showWeekendModal ? (
               <div
-                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
                 onClick={(e) => {
                   if (e.target === e.currentTarget) setShowWeekendModal(false);
                 }}
@@ -1356,7 +1382,7 @@ export function ProfileTab({
                         if (e.target === e.currentTarget) setShowDateConfirm(false);
                       }}
                     >
-                      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
+                      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
                         <h4 className="text-lg font-semibold text-slate-900">
                           {confirmDateIsWeekend ? "Remove weekend" : "Set as weekend"}
                         </h4>
@@ -1408,12 +1434,14 @@ export function ProfileTab({
         {role === "project-manager" ||
           role === "qa-tester" ||
           role === "finance" ? (
-          <section className="rounded-lg border overflow-y-auto h-auto max-h-[500px] border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center gap-2">
-              <Building2 size={18} />
-              <h3 className="text-lg font-semibold uppercase tracking-wide text-slate-700">
-                Team Employee Onboarding
+          <section className="rounded-2xl border overflow-y-auto h-auto max-h-[500px] border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+            <div className="mb-5 border-l-4 border-cyan-500 pl-4">
+              <h3 className="text-base font-semibold text-slate-900">
+                Team Onboarding Codes
               </h3>
+              <p className="mt-0.5 text-sm text-slate-500">
+                Share these codes with new team members
+              </p>
             </div>
             {managerTeams.length === 0 ? (
               <p className="text-sm text-slate-500">
@@ -1494,7 +1522,10 @@ export function ProfileTab({
         ) : null}
 
         <section className={sectionClass}>
-          <h3 className="text-lg font-semibold">Security</h3>
+          <div className="mb-5 border-l-4 border-rose-500 pl-4">
+            <h3 className="text-base font-semibold text-slate-900">Security</h3>
+            <p className="mt-0.5 text-sm text-slate-500">Password &amp; account management</p>
+          </div>
           {passwordResetRequired ? (
             <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
               You signed in with a reset link. Create a new password to finish
@@ -1522,25 +1553,28 @@ export function ProfileTab({
               minLength={8}
             />
 
-            <button className="rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white">
+            <ActionButton variant="primary">
               Update password
-            </button>
+            </ActionButton>
           </form>
 
-          <button
-            className="mt-5 inline-flex items-center gap-2 rounded-lg border border-rose-200 px-4 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-50"
+          <ActionButton
+            variant="danger"
+            className="mt-5"
             onClick={() => setModal(true)}
           >
             <Trash2 size={16} />
             Delete account
-          </button>
+          </ActionButton>
         </section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="text-lg font-semibold">Release Notes</h3>
-          <p className="mt-1 text-sm text-slate-500">
-            Version, last update, and recent changes.
-          </p>
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+          <div className="mb-5 border-l-4 border-slate-400 pl-4">
+            <h3 className="text-base font-semibold text-slate-900">Release Notes</h3>
+            <p className="mt-0.5 text-sm text-slate-500">
+              Version, last update, and recent changes.
+            </p>
+          </div>
           <VersionPanel />
         </section>
 
@@ -1549,8 +1583,8 @@ export function ProfileTab({
 
       {/* Modal */}
       {modal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <h3 className="text-lg font-semibold text-slate-900">
               Delete account?
             </h3>
@@ -1595,8 +1629,8 @@ export function ProfileTab({
       ) : null}
 
       {companyActionModal && companyActionType ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <h3 className="text-lg font-semibold text-slate-900">
               {companyActionType === "hold"
                 ? company?.status === "frozen"
@@ -1652,8 +1686,8 @@ export function ProfileTab({
       ) : null}
 
       {avatarDeleteModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <h3 className="text-lg font-semibold text-slate-900">
               Delete avatar?
             </h3>
@@ -1680,8 +1714,8 @@ export function ProfileTab({
       ) : null}
 
       {setupModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             {setupStep === "send-otp" ? (
               <>
                 <h3 className="text-lg font-semibold text-slate-900">
@@ -1965,23 +1999,16 @@ function MonthlyCheckBox({
 
   return (
     <section className={sectionClass}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-slate-700" />
-            <h3 className="text-lg font-semibold">Monthly Check</h3>
-          </div>
-          <p className="mt-1 text-sm text-slate-500">
-            Compare your attendance, leave, WFH, holidays, weekends, and absences.
-          </p>
-        </div>
-        <input
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700"
-          type="month"
-          value={month}
-          onChange={(event) => setMonth(event.target.value)}
-        />
+      <div className="mb-5 border-l-4 border-emerald-500 pl-4">
+        <h3 className="text-base font-semibold text-slate-900">Monthly Check</h3>
+        <p className="mt-0.5 text-sm text-slate-500">Compare your attendance, leave, WFH, holidays, weekends, and absences.</p>
       </div>
+      <input
+        className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700"
+        type="month"
+        value={month}
+        onChange={(event) => setMonth(event.target.value)}
+      />
 
       <div className="mt-5 space-y-5">
         <div className="space-y-3">
@@ -2053,34 +2080,36 @@ export function TimelineTab({
   role: string;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="text-xl font-semibold">Role Timeline</h3>
-      <p className="mt-1 text-sm text-slate-500">
-        Lifecycle events for your {role} account.
-      </p>
-      <div className="mt-6 space-y-4">
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+      <div className="mb-5 border-l-4 border-slate-400 pl-4">
+        <h3 className="text-base font-semibold text-slate-900">Role Timeline</h3>
+        <p className="mt-0.5 text-sm text-slate-500">
+          Lifecycle events for your {role} account.
+        </p>
+      </div>
+      <div className="space-y-3">
         {items.map((item) => {
           const when = item.date ? new Date(item.date) : null;
           return (
             <div
-              className="flex flex-col gap-3 rounded-lg border border-slate-100 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-3 rounded-xl border border-slate-100 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:shadow-md sm:flex-row sm:items-center sm:justify-between"
               key={`${item.title}-${item.date}`}
             >
               <div className="flex min-w-0 gap-3">
-                <div className="mt-1 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-700">
-                  <Clock size={16} />
+                <div className="mt-1 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-sm">
+                  <Clock size={14} />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-medium">{item.title}</p>
+                  <p className="font-medium text-slate-900">{item.title}</p>
                   <p className="text-sm text-slate-500">{item.body}</p>
                 </div>
               </div>
               {when ? (
-                <div className="shrink-0 rounded-lg bg-slate-50 px-3 py-2 text-left sm:text-right">
+                <div className="shrink-0 rounded-lg bg-slate-50 px-3 py-2 text-left ring-1 ring-slate-100 sm:text-right">
                   <p className="text-sm font-medium text-slate-700">
                     {when.toLocaleDateString()}
                   </p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-400">
                     {when.toLocaleTimeString()}
                   </p>
                 </div>
@@ -2488,9 +2517,9 @@ export function OnboardingTab({
                     value={companyName}
                     onChange={(event) => setCompanyName(event.target.value)}
                   />
-                  <button className="rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white">
+                  <ActionButton variant="primary">
                     Register
-                  </button>
+                  </ActionButton>
                 </form>
               </CodePanel>
             )}
@@ -2554,11 +2583,13 @@ export function OnboardingTab({
               }
               empty="Generating HR staff onboarding codes. Refresh once if they do not appear."
             />
-            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="text-lg font-semibold">HR Membership</h3>
-              <p className="mt-1 text-sm text-slate-500">
-                To quit, nominate another approved HR. Approval goes to admin.
-              </p>
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+              <div className="mb-5 border-l-4 border-teal-500 pl-4">
+                <h3 className="text-base font-semibold text-slate-900">HR Membership</h3>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  To quit, nominate another approved HR. Approval goes to admin.
+                </p>
+              </div>
               <button
                 className="mt-4 w-full rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={
@@ -2603,7 +2634,7 @@ export function OnboardingTab({
 
       {hrQuitModal ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
           role="presentation"
           onClick={(event) => {
             if (event.target === event.currentTarget) setHrQuitModal(false);
@@ -2666,7 +2697,7 @@ export function OnboardingTab({
 
       {roleQuitModal ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
           role="presentation"
           onClick={(event) => {
             if (event.target === event.currentTarget) setRoleQuitModal(false);
@@ -2738,7 +2769,7 @@ export function OnboardingTab({
 
       {cancelQuitModal ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
           role="presentation"
           onClick={(event) => {
             if (event.target === event.currentTarget) setCancelQuitModal(false);
@@ -2792,7 +2823,7 @@ export function OnboardingTab({
 
       {cancelJoinModal ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
           role="presentation"
           onClick={(event) => {
             if (event.target === event.currentTarget) setCancelJoinModal(false);
@@ -2849,7 +2880,7 @@ export function OnboardingTab({
 
       {roleTransferModal ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
           role="presentation"
           onClick={(event) => {
             if (event.target === event.currentTarget) setRoleTransferModal(false);
@@ -2924,16 +2955,17 @@ export function OnboardingTab({
       ) ? (
         profile?.companyStatus === "approved" ? (
           <>
-            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="text-lg font-semibold">
-                {role === "human-resource"
-                  ? "HR Team Management"
-                  : "Manager Membership"}
-              </h3>
-
-              <p className="mt-1 text-sm text-slate-500">
-                You are currently assigned to a company.
-              </p>
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+              <div className="mb-5 border-l-4 border-indigo-500 pl-4">
+                <h3 className="text-base font-semibold text-slate-900">
+                  {role === "human-resource"
+                    ? "HR Team Management"
+                    : "Manager Membership"}
+                </h3>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  You are currently assigned to a company.
+                </p>
+              </div>
 
               <div className="mt-5 space-y-4">
                 <div className="rounded-lg border border-slate-200 p-4">
@@ -3034,12 +3066,12 @@ export function OnboardingTab({
             </section>
 
             {role === "human-resource" && managerTeams.length > 0 ? (
-              <section className="rounded-lg border overflow-y-auto max-h-[500px] border-slate-200 bg-white p-5 shadow-sm">
-                <div className="mb-4 flex items-center gap-2">
-                  <Building2 size={18} />
-                  <h3 className="text-lg font-semibold uppercase tracking-wide text-slate-700">
+              <section className="rounded-2xl border overflow-y-auto max-h-[500px] border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)]">
+                <div className="mb-5 border-l-4 border-teal-500 pl-4">
+                  <h3 className="text-base font-semibold text-slate-900">
                     HR Team Onboarding
                   </h3>
+                  <p className="mt-0.5 text-sm text-slate-500">Share these codes with new team members</p>
                 </div>
                 <div className="space-y-3">
                   {managerTeams.map((teamItem) => {
@@ -3113,11 +3145,13 @@ export function OnboardingTab({
               </section>
             ) : null}
 
-            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="text-lg font-semibold">Manager Team History</h3>
-              <p className="mt-1 text-sm text-slate-500">
-                Open a team to view employees and remove members.
-              </p>
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+              <div className="mb-5 border-l-4 border-cyan-500 pl-4">
+                <h3 className="text-base font-semibold text-slate-900">Manager Team History</h3>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  Open a team to view employees and remove members.
+                </p>
+              </div>
               <div className="mt-4 space-y-2">
                 {managerTeams.length > 0 ? (
                   managerTeams.map((t) => (
@@ -3166,7 +3200,7 @@ export function OnboardingTab({
         )
       ) : null}
       {teamModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">
@@ -3236,7 +3270,7 @@ export function OnboardingTab({
       ) : null}
       {kickModal ? (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-xl rounded-xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
             <h3 className="text-xl font-semibold text-slate-900">
               Kick employee {kickModal.employeeName}?
             </h3>
@@ -3279,7 +3313,7 @@ export function OnboardingTab({
       ) : null}
       {deleteTeamModal ? (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-xl rounded-xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
             <h3 className="text-xl font-semibold text-slate-900">
               Delete team {deleteTeamModal.teamName}?
             </h3>
@@ -3324,12 +3358,13 @@ export function OnboardingTab({
       {["employee", "others"].includes(role) ? (
         companyJoinStatus === "approved" ? (
           <>
-            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="text-lg font-semibold">Membership</h3>
-
-              <p className="mt-1 text-sm text-slate-500">
-                You are currently approved in this company.
-              </p>
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+              <div className="mb-5 border-l-4 border-emerald-500 pl-4">
+                <h3 className="text-base font-semibold text-slate-900">Membership</h3>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  You are currently approved in this company.
+                </p>
+              </div>
 
               <div className="mt-5 space-y-4">
                 <div className="rounded-lg border border-slate-200 p-4">

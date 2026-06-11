@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, UtensilsCrossed, Bus, Check, X } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
-import { AnyRecord, formatRoleWithCustom } from "./shared";
+import { ActionButton, AnyRecord, formatRoleWithCustom } from "./shared";
 
 type PolicyData = {
   foodAmount: number;
@@ -251,20 +251,20 @@ export function FinanceMembersView({
   }
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="text-xl font-semibold">Members</h3>
-          <p className="mt-1 text-sm text-slate-500">View employee attendance, check-ins, leaves, holidays, and salary.</p>
-        </div>
-        <button
-          className="flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+      <div className="mb-5 border-l-4 border-amber-500 pl-4">
+        <h3 className="text-base font-semibold text-slate-900">Members</h3>
+        <p className="mt-0.5 text-sm text-slate-500">View employee attendance, check-ins, leaves, holidays, and salary.</p>
+      </div>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <ActionButton
+          variant="secondary"
           onClick={() => { void loadPolicy(); setPolicyModal(true); }}
           type="button"
         >
           <UtensilsCrossed size={16} />
           Policies
-        </button>
+        </ActionButton>
       </div>
 
       <div className="mt-6 flex gap-2">
@@ -352,18 +352,20 @@ export function FinanceMembersView({
                       Update Check-out
                     </button>
                   ) : null}
-                  <button
-                    className="flex-1 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+                  <ActionButton
+                    variant="primary"
+                    className="flex-1"
                     onClick={() => selectMember(memberId, "attendance")}
                   >
                     See Attendance
-                  </button>
-                  <button
-                    className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  </ActionButton>
+                  <ActionButton
+                    variant="secondary"
+                    className="flex-1"
                     onClick={() => selectMember(memberId, "salary")}
                   >
                     {hasBaseSalary ? "Update Salary" : "Assign Salary"}
-                  </button>
+                  </ActionButton>
                 </div>
               </li>
             );
@@ -424,13 +426,13 @@ export function FinanceMembersView({
                       />
                     </div>
                     <div className="flex gap-2">
-                      <button
+                      <ActionButton
+                        variant="secondary"
                         onClick={() => setIsEditingSalary(false)}
                         disabled={savingSalary}
-                        className="px-4 py-2.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium"
                       >
                         Cancel
-                      </button>
+                      </ActionButton>
                       <button
                         onClick={handleUpdateSalary}
                         disabled={savingSalary}
@@ -467,17 +469,17 @@ export function FinanceMembersView({
               // Attendance Calendar
               <div className="mt-2">
                 <div className="mb-6 flex items-center justify-center gap-4">
-                  <button onClick={() => changeMonth(-1)} className="grid h-10 w-12 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm">
+                  <ActionButton onClick={() => changeMonth(-1)} variant="secondary" className="h-10 w-12" aria-label="Previous month">
                     <ChevronLeft size={20} />
-                  </button>
+                  </ActionButton>
                   <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 shadow-sm">
                     <div className="bg-slate-50 px-8 py-2.5 text-sm font-bold tracking-widest text-slate-700 uppercase">
                       {new Date(attendanceMonth + "-01").toLocaleDateString("en-US", { month: "long", year: "numeric" })}
                     </div>
                   </div>
-                  <button onClick={() => changeMonth(1)} className="grid h-10 w-12 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm">
+                  <ActionButton onClick={() => changeMonth(1)} variant="secondary" className="h-10 w-12" aria-label="Next month">
                     <ChevronRight size={20} />
-                  </button>
+                  </ActionButton>
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
@@ -712,14 +714,15 @@ export function FinanceMembersView({
                   onChange={(e) => setTravelAmount(e.target.value)}
                 />
               </div>
-              <button
-                className="w-full rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+              <ActionButton
+                variant="primary"
+                className="w-full"
                 disabled={policySaving}
                 onClick={() => void savePolicy()}
                 type="button"
               >
                 {policySaving ? "Saving..." : "Save Policy"}
-              </button>
+              </ActionButton>
             </div>
 
             {policyData ? (
@@ -787,9 +790,9 @@ export function FinanceMembersView({
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-lg font-bold text-slate-900">Check-Out Request</h4>
-              <button onClick={() => setCheckOutModalRequest(null)} className="rounded-lg p-1 text-slate-400 hover:text-slate-600">
+              <ActionButton variant="ghost" className="p-1" onClick={() => setCheckOutModalRequest(null)} aria-label="Close">
                 <X size={20} />
-              </button>
+              </ActionButton>
             </div>
             {(() => {
               const req = checkOutModalRequest as any;
@@ -813,18 +816,20 @@ export function FinanceMembersView({
 
                   {checkOutStep === "action" && (
                     <div className="flex gap-3">
-                      <button
+                      <ActionButton
+                        variant="danger"
+                        className="flex-1"
                         onClick={() => setCheckOutStep("reject")}
-                        className="flex-1 rounded-lg border border-rose-200 px-4 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-50"
                       >
                         Reject
-                      </button>
-                      <button
+                      </ActionButton>
+                      <ActionButton
+                        variant="approve"
+                        className="flex-1"
                         onClick={() => setCheckOutStep("approve-status")}
-                        className="flex-1 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700"
                       >
                         Approve
-                      </button>
+                      </ActionButton>
                     </div>
                   )}
 
@@ -838,12 +843,13 @@ export function FinanceMembersView({
                         rows={3}
                       />
                       <div className="flex gap-2">
-                        <button
+                        <ActionButton
+                          variant="secondary"
+                          className="flex-1"
                           onClick={() => setCheckOutStep("action")}
-                          className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600"
                         >
                           Back
-                        </button>
+                        </ActionButton>
                         <button
                           onClick={async () => {
                             if (!checkOutRejectReason.trim()) return;
@@ -882,13 +888,16 @@ export function FinanceMembersView({
                         <option value="absent">Absent</option>
                       </select>
                       <div className="flex gap-2">
-                        <button
+                        <ActionButton
+                          variant="secondary"
+                          className="flex-1"
                           onClick={() => setCheckOutStep("action")}
-                          className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600"
                         >
                           Back
-                        </button>
-                        <button
+                        </ActionButton>
+                        <ActionButton
+                          variant="approve"
+                          className="flex-1"
                           onClick={async () => {
                             try {
                               await apiFetch(`/api/attendance/checkout-request/${String(req._id)}`, {
@@ -904,10 +913,9 @@ export function FinanceMembersView({
                               showToast(err instanceof Error ? err.message : "Failed to approve.", "error");
                             }
                           }}
-                          className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white"
                         >
                           Confirm
-                        </button>
+                        </ActionButton>
                       </div>
                     </div>
                   )}

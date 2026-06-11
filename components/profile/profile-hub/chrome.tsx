@@ -1,21 +1,20 @@
+import type { ReactNode } from "react";
+
 export function ProfileSkeleton() {
   return (
     <div className="animate-pulse space-y-6">
-      {/* Header */}
-      <div className="rounded-xl bg-white p-6 shadow-sm">
-        <div className="h-7 w-48 rounded bg-slate-200" />
-        <div className="mt-3 h-4 w-72 rounded bg-slate-200" />
-      </div>
+      {/* Cover banner skeleton */}
+      <div className="h-48 rounded-2xl bg-gradient-to-r from-slate-200 to-slate-300" />
 
       {/* Cards */}
       <div className="grid gap-5 xl:grid-cols-2">
         {[1, 2].map((item) => (
-          <div key={item} className="rounded-xl bg-white p-6 shadow-sm">
-            <div className="h-6 w-40 rounded bg-slate-200" />
+          <div key={item} className="rounded-2xl bg-white p-6 shadow-sm">
+            <div className="h-6 w-44 rounded bg-slate-200" />
 
             <div className="mt-6 space-y-4">
               {[1, 2, 3, 4].map((line) => (
-                <div key={line} className="h-4 rounded bg-slate-200" />
+                <div key={line} className="h-4 rounded bg-slate-100" />
               ))}
             </div>
           </div>
@@ -28,18 +27,36 @@ export function ProfileSkeleton() {
 export function NavButton({
   active,
   label,
+  icon,
   onClick,
 }: {
   active: boolean;
   label: string;
+  icon?: ReactNode;
   onClick: () => void;
 }) {
   return (
     <button
-      className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium ${active ? "bg-white/15 text-white" : "text-slate-300 hover:bg-white/10 hover:text-white"}`}
+      className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-all duration-200 ${
+        active
+          ? "bg-white/15 text-white shadow-sm"
+          : "text-slate-400 hover:bg-white/10 hover:text-white"
+      }`}
       onClick={onClick}
     >
-      {label}
+      {icon ? (
+        <span
+          className={`flex h-5 w-5 items-center justify-center transition-colors duration-200 ${
+            active ? "text-indigo-300" : "text-slate-500 group-hover:text-slate-300"
+          }`}
+        >
+          {icon}
+        </span>
+      ) : null}
+      <span>{label}</span>
+      {active ? (
+        <span className="ml-auto h-1.5 w-1.5 rounded-full bg-indigo-400" />
+      ) : null}
     </button>
   );
 }

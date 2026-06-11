@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/client-utils";
-import { AnyRecord, displayNested, formatRoleWithCustom } from "./shared";
+import { ActionButton, AnyRecord, displayNested, formatRoleWithCustom } from "./shared";
 
 type FinanceData = {
   month: string;
@@ -73,6 +73,8 @@ export function FinanceTab({
   const [leaveImpacts, setLeaveImpacts] = useState<{ employeeName: string; leaves: number; deduction: number }[]>([]);
 
 
+  const [financeSubTab, setFinanceSubTab] = useState<"my" | "ops" | "reports">("my");
+
   // Policies
   const [policyData, setPolicyData] = useState<{
     foodAmount: number;
@@ -80,6 +82,31 @@ export function FinanceTab({
     foodOptedOutMembers: { _id: string; name: string; email: string; role: string }[];
     travelOptedOutMembers: { _id: string; name: string; email: string; role: string }[];
   } | null>(null);
+  const [foodOptedIn, setFoodOptedIn] = useState(true);
+  const [travelOptedIn, setTravelOptedIn] = useState(true);
+
+  useEffect(() => {
+    if (!policyData || !profileId) return;
+    setFoodOptedIn(!policyData.foodOptedOutMembers.some((m) => String(m._id) === String(profileId)));
+    setTravelOptedIn(!policyData.travelOptedOutMembers.some((m) => String(m._id) === String(profileId)));
+  }, [policyData, profileId]);
+
+  async function toggleOptInOut(type: "food" | "travel", optedIn: boolean) {
+    try {
+      await apiFetch("/api/finance/policy", {
+        method: "PATCH",
+        body: JSON.stringify({ type, optedIn }),
+      });
+      if (type === "food") {
+        setFoodOptedIn(optedIn);
+      } else {
+        setTravelOptedIn(optedIn);
+      }
+      showToast(`Successfully ${optedIn ? "opted in" : "opted out"} of ${type} policy.`, "success");
+    } catch (err: any) {
+      showToast(err.message || "Failed to update policy.", "error");
+    }
+  }
 
   async function load() {
     const result = await apiFetch<FinanceData>(`/api/finance?month=${month}`);
@@ -315,25 +342,38 @@ export function FinanceTab({
 
 
   if (!data) {
-    return <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">Loading finance...</section>;
+    return <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)]">Loading finance...</section>;
   }
 
   const isFinanceOrAdmin = actorRole === "finance" || actorRole === "admin";
   const adminOptions = data.members.filter((m) => String(m.role) === "admin");
 
+  const tabClass = (t: string) =>
+    `rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
+      financeSubTab === t
+        ? "bg-slate-950 text-white shadow-sm"
+        : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+    }`;
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h3 className="text-xl font-semibold">Finance</h3>
-          <p className="text-sm text-slate-500">Payroll, payout status, budgets, and expense requests.</p>
+        <div className="border-l-4 border-amber-500 pl-4">
+          <h3 className="text-base font-semibold text-slate-900">Finance</h3>
+          <p className="mt-0.5 text-sm text-slate-500">Payroll, payout status, budgets, and expense requests.</p>
         </div>
         <input
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+          className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
           type="month"
           value={month}
           onChange={(event) => setMonth(event.target.value)}
         />
+      </div>
+
+      <div className="flex gap-2">
+        <button className={tabClass("my")} onClick={() => setFinanceSubTab("my")}>My Requests</button>
+        <button className={tabClass("ops")} onClick={() => setFinanceSubTab("ops")}>Operations</button>
+        <button className={tabClass("reports")} onClick={() => setFinanceSubTab("reports")}>Reports</button>
       </div>
 
       {data.monthEndGenerated ? (
@@ -353,499 +393,44 @@ export function FinanceTab({
         <FinanceCard label="Paid salaries" value={String(data.dashboard.paidSalaries)} />
       </div>
 
-      {/* Reports & Analytics */}
-      {reports ? (
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h4 className="font-semibold">Reports & Analytics</h4>
-          <p className="mt-1 text-xs text-slate-400">Yearly financial summary</p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-lg border border-slate-100 bg-white p-4">
-              <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Revenue</p>
-              <p className="mt-1 text-xl font-semibold text-emerald-600">₹{reports.revenue.toLocaleString("en-IN")}</p>
+      {/* ══════════ My Requests ══════════ */}
+      {financeSubTab === "my" ? (
+        <div className="space-y-5">
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+            <div className="mb-5 border-l-4 border-rose-500 pl-4">
+              <h3 className="text-base font-semibold text-slate-900">Expense Request</h3>
+              <p className="mt-0.5 text-sm text-slate-500">Submit a new expense for approval</p>
             </div>
-            <div className="rounded-lg border border-slate-100 bg-white p-4">
-              <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Expenses</p>
-              <p className="mt-1 text-xl font-semibold text-rose-600">₹{reports.expenses.toLocaleString("en-IN")}</p>
-            </div>
-            <div className="rounded-lg border border-slate-100 bg-white p-4">
-              <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Profit</p>
-              <p className={`mt-1 text-xl font-semibold ${reports.profit >= 0 ? "text-emerald-600" : "text-rose-600"}`}>₹{reports.profit.toLocaleString("en-IN")}</p>
-            </div>
-            <div className="rounded-lg border border-slate-100 bg-white p-4">
-              <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Pending Invoices</p>
-              <p className="mt-1 text-xl font-semibold text-amber-600">{reports.pendingInvoices} (₹{reports.pendingInvoicesAmount.toLocaleString("en-IN")})</p>
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-
-
-      {data.canManage ? (
-        <><div className="grid gap-5 xl:grid-cols-2">
-          {actorRole === "finance" ? (
-            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" ref={salaryFormRef}>
-              <h4 className="font-semibold">Generate Monthly Salary</h4>
-              <div className="mt-4">
-                {salaryStep === 1 && (
-                  <form onSubmit={(e) => { e.preventDefault(); setSalaryStep(2); }} className="grid gap-3">
-                    <p className="text-sm font-medium text-slate-700">Step 1: Select Date Range</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <input className="rounded-lg border border-slate-200 px-3 py-2" type="date" required value={salaryPeriod.start} onChange={(e) => setSalaryPeriod({ ...salaryPeriod, start: e.target.value })} />
-                      <input className="rounded-lg border border-slate-200 px-3 py-2" type="date" required value={salaryPeriod.end} onChange={(e) => setSalaryPeriod({ ...salaryPeriod, end: e.target.value })} />
-                    </div>
-                    <button className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white justify-self-end">Next</button>
-                  </form>
-                )}
-                {salaryStep === 2 && (
-                  <form onSubmit={calculateSalary} className="grid gap-3">
-                    <p className="text-sm font-medium text-slate-700">Step 2: Select Employee</p>
-                    <select className="rounded-lg border border-slate-200 px-3 py-2" required value={salaryEmployeeId} onChange={(e) => setSalaryEmployeeId(e.target.value)}>
-                      <option value="">Select employee</option>
-                      {data.members.map((member) => (
-                        <option key={String(member.id)} value={String(member.id)}>
-                          {String(member.name)} - {formatRoleWithCustom(String(member.role), member.customRole)}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="flex justify-between">
-                      <button type="button" className="rounded-lg border border-slate-200 px-4 py-2 text-sm" onClick={() => setSalaryStep(1)}>Back</button>
-                      <button className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white">Calculate</button>
-                    </div>
-                  </form>
-                )}
-                {salaryStep === 3 && salaryBreakdown && (
-                  <form onSubmit={submitSalary} className="grid gap-3 text-sm">
-                    <p className="font-medium text-slate-700">Step 3: Review & Adjust</p>
-                    <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 space-y-2">
-                      <div className="flex justify-between"><span>Period:</span> <span>{salaryBreakdown.periodStart} to {salaryBreakdown.periodEnd}</span></div>
-                      {salaryBreakdown.periodStart !== salaryPeriod.start && (
-                        <p className="text-xs text-amber-600 bg-amber-50 rounded px-2 py-1">⚠ Period adjusted — employee joined on {salaryBreakdown.periodStart}</p>
-                      )}
-                      <div className="flex justify-between">
-                        <span>Employee:</span>
-                        <span className="font-medium text-slate-900">
-                          {(() => {
-                            const m = data.members.find((x: any) => String(x.id) === salaryEmployeeId);
-                            return m ? `${m.name} (${formatRoleWithCustom(String(m.role), m.customRole)})` : "-";
-                          })()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between"><span>Total Days:</span> <span>{salaryBreakdown.totalDays}</span></div>
-                      <div className="flex justify-between text-rose-600"><span>Absent Days:</span> <span>{salaryBreakdown.absentDays}</span></div>
-                      <div className="flex justify-between text-emerald-600"><span>Paid Leave Days:</span> <span>{salaryBreakdown.paidLeaveDays}</span></div>
-                      <div className="flex justify-between text-rose-600"><span>Unpaid Leave Days:</span> <span>{salaryBreakdown.unpaidLeaveDays}</span></div>
-                      <div className="flex justify-between"><span>Payable Days:</span> <span>{salaryBreakdown.payableDays}</span></div>
-                      <div className="flex justify-between"><span>Daily Salary:</span> <span>₹{salaryBreakdown.dailySalary.toLocaleString("en-IN")}</span></div>
-                      <div className="flex justify-between"><span>Gross Salary:</span> <span>₹{salaryBreakdown.grossSalary.toLocaleString("en-IN")}</span></div>
-                      <div className="flex justify-between text-rose-600"><span>Attendance/Leave Deduction:</span> <span>- ₹{salaryBreakdown.leaveDeduction.toLocaleString("en-IN")}</span></div>
-                      {salaryBreakdown.foodDeduction > 0 ? (
-                        <div className="flex justify-between text-rose-600"><span>Food Deduction:</span> <span>- ₹{salaryBreakdown.foodDeduction.toLocaleString("en-IN")}</span></div>
-                      ) : null}
-                      {salaryBreakdown.travelDeduction > 0 ? (
-                        <div className="flex justify-between text-rose-600"><span>Travel Accommodation Deduction:</span> <span>- ₹{salaryBreakdown.travelDeduction.toLocaleString("en-IN")}</span></div>
-                      ) : null}
-                      <div className="flex justify-between text-emerald-600"><span>Total In Hand:</span> <span>₹{Math.max(salaryBreakdown.grossSalary + Number(salaryAllowances || 0) - (salaryBreakdown.leaveDeduction + Number(salaryDeductions || 0) + (salaryBreakdown.foodDeduction ?? 0) + (salaryBreakdown.travelDeduction ?? 0))).toLocaleString("en-IN")}</span> </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs font-medium text-slate-500 mb-1 block">Manual Allowances (₹)</label>
-                        <input className="w-full rounded-lg border border-slate-200 px-3 py-2" type="number" min="0" value={salaryAllowances} onChange={(e) => setSalaryAllowances(e.target.value)} />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-slate-500 mb-1 block">Manual Deductions (₹)</label>
-                        <input className="w-full rounded-lg border border-slate-200 px-3 py-2" type="number" min="0" value={salaryDeductions} onChange={(e) => setSalaryDeductions(e.target.value)} />
-                      </div>
-                    </div>
-                    <div className="rounded-lg bg-emerald-50 p-3 flex justify-between font-bold text-emerald-700 text-lg mt-2">
-                      <span>Net Salary:</span>
-                      <span>₹{Math.max(0, salaryBreakdown.grossSalary + Number(salaryAllowances || 0) - (salaryBreakdown.leaveDeduction + Number(salaryDeductions || 0) + (salaryBreakdown.foodDeduction ?? 0) + (salaryBreakdown.travelDeduction ?? 0))).toLocaleString("en-IN")}</span>
-                    </div>
-                    <div className="flex justify-between mt-2">
-                      <button type="button" className="rounded-lg border border-slate-200 px-4 py-2 text-sm" onClick={() => setSalaryStep(2)}>Back</button>
-                      <button className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50" disabled={salaryGenerating}>
-                        {salaryGenerating ? "Generating..." : "Generate Salary"}
-                      </button>
-                    </div>
-                  </form>
-                )}
-              </div>
-            </section>
-          ) : null}
-          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <h4 className="font-semibold">Expense Allocator</h4>
-            <p className="mt-1 text-xs text-slate-400">Disburse money or hardware for accepted expense requests.</p>
-            <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
-              {data.expenses.filter((e) => String(e.status) === "accepted").length === 0 ? (
-                <p className="py-2 text-sm text-slate-500">No accepted expenses ready for disbursement.</p>
+            <form className="mt-4 grid gap-3 md:grid-cols-4" onSubmit={submitExpense}>
+              <select className="rounded-lg border border-slate-200 px-3 py-2" value={expenseForm.category} onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}>
+                <option value="software">Software purchase</option>
+                <option value="device">Laptop/device</option>
+                <option value="travel">Travel expense</option>
+                <option value="office-resources">Office resources</option>
+              </select>
+              <input className="rounded-lg border border-slate-200 px-3 py-2" required placeholder="Title" value={expenseForm.title} onChange={(e) => setExpenseForm({ ...expenseForm, title: e.target.value })} />
+              <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Amount" type="number" value={expenseForm.amount} onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })} />
+              <input className="rounded-lg border border-slate-200 px-3 py-2" required min={1} placeholder="Quantity" type="number" value={expenseForm.quantity} onChange={(e) => setExpenseForm({ ...expenseForm, quantity: e.target.value })} />
+              {actorRole !== "finance" ? (
+                <select className="rounded-lg border border-slate-200 px-3 py-2" required value={expenseForm.assignedTo} onChange={(e) => setExpenseForm({ ...expenseForm, assignedTo: e.target.value })}>
+                  <option value="">Assign finance user</option>
+                  {data.financeMembers.map((fm) => (
+                    <option key={String(fm.id)} value={String(fm.id)}>{String(fm.name)}</option>
+                  ))}
+                </select>
               ) : null}
-              {data.expenses.filter((e) => String(e.status) === "accepted").map((expense) => (
-                <div className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2" key={String(expense.id)}>
-                  <div>
-                    <p className="text-sm font-medium">{String(expense.title)} x {Number(expense.quantity ?? 1)}</p>
-                    <p className="text-xs text-slate-500">
-                      {displayNested(expense.requester, "name", "Member")} <span className="text-[10px] uppercase text-slate-400">({displayNested(expense.requester, "role", "–")})</span> • {String(expense.category)} • Qty: {Number(expense.quantity ?? 1)} • ₹{Number(expense.amount ?? 0).toLocaleString("en-IN")}
-                    </p>
-                  </div>
-                  <button className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs text-white" onClick={() => updateStatus("expense", String(expense.id), "disbursed")}>Disburse</button>
-                </div>
-              ))}
-            </div>
-            {data.expenses.filter((e) => String(e.status) === "disbursed").length > 0 ? (
-              <div className="mt-3 border-t border-slate-200 pt-3">
-                <p className="mb-2 text-xs font-medium text-slate-500">Disbursed</p>
-                {data.expenses.filter((e) => String(e.status) === "disbursed").map((expense) => (
-                  <div key={String(expense.id)}>
-                  <div className="flex items-center justify-between py-1.5 text-sm">
-                    <div className="flex items-center justify-between w-full gap-3">
-                      <span>₹{Number(expense.amount ?? 0).toLocaleString("en-IN")} — {String(expense.title)} x {Number(expense.quantity ?? 1)} <span className="ml-2 inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">disbursed</span></span>
-                      <div className="ml-2 inline-block rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-medium text-cyan-700">
-                        <div>{displayNested(expense.requester, "name", "Member")}</div>
-                        <div>{displayNested(expense.requester, "role", "Member")}</div>
-                      </div>
-                    </div>
-                  </div>
-                  <hr />
-                  </div>
-                ))}
-              </div>
-            ) : null}
+              <ActionButton variant="primary">Request</ActionButton>
+              <textarea className="rounded-lg border border-slate-200 px-3 py-2 md:col-span-4" placeholder="Reason" value={expenseForm.reason} onChange={(e) => setExpenseForm({ ...expenseForm, reason: e.target.value })} />
+            </form>
           </section>
-          {/* Invoices */}
-          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <h4 className="font-semibold">Invoices
-                {invoices.length > 0 ? (
-                  <span className="ml-2 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{invoices.length}</span>
-                ) : null}
-              </h4>
-              <button className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white" onClick={() => setShowInvoiceForm(true)}>Create Invoice</button>
-            </div>
-            <p className="mt-1 text-xs text-slate-400">Generate client invoices and track payments.</p>
-            <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
-              {invoices.length === 0 ? <p className="py-2 text-sm text-slate-500">No invoices yet.</p> : null}
-              {invoices.map((inv) => (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 px-3 py-2" key={String(inv.id)}>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{String(inv.clientName)} — ₹{Number(inv.amount ?? 0).toLocaleString("en-IN")}</p>
-                    <p className="text-xs text-slate-500 truncate">{String(inv.invoiceNumber)} • {String(inv.status)}</p>
-                  </div>
-                  <div className="flex gap-2 shrink-0">
-                    {isFinanceOrAdmin ? (
-                      String(inv.status) === "pending"
-                        ? <button className="rounded-lg bg-emerald-600 px-2 py-1 text-xs text-white" onClick={() => markInvoice(String(inv.id), "paid")}>Mark paid</button>
-                        : <button className="rounded-lg border border-slate-200 px-2 py-1 text-xs" onClick={() => markInvoice(String(inv.id), "pending")}>Mark pending</button>
-                    ) : null}
-                    <button className="rounded-lg border border-slate-200 px-2 py-1 text-xs" onClick={() => window.open(`/invoice/${String(inv.id)}`, "_blank")}>PDF</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-          {/* Project Budget Allocation */}
-          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <h4 className="font-semibold">Project Budget Allocation</h4>
-              <button className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white" onClick={() => openBudgetModal()}>Allocate Budget</button>
-            </div>
-            <p className="mt-1 text-xs text-slate-400">Set project budgets and submit for approval.</p>
-          </section>
-        </div>
-          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <h4 className="font-semibold">Allocated Budgets
-                {data.budgets.filter((b) => String(b.status) === "pending").length > 0 ? (
-                  <span className="ml-2 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                    {data.budgets.filter((b) => String(b.status) === "pending").length} pending
-                  </span>
-                ) : null}
-              </h4>
-              {actorRole === "finance" ? (
-                <button className="text-sm text-blue-600 underline" onClick={() => setShowExpiredBudgets(true)}>View expired budgets</button>
-              ) : null}
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+            <div className="mb-5 border-l-4 border-rose-500 pl-4">
+              <h3 className="text-base font-semibold text-slate-900">My Expense Requests</h3>
+              <p className="mt-0.5 text-sm text-slate-500">Track and manage your expense submissions</p>
             </div>
             <div className="mt-4 divide-y divide-slate-200">
-              {data.budgets.map((budget) => {
-                const deadline = budget.deadline ? new Date(String(budget.deadline)) : null;
-                const isExpired = deadline && (Date.now() - deadline.getTime()) > 25 * 24 * 60 * 60 * 1000;
-                if (isExpired) return null;
-                const budgetStatus = String(budget.status ?? "pending");
-                const budgetAssignedTo = (budget.assignedTo as AnyRecord)?._id ?? (budget.assignedTo as AnyRecord)?.id ?? "";
-                const isPendingForMe =
-                  (actorRole === "finance" && String(budgetAssignedTo) === profileId && budgetStatus === "pending") ||
-                  (actorRole === "admin" && !budget.assignedTo && budgetStatus === "pending");
-                return (
-                  <div className="flex flex-wrap items-center justify-between gap-3 py-3" key={String(budget.id)}>
-                    <div>
-                      <p className="font-medium">{displayNested(budget.board, "title", "Board")}</p>
-                      <p className="text-sm text-slate-500">
-                        Total: ₹{Number(budget.totalBudget ?? 0).toLocaleString("en-IN")}
-                        {Number(budget.teamSpendingLimit ?? 0) > 0 ? <> • Team limit: ₹{Number(budget.teamSpendingLimit).toLocaleString("en-IN")}</> : null}
-                        {Number(budget.resourceBudget ?? 0) > 0 ? <> • Resource: ₹{Number(budget.resourceBudget).toLocaleString("en-IN")}</> : null}
-                        {budget.deadline ? <> • Deadline: {new Date(String(budget.deadline)).toLocaleDateString()}</> : null}
-                        {budget.decidedBy ? <> • By: {displayNested(budget.decidedBy, "name", "User")}</> : null}
-                      </p>
-                      <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${budgetStatus === "approved" ? "bg-emerald-100 text-emerald-700" :
-                        budgetStatus === "rejected" ? "bg-rose-100 text-rose-700" :
-                          "bg-amber-100 text-amber-700"
-                        }`}>{budgetStatus}</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <button className="rounded-lg border border-slate-200 px-3 py-2 text-sm" onClick={() => openBudgetModal(budget)}>Edit</button>
-                      {isPendingForMe ? (
-                        <>
-                          <button className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white" onClick={() => updateStatus("budget", String(budget.id), "approved")}>Approve</button>
-                          <button className="rounded-lg border border-rose-200 px-3 py-2 text-sm text-rose-600" onClick={() => setRejectTarget({ id: String(budget.id), type: "budget" })}>Reject</button>
-                        </>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
-              {data.budgets.filter((b) => {
-                const d = b.deadline ? new Date(String(b.deadline)) : null;
-                return !(d && (Date.now() - d.getTime()) > 25 * 24 * 60 * 60 * 1000);
-              }).length === 0 ? <p className="py-4 text-sm text-slate-500">No budgets allocated yet.</p> : null}
-            </div>
-          </section>
-          {showExpiredBudgets ? (
-            <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
-              <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-lg font-semibold">Expired Budgets</h4>
-                  <button className="text-sm text-slate-500" onClick={() => setShowExpiredBudgets(false)}>Close</button>
-                </div>
-                <div className="mt-4 divide-y divide-slate-200">
-                  {data.budgets.filter((b) => {
-                    const d = b.deadline ? new Date(String(b.deadline)) : null;
-                    return d && (Date.now() - d.getTime()) > 25 * 24 * 60 * 60 * 1000;
-                  }).length === 0 ? <p className="py-4 text-sm text-slate-500">No expired budgets.</p> : null}
-                  {data.budgets.map((budget) => {
-                    const deadline = budget.deadline ? new Date(String(budget.deadline)) : null;
-                    const isExpired = deadline && (Date.now() - deadline.getTime()) > 25 * 24 * 60 * 60 * 1000;
-                    if (!isExpired) return null;
-                    return (
-                      <div className="flex flex-wrap items-center justify-between gap-3 py-3" key={String(budget.id)}>
-                        <div>
-                          <p className="font-medium">{displayNested(budget.board, "title", "Board")}</p>
-                          <p className="text-sm text-slate-500">
-                            Total: ₹{Number(budget.totalBudget ?? 0).toLocaleString("en-IN")}
-                            {budget.deadline ? <> • Deadline: {new Date(String(budget.deadline)).toLocaleDateString()}</> : null}
-                            {budget.decidedBy ? <> • Set by: {displayNested(budget.decidedBy, "name", "User")}</> : null}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          ) : null}
-          {showBudgetModal ? (
-            <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
-              <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
-                <h4 className="text-lg font-semibold">{editingBudgetId ? "Edit Budget" : "Allocate Budget"}</h4>
-                <form className="mt-4 grid gap-3" onSubmit={submitBudget}>
-                  <select className="rounded-lg border border-slate-200 px-3 py-2" required value={budgetForm.boardId} onChange={(e) => setBudgetForm({ ...budgetForm, boardId: e.target.value })}>
-                    <option value="">Select project</option>
-                    {data.boards.map((board: AnyRecord) => (
-                      <option key={String(board.id)} value={String(board.id)}>
-                        {String(board.title)} ({String(board.label ?? "Created by Unknown")})
-                      </option>
-                    ))}
-                  </select>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Total project budget" type="number" value={budgetForm.totalBudget} onChange={(e) => setBudgetForm({ ...budgetForm, totalBudget: e.target.value })} />
-                    <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Team spending limit" type="number" value={budgetForm.teamSpendingLimit} onChange={(e) => setBudgetForm({ ...budgetForm, teamSpendingLimit: e.target.value })} />
-                    <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Resource budget" type="number" value={budgetForm.resourceBudget} onChange={(e) => setBudgetForm({ ...budgetForm, resourceBudget: e.target.value })} />
-                    <input className="rounded-lg border border-slate-200 px-3 py-2" type="date" value={budgetForm.deadline} onChange={(e) => setBudgetForm({ ...budgetForm, deadline: e.target.value })} />
-                  </div>
-                  {actorRole === "admin" ? (
-                    <select className="rounded-lg border border-slate-200 px-3 py-2" required value={budgetForm.assignedTo} onChange={(e) => setBudgetForm({ ...budgetForm, assignedTo: e.target.value })}>
-                      <option value="">Assign a finance user to approve</option>
-                      {data.financeMembers.map((fm) => (
-                        <option key={String(fm.id)} value={String(fm.id)}>{String(fm.name)}</option>
-                      ))}
-                    </select>
-                  ) : null}
-                  <div className="flex justify-end gap-3">
-                    <button type="button" className="rounded-lg border border-slate-200 px-4 py-2 text-sm" onClick={() => { setShowBudgetModal(false); setEditingBudgetId(null); }}>Cancel</button>
-                    <button className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white">{editingBudgetId ? "Update" : "Allocate"}</button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          ) : null}
-          {/* Invoice form modal */}
-          {showInvoiceForm ? (
-            <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
-              <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
-                <h4 className="text-lg font-semibold">Create Invoice</h4>
-                <form className="mt-4 grid gap-3" onSubmit={createInvoice}>
-                  <input className="rounded-lg border border-slate-200 px-3 py-2" required placeholder="Client name" value={invoiceForm.clientName} onChange={(e) => setInvoiceForm({ ...invoiceForm, clientName: e.target.value })} />
-                  <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Client email" type="email" value={invoiceForm.clientEmail} onChange={(e) => setInvoiceForm({ ...invoiceForm, clientEmail: e.target.value })} />
-                  <input className="rounded-lg border border-slate-200 px-3 py-2" required placeholder="Amount" type="number" value={invoiceForm.amount} onChange={(e) => setInvoiceForm({ ...invoiceForm, amount: e.target.value })} />
-                  <textarea className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Description (optional)" value={invoiceForm.description} onChange={(e) => setInvoiceForm({ ...invoiceForm, description: e.target.value })} />
-                  <div className="flex justify-end gap-3">
-                    <button type="button" className="rounded-lg border border-slate-200 px-4 py-2 text-sm" onClick={() => { setShowInvoiceForm(false); setInvoiceForm({ boardId: "", clientName: "", clientEmail: "", amount: "", description: "" }); }}>Cancel</button>
-                    <button className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white">Create</button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          ) : null}
-        </>) : null}
-
-      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h4 className="font-semibold">Expense Request</h4>
-        <form className="mt-4 grid gap-3 md:grid-cols-4" onSubmit={submitExpense}>
-          <select className="rounded-lg border border-slate-200 px-3 py-2" value={expenseForm.category} onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}>
-            <option value="software">Software purchase</option>
-            <option value="device">Laptop/device</option>
-            <option value="travel">Travel expense</option>
-            <option value="office-resources">Office resources</option>
-          </select>
-          <input className="rounded-lg border border-slate-200 px-3 py-2" required placeholder="Title" value={expenseForm.title} onChange={(e) => setExpenseForm({ ...expenseForm, title: e.target.value })} />
-          <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Amount" type="number" value={expenseForm.amount} onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })} />
-          <input className="rounded-lg border border-slate-200 px-3 py-2" required min={1} placeholder="Quantity" type="number" value={expenseForm.quantity} onChange={(e) => setExpenseForm({ ...expenseForm, quantity: e.target.value })} />
-          {actorRole !== "finance" ? (
-            <select className="rounded-lg border border-slate-200 px-3 py-2" required value={expenseForm.assignedTo} onChange={(e) => setExpenseForm({ ...expenseForm, assignedTo: e.target.value })}>
-              <option value="">Assign finance user</option>
-              {data.financeMembers.map((fm) => (
-                <option key={String(fm.id)} value={String(fm.id)}>{String(fm.name)}</option>
-              ))}
-            </select>
-          ) : null}
-          <button className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white">Request</button>
-          <textarea className="rounded-lg border border-slate-200 px-3 py-2 md:col-span-4" placeholder="Reason" value={expenseForm.reason} onChange={(e) => setExpenseForm({ ...expenseForm, reason: e.target.value })} />
-        </form>
-      </section>
-
-      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h4 className="font-semibold">Salary Records</h4>
-        <div className="mt-4 divide-y divide-slate-200">
-          {data.salaries.map((salary) => (
-            <div className="flex flex-wrap items-center justify-between gap-3 py-3" key={String(salary.id)}>
-              <div>
-                <p className="font-medium">{displayNested(salary.employee, "name", "Employee")} - ₹{Number(salary.netSalary ?? 0).toLocaleString("en-IN")}</p>
-                <p className="text-sm text-slate-500">{String(salary.month)} • {String(salary.status)}</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {String(salary.status) === "pending" && actorRole === "finance" ? (
-                  <button
-                    className="rounded-lg border border-rose-200 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50"
-                    onClick={() => {
-                      setDeleteSalaryId(String(salary.id));
-                      setDeleteSalaryEmployee(displayNested(salary.employee, "name", "Employee"));
-                    }}
-                  >
-                    Delete
-                  </button>
-                ) : null}
-                {String(salary.status) === "pending" && actorRole === "admin" ? (
-                  <>
-                    <button className="rounded-lg border border-slate-200 px-3 py-2 text-sm" onClick={() => updateStatus("salary", String(salary.id), "approved")}>Approve payout</button>
-                    <button className="rounded-lg border border-rose-200 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50" onClick={() => updateStatus("salary", String(salary.id), "rejected")}>Reject</button>
-                  </>
-                ) : null}
-                {String(salary.status) === "approved" && actorRole === "finance" ? (
-                  <button className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white" onClick={() => updateStatus("salary", String(salary.id), "paid")}>Mark paid</button>
-                ) : null}
-              </div>
-            </div>
-          ))}
-          {data.salaries.length === 0 ? <p className="py-4 text-sm text-slate-500">No salary records for this month.</p> : null}
-        </div>
-      </section>
-
-      {/* Leave Impact on Payroll */}
-      {policyData && (policyData.foodAmount > 0 || policyData.travelAccommodationAmount > 0) ? (
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h4 className="font-semibold">Company Policies</h4>
-          <p className="mt-1 text-xs text-slate-400">Fixed deductions configured by finance. Opt in/out separately below.</p>
-          <div className="mt-3 space-y-2">
-            {policyData.foodAmount > 0 ? (
-              <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-slate-800">Food Allowance</p>
-                  <p className="text-xs text-slate-500">₹{policyData.foodAmount.toLocaleString("en-IN")} per month</p>
-                </div>
-                <button
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${policyData.foodOptedOutMembers?.some((om) => String(om._id) === profileId)
-                      ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                      : "bg-rose-100 text-rose-700 hover:bg-rose-200"
-                    }`}
-                  onClick={() => void togglePolicyOptOut("food")}
-                  type="button"
-                >
-                  {policyData.foodOptedOutMembers?.some((om) => String(om._id) === profileId)
-                    ? "Opt In"
-                    : "Opt Out"}
-                </button>
-              </div>
-            ) : null}
-            {policyData.travelAccommodationAmount > 0 ? (
-              <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-slate-800">Travel Accommodation</p>
-                  <p className="text-xs text-slate-500">₹{policyData.travelAccommodationAmount.toLocaleString("en-IN")} per month</p>
-                </div>
-                <button
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${policyData.travelOptedOutMembers?.some((om) => String(om._id) === profileId)
-                      ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                      : "bg-rose-100 text-rose-700 hover:bg-rose-200"
-                    }`}
-                  onClick={() => void togglePolicyOptOut("travel")}
-                  type="button"
-                >
-                  {policyData.travelOptedOutMembers?.some((om) => String(om._id) === profileId)
-                    ? "Opt In"
-                    : "Opt Out"}
-                </button>
-              </div>
-            ) : null}
-          </div>
-        </section>
-      ) : null}
-
-      {leaveImpacts.length > 0 ? (
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h4 className="font-semibold">Leave Impact on Payroll</h4>
-          <p className="mt-1 text-xs text-slate-400">Approved leave deductions for {month}</p>
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-xs font-medium uppercase text-slate-500">
-                  <th className="pb-3 pr-4">Employee</th>
-                  <th className="pb-3 pr-4">Leaves</th>
-                  <th className="pb-3 text-right">Salary Deduction</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leaveImpacts.map((impact, idx) => (
-                  <tr key={idx} className="border-b border-slate-100">
-                    <td className="py-3 pr-4 font-medium">{impact.employeeName}</td>
-                    <td className="py-3 pr-4">{impact.leaves}</td>
-                    <td className="py-3 text-right text-rose-600">-₹{impact.deduction.toLocaleString("en-IN")}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="font-semibold">
-                  <td className="pt-3 pr-4">Total</td>
-                  <td className="pt-3 pr-4">{leaveImpacts.reduce((s, i) => s + i.leaves, 0)}</td>
-                  <td className="pt-3 text-right text-rose-600">-₹{leaveImpacts.reduce((s, i) => s + i.deduction, 0).toLocaleString("en-IN")}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </section>
-      ) : null}
-
-      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h4 className="font-semibold">Expense Requests</h4>
-        <div className="mt-4 divide-y divide-slate-200">
-          {data.expenses.map((expense) => {
+              {data.expenses.map((expense) => {
             const expenseId = String(expense.id);
             const assignedToId = expense.assignedTo ? String((expense.assignedTo as AnyRecord)._id ?? (expense.assignedTo as AnyRecord).id ?? "") : "";
             const adminApproverId = expense.adminApprover ? String((expense.adminApprover as AnyRecord)._id ?? (expense.adminApprover as AnyRecord).id ?? "") : "";
@@ -874,7 +459,7 @@ export function FinanceTab({
                 <div className="flex flex-wrap items-center gap-2">
                   {canForward ? (
                     <>
-                      <button className="rounded-lg border border-rose-200 px-3 py-2 text-sm text-rose-600" onClick={() => setRejectTarget({ id: expenseId, type: "expense" })}>Reject</button>
+                      <ActionButton variant="danger" className="px-3" onClick={() => setRejectTarget({ id: expenseId, type: "expense" })}>Reject</ActionButton>
                       <select className="rounded-lg border border-slate-200 px-3 py-2 text-sm" required value={forwardAdminByExpense[expenseId] ?? ""} onChange={(e) => setForwardAdminByExpense({ ...forwardAdminByExpense, [expenseId]: e.target.value })}>
                         <option value="">Select admin</option>
                         {adminOptions.map((admin) => (
@@ -886,12 +471,12 @@ export function FinanceTab({
                   ) : null}
                   {canAdminApprove ? (
                     <>
-                      <button className="rounded-lg border border-rose-200 px-3 py-2 text-sm text-rose-600" onClick={() => setRejectTarget({ id: expenseId, type: "expense" })}>Reject</button>
-                      <button className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white" onClick={() => updateStatus("expense", expenseId, "approved")}>Approve</button>
+                      <ActionButton variant="danger" className="px-3" onClick={() => setRejectTarget({ id: expenseId, type: "expense" })}>Reject</ActionButton>
+                      <ActionButton variant="approve" className="px-3" onClick={() => updateStatus("expense", expenseId, "approved")}>Approve</ActionButton>
                     </>
                   ) : null}
                   {canAccept ? (
-                    <button className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white" onClick={() => updateStatus("expense", expenseId, "accepted")}>Accept</button>
+                    <ActionButton variant="approve" className="px-3" onClick={() => updateStatus("expense", expenseId, "accepted")}>Accept</ActionButton>
                   ) : null}
                 </div>
               </div>
@@ -900,13 +485,313 @@ export function FinanceTab({
           {data.expenses.length === 0 ? <p className="py-4 text-sm text-slate-500">No expense requests yet.</p> : null}
         </div>
       </section>
+        </div>
+      ) : null}
+
+      {/* ══════════ Operations ══════════ */}
+      {financeSubTab === "ops" ? (
+        <div className="space-y-5">
+          {data.canManage ? (
+            <>
+              <div className="grid gap-5 xl:grid-cols-2">
+                {actorRole === "finance" ? (
+                  <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]" ref={salaryFormRef}>
+                    <div className="mb-5 border-l-4 border-emerald-500 pl-4">
+                      <h3 className="text-base font-semibold text-slate-900">Generate Monthly Salary</h3>
+                      <p className="mt-0.5 text-sm text-slate-500">Create salary records for employees</p>
+                    </div>
+                    <div className="mt-4">
+                      {salaryStep === 1 && (
+                        <form onSubmit={(e) => { e.preventDefault(); setSalaryStep(2); }} className="grid gap-3">
+                          <p className="text-sm font-medium text-slate-700">Step 1: Select Date Range</p>
+                          <div className="grid grid-cols-2 gap-3">
+                            <input className="rounded-lg border border-slate-200 px-3 py-2" type="date" required value={salaryPeriod.start} onChange={(e) => setSalaryPeriod({ ...salaryPeriod, start: e.target.value })} />
+                            <input className="rounded-lg border border-slate-200 px-3 py-2" type="date" required value={salaryPeriod.end} onChange={(e) => setSalaryPeriod({ ...salaryPeriod, end: e.target.value })} />
+                          </div>
+                          <ActionButton variant="primary" className="justify-self-end">Next</ActionButton>
+                        </form>
+                      )}
+                      {salaryStep === 2 && (
+                        <form onSubmit={calculateSalary} className="grid gap-3">
+                          <p className="text-sm font-medium text-slate-700">Step 2: Select Employee</p>
+                          <select className="rounded-lg border border-slate-200 px-3 py-2" required value={salaryEmployeeId} onChange={(e) => setSalaryEmployeeId(e.target.value)}>
+                            <option value="">Select employee</option>
+                            {data.members.map((member: AnyRecord) => (
+                              <option key={String(member.id)} value={String(member.id)}>
+                                {String(member.name)} - {formatRoleWithCustom(String(member.role), member.customRole)}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="flex justify-between">
+                            <ActionButton variant="secondary" type="button" onClick={() => setSalaryStep(1)}>Back</ActionButton>
+                            <ActionButton variant="primary">Calculate</ActionButton>
+                          </div>
+                        </form>
+                      )}
+                      {salaryStep === 3 && salaryBreakdown && (
+                        <form onSubmit={submitSalary} className="grid gap-3 text-sm">
+                          <p className="font-medium text-slate-700">Step 3: Review & Adjust</p>
+                          <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 space-y-2">
+                            <div className="flex justify-between"><span>Period:</span> <span>{salaryBreakdown.periodStart} to {salaryBreakdown.periodEnd}</span></div>
+                            {salaryBreakdown.periodStart !== salaryPeriod.start && (
+                              <p className="text-xs text-amber-600 bg-amber-50 rounded px-2 py-1">&#9888; Period adjusted — employee joined on {salaryBreakdown.periodStart}</p>
+                            )}
+                            <div className="flex justify-between"><span>Employee:</span><span className="font-medium text-slate-900">{(() => { const m = data.members.find((x: any) => String(x.id) === salaryEmployeeId); return m ? `${String(m.name)} (${formatRoleWithCustom(String(m.role), m.customRole)})` : "-"; })()}</span></div>
+                            <div className="flex justify-between"><span>Total Days:</span> <span>{salaryBreakdown.totalDays}</span></div>
+                            <div className="flex justify-between text-rose-600"><span>Absent Days:</span> <span>{salaryBreakdown.absentDays}</span></div>
+                            <div className="flex justify-between text-emerald-600"><span>Paid Leave Days:</span> <span>{salaryBreakdown.paidLeaveDays}</span></div>
+                            <div className="flex justify-between text-rose-600"><span>Unpaid Leave Days:</span> <span>{salaryBreakdown.unpaidLeaveDays}</span></div>
+                            <div className="flex justify-between"><span>Payable Days:</span> <span>{salaryBreakdown.payableDays}</span></div>
+                            <div className="flex justify-between"><span>Daily Salary:</span> <span>&#x20B9;{salaryBreakdown.dailySalary.toLocaleString("en-IN")}</span></div>
+                            <div className="flex justify-between"><span>Gross Salary:</span> <span>&#x20B9;{salaryBreakdown.grossSalary.toLocaleString("en-IN")}</span></div>
+                            <div className="flex justify-between text-rose-600"><span>Attendance/Leave Deduction:</span> <span>- &#x20B9;{salaryBreakdown.leaveDeduction.toLocaleString("en-IN")}</span></div>
+                            {salaryBreakdown.foodDeduction > 0 ? <div className="flex justify-between text-rose-600"><span>Food Deduction:</span> <span>- &#x20B9;{salaryBreakdown.foodDeduction.toLocaleString("en-IN")}</span></div> : null}
+                            {salaryBreakdown.travelDeduction > 0 ? <div className="flex justify-between text-rose-600"><span>Travel Accommodation Deduction:</span> <span>- &#x20B9;{salaryBreakdown.travelDeduction.toLocaleString("en-IN")}</span></div> : null}
+                            <div className="flex justify-between text-emerald-600"><span>Total In Hand:</span> <span>&#x20B9;{Math.max(salaryBreakdown.grossSalary + Number(salaryAllowances || 0) - (salaryBreakdown.leaveDeduction + Number(salaryDeductions || 0) + (salaryBreakdown.foodDeduction ?? 0) + (salaryBreakdown.travelDeduction ?? 0))).toLocaleString("en-IN")}</span></div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div><label className="text-xs font-medium text-slate-500 mb-1 block">Manual Allowances (&#x20B9;)</label><input className="w-full rounded-lg border border-slate-200 px-3 py-2" type="number" min="0" value={salaryAllowances} onChange={(e) => setSalaryAllowances(e.target.value)} /></div>
+                            <div><label className="text-xs font-medium text-slate-500 mb-1 block">Manual Deductions (&#x20B9;)</label><input className="w-full rounded-lg border border-slate-200 px-3 py-2" type="number" min="0" value={salaryDeductions} onChange={(e) => setSalaryDeductions(e.target.value)} /></div>
+                          </div>
+                          <div className="rounded-lg bg-emerald-50 p-3 flex justify-between font-bold text-emerald-700 text-lg mt-2"><span>Net Salary:</span><span>&#x20B9;{Math.max(0, salaryBreakdown.grossSalary + Number(salaryAllowances || 0) - (salaryBreakdown.leaveDeduction + Number(salaryDeductions || 0) + (salaryBreakdown.foodDeduction ?? 0) + (salaryBreakdown.travelDeduction ?? 0))).toLocaleString("en-IN")}</span></div>
+                          <div className="flex justify-between mt-2">
+                            <ActionButton variant="secondary" type="button" onClick={() => setSalaryStep(2)}>Back</ActionButton>
+                            <ActionButton variant="approve" disabled={salaryGenerating}>{salaryGenerating ? "Generating..." : "Generate Salary"}</ActionButton>
+                          </div>
+                        </form>
+                      )}
+                    </div>
+                  </section>
+                ) : null}
+                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+                  <div className="mb-5 border-l-4 border-rose-500 pl-4">
+                    <h3 className="text-base font-semibold text-slate-900">Expense Allocator</h3>
+                    <p className="mt-0.5 text-sm text-slate-500">Disburse money or hardware for accepted expense requests.</p>
+                  </div>
+                  <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
+                    {data.expenses.filter((e) => String(e.status) === "accepted").length === 0 ? <p className="py-2 text-sm text-slate-500">No accepted expenses ready for disbursement.</p> : null}
+                    {data.expenses.filter((e) => String(e.status) === "accepted").map((expense) => (
+                      <div className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2" key={String(expense.id)}>
+                        <div>
+                          <p className="text-sm font-medium">{String(expense.title)} x {Number(expense.quantity ?? 1)}</p>
+                          <p className="text-xs text-slate-500">{displayNested(expense.requester, "name", "Member")} <span className="text-[10px] uppercase text-slate-400">({displayNested(expense.requester, "role", "–")})</span> &bull; {String(expense.category)} &bull; Qty: {Number(expense.quantity ?? 1)} &bull; &#x20B9;{Number(expense.amount ?? 0).toLocaleString("en-IN")}</p>
+                        </div>
+                        <ActionButton variant="approve" className="px-3 py-1.5 text-xs" onClick={() => updateStatus("expense", String(expense.id), "disbursed")}>Disburse</ActionButton>
+                      </div>
+                    ))}
+                  </div>
+                  {data.expenses.filter((e) => String(e.status) === "disbursed").length > 0 ? (
+                    <div className="mt-3 border-t border-slate-200 pt-3">
+                      <p className="mb-2 text-xs font-medium text-slate-500">Disbursed</p>
+                      {data.expenses.filter((e) => String(e.status) === "disbursed").map((expense) => (
+                        <div key={String(expense.id)} className="flex items-center justify-between py-1.5 text-sm">
+                          <span>&#x20B9;{Number(expense.amount ?? 0).toLocaleString("en-IN")} &mdash; {String(expense.title)} x {Number(expense.quantity ?? 1)} <span className="ml-2 inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">disbursed</span></span>
+                          <div className="ml-2 inline-block rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-medium text-cyan-700">{displayNested(expense.requester, "name", "Member")} ({displayNested(expense.requester, "role", "Member")})</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+              </div>
+              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+                <div className="mb-5 border-l-4 border-sky-500 pl-4">
+                  <h3 className="text-base font-semibold text-slate-900">Invoices{invoices.length > 0 ? <span className="ml-2 inline-block rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">{invoices.length}</span> : null}</h3>
+                  <p className="mt-0.5 text-sm text-slate-500">Generate client invoices and track payments.</p>
+                </div>
+                <div className="mb-3 flex justify-end">
+                  <ActionButton variant="primary" onClick={() => setShowInvoiceForm(true)}>Create Invoice</ActionButton>
+                </div>
+                <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
+                  {invoices.length === 0 ? <p className="py-2 text-sm text-slate-500">No invoices yet.</p> : null}
+                  {invoices.map((inv) => (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 px-3 py-2" key={String(inv.id)}>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{String(inv.clientName)} &mdash; &#x20B9;{Number(inv.amount ?? 0).toLocaleString("en-IN")}</p>
+                        <p className="text-xs text-slate-500 truncate">{String(inv.invoiceNumber)} &bull; {String(inv.status)}</p>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        {isFinanceOrAdmin ? (String(inv.status) === "pending" ? <ActionButton variant="approve" className="px-2 py-1 text-xs" onClick={() => markInvoice(String(inv.id), "paid")}>Mark paid</ActionButton> : <ActionButton variant="secondary" className="px-2 py-1 text-xs" onClick={() => markInvoice(String(inv.id), "pending")}>Mark pending</ActionButton>) : null}
+                        <ActionButton variant="secondary" className="px-2 py-1 text-xs" onClick={() => window.open(`/invoice/${String(inv.id)}`, "_blank")}>PDF</ActionButton>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+                <div className="mb-5 border-l-4 border-violet-500 pl-4">
+                  <h3 className="text-base font-semibold text-slate-900">Project Budget Allocation</h3>
+                  <p className="mt-0.5 text-sm text-slate-500">Set project budgets and submit for approval.</p>
+                </div>
+                <div className="flex justify-end">
+                  <ActionButton variant="primary" onClick={() => openBudgetModal()}>Allocate Budget</ActionButton>
+                </div>
+              </section>
+              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+                <div className="mb-5 border-l-4 border-violet-500 pl-4">
+                  <h3 className="text-base font-semibold text-slate-900">Allocated Budgets{data.budgets.filter((b) => String(b.status) === "pending").length > 0 ? <span className="ml-2 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{data.budgets.filter((b) => String(b.status) === "pending").length} pending</span> : null}</h3>
+                  {actorRole === "finance" ? <button className="text-sm text-blue-600 underline" onClick={() => setShowExpiredBudgets(true)}>View expired budgets</button> : null}
+                </div>
+                <div className="mt-4 divide-y divide-slate-200">
+                  {data.budgets.map((budget) => {
+                    const deadline = budget.deadline ? new Date(String(budget.deadline)) : null;
+                    const isExpired = deadline && (Date.now() - deadline.getTime()) > 25 * 24 * 60 * 60 * 1000;
+                    if (isExpired) return null;
+                    const budgetStatus = String(budget.status ?? "pending");
+                    const budgetAssignedTo = (budget.assignedTo as AnyRecord)?._id ?? (budget.assignedTo as AnyRecord)?.id ?? "";
+                    const isPendingForMe = (actorRole === "finance" && String(budgetAssignedTo) === profileId && budgetStatus === "pending") || (actorRole === "admin" && !budget.assignedTo && budgetStatus === "pending");
+                    return (
+                      <div className="flex flex-wrap items-center justify-between gap-3 py-3" key={String(budget.id)}>
+                        <div>
+                          <p className="font-medium">{displayNested(budget.board, "title", "Board")}</p>
+                          <p className="text-sm text-slate-500">Total: &#x20B9;{Number(budget.totalBudget ?? 0).toLocaleString("en-IN")}{Number(budget.teamSpendingLimit ?? 0) > 0 ? <> &bull; Team limit: &#x20B9;{Number(budget.teamSpendingLimit).toLocaleString("en-IN")}</> : null}{Number(budget.resourceBudget ?? 0) > 0 ? <> &bull; Resource: &#x20B9;{Number(budget.resourceBudget).toLocaleString("en-IN")}</> : null}{budget.deadline ? <> &bull; Deadline: {new Date(String(budget.deadline)).toLocaleDateString()}</> : null}{budget.decidedBy ? <> &bull; By: {displayNested(budget.decidedBy, "name", "User")}</> : null}</p>
+                          <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${budgetStatus === "approved" ? "bg-emerald-100 text-emerald-700" : budgetStatus === "rejected" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>{budgetStatus}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <ActionButton variant="secondary" className="px-3" onClick={() => openBudgetModal(budget)}>Edit</ActionButton>
+                          {isPendingForMe ? (<><ActionButton variant="approve" className="px-3" onClick={() => updateStatus("budget", String(budget.id), "approved")}>Approve</ActionButton><ActionButton variant="danger" className="px-3" onClick={() => setRejectTarget({ id: String(budget.id), type: "budget" })}>Reject</ActionButton></>) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {data.budgets.filter((b) => { const d = b.deadline ? new Date(String(b.deadline)) : null; return !(d && (Date.now() - d.getTime()) > 25 * 24 * 60 * 60 * 1000); }).length === 0 ? <p className="py-4 text-sm text-slate-500">No budgets allocated yet.</p> : null}
+                </div>
+              </section>
+              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+                <div className="mb-5 border-l-4 border-emerald-500 pl-4">
+                  <h3 className="text-base font-semibold text-slate-900">Salary Records</h3>
+                  <p className="mt-0.5 text-sm text-slate-500">Manage monthly salary payouts</p>
+                </div>
+                <div className="mt-4 divide-y divide-slate-200">
+                  {data.salaries.map((salary) => (
+                    <div className="flex flex-wrap items-center justify-between gap-3 py-3" key={String(salary.id)}>
+                      <div>
+                        <p className="font-medium">{displayNested(salary.employee, "name", "Employee")} - &#x20B9;{Number(salary.netSalary ?? 0).toLocaleString("en-IN")}</p>
+                        <p className="text-sm text-slate-500">{String(salary.month)} &bull; {String(salary.status)}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {String(salary.status) === "pending" && actorRole === "finance" ? <ActionButton variant="danger" className="px-3" onClick={() => { setDeleteSalaryId(String(salary.id)); setDeleteSalaryEmployee(displayNested(salary.employee, "name", "Employee")); }}>Delete</ActionButton> : null}
+                        {String(salary.status) === "pending" && actorRole === "admin" ? <><ActionButton variant="secondary" className="px-3" onClick={() => updateStatus("salary", String(salary.id), "approved")}>Approve payout</ActionButton><ActionButton variant="danger" className="px-3" onClick={() => updateStatus("salary", String(salary.id), "rejected")}>Reject</ActionButton></> : null}
+                        {String(salary.status) === "approved" && actorRole === "finance" ? <ActionButton variant="approve" className="px-3" onClick={() => updateStatus("salary", String(salary.id), "paid")}>Mark paid</ActionButton> : null}
+                      </div>
+                    </div>
+                  ))}
+                  {data.salaries.length === 0 ? <p className="py-4 text-sm text-slate-500">No salary records for this month.</p> : null}
+                </div>
+              </section>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* ══════════ Reports ══════════ */}
+      {financeSubTab === "reports" ? (
+        <div className="space-y-5">
+          {reports ? (
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+              <div className="mb-5 border-l-4 border-indigo-500 pl-4">
+                <h3 className="text-base font-semibold text-slate-900">Reports & Analytics</h3>
+                <p className="mt-0.5 text-sm text-slate-500">Yearly financial summary</p>
+              </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-lg border border-slate-100 bg-white p-4">
+                  <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Revenue</p>
+                  <p className="mt-1 text-xl font-semibold text-emerald-600">&#x20B9;{reports.revenue.toLocaleString("en-IN")}</p>
+                </div>
+                <div className="rounded-lg border border-slate-100 bg-white p-4">
+                  <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Expenses</p>
+                  <p className="mt-1 text-xl font-semibold text-rose-600">&#x20B9;{reports.expenses.toLocaleString("en-IN")}</p>
+                </div>
+                <div className="rounded-lg border border-slate-100 bg-white p-4">
+                  <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Profit</p>
+                  <p className={`mt-1 text-xl font-semibold ${reports.profit >= 0 ? "text-emerald-600" : "text-rose-600"}`}>&#x20B9;{reports.profit.toLocaleString("en-IN")}</p>
+                </div>
+                <div className="rounded-lg border border-slate-100 bg-white p-4">
+                  <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Pending Invoices</p>
+                  <p className="mt-1 text-xl font-semibold text-amber-600">{reports.pendingInvoices} (&#x20B9;{reports.pendingInvoicesAmount.toLocaleString("en-IN")})</p>
+                </div>
+              </div>
+            </section>
+          ) : null}
+          {policyData && (policyData.foodAmount > 0 || policyData.travelAccommodationAmount > 0) ? (
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+              <div className="mb-5 border-l-4 border-amber-500 pl-4">
+                <h3 className="text-base font-semibold text-slate-900">Company Policies</h3>
+                <p className="mt-0.5 text-sm text-slate-500">Fixed deductions configured by finance. Opt in/out separately below.</p>
+              </div>
+              <div className="mt-3 space-y-2">
+                {policyData.foodAmount > 0 ? (
+                  <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                    <div>
+                      <p className="font-medium text-slate-900">Food Allowance (&#x20B9;{policyData.foodAmount})</p>
+                      <p className="text-xs text-slate-500">Fixed deduction from salary</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button className={`rounded-lg px-3 py-1.5 text-xs font-medium ${foodOptedIn ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`} onClick={() => toggleOptInOut("food", true)}>Active</button>
+                      <button className={`rounded-lg px-3 py-1.5 text-xs font-medium ${!foodOptedIn ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`} onClick={() => toggleOptInOut("food", false)}>Opt Out</button>
+                    </div>
+                  </div>
+                ) : null}
+                {policyData.travelAccommodationAmount > 0 ? (
+                  <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                    <div>
+                      <p className="font-medium text-slate-900">Travel Accommodation (&#x20B9;{policyData.travelAccommodationAmount})</p>
+                      <p className="text-xs text-slate-500">Fixed deduction from salary</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button className={`rounded-lg px-3 py-1.5 text-xs font-medium ${travelOptedIn ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`} onClick={() => toggleOptInOut("travel", true)}>Active</button>
+                      <button className={`rounded-lg px-3 py-1.5 text-xs font-medium ${!travelOptedIn ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`} onClick={() => toggleOptInOut("travel", false)}>Opt Out</button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
+          {leaveImpacts.length > 0 ? (
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+              <div className="mb-5 border-l-4 border-amber-500 pl-4">
+                <h3 className="text-base font-semibold text-slate-900">Leave Impact on Payroll</h3>
+                <p className="mt-0.5 text-sm text-slate-500">Approved leave deductions for {month}</p>
+              </div>
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-xs font-medium uppercase text-slate-500">
+                      <th className="pb-3 pr-4">Employee</th>
+                      <th className="pb-3 pr-4">Leaves</th>
+                      <th className="pb-3 text-right">Salary Deduction</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leaveImpacts.map((li, idx) => (
+                      <tr className="border-b border-slate-100" key={idx}>
+                        <td className="py-2 pr-4 font-medium">{li.employeeName}</td>
+                        <td className="py-2 pr-4">{li.leaves}</td>
+                        <td className="py-2 text-right text-rose-600">- &#x20B9;{li.deduction.toLocaleString("en-IN")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t border-slate-200 font-semibold">
+                      <td className="pt-3 pr-4">Total</td>
+                      <td className="pt-3 pr-4">{leaveImpacts.reduce((s, li) => s + li.leaves, 0)}</td>
+                      <td className="pt-3 text-right">- &#x20B9;{leaveImpacts.reduce((s, li) => s + li.deduction, 0).toLocaleString("en-IN")}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </section>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* ── Shared Modals ── */}
       {rejectTarget ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <h4 className="text-lg font-semibold">Rejection reason</h4>
             <textarea className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2" rows={3} placeholder="Why are you rejecting this request?" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
             <div className="mt-4 flex justify-end gap-3">
-              <button className="rounded-lg border border-slate-200 px-4 py-2 text-sm" onClick={() => { setRejectTarget(null); setRejectReason(""); }}>Cancel</button>
+              <ActionButton variant="secondary" onClick={() => { setRejectTarget(null); setRejectReason(""); }}>Cancel</ActionButton>
               <button className="rounded-lg bg-rose-600 px-4 py-2 text-sm text-white disabled:opacity-50" disabled={!rejectReason.trim()} onClick={rejectItem}>Reject</button>
             </div>
           </div>
@@ -915,25 +800,76 @@ export function FinanceTab({
 
       {deleteSalaryId ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <h4 className="text-lg font-semibold">Delete salary record?</h4>
-            <p className="mt-2 text-sm text-slate-600">
-              This will permanently delete the salary record for <strong>{deleteSalaryEmployee}</strong>. This action cannot be undone.
-            </p>
+            <p className="mt-2 text-sm text-slate-600">This will permanently delete the salary record for <strong>{deleteSalaryEmployee}</strong>. This action cannot be undone.</p>
             <div className="mt-6 flex justify-end gap-3">
-              <button
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
-                onClick={() => { setDeleteSalaryId(null); setDeleteSalaryEmployee(""); }}
-              >
-                Cancel
-              </button>
-              <button
-                className="rounded-lg bg-rose-600 px-4 py-2 text-sm text-white"
-                onClick={deleteSalary}
-              >
-                Delete
-              </button>
+              <ActionButton variant="secondary" onClick={() => { setDeleteSalaryId(null); setDeleteSalaryEmployee(""); }}>Cancel</ActionButton>
+              <button className="rounded-lg bg-rose-600 px-4 py-2 text-sm text-white" onClick={deleteSalary}>Delete</button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showExpiredBudgets ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h4 className="text-lg font-semibold">Expired Budgets</h4>
+              <ActionButton variant="ghost" onClick={() => setShowExpiredBudgets(false)}>Close</ActionButton>
+            </div>
+            <div className="mt-4 divide-y divide-slate-200">
+              {data.budgets.filter((b) => { const d = b.deadline ? new Date(String(b.deadline)) : null; return d && (Date.now() - d.getTime()) > 25 * 24 * 60 * 60 * 1000; }).length === 0 ? <p className="py-4 text-sm text-slate-500">No expired budgets.</p> : null}
+              {data.budgets.map((budget) => { const deadline = budget.deadline ? new Date(String(budget.deadline)) : null; const isExpired = deadline && (Date.now() - deadline.getTime()) > 25 * 24 * 60 * 60 * 1000; if (!isExpired) return null; return (<div className="flex flex-wrap items-center justify-between gap-3 py-3" key={String(budget.id)}><div><p className="font-medium">{displayNested(budget.board, "title", "Board")}</p><p className="text-sm text-slate-500">Total: &#x20B9;{Number(budget.totalBudget ?? 0).toLocaleString("en-IN")}{budget.deadline ? <> &bull; Deadline: {new Date(String(budget.deadline)).toLocaleDateString()}</> : null}{budget.decidedBy ? <> &bull; Set by: {displayNested(budget.decidedBy, "name", "User")}</> : null}</p></div></div>); })}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showBudgetModal ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <h4 className="text-lg font-semibold">{editingBudgetId ? "Edit Budget" : "Allocate Budget"}</h4>
+            <form className="mt-4 grid gap-3" onSubmit={submitBudget}>
+              <select className="rounded-lg border border-slate-200 px-3 py-2" required value={budgetForm.boardId} onChange={(e) => setBudgetForm({ ...budgetForm, boardId: e.target.value })}>
+                <option value="">Select project</option>
+                {data.boards.map((board: AnyRecord) => (<option key={String(board.id)} value={String(board.id)}>{String(board.title)} ({String(board.label ?? "Created by Unknown")})</option>))}
+              </select>
+              <div className="grid gap-3 md:grid-cols-2">
+                <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Total project budget" type="number" value={budgetForm.totalBudget} onChange={(e) => setBudgetForm({ ...budgetForm, totalBudget: e.target.value })} />
+                <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Team spending limit" type="number" value={budgetForm.teamSpendingLimit} onChange={(e) => setBudgetForm({ ...budgetForm, teamSpendingLimit: e.target.value })} />
+                <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Resource budget" type="number" value={budgetForm.resourceBudget} onChange={(e) => setBudgetForm({ ...budgetForm, resourceBudget: e.target.value })} />
+                <input className="rounded-lg border border-slate-200 px-3 py-2" type="date" value={budgetForm.deadline} onChange={(e) => setBudgetForm({ ...budgetForm, deadline: e.target.value })} />
+              </div>
+              {actorRole === "admin" ? (
+                <select className="rounded-lg border border-slate-200 px-3 py-2" required value={budgetForm.assignedTo} onChange={(e) => setBudgetForm({ ...budgetForm, assignedTo: e.target.value })}>
+                  <option value="">Assign a finance user to approve</option>
+                  {data.financeMembers.map((fm: AnyRecord) => (<option key={String(fm.id)} value={String(fm.id)}>{String(fm.name)}</option>))}
+                </select>
+              ) : null}
+              <div className="flex justify-end gap-3">
+                <ActionButton variant="secondary" type="button" onClick={() => { setShowBudgetModal(false); setEditingBudgetId(null); }}>Cancel</ActionButton>
+                <ActionButton variant="primary">{editingBudgetId ? "Update" : "Allocate"}</ActionButton>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {showInvoiceForm ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <h4 className="text-lg font-semibold">Create Invoice</h4>
+            <form className="mt-4 grid gap-3" onSubmit={createInvoice}>
+              <input className="rounded-lg border border-slate-200 px-3 py-2" required placeholder="Client name" value={invoiceForm.clientName} onChange={(e) => setInvoiceForm({ ...invoiceForm, clientName: e.target.value })} />
+              <input className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Client email" type="email" value={invoiceForm.clientEmail} onChange={(e) => setInvoiceForm({ ...invoiceForm, clientEmail: e.target.value })} />
+              <input className="rounded-lg border border-slate-200 px-3 py-2" required placeholder="Amount" type="number" value={invoiceForm.amount} onChange={(e) => setInvoiceForm({ ...invoiceForm, amount: e.target.value })} />
+              <textarea className="rounded-lg border border-slate-200 px-3 py-2" placeholder="Description (optional)" value={invoiceForm.description} onChange={(e) => setInvoiceForm({ ...invoiceForm, description: e.target.value })} />
+              <div className="flex justify-end gap-3">
+                <ActionButton variant="secondary" type="button" onClick={() => { setShowInvoiceForm(false); setInvoiceForm({ boardId: "", clientName: "", clientEmail: "", amount: "", description: "" }); }}>Cancel</ActionButton>
+                <ActionButton variant="primary">Create</ActionButton>
+              </div>
+            </form>
           </div>
         </div>
       ) : null}
@@ -943,7 +879,7 @@ export function FinanceTab({
 
 function FinanceCard({ label, value }: { label: string; value: string }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)]">
       <p className="text-sm text-slate-500">{label}</p>
       <p className="mt-2 text-2xl font-semibold text-slate-950">{value}</p>
     </section>

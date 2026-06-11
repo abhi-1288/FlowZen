@@ -76,10 +76,14 @@ export async function GET(request: Request, { params }: Params) {
     date: string;
     checkIn: string | null;
     checkOut: string | null;
+    checkInTime: string | null;
+    checkOutTime: string | null;
     leave: boolean;
     leaveReason: string;
     leaveStatus: string;
     absent: boolean;
+    halfDay: boolean;
+    workHours: number | null;
     holiday: boolean;
     holidayTitle: string;
     notJoined: boolean;

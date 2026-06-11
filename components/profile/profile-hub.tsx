@@ -5,7 +5,24 @@ import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { AlertCircle, CheckCircle2, LogOut } from "lucide-react";
+import {
+  AlertCircle,
+  Bell,
+  Building2,
+  Calendar,
+  CalendarCheck,
+  CheckCircle2,
+  CheckSquare,
+  ChevronRight,
+  Clock,
+  History,
+  LogOut,
+  MessageSquare,
+  ShieldCheck,
+  User,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import { ProfileSkeleton, NavButton } from "./profile-hub/chrome";
 import { AttendanceTab } from "./profile-hub/attendance-tab";
@@ -125,6 +142,14 @@ export function ProfileHub() {
     ["pending", "manager-approved", "hr-approved"].includes(String(r.status)),
   ).length;
   const pendingAttendanceCount = pendingLeaveCount + pendingWfhCount;
+  const company =
+    typeof profile?.company === "object" && profile.company
+      ? (profile.company as AnyRecord)
+      : null;
+  const team =
+    typeof profile?.team === "object" && profile.team
+      ? (profile.team as AnyRecord)
+      : null;
   const hasCompany = Boolean(
     profile?.company && profile?.companyStatus === "approved",
   );
@@ -419,7 +444,7 @@ export function ProfileHub() {
 
   return (
     <main className="min-h-screen bg-[#f7f8fb] text-slate-950">
-      <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-200 bg-slate-950 p-5 text-white lg:block">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-slate-800/60 bg-slate-950/95 p-5 text-white backdrop-blur-xl lg:block">
         <div className="mb-8 flex flex-col gap-4">
           <div className="flex items-center gap-3">
             <div className="relative h-10 w-10 overflow-hidden rounded-xl shadow-lg shadow-indigo-500/20">
@@ -434,107 +459,184 @@ export function ProfileHub() {
               FlowZen
             </h1>
           </div>
-          <div className="flex items-center gap-3 rounded-lg bg-slate-900 p-2 border border-slate-800">
-            <AvatarBadge avatarUrl={avatarUrl} name={displayName} size="md" />
-            <div>
-              <p className="text-sm font-medium text-slate-200 capitalize">
+          <div className="flex items-center gap-3 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800/80 p-2.5 ring-1 ring-slate-700/50">
+            <AvatarBadge
+              avatarUrl={avatarUrl}
+              name={displayName}
+              size="md"
+              showRing
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-slate-100 capitalize">
                 {displayName}
               </p>
-              <p className="text-xs text-slate-400 capitalize">{displayRole}</p>
+              <p className="truncate text-xs text-slate-400 capitalize">
+                {displayRole}
+              </p>
             </div>
           </div>
         </div>
+        <div className="mb-6 h-px bg-gradient-to-r from-indigo-500/40 via-violet-500/20 to-transparent" />
         <nav className="space-y-1">
           <NavButton
             active={tab === "profile"}
+            icon={<User size={16} />}
             label="Profile"
             onClick={() => setTab("profile")}
           />
           <NavButton
             active={tab === "timeline"}
+            icon={<History size={16} />}
             label="Timeline"
             onClick={() => setTab("timeline")}
           />
           <NavButton
             active={tab === "onboarding"}
+            icon={<ShieldCheck size={16} />}
             label="Onboarding"
             onClick={() => setTab("onboarding")}
           />
+          <div className="my-3 h-px bg-slate-800/40" />
+          <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Admin</p>
           {["human-resource", "admin", "finance"].includes(String(role)) ? (
             <NavButton
               active={tab === "members"}
+              icon={<Users size={16} />}
               label={`Members${checkOutRequestCount ? ` (${checkOutRequestCount})` : ""}`}
               onClick={() => setTab("members")}
             />
           ) : null}
+          <NavButton
+            active={tab === "approvals"}
+            icon={<CheckSquare size={16} />}
+            label={`Approvals ${approvals.length ? `(${approvals.length})` : ""}`}
+            onClick={() => setTab("approvals")}
+          />
           {hasCompany ? (
             <NavButton
               active={tab === "messages"}
+              icon={<MessageSquare size={16} />}
               label="Messages"
               onClick={() => setTab("messages")}
             />
           ) : null}
+          <div className="my-3 h-px bg-slate-800/40" />
+          <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Finance</p>
           {hasCompany ? (
             <NavButton
               active={tab === "finance"}
+              icon={<Wallet size={16} />}
               label={`Finance${financeCount ? ` (${financeCount})` : ""}`}
               onClick={() => setTab("finance")}
             />
           ) : null}
           <NavButton
-            active={tab === "approvals"}
-            label={`Approvals ${approvals.length ? `(${approvals.length})` : ""}`}
-            onClick={() => setTab("approvals")}
-          />
-          <NavButton
-            active={tab === "notifications"}
-            label={`Notifications ${unreadCount ? `(${unreadCount})` : ""}`}
-            onClick={() => setTab("notifications")}
-          />
-          <NavButton
             active={tab === "attendance"}
+            icon={<CalendarCheck size={16} />}
             label={`Attendance ${pendingAttendanceCount ? `(${pendingAttendanceCount})` : ""}`}
             onClick={() => setTab("attendance")}
           />
+          <NavButton
+            active={tab === "notifications"}
+            icon={<Bell size={16} />}
+            label={`Notifications ${unreadCount ? `(${unreadCount})` : ""}`}
+            onClick={() => setTab("notifications")}
+          />
         </nav>
         <Link
-          className="mt-8 block rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white"
+          className="mt-6 flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400 transition-all hover:bg-white/10 hover:text-white"
           href="/board"
         >
+          <ChevronRight size={14} className="-ml-0.5" />
           Back to boards
         </Link>
       </aside>
 
       <section className="lg:pl-72">
-        <header className="border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-2xl font-semibold">Profile Center</h2>
-              <p className="text-sm text-slate-500">
-                {String(profile?.email ?? session?.user?.email ?? "")}
-              </p>
+        {/* ── Cover Banner ── */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 px-6 pb-8 pt-6 sm:px-10 sm:pb-10 sm:pt-8">
+          {/* Decorative blobs */}
+          <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-violet-500/20 blur-3xl" />
+
+          <div className="relative z-10 flex flex-wrap items-start justify-between gap-4">
+            {/* Avatar + Name + Role */}
+            <div className="flex items-center gap-5">
+              <div className="relative shrink-0">
+                <AvatarBadge avatarUrl={avatarUrl} name={displayName} size="lg" />
+                <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-400 shadow-sm" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight text-white">
+                  {displayName}
+                </h1>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-3 py-0.5 text-xs font-semibold text-white backdrop-blur-sm">
+                    <ShieldCheck size={12} />
+                    {displayRole}
+                  </span>
+                  <span className="text-sm text-indigo-200">
+                    {String(profile?.email ?? session?.user?.email ?? "")}
+                  </span>
+                </div>
+              </div>
             </div>
+
+            {/* Logout */}
             <button
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition-all hover:bg-white/20"
               onClick={() => signOut({ callbackUrl: "/login" })}
             >
-              <LogOut size={16} />
+              <LogOut size={15} />
               Log out
             </button>
           </div>
-          <div className="mt-4 flex gap-2 overflow-x-auto lg:hidden">
+
+          {/* Info chips */}
+          <div className="relative z-10 mt-5 flex flex-wrap items-center gap-2">
+            {company?.name ? (
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-indigo-100 backdrop-blur-sm">
+                <Building2 size={13} />
+                {String(company.name)}
+              </span>
+            ) : null}
+            {team?.name ? (
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-indigo-100 backdrop-blur-sm">
+                <Users size={13} />
+                {String(team.name)}
+              </span>
+            ) : null}
+            {profile?.companyJoined ? (
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-indigo-100 backdrop-blur-sm">
+                <Calendar size={13} />
+                Joined {new Date(profile.companyJoined as string | Date).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+              </span>
+            ) : null}
+          </div>
+
+          {/* Mobile tabs */}
+          <div className="relative z-10 mt-6 flex gap-1.5 overflow-x-auto lg:hidden">
             {mobileTabs.map((item) => {
               const label =
-                item === "attendance" &&
-                  pendingAttendanceCount > 0
-                  ? `attendance (${pendingAttendanceCount})`
+                item === "attendance" && pendingAttendanceCount > 0
+                  ? `Attendance (${pendingAttendanceCount})`
                   : item === "members" && checkOutRequestCount > 0
-                      ? `members (${checkOutRequestCount})`
-                      : item;
+                    ? `Members (${checkOutRequestCount})`
+                    : item === "finance" && financeCount > 0
+                      ? `Finance (${financeCount})`
+                      : item === "approvals" && approvals.length > 0
+                        ? `Approvals (${approvals.length})`
+                        : item === "notifications" && unreadCount > 0
+                          ? `Notifications (${unreadCount})`
+                          : item.charAt(0).toUpperCase() + item.slice(1);
 
               return (
                 <button
-                  className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium ${tab === item ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-600"}`}
+                  className={`shrink-0 whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-medium transition-all duration-200 ${
+                    tab === item
+                      ? "bg-white text-indigo-700 shadow-md"
+                      : "bg-white/10 text-white/80 backdrop-blur-sm hover:bg-white/20"
+                  }`}
                   key={item}
                   onClick={() => setTab(item)}
                 >
@@ -543,7 +645,7 @@ export function ProfileHub() {
               );
             })}
           </div>
-        </header>
+        </div>
 
         <div className="p-5 sm:p-8">
           {loading ? (
