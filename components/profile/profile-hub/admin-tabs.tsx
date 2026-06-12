@@ -1696,7 +1696,6 @@ export function CodePanel({
                     <ActionButton
                       aria-label={`Copy ${item.label}`}
                       variant="secondary"
-                      className="h-9 w-9"
                       onClick={() => {
                         navigator.clipboard.writeText(item.code);
                         showToast?.(`${item.label} copied.`);

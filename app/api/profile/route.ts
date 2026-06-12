@@ -168,7 +168,7 @@ export async function GET() {
     };
   }
 
-  if (["project-manager", "qa-tester", "human-resource"].includes(safeRole)) {
+  if (["project-manager", "qa-tester", "human-resource", "finance", "admin"].includes(safeRole)) {
     const teams = await Team.find({ manager: user._id }).populate("employees", "name email").sort({ createdAt: -1 });
     for (const team of teams) {
       if (!team.otherJoinCode) {
@@ -176,10 +176,13 @@ export async function GET() {
         await team.save();
       }
     }
+    const createdTeamsCount = await Team.countDocuments({ createdBy: user._id });
     insights.manager = {
       teams: teams.map((team) => ({
         id: team._id.toString(),
         name: team.name,
+        createdBy: user.name,
+        createdByRole: ({ "human-resource": "Human Resource", "project-manager": "Project Manager", "qa-tester": "Q-A Tester", finance: "Finance", employee: "Employee", admin: "Admin", others: "Others" } as Record<string, string>)[String(user.role ?? "")] ?? String(user.role ?? ""),
         joinCode: team.joinCode,
         otherJoinCode: team.otherJoinCode,
         employeeCount: team.employees.length,
@@ -190,7 +193,8 @@ export async function GET() {
         })),
         createdAt: team.createdAt
       })),
-      totalTeams: teams.length
+      totalTeams: teams.length,
+      createdTeamsCount
     };
   }
 
@@ -261,22 +265,42 @@ export async function GET() {
   }
 
   if (safeRole === "admin" && user.company) {
-    const teams = await Team.find({ company: userCompanyId }).populate("manager", "name email").sort({ createdAt: -1 });
+    const teams = await Team.find({ company: userCompanyId }).populate("manager", "name email role").populate("employees", "name email").sort({ createdAt: -1 });
     const company = await Company.findById(userCompanyId).select("name");
+    const ownerRoleMap: Record<string, string> = {
+      "human-resource": "Human Resource",
+      "project-manager": "Project Manager",
+      "qa-tester": "Q-A Tester",
+      finance: "Finance",
+      employee: "Employee",
+      admin: "Admin",
+      others: "Others",
+    };
     insights.admin = {
       companyName: company?.name ?? "",
       totalTeams: teams.length,
-      teams: teams.map((team) => ({
-        id: team._id.toString(),
-        name: team.name,
-        owner: typeof team.manager === "object" && team.manager
-          ? {
-              name: (team.manager as { name?: string }).name ?? "",
-              email: (team.manager as { email?: string }).email ?? ""
-            }
-          : { name: "", email: "" },
-        employeeCount: Array.isArray(team.employees) ? team.employees.length : 0
-      }))
+      teams: teams.map((team) => {
+        const mgr = typeof team.manager === "object" && team.manager ? (team.manager as { _id?: unknown; name?: string; email?: string; role?: string }) : null;
+        return {
+          id: team._id.toString(),
+          name: team.name,
+          owner: mgr
+            ? {
+                name: mgr.name ?? "",
+                email: mgr.email ?? ""
+              }
+            : { name: "", email: "" },
+          managerId: mgr ? String((team.manager as any)._id ?? "") : "",
+          createdBy: mgr?.name ?? "",
+          createdByRole: mgr?.role ? (ownerRoleMap[mgr.role] ?? mgr.role) : "",
+          employeeCount: Array.isArray(team.employees) ? team.employees.length : 0,
+          employees: Array.isArray(team.employees) ? team.employees.map((emp: { _id: { toString: () => string }; name?: string; email?: string }) => ({
+            id: emp._id.toString(),
+            name: emp.name ?? "",
+            email: emp.email ?? ""
+          })) : []
+        };
+      })
     };
   }
 

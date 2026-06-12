@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { CheckSquare, Trash2, X } from "lucide-react";
+import { CheckSquare, ChevronDown, ChevronUp, Trash2, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useBoardStore, type TaskInput } from "@/store/board-store";
@@ -150,7 +150,7 @@ export function ColumnModal({ boardId }: { boardId: string }) {
 }
 
 type BoardMemberView = {
-  user?: { id?: string; _id?: string; name?: string; email?: string } | string;
+  user?: { id?: string; _id?: string; name?: string; email?: string; team?: { name?: string } } | string;
   assignedTo?: { id?: string; _id?: string; name?: string; email?: string } | string | null;
   role: string;
 };
@@ -167,11 +167,14 @@ type AssignTeam = {
   name: string;
   employeeCount: number;
   employeeIds: string[];
+  employees: AssignCandidate[];
 };
 
 type AssignCandidates = {
   managers: AssignCandidate[];
   testers: AssignCandidate[];
+  finance: AssignCandidate[];
+  hr: AssignCandidate[];
   employees: AssignCandidate[];
   teams: AssignTeam[];
 };
@@ -187,8 +190,12 @@ function assignedLeadId(member: BoardMemberView) {
 }
 
 function memberLabel(member: BoardMemberView) {
-  if (typeof member.user === "string") return { name: "User", email: "" };
-  return { name: member.user?.name || "User", email: member.user?.email || "" };
+  if (typeof member.user === "string") return { name: "User", email: "", teamName: "" };
+  return {
+    name: member.user?.name || "User",
+    email: member.user?.email || "",
+    teamName: typeof member.user?.team === "object" ? String(member.user?.team?.name ?? "") : "",
+  };
 }
 
 export function AssignModal({ boardId }: { boardId: string }) {
@@ -197,12 +204,14 @@ export function AssignModal({ boardId }: { boardId: string }) {
   const members = (activeBoard?.members ?? []) as BoardMemberView[];
   const leads = members.filter((member) => ["manager", "tester"].includes(member.role));
   const assignableMembers = members.filter((member) => member.role !== "admin" && memberUserId(member) !== activeBoard?.owner);
-  const [candidates, setCandidates] = useState<AssignCandidates>({ managers: [], testers: [], employees: [], teams: [] });
+  const [candidates, setCandidates] = useState<AssignCandidates>({ managers: [], testers: [], finance: [], hr: [], employees: [], teams: [] });
   const [memberId, setMemberId] = useState("");
   const [leadId, setLeadId] = useState("");
   const [openLeadId, setOpenLeadId] = useState(() => memberUserId(leads[0] ?? { role: "manager" }));
+  const [openTeamId, setOpenTeamId] = useState("");
   const currentMember = members.find((member) => memberUserId(member) === session?.user?.id);
   const isAdminOwner = Boolean(session?.user?.role === "admin" && activeBoard?.owner === session.user.id);
+  const canAssignTeam = isAdminOwner || ["manager", "tester"].includes(currentMember?.role ?? "");
 
   useEffect(() => {
     async function loadCandidates() {
@@ -216,7 +225,7 @@ export function AssignModal({ boardId }: { boardId: string }) {
   useEffect(() => {
     if (memberId) return;
     const firstCandidate = isAdminOwner
-      ? candidates.managers[0] ?? candidates.testers[0]
+      ? candidates.managers[0] ?? candidates.testers[0] ?? candidates.finance[0] ?? candidates.hr[0]
       : candidates.employees[0] ?? assignableMembers[0];
     if (firstCandidate) setMemberId(firstCandidate.id);
     else if (assignableMembers[0]) setMemberId(memberUserId(assignableMembers[0]));
@@ -251,12 +260,14 @@ export function AssignModal({ boardId }: { boardId: string }) {
   const candidateSections = [
     { title: "Project managers", items: candidates.managers, type: "user" as const },
     { title: "Q-A testers", items: candidates.testers, type: "user" as const },
+    { title: "Finance", items: candidates.finance, type: "user" as const },
+    { title: "HR", items: candidates.hr, type: "user" as const },
     { title: "My Teams", items: candidates.teams, type: "team" as const },
     { title: "Employees", items: candidates.employees, type: "user" as const },
-  ].filter((section) => section.items.length > 0);
+  ].filter((section) => Array.isArray(section.items) && section.items.length > 0);
 
   return (
-    <Dialog title={`${activeBoard?.title ?? "Board"} project assignments`} panelClassName="max-w-3xl" bodyClassName="max-h-[80vh] overflow-y-auto">
+    <Dialog title={`${activeBoard?.title ?? "Board"} project assignments`} panelClassName="max-w-3xl" bodyClassName="max-h-[85vh] overflow-y-auto">
       {candidateSections.length ? (
         <div className="space-y-3 border-b border-slate-200 p-5">
           {candidateSections.map((section) => (
@@ -318,69 +329,90 @@ export function AssignModal({ boardId }: { boardId: string }) {
                             )}
                           </>
                         ) : (
-                          <button
-                            className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
-                            onClick={() => {
-                              if (section.type === "team") void assignTeam(item.id);
-                              else void assignCandidate(item.id, isAdminOwner ? "" : session?.user?.id ?? "");
-                            }}
-                            type="button"
-                          >
-                            {section.type === "team" ? "Assign Team" : "Assign"}
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+                              onClick={() => {
+                                if (section.type === "team") setOpenTeamId(openTeamId === item.id ? "" : item.id);
+                                else void assignCandidate(item.id, isAdminOwner ? "" : session?.user?.id ?? "");
+                              }}
+                              type="button"
+                            >
+                              {section.type === "team" ? (
+                                <span className="inline-flex items-center gap-1">
+                                  {openTeamId === item.id ? "Hide members" : "View members"}
+                                  {openTeamId === item.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                </span>
+                              ) : "Assign"}
+                            </button>
+                            {section.type === "team" ? (
+                              <button
+                                className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+                                onClick={() => canAssignTeam ? void assignTeam(item.id) : undefined}
+                                type="button"
+                                disabled={!canAssignTeam}
+                              >
+                                Assign Team
+                              </button>
+                            ) : null}
+                          </div>
                         )}
                       </div>
                     </div>
                   );
                 })}
               </div>
+              {section.type === "team" && section.items.map((item: any) => {
+                const isOpenTeam = openTeamId === item.id;
+                return isOpenTeam ? (
+                  <div key={`${item.id}-members`} className="border-t border-slate-200 bg-slate-50 px-4 py-3">
+                    <div className="mb-3 flex items-center justify-between gap-3 text-sm text-slate-700">
+                      <span>{item.employeeCount} approved team member{item.employeeCount === 1 ? "" : "s"}</span>
+                      <button
+                        className="rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+                        type="button"
+                        onClick={() => setOpenTeamId("")}
+                      >
+                        Close
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {(item.employees ?? []).map((teamMember: any) => {
+                        const isTeamMemberAssigned = boardMemberIds.has(teamMember.id);
+                        const isAssignedToMe = assignedToMeIds.has(teamMember.id);
+                        return (
+                          <div key={teamMember.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                            <div className="min-w-0">
+                              <p className="font-medium text-slate-900">{teamMember.name}</p>
+                              <p className="truncate text-xs text-slate-500">{teamMember.email}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {isTeamMemberAssigned ? (
+                                <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">Assigned</span>
+                              ) : (
+                                <button
+                                  className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+                                  onClick={() => canAssignTeam ? void assignCandidate(teamMember.id, session?.user?.id ?? "") : undefined}
+                                  type="button"
+                                  disabled={!canAssignTeam}
+                                >
+                                  <span className="inline-flex items-center gap-1">
+                                    Assign
+                                    <ChevronDown size={12} />
+                                  </span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null;
+              })}
             </section>
           ))}
         </div>
-      ) : null}
-
-      {!isAdminOwner && assignableMembers.filter((member) => ["employee", "others"].includes(member.role)).length ? (
-        <form className="grid gap-3 border-b border-slate-200 p-5 sm:grid-cols-[1fr_1fr_auto]" onSubmit={submit}>
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">Member</span>
-            <select
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 outline-none ring-emerald-500 focus:ring-2"
-              value={memberId}
-              onChange={(event) => setMemberId(event.target.value)}
-            >
-              {assignableMembers.filter((item) => ["employee", "others"].includes(item.role)).map((member) => {
-                const user = memberLabel(member);
-                return (
-                  <option key={memberUserId(member)} value={memberUserId(member)}>
-                    {user.name} - {member.role}
-                  </option>
-                );
-              })}
-            </select>
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">Assign under</span>
-            <select
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 outline-none ring-emerald-500 focus:ring-2"
-              value={leadId}
-              onChange={(event) => setLeadId(event.target.value)}
-              disabled={!isAdminOwner}
-            >
-              <option value="">Unassigned</option>
-              {leads.map((member) => {
-                const user = memberLabel(member);
-                return (
-                  <option key={memberUserId(member)} value={memberUserId(member)}>
-                    {user.name} - {member.role}
-                  </option>
-                );
-              })}
-            </select>
-          </label>
-          <div className="flex items-end">
-            <Submit label="Assign" />
-          </div>
-        </form>
       ) : null}
 
       <div className="space-y-3 p-5">
@@ -408,8 +440,13 @@ export function AssignModal({ boardId }: { boardId: string }) {
                     <span className="block text-sm font-semibold capitalize text-slate-900">{lead.role}</span>
                     <span className="block text-sm text-slate-500">{leadUser.email}</span>
                   </span>
-                  <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
-                    {assignedMembers.length}
+                  <span className="flex items-center gap-2">
+                    <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
+                      {assignedMembers.length}
+                    </span>
+                    <span className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}>
+                      <ChevronDown size={16} className="text-slate-400" />
+                    </span>
                   </span>
                 </button>
                 {isAdminOwner && leadIdValue !== session?.user?.id && (
@@ -510,7 +547,7 @@ export function InviteModal({ boardId }: { boardId: string }) {
   }
 
   return (
-    <Dialog title={isOwner ? "Invite collaborator" : "Board members"}>
+    <Dialog title={isOwner ? "Invite collaborator" : "Board members"} bodyClassName="max-h-[85vh] overflow-y-auto">
       {isOwner ? (
         <form className="space-y-4 p-5" onSubmit={submit}>
           <Field label="Email" value={email} onChange={setEmail} type="email" required />
@@ -535,37 +572,174 @@ export function InviteModal({ boardId }: { boardId: string }) {
       {activeBoard?.members?.length ? (
         <div className={`${isOwner ? "border-t" : ""} border-slate-200 p-5`}>
           <p className="mb-3 text-sm font-semibold text-slate-700">Board Members</p>
-          <div className="max-h-48 space-y-2 overflow-y-auto">
-            {activeBoard.members.map((member: any) => {
-              const mUser = (member.user as any) ?? {};
-              const memberId = mUser.id || mUser._id || member.user;
-              const canRemoveMember = isOwner
-                ? activeBoard.owner !== memberId
-                : Boolean(currentUserId && memberId === currentUserId);
+          <div className="max-h-48 overflow-y-auto space-y-3">
+            {(() => {
+              const members = (activeBoard.members ?? []) as BoardMemberView[];
+              const memberEntries = members.map((member) => {
+                const { name, email, teamName } = memberLabel(member);
+                return {
+                  member,
+                  id: memberUserId(member),
+                  name,
+                  email,
+                  teamName,
+                  role: member.role,
+                  assignedTo: assignedLeadId(member),
+                };
+              });
+
+              const leadEntries = memberEntries.filter((item) => ["admin", "manager", "tester"].includes(item.role));
+              const employeeEntries = memberEntries.filter((item) => ["employee", "others"].includes(item.role));
+              const leadMap = new Map(leadEntries.map((lead) => [lead.id, lead]));
+              const groupedLeads = leadEntries.map((lead) => ({
+                lead,
+                employees: employeeEntries.filter((employee) => employee.assignedTo === lead.id),
+              }));
+              const unassignedEmployees = employeeEntries.filter(
+                (employee) => !employee.assignedTo || !leadMap.has(employee.assignedTo),
+              );
+              const showGrouped = groupedLeads.length > 0 || unassignedEmployees.length > 0;
+
+              if (!showGrouped) {
+                return memberEntries.map(({ member, id, name, email, teamName, role }) => {
+                  const canRemoveMember = isOwner ? activeBoard.owner !== id : Boolean(currentUserId && id === currentUserId);
+                  return (
+                    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 p-2 text-sm" key={id}>
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-900">{name}</p>
+                        <p className="truncate text-xs text-slate-500">{email}</p>
+                        {teamName ? <p className="text-xs text-slate-400">Team: {teamName}</p> : null}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">
+                          {role}
+                        </span>
+                        {canRemoveMember ? (
+                          <button
+                            className="rounded-md p-1.5 text-rose-600 hover:bg-rose-50"
+                            onClick={() => void removeBoardMember(id)}
+                            title={isOwner ? "Remove member" : "Leave board"}
+                            type="button"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                });
+              }
+
               return (
-                <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 p-2 text-sm" key={memberId}>
-                  <div className="min-w-0">
-                    <p className="font-medium text-slate-900">{mUser.name || "User"}</p>
-                    <p className="truncate text-xs text-slate-500">{mUser.email || ""}</p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">
-                      {member.role}
-                    </span>
-                    {canRemoveMember ? (
-                      <button
-                        className="rounded-md p-1.5 text-rose-600 hover:bg-rose-50"
-                        onClick={() => void removeBoardMember(memberId)}
-                        title={isOwner ? "Remove member" : "Leave board"}
-                        type="button"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    ) : null}
-                  </div>
+                <div className="space-y-3">
+                  {groupedLeads.map(({ lead, employees }) => {
+                    const canRemoveLead = isOwner ? activeBoard.owner !== lead.id : Boolean(currentUserId && lead.id === currentUserId);
+                    return (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4" key={lead.id}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-slate-900">{lead.name}</p>
+                            <p className="text-xs text-slate-500">{lead.email}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">
+                              {lead.role}
+                            </span>
+                            {canRemoveLead ? (
+                              <button
+                                className="rounded-md p-1.5 text-rose-600 hover:bg-rose-50"
+                                onClick={() => void removeBoardMember(lead.id)}
+                                title={isOwner ? "Remove member" : "Leave board"}
+                                type="button"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+                        <div className="mt-4 space-y-2">
+                          {employees.length ? (
+                            employees.map((employee) => {
+                              const canRemoveEmployee = isOwner
+                                ? activeBoard.owner !== employee.id
+                                : Boolean(currentUserId && employee.id === currentUserId);
+                              return (
+                                <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-white p-3" key={employee.id}>
+                                  <div className="min-w-0">
+                                    <p className="font-medium text-slate-900">{employee.name}</p>
+                                    <p className="truncate text-xs text-slate-500">{employee.email}</p>
+                                    {employee.teamName ? <p className="text-xs text-slate-400">Team: {employee.teamName}</p> : null}
+                                  </div>
+                                  <div className="flex shrink-0 items-center gap-2">
+                                    <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">
+                                      {employee.role}
+                                    </span>
+                                    {canRemoveEmployee ? (
+                                      <button
+                                        className="rounded-md p-1.5 text-rose-600 hover:bg-rose-50"
+                                        onClick={() => void removeBoardMember(employee.id)}
+                                        title={isOwner ? "Remove member" : "Leave board"}
+                                        type="button"
+                                      >
+                                        <Trash2 size={16} />
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <p className="text-sm text-slate-500">No members assigned to this lead yet.</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {unassignedEmployees.length ? (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-900">Unassigned employees</p>
+                          <p className="text-xs text-slate-500">Employees without an assigned lead</p>
+                        </div>
+                        <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">Employees</span>
+                      </div>
+                      <div className="mt-4 space-y-2">
+                        {unassignedEmployees.map((employee) => {
+                          const canRemoveEmployee = isOwner
+                            ? activeBoard.owner !== employee.id
+                            : Boolean(currentUserId && employee.id === currentUserId);
+                          return (
+                            <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-white p-3" key={employee.id}>
+                              <div className="min-w-0">
+                                <p className="font-medium text-slate-900">{employee.name}</p>
+                                <p className="truncate text-xs text-slate-500">{employee.email}</p>
+                              </div>
+                              <div className="flex shrink-0 items-center gap-2">
+                                <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">
+                                  {employee.role}
+                                </span>
+                                {canRemoveEmployee ? (
+                                  <button
+                                    className="rounded-md p-1.5 text-rose-600 hover:bg-rose-50"
+                                    onClick={() => void removeBoardMember(employee.id)}
+                                    title={isOwner ? "Remove member" : "Leave board"}
+                                    type="button"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               );
-            })}
+            })()}
           </div>
         </div>
       ) : null}
@@ -588,12 +762,16 @@ export function TaskModal({ boardId, columnId, taskId }: { boardId: string; colu
   const [attachmentUploading, setAttachmentUploading] = useState(false);
   const [subTaskTitle, setSubTaskTitle] = useState("");
   const [subTasks, setSubTasks] = useState(task?.subTasks ?? []);
+  const [submitting, setSubmitting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const currentUserId = session?.user?.id;
   const isOwner = Boolean(currentUserId && activeBoard?.owner === currentUserId);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
     const payload: TaskInput = {
       column: columnId,
       title,
@@ -603,16 +781,24 @@ export function TaskModal({ boardId, columnId, taskId }: { boardId: string; colu
       subTasks
     };
 
-    if (task) {
-      await updateTask(boardId, task.id, payload);
-    } else {
-      await createTask(boardId, payload);
+    try {
+      if (task) {
+        await updateTask(boardId, task.id, payload);
+      } else {
+        await createTask(boardId, payload);
+      }
+      setModal(null);
+    } finally {
+      setSubmitting(false);
     }
-    setModal(null);
   }
 
   async function remove() {
     if (!task) return;
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
     await deleteTask(boardId, task.id);
     setModal(null);
   }
@@ -861,11 +1047,11 @@ export function TaskModal({ boardId, columnId, taskId }: { boardId: string; colu
 
         <div className="flex items-center justify-between gap-3">
           {task && isOwner ? (
-            <button className="rounded-lg px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50" onClick={remove} type="button">
-              Delete
+            <button className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${confirmDelete ? "bg-rose-600 text-white hover:bg-rose-700" : "text-rose-600 hover:bg-rose-50"}`} onClick={remove} type="button">
+              {confirmDelete ? "Click again to confirm" : "Delete"}
             </button>
           ) : <span />}
-          <Submit label={task ? "Save task" : "Create task"} />
+          <Submit disabled={submitting} loading={submitting} label={task ? "Save task" : "Create task"} />
         </div>
       </form>
     </Dialog>
@@ -916,9 +1102,10 @@ function TextArea({ label, value, onChange, disabled = false }: { label: string;
   );
 }
 
-function Submit({ label }: { label: string }) {
+function Submit({ label, disabled, loading }: { label: string; disabled?: boolean; loading?: boolean }) {
   return (
-    <button className="rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800" type="submit">
+    <button className="flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50" type="submit" disabled={disabled || loading}>
+      {loading && <span className="inline-block size-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />}
       {label}
     </button>
   );

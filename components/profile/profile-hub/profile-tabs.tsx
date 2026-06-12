@@ -6,8 +6,9 @@ import {
   Building2,
   Camera,
   Check,
-  Clipboard,
+  ChevronDown,
   Clock,
+  Copy,
   Info,
   Plus,
   ShieldCheck,
@@ -1433,7 +1434,8 @@ export function ProfileTab({
 
         {role === "project-manager" ||
           role === "qa-tester" ||
-          role === "finance" ? (
+          role === "finance" ||
+          role === "admin" ? (
           <section className="rounded-2xl border overflow-y-auto h-auto max-h-[500px] border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
             <div className="mb-5 border-l-4 border-cyan-500 pl-4">
               <h3 className="text-base font-semibold text-slate-900">
@@ -1493,7 +1495,7 @@ export function ProfileTab({
                                 title="Copy code"
                                 type="button"
                               >
-                                <Clipboard size={16} />
+                                <Copy size={20} />
                               </button>
                             </div>
                           </div>
@@ -2172,6 +2174,10 @@ export function OnboardingTab({
   const managerTeams = Array.isArray(managerInsight?.teams)
     ? (managerInsight.teams as AnyRecord[])
     : [];
+  const adminTeams = Array.isArray((insights?.admin as AnyRecord | undefined)?.teams)
+    ? ((insights?.admin as AnyRecord).teams as AnyRecord[])
+    : [];
+  const transferTeams = role === "admin" ? adminTeams : managerTeams;
   const companyMembers = Array.isArray(insights?.companyMembers)
     ? (insights.companyMembers as AnyRecord[])
     : [];
@@ -2193,17 +2199,19 @@ export function OnboardingTab({
   const [replacementRoleUserId, setReplacementRoleUserId] = useState("");
   const [requestingHrQuit, setRequestingHrQuit] = useState(false);
   const [requestingRoleQuit, setRequestingRoleQuit] = useState(false);
-  const [roleTransferModal, setRoleTransferModal] = useState(false);
-  const [roleTransferReplacementId, setRoleTransferReplacementId] = useState("");
-  const [requestingRoleTransfer, setRequestingRoleTransfer] = useState(false);
+  const [teamTransferTeamIds, setTeamTransferTeamIds] = useState<string[]>([]);
+  const [teamTransferReplacementId, setTeamTransferReplacementId] = useState("");
+  const [teamTransferSubmitting, setTeamTransferSubmitting] = useState(false);
+  const [teamTransferOpen, setTeamTransferOpen] = useState(false);
   const [cancelQuitModal, setCancelQuitModal] = useState(false);
   const [cancelQuitReason, setCancelQuitReason] = useState("");
   const [cancellingQuit, setCancellingQuit] = useState(false);
   const [cancelJoinModal, setCancelJoinModal] = useState(false);
   const [cancelJoinConfirmText, setCancelJoinConfirmText] = useState("");
   const [cancellingJoin, setCancellingJoin] = useState(false);
-  const teamLimit = role === "human-resource" ? 2 : 5;
-  const canCreateMoreTeams = managerTeams.length < teamLimit;
+  const createdTeamsCount = Number(managerInsight?.createdTeamsCount ?? managerTeams.length);
+  const teamLimit = role === "human-resource" ? 2 : role === "admin" ? 10 : 5;
+  const canCreateMoreTeams = createdTeamsCount < teamLimit;
   const companyJoinStatus = profile?.companyStatus
     ? String(profile.companyStatus)
     : "none";
@@ -2248,7 +2256,7 @@ export function OnboardingTab({
     event.preventDefault();
     if (!canCreateMoreTeams) {
       showToast(
-        `Team limit reached. ${role === "human-resource" ? "HR" : "Managers"} can create up to ${teamLimit} teams.`,
+        `Team limit reached. ${role === "human-resource" ? "HR" : role === "admin" ? "Admins" : "Managers"} can create up to ${teamLimit} teams.`,
         "error",
       );
       return;
@@ -2318,28 +2326,32 @@ export function OnboardingTab({
     }
   }
 
-  async function requestRoleTransfer() {
-    if (!roleTransferReplacementId) {
+  async function requestTeamTransfer() {
+    if (!teamTransferReplacementId) {
       showToast("Please select a replacement first.", "error");
       return;
     }
+    if (teamTransferTeamIds.length === 0) {
+      showToast("Please select at least one team to transfer.", "error");
+      return;
+    }
     try {
-      setRequestingRoleTransfer(true);
+      setTeamTransferSubmitting(true);
       await apiFetch("/api/company/role-transfer", {
         method: "POST",
-        body: JSON.stringify({ replacementUserId: roleTransferReplacementId }),
+        body: JSON.stringify({ replacementUserId: teamTransferReplacementId, teamIds: teamTransferTeamIds }),
       });
-      setRoleTransferModal(false);
-      setRoleTransferReplacementId("");
-      showToast("Role transfer request sent to admin.");
+      setTeamTransferTeamIds([]);
+      setTeamTransferReplacementId("");
+      showToast("Team transfer request sent to admin.");
       await refresh();
     } catch (err) {
       showToast(
-        err instanceof Error ? err.message : "Unable to request role transfer.",
+        err instanceof Error ? err.message : "Unable to request team transfer.",
         "error",
       );
     } finally {
-      setRequestingRoleTransfer(false);
+      setTeamTransferSubmitting(false);
     }
   }
 
@@ -2878,79 +2890,7 @@ export function OnboardingTab({
         </div>
       ) : null}
 
-      {roleTransferModal ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-          role="presentation"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) setRoleTransferModal(false);
-          }}
-        >
-          <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-5 shadow-xl">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h4 className="text-lg font-semibold">
-                  Transfer Teams & Role ({formatRole(String(role))})
-                </h4>
-                <p className="mt-1 text-sm text-slate-500">
-                  Your teams and board assignments will be transferred to the
-                  replacement. Admin approval is required.
-                </p>
-              </div>
-              <button
-                aria-label="Close"
-                className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
-                type="button"
-                onClick={() => setRoleTransferModal(false)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="mt-4">
-              <label className="text-xs font-semibold uppercase text-slate-500">
-                Replacement
-              </label>
-              <select
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-                value={roleTransferReplacementId}
-                onChange={(e) => setRoleTransferReplacementId(e.target.value)}
-              >
-                <option value="">Select replacement</option>
-                {replacementRoleCandidates.map((member) => (
-                  <option key={String(member.id)} value={String(member.id)}>
-                    {String(member.name ?? "Member")} (
-                    {String(member.email ?? "")})
-                  </option>
-                ))}
-              </select>
-              {replacementRoleCandidates.length === 0 ? (
-                <p className="mt-2 text-xs text-amber-700">
-                  No approved replacement available with this role.
-                </p>
-              ) : null}
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
-                type="button"
-                onClick={() => setRoleTransferModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                disabled={!roleTransferReplacementId || requestingRoleTransfer}
-                type="button"
-                onClick={() => void requestRoleTransfer()}
-              >
-                {requestingRoleTransfer ? "Submitting..." : "Submit transfer request"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {["project-manager", "qa-tester", "human-resource", "finance"].includes(
+      {["project-manager", "qa-tester", "human-resource", "finance", "admin"].includes(
         role,
       ) ? (
         profile?.companyStatus === "approved" ? (
@@ -2960,7 +2900,9 @@ export function OnboardingTab({
                 <h3 className="text-base font-semibold text-slate-900">
                   {role === "human-resource"
                     ? "HR Team Management"
-                    : "Manager Membership"}
+                    : role === "admin"
+                      ? "Admin Team Management"
+                      : "Manager Membership"}
                 </h3>
                 <p className="mt-0.5 text-sm text-slate-500">
                   You are currently assigned to a company.
@@ -2984,7 +2926,7 @@ export function OnboardingTab({
 
                     <span className="font-medium">
                       {Array.isArray(managerTeams)
-                        ? `${managerTeams.length}/${teamLimit}`
+                        ? `${managerTeams.length} (${createdTeamsCount} created)`
                         : "No team created"}
                     </span>
                   </div>
@@ -3026,15 +2968,29 @@ export function OnboardingTab({
                   </form>
                 ) : (
                   <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                    Team limit reached ({managerTeams.length}/{teamLimit}).
+                    Team creation limit reached ({createdTeamsCount}/{teamLimit}).
                   </p>
                 )}
 
                 <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                  {role === "human-resource" ? "HR" : "Managers"} can create up
-                  to {teamLimit} teams. Current: {managerTeams.length}/
-                  {teamLimit}
+                  {role === "human-resource" ? "HR" : role === "admin" ? "Admins" : "Managers"} can create up
+                  to {teamLimit} teams. Created: {createdTeamsCount}/{teamLimit} &middot; Total managed: {managerTeams.length}
                 </p>
+
+                {managerTeams.length > 0 ? (
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase text-slate-500">My Teams</p>
+                    <div className="space-y-1">
+                      {managerTeams.map((t) => (
+                        <div key={String(t.id)} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                          <span className="font-medium text-slate-900">{String(t.name ?? "")}</span>
+                          <span className="text-xs text-slate-500">{Number(t.employeeCount ?? 0)} employees</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
                 <button
                   className="w-full rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={Boolean(insights?.pendingQuit)}
@@ -3043,16 +2999,6 @@ export function OnboardingTab({
                 >
                   {pendingQuitText("Request Quit Company")}
                 </button>
-                {managerTeams.length > 0 ? (
-                  <button
-                    className="w-full rounded-lg border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-medium text-sky-700 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={replacementRoleCandidates.length === 0}
-                    onClick={() => setRoleTransferModal(true)}
-                    type="button"
-                  >
-                    Transfer Teams & Role
-                  </button>
-                ) : null}
                 {insights?.pendingQuit ? (
                   <button
                     className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -3118,23 +3064,23 @@ export function OnboardingTab({
                                   title="Copy code"
                                   type="button"
                                 >
-                                  <Clipboard size={16} />
+                                  <Copy size={20} />
                                 </button>
-                              </div>
-                            </div>
-                            <button
-                              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-100 px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-sky-200"
-                              onClick={() => {
-                                const joinUrl = `${window.location.origin}/join?code=${item.code}`;
-                                navigator.clipboard.writeText(joinUrl);
-                                showToast(
-                                  `${teamName} ${item.label.toLowerCase()} join URL copied.`,
-                                );
-                              }}
-                              type="button"
-                            >
-                              <Users size={16} />
-                              Copy {item.label} Join URL
+                                            </div>
+                                          </div>
+                                          <button
+                                            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-100 px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-sky-200"
+                                            onClick={() => {
+                                              const joinUrl = `${window.location.origin}/join?code=${item.code}`;
+                                              navigator.clipboard.writeText(joinUrl);
+                                              showToast(
+                                                `${teamName} ${item.label.toLowerCase()} join URL copied.`,
+                                              );
+                                            }}
+                                            type="button"
+                                          >
+                                            <Users size={16} />
+                                            Copy {item.label} Join URL
                             </button>
                           </div>
                         ))}
@@ -3145,16 +3091,95 @@ export function OnboardingTab({
               </section>
             ) : null}
 
+            {managerTeams.length > 0 ? (
+              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+                <button
+                  className="flex w-full items-center justify-between"
+                  onClick={() => setTeamTransferOpen((prev) => !prev)}
+                  type="button"
+                >
+                  <div className="border-l-4 border-amber-500 pl-4">
+                    <h3 className="text-base font-semibold text-slate-900">Team Transfer</h3>
+                    <p className="mt-0.5 text-sm text-slate-500">
+                      Transfer teams to another {formatRole(String(role))}. Admin approval required.
+                    </p>
+                  </div>
+                  <ChevronDown
+                    size={20}
+                    className={`shrink-0 text-slate-400 transition-transform duration-200 ${teamTransferOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {teamTransferOpen ? (
+                  <div className="mt-5 space-y-4">
+                    {managerTeams.map((t) => {
+                      const tid = String(t.id ?? "");
+                      const checked = teamTransferTeamIds.includes(tid);
+                      return (
+                        <label key={tid} className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50">
+                          <input
+                            type="checkbox"
+                            className="size-4 accent-slate-900"
+                            checked={checked}
+                            onChange={() => {
+                              setTeamTransferTeamIds((prev) =>
+                                checked ? prev.filter((id) => id !== tid) : [...prev, tid]
+                              );
+                            }}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-slate-900">{String(t.name ?? "Team")}</p>
+                            <p className="text-xs text-slate-500">
+                              {Number(t.employeeCount ?? 0)} employees &middot; Created by {String(t.createdBy ?? "Unknown")}{t.createdByRole ? ` (${String(t.createdByRole)})` : ""}
+                            </p>
+                          </div>
+                        </label>
+                      );
+                    })}
+                    <div>
+                      <label className="text-xs font-semibold uppercase text-slate-500">
+                        Replacement
+                      </label>
+                      <select
+                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                        value={teamTransferReplacementId}
+                        onChange={(e) => setTeamTransferReplacementId(e.target.value)}
+                      >
+                        <option value="">Select replacement</option>
+                        {replacementRoleCandidates.map((member) => (
+                          <option key={String(member.id)} value={String(member.id)}>
+                            {String(member.name ?? "Member")} ({String(member.email ?? "")})
+                          </option>
+                        ))}
+                      </select>
+                      {replacementRoleCandidates.length === 0 ? (
+                        <p className="mt-2 text-xs text-amber-700">
+                          No approved replacement available with this role.
+                        </p>
+                      ) : null}
+                    </div>
+                    <button
+                      className="w-full rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                      disabled={!teamTransferReplacementId || teamTransferTeamIds.length === 0 || teamTransferSubmitting}
+                      onClick={() => void requestTeamTransfer()}
+                      type="button"
+                    >
+                      {teamTransferSubmitting ? "Submitting..." : "Submit Team Transfer Request"}
+                    </button>
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
+
             <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
               <div className="mb-5 border-l-4 border-cyan-500 pl-4">
-                <h3 className="text-base font-semibold text-slate-900">Manager Team History</h3>
+                <h3 className="text-base font-semibold text-slate-900">{role === "admin" ? "All Teams History" : "Manager Team History"}</h3>
                 <p className="mt-0.5 text-sm text-slate-500">
-                  Open a team to view employees and remove members.
+                  {role === "admin" ? "View all teams in the company." : "Open a team to view employees and remove members."}
                 </p>
               </div>
               <div className="mt-4 space-y-2">
-                {managerTeams.length > 0 ? (
-                  managerTeams.map((t) => (
+                {(role === "admin" ? transferTeams : managerTeams).length > 0 ? (
+                  (role === "admin" ? transferTeams : managerTeams).map((t) => (
                     <button
                       key={String(t.id)}
                       type="button"
@@ -3207,18 +3232,20 @@ export function OnboardingTab({
                 {String(teamModal.name)} employees
               </h3>
               <div className="flex items-center gap-2">
-                <button
-                  className="rounded-lg border border-rose-200 px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50"
-                  onClick={() =>
-                    setDeleteTeamModal({
-                      teamId: String(teamModal.id),
-                      teamName: String(teamModal.name ?? "Team"),
-                    })
-                  }
-                  type="button"
-                >
-                  Delete Team
-                </button>
+                {String(teamModal.managerId ?? "") === selfId ? (
+                  <button
+                    className="rounded-lg border border-rose-200 px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50"
+                    onClick={() =>
+                      setDeleteTeamModal({
+                        teamId: String(teamModal.id),
+                        teamName: String(teamModal.name ?? "Team"),
+                      })
+                    }
+                    type="button"
+                  >
+                    Delete Team
+                  </button>
+                ) : null}
                 <button
                   className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
                   onClick={() => setTeamModal(null)}

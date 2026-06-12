@@ -48,7 +48,7 @@ export function BoardCanvas({ boardId }: { boardId: string }) {
   }) as any;
   const isOwner = Boolean(session?.user?.id && activeBoard?.owner === session.user.id);
   const isAdminOwner = isOwner && session?.user?.role === "admin";
-  const canAssignProject = isAdminOwner || ["manager", "tester"].includes(String(currentMember?.role));
+  const canAssignProject = Boolean(currentMember) && !isOwner;
   const memberStatus = isOwner
     ? "self"
     : currentMember?.assignedTo || ["manager", "tester"].includes(String(currentMember?.role))

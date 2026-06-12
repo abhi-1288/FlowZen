@@ -25,9 +25,9 @@ export async function POST(request: Request) {
   if (!user) return jsonError("User not found.", 404);
   if (!user.company) return jsonError("You are not in a company.", 400);
 
-  const allowedRoles = ["project-manager", "qa-tester", "human-resource", "finance"];
+  const allowedRoles = ["project-manager", "qa-tester", "human-resource", "finance", "admin"];
   if (!allowedRoles.includes(String(user.role ?? ""))) {
-    return jsonError("Only project managers, QA testers, HR, or finance can transfer role.", 403);
+    return jsonError("Only project managers, QA testers, HR, finance, or admins can transfer role.", 403);
   }
 
   const existingRequest = await JoinRequest.findOne({
@@ -37,17 +37,28 @@ export async function POST(request: Request) {
   });
   if (existingRequest) return jsonError("Role transfer request already pending.", 409);
 
-  const managedTeams = await Team.find({ manager: user._id }).select("_id name");
-  if (managedTeams.length === 0) {
-    return jsonError("You have no teams to transfer.", 400);
-  }
-
   const replacementUserId = String((body as any).replacementUserId ?? "").trim();
   if (!replacementUserId) {
     return jsonError("Please select a replacement first.", 400);
   }
   if (replacementUserId === String(user._id)) {
     return jsonError("Replacement cannot be yourself.", 400);
+  }
+
+  const rawTeamIds = Array.isArray((body as any).teamIds) ? (body as any).teamIds : [];
+  const teamIds = rawTeamIds.filter((id: string) => String(id).trim()).map((id: string) => String(id).trim());
+  if (teamIds.length === 0) {
+    return jsonError("Please select at least one team to transfer.", 400);
+  }
+
+  const allManagedTeams = await Team.find({ manager: user._id }).select("_id name");
+  if (allManagedTeams.length === 0) {
+    return jsonError("You have no teams to transfer.", 400);
+  }
+
+  const managedTeams = allManagedTeams.filter((t) => teamIds.includes(String(t._id)));
+  if (managedTeams.length === 0) {
+    return jsonError("Selected teams not found or not owned by you.", 400);
   }
 
   const company = await Company.findById(user.company);
@@ -63,43 +74,54 @@ export async function POST(request: Request) {
     return jsonError("Replacement must be an approved member with the same role.", 400);
   }
 
-  const replacementManagedTeams = await Team.find({ manager: replacement._id }).countDocuments();
-  const roleTeamLimit = String(user.role) === "human-resource" ? 2 : 5;
-  const totalAfterTransfer = replacementManagedTeams + managedTeams.length;
-  if (totalAfterTransfer > roleTeamLimit) {
-    return jsonError(
-      `Replacement can manage up to ${roleTeamLimit} teams. They currently have ${replacementManagedTeams} team${replacementManagedTeams === 1 ? "" : "s"} and cannot accept ${managedTeams.length} more.`,
-      409,
-    );
+  if (managedTeams.length > 5) {
+    return jsonError(`You can transfer up to 5 teams at a time. Selected ${managedTeams.length}.`, 400);
   }
 
-  const admin = await User.findOne({
-    company: company._id,
-    role: "admin",
-    companyStatus: "approved",
-  }).select("_id name");
-  const adminId = admin?._id ?? company.owner;
-  if (!adminId) return jsonError("No admin available to review this request.", 409);
+  const isSelfAdmin = String(user.role) === "admin";
+  let approverId: string | undefined;
+
+  if (isSelfAdmin && String(replacement.role) === "admin" && replacementUserId !== String(user._id)) {
+    approverId = replacementUserId;
+  } else {
+    const otherAdmin = await User.findOne({
+      company: company._id,
+      role: "admin",
+      companyStatus: "approved",
+      _id: { $ne: user._id },
+    }).select("_id");
+    approverId = String(otherAdmin?._id ?? "");
+  }
+
+  if (!approverId) {
+    const owner = company.owner ? String(company.owner) : "";
+    if (owner && owner !== String(user._id)) {
+      approverId = owner;
+    }
+  }
+
+  if (!approverId) return jsonError("No admin available to review this request.", 409);
 
   const boardLabel = managedTeams.length > 1 ? "teams were" : "team was";
   const teamNames = managedTeams.map((t) => t.name).filter(Boolean).join(", ");
 
   await JoinRequest.create({
     requester: user._id,
-    approver: adminId,
+    approver: approverId,
     company: user.company,
     kind: "role-transfer",
     replacementUser: replacementUserId,
+    metadata: { teamIds: managedTeams.map((t) => String(t._id)) },
   });
 
   await Notification.create({
-    user: adminId,
+    user: approverId,
     company: user.company,
     type: "approval",
     title: "Role Transfer Request",
     message: `${user.name}: ${user.role} is requesting to transfer their role to ${replacement.name}, the assigned ${boardLabel} ${teamNames}`,
   });
-  emitNotification(String(adminId));
+  emitNotification(String(approverId));
 
   await Notification.create({
     user: replacementUserId,

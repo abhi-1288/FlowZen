@@ -5,6 +5,8 @@ import { User } from "@/models/User";
 import { Notification } from "@/models/Notification";
 import { findOwnedBoard } from "@/lib/board-access";
 import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
+import { emitNotification } from "@/lib/realtime";
+import { emitToBoard } from "@/lib/socket-emit";
 
 const BOARD_ROLES = ["admin", "manager", "employee", "tester", "others"] as const;
 
@@ -89,6 +91,8 @@ export async function POST(request: Request, { params }: Params) {
           message: `${caller.name}: ${caller.role} has invited you to ${board.title}.`,
         }),
       ]);
+      emitNotification(String(invitedUser._id));
+      emitToBoard(board, "board:update", { id: String(board._id) });
     }
 
     const freshBoard = await Board.findById(id)
@@ -174,6 +178,8 @@ export async function DELETE(request: Request, { params }: Params) {
           message: `${caller.name}: ${caller.role} has removed you from ${board.title}.`,
         }),
       ]);
+      emitNotification(String(removedUser._id));
+      emitToBoard(board, "board:update", { id: String(board._id) });
     }
 
     const freshBoard = await Board.findById(id)

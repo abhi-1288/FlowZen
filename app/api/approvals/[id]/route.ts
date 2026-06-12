@@ -507,18 +507,24 @@ export async function PATCH(request: Request, { params }: Params) {
           return jsonError("Replacement user is required for role transfer approval.", 400);
         }
 
-        const teamsToTransfer = await Team.find({ manager: requester._id }).select("_id name");
-        const replacementManagedCount = await Team.countDocuments({ manager: joinRequest.replacementUser });
-        const roleLimit = String(requester.role) === "human-resource" ? 2 : 5;
-        if (replacementManagedCount + teamsToTransfer.length > roleLimit) {
-          return jsonError(
-            `Replacement can manage up to ${roleLimit} teams. They currently have ${replacementManagedCount} team${replacementManagedCount === 1 ? "" : "s"} and cannot accept ${teamsToTransfer.length} more.`,
-            409,
-          );
+        const selectedTeamIds: string[] = Array.isArray((joinRequest.metadata as any)?.teamIds)
+          ? (joinRequest.metadata as any).teamIds
+          : [];
+        if (selectedTeamIds.length === 0) {
+          return jsonError("No teams specified for transfer.", 400);
+        }
+
+        const teamsToTransfer = await Team.find({ _id: { $in: selectedTeamIds }, manager: requester._id }).select("_id name");
+        if (teamsToTransfer.length !== selectedTeamIds.length) {
+          return jsonError("Some selected teams were not found or are not managed by you.", 400);
+        }
+
+        if (teamsToTransfer.length > 5) {
+          return jsonError("Cannot transfer more than 5 teams at a time.", 400);
         }
 
         await Team.updateMany(
-          { manager: requester._id },
+          { _id: { $in: selectedTeamIds }, manager: requester._id },
           { $set: { manager: joinRequest.replacementUser } },
         );
 
