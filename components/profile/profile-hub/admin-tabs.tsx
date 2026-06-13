@@ -1609,7 +1609,7 @@ export function NotificationsTab({
                             <ActionButton
                               aria-label="Mark notification as read"
                               variant="secondary"
-                              className="h-10 w-10"
+                              className=""
                               onClick={() => markRead(String(item.id))}
                               title="Mark as read"
                               type="button"
@@ -1621,7 +1621,7 @@ export function NotificationsTab({
                             <ActionButton
                               aria-label="Delete notification"
                               variant="danger"
-                              className="h-10 w-10"
+                              className=""
                               onClick={() => deleteOne(String(item.id))}
                               title="Delete"
                               type="button"

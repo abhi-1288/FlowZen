@@ -80,10 +80,14 @@ export function FinanceMembersView({
   const [checkOutRejectReason, setCheckOutRejectReason] = useState("");
   const [checkOutStatusType, setCheckOutStatusType] = useState<"present" | "halfDay" | "absent">("present");
   const [checkOutStep, setCheckOutStep] = useState<"action" | "reject" | "approve-status">("action");
+  const [minWorkHours, setMinWorkHours] = useState(8);
 
   useEffect(() => {
-    apiFetch<{ requests: AnyRecord[] }>("/api/attendance/checkout-request")
-      .then((res) => setCheckOutRequests(res.requests ?? []))
+    apiFetch<{ requests: AnyRecord[]; minWorkHours?: number }>("/api/attendance/checkout-request")
+      .then((res) => {
+        setCheckOutRequests(res.requests ?? []);
+        if (res.minWorkHours) setMinWorkHours(res.minWorkHours);
+      })
       .catch(() => { });
   }, []);
 
@@ -887,6 +891,36 @@ export function FinanceMembersView({
                         <option value="halfDay">Half-Day</option>
                         <option value="absent">Absent</option>
                       </select>
+                      {att?.checkIn ? (() => {
+                        const checkInDate = new Date(att.checkIn);
+                        const checkInMs = checkInDate.getTime();
+                        const mwh = minWorkHours;
+                        let hoursToAdd: number;
+                        if (checkOutStatusType === "absent") {
+                          hoursToAdd = 0;
+                        } else if (checkOutStatusType === "halfDay") {
+                          hoursToAdd = mwh / 2;
+                        } else {
+                          hoursToAdd = mwh;
+                        }
+                        const estimatedDate = new Date(checkInMs + hoursToAdd * 60 * 60 * 1000);
+                        const estimatedTime = estimatedDate.toLocaleTimeString();
+                        return (
+                          <div className="rounded-xl border border-slate-200 bg-blue-50 px-4 py-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-blue-800">Estimated Check-out</span>
+                              <span className="text-sm font-bold text-blue-900">{estimatedTime}</span>
+                            </div>
+                            <p className="mt-0.5 text-xs text-blue-600">
+                              {checkOutStatusType === "absent"
+                                ? "Check-out set to same as check-in (0 hrs)"
+                                : checkOutStatusType === "halfDay"
+                                  ? `Check-in + ${mwh / 2} hrs (Half-Day)`
+                                  : `Check-in + ${mwh} hrs (Full Day)`}
+                            </p>
+                          </div>
+                        );
+                      })() : null}
                       <div className="flex gap-2">
                         <ActionButton
                           variant="secondary"

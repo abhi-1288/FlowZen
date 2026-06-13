@@ -59,13 +59,13 @@ export async function PATCH(request: Request) {
   if (hasMinWorkHours) company.minWorkHours = Math.floor(minWorkHours);
   await company.save();
 
-  if (hasPaidLeaveDays || hasPaidLeavePeriod) {
-    const targets = new Set<string>(
-      (company.members ?? []).map((member: any) => String(member))
-    );
-    targets.add(String(company.owner));
+  const targets = new Set<string>(
+    (company.members ?? []).map((member: any) => String(member))
+  );
+  targets.add(String(company.owner));
 
-    const body = `Paid leave policy updated: ${Math.floor(Number(company.paidLeaveDays ?? 0))} day(s) per ${String(company.paidLeavePeriod ?? "monthly")}`;
+  if (hasPaidLeaveDays || hasPaidLeavePeriod) {
+    const notifBody = `Paid leave policy updated: ${Math.floor(Number(company.paidLeaveDays ?? 0))} day(s) per ${String(company.paidLeavePeriod ?? "monthly")}`;
 
     await Notification.insertMany(
       Array.from(targets).map((targetUserId) => ({
@@ -73,7 +73,22 @@ export async function PATCH(request: Request) {
         company: company._id,
         type: "system",
         title: "Paid Leave Policy Updated",
-        body,
+        body: notifBody,
+      }))
+    );
+    Array.from(targets).forEach((target) => emitNotification(target));
+  }
+
+  if (hasMinWorkHours) {
+    const notifBody = `Minimum work hours policy updated: ${Math.floor(Number(company.minWorkHours ?? 0))} hrs / day`;
+
+    await Notification.insertMany(
+      Array.from(targets).map((targetUserId) => ({
+        user: targetUserId,
+        company: company._id,
+        type: "system",
+        title: "Work Hours Policy Updated",
+        body: notifBody,
       }))
     );
     Array.from(targets).forEach((target) => emitNotification(target));

@@ -43,6 +43,7 @@ type BoardStore = {
   addComment: (boardId: string, taskId: string, body: string) => Promise<void>;
   addAttachment: (boardId: string, taskId: string, name: string, url: string, id?: string) => Promise<void>;
   removeAttachment: (boardId: string, taskId: string, attachmentId: string) => Promise<void>;
+  setTasks: (tasks: Task[]) => void;
   moveTaskLocal: (taskId: string, toColumnId: string, overTaskId?: string) => { orderedTaskIds: string[] } | null;
   persistTaskMove: (boardId: string, taskId: string, toColumnId: string, orderedTaskIds: string[]) => Promise<void>;
 };
@@ -236,6 +237,7 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
     });
     set((state) => ({ tasks: state.tasks.map((item) => (item.id === task.id ? task : item)) }));
   },
+  setTasks: (tasks) => set({ tasks }),
   moveTaskLocal: (taskId, toColumnId, overTaskId) => {
     const { tasks } = get();
     const task = tasks.find((item) => item.id === taskId);

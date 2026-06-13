@@ -115,7 +115,9 @@ export function ProfileTab({
       ? "yearly"
       : "monthly",
   );
-  const [savingPolicy, setSavingPolicy] = useState(false);
+  const [savingNoticePeriod, setSavingNoticePeriod] = useState(false);
+  const [savingPaidLeave, setSavingPaidLeave] = useState(false);
+  const [savingDayHour, setSavingDayHour] = useState(false);
   // WFH quota (HR)
   const [minWorkHours, setMinWorkHours] = useState<number>(
     Math.max(1, Math.min(24, Number(company?.minWorkHours ?? 8))),
@@ -284,27 +286,60 @@ export function ProfileTab({
     }
   }
 
-  async function savePolicy() {
+  async function saveNoticePeriodOnly() {
     try {
-      setSavingPolicy(true);
+      setSavingNoticePeriod(true);
       await apiFetch("/api/hr/policy", {
         method: "PATCH",
-        body: JSON.stringify({
-          noticePeriodDays,
-          paidLeaveDays,
-          paidLeavePeriod,
-          minWorkHours,
-        }),
+        body: JSON.stringify({ noticePeriodDays }),
       });
-      showToast("Policy updated.");
+      showToast("Notice period updated.", "success");
       await refresh(true);
     } catch (err) {
       showToast(
-        err instanceof Error ? err.message : "Unable to update policy.",
+        err instanceof Error ? err.message : "Unable to update notice period.",
         "error",
       );
     } finally {
-      setSavingPolicy(false);
+      setSavingNoticePeriod(false);
+    }
+  }
+
+  async function savePaidLeaveOnly() {
+    try {
+      setSavingPaidLeave(true);
+      await apiFetch("/api/hr/policy", {
+        method: "PATCH",
+        body: JSON.stringify({ paidLeaveDays, paidLeavePeriod }),
+      });
+      showToast("Paid leave policy updated.", "success");
+      await refresh(true);
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Unable to update paid leave policy.",
+        "error",
+      );
+    } finally {
+      setSavingPaidLeave(false);
+    }
+  }
+
+  async function saveDayHourOnly() {
+    try {
+      setSavingDayHour(true);
+      await apiFetch("/api/hr/policy", {
+        method: "PATCH",
+        body: JSON.stringify({ minWorkHours }),
+      });
+      showToast("Day-hour working policy updated.", "success");
+      await refresh(true);
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Unable to update day-hour policy.",
+        "error",
+      );
+    } finally {
+      setSavingDayHour(false);
     }
   }
 
@@ -924,11 +959,11 @@ export function ProfileTab({
               </select>
               <button
                 className="mt-3 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={savingPolicy}
+                disabled={savingNoticePeriod}
                 type="button"
-                onClick={() => void savePolicy()}
+                onClick={() => void saveNoticePeriodOnly()}
               >
-                {savingPolicy ? "Saving..." : "Save policy"}
+                {savingNoticePeriod ? "Saving..." : "Save policy"}
               </button>
             </div>
 
@@ -970,11 +1005,11 @@ export function ProfileTab({
               </p>
               <button
                 className="mt-3 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={savingPolicy}
+                disabled={savingPaidLeave}
                 type="button"
-                onClick={() => void savePolicy()}
+                onClick={() => void savePaidLeaveOnly()}
               >
-                {savingPolicy ? "Saving..." : "Save paid leave"}
+                {savingPaidLeave ? "Saving..." : "Save paid leave"}
               </button>
             </div>
 
@@ -1031,12 +1066,12 @@ export function ProfileTab({
                 />
                 <span className="text-sm text-slate-600">hours per day</span>
                 <button
-                  onClick={() => void savePolicy()}
-                  disabled={savingPolicy}
+                  onClick={() => void saveDayHourOnly()}
+                  disabled={savingDayHour}
                   className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 transition"
                   type="button"
                 >
-                  {savingPolicy ? "Saving..." : "Save"}
+                  {savingDayHour ? "Saving..." : "Save"}
                 </button>
               </div>
               <p className="mt-2 text-xs text-slate-500">

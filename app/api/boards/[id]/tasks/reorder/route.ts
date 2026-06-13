@@ -115,8 +115,6 @@ export async function PATCH(request: Request, { params }: Params) {
     emitToUser(String(board.owner), "notification:new", { boardId: id });
   }
 
-  emitToBoard(board, "board:update", id);
-
   await Promise.all(
     orderedTaskIds.map((orderedTaskId: string, order: number) =>
       Task.updateOne({ _id: orderedTaskId, board: id, column: toColumnId }, { $set: { order } })
@@ -129,5 +127,7 @@ export async function PATCH(request: Request, { params }: Params) {
   }
 
   const tasks = await Task.find({ board: id }).sort({ column: 1, order: 1 });
-  return NextResponse.json({ tasks: serializeDocs(tasks) });
+  const serialized = serializeDocs(tasks);
+  emitToBoard(board, "board:update", { type: "tasks", boardId: id, tasks: serialized });
+  return NextResponse.json({ tasks: serialized });
 }

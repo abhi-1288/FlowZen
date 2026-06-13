@@ -10,6 +10,7 @@ import { useBoardStore } from "@/store/board-store";
 import { BoardCanvas } from "@/components/boards/board-canvas";
 import { AssignModal, BoardModal, BoardEditModal, ColumnModal, InviteModal, TaskModal } from "@/components/boards/modals";
 import { apiFetch } from "@/lib/client-utils";
+import { useNotificationToast } from "@/lib/toast-context";
 
 type NotificationPreview = {
   readAt?: string | null;
@@ -27,7 +28,10 @@ export function BoardShell({ boardId }: { boardId?: string }) {
   const fetchBoard = useBoardStore((state) => state.fetchBoard);
   const createBoard = useBoardStore((state) => state.createBoard);
   const setModal = useBoardStore((state) => state.setModal);
+  const setTasks = useBoardStore((state) => state.setTasks);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  const { showNotificationToast } = useNotificationToast();
 
   const [filter, setFilter] = useState<"all" | "self" | "assigned" | "invited">("all");
   const [boardSearchQuery, setBoardSearchQuery] = useState("");
@@ -95,10 +99,16 @@ export function BoardShell({ boardId }: { boardId?: string }) {
           if (!mounted) return;
           try {
             const data = JSON.parse(event.data);
-            const boardIdFromEvent = typeof data === "string" ? data : data?.id || data?.boardId;
-            console.log("SSE: board:update received", boardIdFromEvent);
-            void fetchBoards(true);
-            if (boardIdFromEvent === boardId) void fetchBoard(boardIdFromEvent, true);
+            if (data?.type === "tasks") {
+              const boardIdFromEvent = String(data.boardId);
+              if (boardIdFromEvent === boardId) {
+                setTasks(data.tasks);
+              }
+            } else {
+              const boardIdFromEvent = typeof data === "string" ? data : data?.id || data?.boardId;
+              console.log("SSE: board:update received", boardIdFromEvent);
+              if (boardIdFromEvent === boardId) void fetchBoard(boardIdFromEvent, true);
+            }
           } catch (err) {
             console.error("SSE: failed to parse board:update", err);
           }
@@ -108,12 +118,14 @@ export function BoardShell({ boardId }: { boardId?: string }) {
           if (!mounted) return;
           console.log("SSE: notification:new received");
           new Audio("/sound/notification_sound.mp3").play().catch((err) => console.warn("Notification sound unavailable:", err));
+          apiFetch<{ notifications: any[] }>("/api/notifications")
+            .then((res) => {
+              const latest = res.notifications?.[0];
+              if (latest) showNotificationToast(String(latest.title ?? "Notification"), String(latest.body ?? ""));
+              setUnreadNotifications(res.notifications.filter((item) => !item.readAt).length);
+            })
+            .catch(() => {});
           void fetchBoards(true);
-          const refreshCount = async () => {
-            const result = await apiFetch<{ notifications: NotificationPreview[] }>("/api/notifications").catch(() => null);
-            setUnreadNotifications(result?.notifications.filter((item) => !item.readAt).length ?? 0);
-          };
-          void refreshCount();
         });
 
         eventSource.onerror = () => {

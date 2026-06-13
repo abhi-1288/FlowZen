@@ -120,16 +120,19 @@ export async function GET(request: Request) {
   const isFinanceOrAdmin = role === "finance" || role === "admin";
 
   let requests;
+  let minWorkHours = 8;
   if (isFinanceOrAdmin && user.company) {
     requests = await CheckOutRequest.find({ company: user.company })
       .populate("requester", "name email")
       .populate("attendance", "checkIn checkOut date")
       .sort({ createdAt: -1 });
+    const company = await Company.findById(user.company).select("minWorkHours");
+    if (company) minWorkHours = company.minWorkHours ?? 8;
   } else {
     requests = await CheckOutRequest.find({ requester: userId })
       .populate("attendance", "checkIn checkOut date")
       .sort({ createdAt: -1 });
   }
 
-  return NextResponse.json({ requests });
+  return NextResponse.json({ requests, minWorkHours });
 }

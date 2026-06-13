@@ -24,6 +24,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
+import { useNotificationToast } from "@/lib/toast-context";
 import { ProfileSkeleton, NavButton } from "./profile-hub/chrome";
 import { AttendanceTab } from "./profile-hub/attendance-tab";
 import { ApprovalsTab, MembersTab, MessagesTab, NotificationsTab } from "./profile-hub/admin-tabs";
@@ -166,6 +167,8 @@ export function ProfileHub() {
     "notifications",
     "attendance",
   ];
+
+  const { showNotificationToast } = useNotificationToast();
 
   const showToast = (text: string, type: "success" | "error" = "success") => {
     setToast({ text, type });
@@ -315,6 +318,12 @@ export function ProfileHub() {
           console.log("SSE: ProfileHub notification:new received");
           const snd = new Audio("/sound/notification_sound.mp3");
           snd.play().catch((err) => console.warn("Notification sound unavailable:", err));
+          apiFetch<{ notifications: AnyRecord[] }>("/api/notifications")
+            .then((res) => {
+              const latest = res.notifications?.[0];
+              if (latest) showNotificationToast(String(latest.title ?? "Notification"), String(latest.body ?? ""));
+            })
+            .catch(() => {});
           void load(true);
         });
 
