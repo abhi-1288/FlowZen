@@ -108,6 +108,14 @@ const UserSchema = new Schema(
         date: { type: Date, default: Date.now },
         type: { type: String, default: "increment" }
       }
+    ],
+    roleHistory: [
+      {
+        oldRole: { type: String, required: true },
+        newRole: { type: String, required: true },
+        changedBy: { type: String, default: "" },
+        changedAt: { type: Date, default: Date.now },
+      }
     ]
   },
   { timestamps: true },

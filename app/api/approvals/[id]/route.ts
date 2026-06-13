@@ -136,6 +136,7 @@ export async function PATCH(request: Request, { params }: Params) {
     const validStatuses = ["approved", "hr-approved", "rejected"];
     let status = validStatuses.includes(body.status) ? body.status : "rejected";
     const force = Boolean(body.force);
+    const rejectionReason = String(body.reason ?? "").trim();
 
     await connectDb();
     const joinRequest = await JoinRequest.findById(id);
@@ -195,7 +196,7 @@ export async function PATCH(request: Request, { params }: Params) {
       }
     }
 
-    if (status === "approved" && (joinRequest.kind === "quit-company" || joinRequest.kind === "quit-team") && !force) {
+    if (status === "approved" && joinRequest.kind === "quit-company" && !force) {
       const company = await Company.findById(joinRequest.company).select("noticePeriodDays");
       const noticeDays = Math.max(0, Number(company?.noticePeriodDays ?? 0));
       if (noticeDays > 0) {
@@ -558,6 +559,60 @@ export async function PATCH(request: Request, { params }: Params) {
       }
     }
 
+    if (joinRequest.kind === "document-letter") {
+      const metadata = (joinRequest.metadata ?? {}) as Record<string, unknown>;
+      if (status === "approved") {
+        metadata.approvedAt = new Date().toISOString();
+        metadata.requesterName = requester.name;
+        metadata.requesterRole = requester.role;
+
+        if (String(metadata.letterType ?? "") === "resignation") {
+          const existingQuit = await JoinRequest.findOne({
+            requester: requester._id,
+            kind: "quit-company",
+            status: "pending",
+          });
+          if (!existingQuit) {
+            await JoinRequest.create({
+              requester: requester._id,
+              approver: joinRequest.approver,
+              company: joinRequest.company,
+              kind: "quit-company",
+              status: "pending",
+            });
+            const resolvedHr =
+              joinRequest.approver && String(joinRequest.approver).length > 0
+                ? joinRequest.approver
+                : null;
+            const fallbackHr = await User.findOne({
+              company: joinRequest.company,
+              role: "human-resource",
+              companyStatus: "approved",
+            })
+              .select("_id")
+              .sort({ createdAt: 1 })
+              .lean();
+            const quitApproverId =
+              resolvedHr ?? (fallbackHr ? String((fallbackHr as any)._id) : null);
+            if (quitApproverId) {
+              const notifyBody = `${String(requester.name ?? "A member")} has submitted a resignation. Their quit request is pending and will be processed after the notice period ends.`;
+              await Notification.create({
+                user: quitApproverId,
+                company: joinRequest.company,
+                type: "approval",
+                title: "Resignation quit request",
+                message: notifyBody,
+              });
+              emitNotification(String(quitApproverId));
+            }
+          }
+        }
+      } else if (status === "rejected" && rejectionReason) {
+        metadata.rejectionReason = rejectionReason;
+      }
+      joinRequest.metadata = metadata;
+    }
+
     if (joinRequest.kind !== "salary-increment" || status === "approved" || status === "rejected") {
       await requester.save();
     }
@@ -620,7 +675,19 @@ export async function PATCH(request: Request, { params }: Params) {
         status === "approved"
           ? `Your role transfer approval for ${companyName} was approved`
           : `Your role transfer request for ${companyName} was rejected`;
+    } else if (joinRequest.kind === "document-letter") {
+      const letterType = String((joinRequest.metadata as any)?.letterType ?? "").replace("-", " ");
+      title = status === "approved" ? "Document letter approved" : "Document letter rejected";
+      message =
+        status === "approved"
+          ? `Your ${letterType} request has been approved. View it here.`
+          : `Your ${letterType} request was rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`;
     }
+
+    const notificationLink =
+      joinRequest.kind === "document-letter" && status === "approved"
+        ? `/letter/${id}`
+        : "";
 
     await Notification.create({
       user: requester._id,
@@ -629,6 +696,7 @@ export async function PATCH(request: Request, { params }: Params) {
       type: "approval",
       title,
       message,
+      link: notificationLink,
     });
     emitNotification(String(requester._id));
 

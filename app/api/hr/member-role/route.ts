@@ -71,6 +71,15 @@ export async function PATCH(request: Request) {
 
   if (newRole) {
     if (!VALID_ROLES.includes(newRole)) return jsonError("Invalid role.", 400);
+    const oldRole = member.role;
+    if (oldRole !== newRole) {
+      member.roleHistory.push({
+        oldRole,
+        newRole,
+        changedBy: actor.name ?? "Unknown",
+        changedAt: new Date(),
+      });
+    }
     member.role = newRole;
     member.customRole = "";
     await member.save();

@@ -60,7 +60,7 @@ export async function GET() {
     if (String(actor.role) === "admin" && actor.company) {
       const companyPendingRequests = await JoinRequest.find({
         company: actor.company,
-        kind: { $in: ["company", "identity-code", "quit-company", "quit-company-board-transfer", "role-transfer"] },
+        kind: { $in: ["company", "identity-code", "quit-company", "quit-company-board-transfer", "role-transfer", "document-letter"] },
         status: "pending",
       })
         .sort({ createdAt: -1 })
@@ -99,15 +99,15 @@ export async function GET() {
       String(actor.companyStatus) === "approved" &&
       actor.company
     ) {
-      const hrQuitRequests = await JoinRequest.find({
+      const hrCompanyRequests = await JoinRequest.find({
         company: actor.company,
-        kind: "quit-company",
+        kind: { $in: ["quit-company", "document-letter"] },
         status: "pending",
       })
         .sort({ createdAt: -1 })
         .lean();
 
-      const requesterIds = hrQuitRequests
+      const requesterIds = hrCompanyRequests
         .map((request) => request.requester)
         .filter(Boolean);
       const requesters = await User.find({ _id: { $in: requesterIds } })
@@ -115,7 +115,7 @@ export async function GET() {
         .lean();
       const rolesByUserId = new Map(requesters.map((requester) => [String(requester._id), String(requester.role ?? "")]));
 
-      requests = [...directRequests, ...hrQuitRequests.filter((request) => rolesByUserId.get(String(request.requester ?? "")) !== "human-resource")]
+      requests = [...directRequests, ...hrCompanyRequests.filter((request) => rolesByUserId.get(String(request.requester ?? "")) !== "human-resource")]
         .filter((request, index, all) => {
           const id = String(request._id);
           return all.findIndex((r) => String(r._id) === id) === index;

@@ -131,18 +131,21 @@ export async function GET() {
     insights.enrolledByHr = await resolveEnrollingHr(user);
     insights.joinedBy = await resolveJoinedByInfo(user);
   }
-  if (pendingQuitRequest && user.company) {
+  if (user.company) {
     const companyDoc = await Company.findById(userCompanyId).select("noticePeriodDays");
     const noticeDays = Number(companyDoc?.noticePeriodDays ?? 0);
-    const elapsedDays = Math.max(
-      0,
-      Math.floor((Date.now() - new Date(pendingQuitRequest.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
-    );
-    insights.pendingQuitNotice = {
-      noticeDays,
-      elapsedDays,
-      remainingDays: Math.max(0, noticeDays - elapsedDays),
-    };
+    insights.noticePeriodDays = noticeDays;
+    if (pendingQuitRequest) {
+      const elapsedDays = Math.max(
+        0,
+        Math.floor((Date.now() - new Date(pendingQuitRequest.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
+      );
+      insights.pendingQuitNotice = {
+        noticeDays,
+        elapsedDays,
+        remainingDays: Math.max(0, noticeDays - elapsedDays),
+      };
+    }
   }
 
   if (user.company && user.companyStatus === "approved") {

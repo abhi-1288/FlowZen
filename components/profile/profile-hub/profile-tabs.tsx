@@ -35,6 +35,7 @@ import {
 import { VersionPanel } from "@/components/version/version-panel";
 import { WfhAssignModal } from "./wfh-assign-modal";
 import { ManageWfhDatesModal } from "./manage-wfh-dates-modal";
+import { DocumentLetterModal } from "./document-letter-modal";
 
 export function ProfileTab({
   profile,
@@ -139,6 +140,7 @@ export function ProfileTab({
   const [confirmDateIsWeekend, setConfirmDateIsWeekend] = useState(false);
   const [confirmDateDay, setConfirmDateDay] = useState(0);
   const [identityRequesting, setIdentityRequesting] = useState(false);
+  const [showDocLetterModal, setShowDocLetterModal] = useState(false);
   const managerTeams = Array.isArray(
     (insights?.manager as AnyRecord | undefined)?.teams,
   )
@@ -740,6 +742,27 @@ export function ProfileTab({
               }
             />
           </dl>
+
+          {Array.isArray(profile?.roleHistory) && profile.roleHistory.length > 0 ? (
+            <div className="mt-5 border-t border-slate-100 pt-4">
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                Role History
+              </p>
+              <div className="space-y-2">
+                {(profile.roleHistory as { oldRole: string; newRole: string; changedBy: string; changedAt: string }[]).map((entry, i) => (
+                  <div key={i} className="flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    <span className="font-medium text-slate-900">{formatRole(entry.oldRole)}</span>
+                    <span className="text-slate-400">→</span>
+                    <span className="font-medium text-emerald-700">{formatRole(entry.newRole)}</span>
+                    <span className="ml-auto whitespace-nowrap text-slate-400">
+                      {new Date(entry.changedAt).toLocaleDateString()}
+                    </span>
+                    <span className="text-slate-400">by {entry.changedBy}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </section>
 
         {/* ── Company & Team ── */}
@@ -1558,6 +1581,27 @@ export function ProfileTab({
           </section>
         ) : null}
 
+        {inApprovedCompany ? (
+          <section className={sectionClass}>
+            <div className="mb-5 border-l-4 border-indigo-500 pl-4">
+              <h3 className="text-base font-semibold text-slate-900">Document Letters</h3>
+              <p className="mt-0.5 text-sm text-slate-500">
+                Request official company letters (experience, salary certificate, etc.)
+              </p>
+            </div>
+            <p className="mt-4 text-sm text-slate-600">
+              Submit a request to HR for an official document letter. Once approved, you can view and download the PDF.
+            </p>
+            <button
+              className="mt-4 rounded-lg bg-slate-950 px-5 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              type="button"
+              onClick={() => setShowDocLetterModal(true)}
+            >
+              Request Document Letter
+            </button>
+          </section>
+        ) : null}
+
         <section className={sectionClass}>
           <div className="mb-5 border-l-4 border-rose-500 pl-4">
             <h3 className="text-base font-semibold text-slate-900">Security</h3>
@@ -1617,6 +1661,14 @@ export function ProfileTab({
 
         <MonthlyCheckBox sectionClass={sectionClass} showToast={showToast} />
       </div>
+
+      {showDocLetterModal ? (
+        <DocumentLetterModal
+          onClose={() => setShowDocLetterModal(false)}
+          onSuccess={() => { setShowDocLetterModal(false); void refresh(true); }}
+          showToast={showToast}
+        />
+      ) : null}
 
       {/* Modal */}
       {modal ? (

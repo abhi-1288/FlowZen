@@ -1,5 +1,5 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
-import { Bell, Building2, Check, Clipboard, Trash2, Users, X } from "lucide-react";
+import { Bell, Building2, Check, Clipboard, ExternalLink, Trash2, Users, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { apiFetch } from "@/lib/client-utils";
 import { ActionButton, AnyRecord, AvatarBadge, displayNested, formatRole, formatRoleWithCustom } from "./shared";
@@ -17,6 +17,9 @@ export function ApprovalsTab({
   const [decidingIds, setDecidingIds] = useState<Record<string, boolean>>({});
   const [clearedIds, setClearedIds] = useState<Record<string, boolean>>({});
   const [salaryAmounts, setSalaryAmounts] = useState<Record<string, string>>({});
+  const [rejectModalId, setRejectModalId] = useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [viewingResignation, setViewingResignation] = useState<AnyRecord | null>(null);
 
   function requestIdOf(request: AnyRecord) {
     const value = request.id ?? request._id;
@@ -65,6 +68,7 @@ export function ApprovalsTab({
     status: "approved" | "rejected",
     force = false,
     requestKind?: string,
+    reason?: string,
   ) {
     if (!id) return;
     const salaryAmount = ["salary", "company"].includes(String(requestKind ?? ""))
@@ -74,7 +78,7 @@ export function ApprovalsTab({
     try {
       await apiFetch(`/api/approvals/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ status, force, salaryAmount }),
+        body: JSON.stringify({ status, force, salaryAmount, reason }),
       });
       setClearedIds((current) => ({ ...current, [id]: true }));
       showToast(`Request ${status}${force ? " (forced)" : ""}.`);
@@ -128,6 +132,8 @@ export function ApprovalsTab({
                   ? "requested salary assignment"
                   : String(request.kind) === "salary-increment"
                   ? `requested salary update for ${metadata.targetUserName || "a member"}`
+                  : request.kind === "document-letter"
+                  ? `requested a ${String((request.metadata as any)?.letterType ?? "document").replace(/-/g, " ")} letter`
                   : "requested to join"}{" "}
                 {String(request.kind) === "identity-code"
                   ? displayNested(request.company, "name", "company")
@@ -145,6 +151,16 @@ export function ApprovalsTab({
                 <p className="mt-1 text-xs text-slate-500">
                   Role transfer approval pending.
                 </p>
+              ) : String(request.kind) === "document-letter" ? (
+                <div className="mt-1 space-y-0.5 text-xs text-slate-500">
+                  <p>Purpose: {String((request.metadata as any)?.purpose ?? "")}</p>
+                  {String((request.metadata as any)?.letterType ?? "") === "resignation" ? (
+                    <>
+                      <p>Last working day: {String((request.metadata as any)?.resignationLastWorkingDay ?? "")}</p>
+                      <p>Notice period: {String((request.metadata as any)?.noticePeriodDays ?? "")} days</p>
+                    </>
+                  ) : null}
+                </div>
               ) : String(request.kind).startsWith("quit-") ? (
                 <p className="mt-1 text-xs text-slate-500">
                   {(() => {
@@ -169,11 +185,28 @@ export function ApprovalsTab({
               ) : null}
             </div>
             <div className="flex gap-2">
+                {String(request.kind) === "document-letter" && String((request.metadata as any)?.letterType ?? "") === "resignation" ? (
+                  <ActionButton
+                    variant="secondary"
+                    className="px-3"
+                    disabled={isDeciding}
+                    onClick={() => setViewingResignation(request)}
+                  >
+                    View
+                  </ActionButton>
+                ) : null}
                 <ActionButton
                   variant="danger"
                   className="px-3"
                   disabled={isDeciding}
-                  onClick={() => decide(requestId, "rejected", false, String(request.kind ?? ""))}
+                  onClick={() => {
+                    if (String(request.kind ?? "") === "document-letter") {
+                      setRejectModalId(requestId);
+                      setRejectionReason("");
+                    } else {
+                      decide(requestId, "rejected", false, String(request.kind ?? ""));
+                    }
+                  }}
                 >
                   {isDeciding ? "Working..." : "Decline"}
                 </ActionButton>
@@ -236,6 +269,129 @@ export function ApprovalsTab({
           <p className="py-6 text-sm text-slate-500">No pending approvals.</p>
         ) : null}
       </div>
+
+      {rejectModalId ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setRejectModalId(null); }}
+        >
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl">
+            <div className="border-b border-slate-100 px-6 py-4">
+              <h4 className="text-lg font-semibold text-slate-900">Rejection Reason</h4>
+              <p className="mt-0.5 text-sm text-slate-500">Provide a reason for declining this letter request.</p>
+            </div>
+            <div className="px-6 py-5">
+              <textarea
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                rows={3}
+                placeholder="e.g., Insufficient documentation, request doesn't meet company policy..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">
+              <button
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                type="button"
+                onClick={() => setRejectModalId(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 hover:bg-red-700"
+                type="button"
+                disabled={!rejectionReason.trim()}
+                onClick={() => {
+                  if (rejectModalId) {
+                    decide(rejectModalId, "rejected", false, "document-letter", rejectionReason.trim());
+                    setRejectModalId(null);
+                  }
+                }}
+              >
+                Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {viewingResignation ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setViewingResignation(null); }}
+        >
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+              <div>
+                <h4 className="text-lg font-semibold text-slate-900">Resignation Letter Details</h4>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  {String((viewingResignation.metadata as any)?.requesterName ?? (viewingResignation.requester as any)?.name ?? "Employee")}
+                  {" "}· {String((viewingResignation.metadata as any)?.requesterRole ?? (viewingResignation.requester as any)?.role ?? "")}
+                </p>
+              </div>
+              <button
+                className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
+                type="button"
+                onClick={() => setViewingResignation(null)}
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="max-h-[65vh] space-y-3 overflow-y-auto px-6 py-5 text-sm leading-relaxed text-slate-800">
+              <p>Date: <strong>{new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</strong></p>
+              <br />
+              <p><strong>Subject: Resignation Letter</strong></p>
+              <br />
+              <p>Dear <strong>{(viewingResignation.approver as any)?.name ?? "Human Resource"}</strong>,</p>
+              <br />
+              <p>
+                Please accept this letter as formal notice of my resignation from my position as{" "}
+                <strong>{String((viewingResignation.metadata as any)?.requesterRole ?? (viewingResignation.requester as any)?.role ?? "Member")}</strong>
+                {" "}at <strong>{String((viewingResignation.company as any)?.name ?? "Company")}</strong>.
+                {" "}My last working day will be{" "}
+                <strong>
+                  {new Date(String((viewingResignation.metadata as any)?.resignationLastWorkingDay ?? "")).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+                </strong>, in accordance with my{" "}
+                <strong>{String((viewingResignation.metadata as any)?.noticePeriodDays ?? "")}-day notice period</strong>.
+              </p>
+              <br />
+              <p>
+                I joined <strong>{String((viewingResignation.company as any)?.name ?? "Company")}</strong> on
+                {" "}<strong>{new Date((viewingResignation.requester as any)?.companyJoined ?? Date.now()).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</strong>,
+                {" "}and I am grateful for the opportunities, support, and experiences I have gained during my tenure. Working with the team has been valuable for my professional and personal growth.
+              </p>
+              <br />
+              <p>
+                I will do my best to ensure a smooth transition of my responsibilities during the notice period. Please let me know how I can assist in this process.
+              </p>
+              <br />
+              <p>Thank you for your guidance and support. I wish the company and the team continued success in the future.</p>
+              <br />
+              <p>Sincerely,</p>
+              <br />
+              <p className="font-semibold">{String((viewingResignation.metadata as any)?.requesterName ?? (viewingResignation.requester as any)?.name ?? "Employee")}</p>
+              {(viewingResignation.requester as any)?.companyIdentityCode ? (
+                <p className="text-xs text-slate-500">ID: {String((viewingResignation.requester as any)?.companyIdentityCode)}</p>
+              ) : null}
+              <p className="capitalize">{String((viewingResignation.metadata as any)?.requesterRole ?? (viewingResignation.requester as any)?.role ?? "")}</p>
+              <p>{String((viewingResignation.company as any)?.name ?? "")}</p>
+              {(viewingResignation.requester as any)?.email ? (
+                <p className="text-slate-500">{String((viewingResignation.requester as any)?.email)}</p>
+              ) : null}
+            </div>
+            <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">
+              <button
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                type="button"
+                onClick={() => setViewingResignation(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -1605,6 +1761,17 @@ export function NotificationsTab({
                           </div>
                         </div>
                         <div className="flex shrink-0 gap-2 sm:flex-col">
+                          {item.link ? (
+                            <a
+                              href={String(item.link)}
+                              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <ExternalLink size={14} />
+                              View
+                            </a>
+                          ) : null}
                           {!item.readAt ? (
                             <ActionButton
                               aria-label="Mark notification as read"

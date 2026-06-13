@@ -1,0 +1,347 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { X } from "lucide-react";
+import { apiFetch } from "@/lib/client-utils";
+
+type Props = {
+  onClose: () => void;
+  onSuccess: () => void;
+  showToast: (text: string, type?: "success" | "error") => void;
+};
+
+type HrUser = {
+  _id: string;
+  name: string;
+  email: string;
+};
+
+const LETTER_TYPES = [
+  { value: "experience", label: "Experience Certificate" },
+  { value: "salary-certificate", label: "Salary Certificate" },
+  { value: "offer-letter", label: "Offer Letter" },
+  { value: "relieving", label: "Relieving Letter" },
+  { value: "internship", label: "Internship Certificate" },
+  { value: "resignation", label: "Resignation Letter" },
+  { value: "other", label: "Other" },
+];
+
+export function DocumentLetterModal({ onClose, onSuccess, showToast }: Props) {
+  const [letterType, setLetterType] = useState("experience");
+  const [customType, setCustomType] = useState("");
+  const [purpose, setPurpose] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [hrs, setHrs] = useState<HrUser[]>([]);
+  const [selectedHrId, setSelectedHrId] = useState("");
+  const [internshipStart, setInternshipStart] = useState("");
+  const [internshipEnd, setInternshipEnd] = useState("");
+  const [projectTitle, setProjectTitle] = useState("");
+  const [projectDescription, setProjectDescription] = useState("");
+  const [projectAchievements, setProjectAchievements] = useState("");
+  const [resignationLastWorkingDay, setResignationLastWorkingDay] = useState("");
+  const [noticePeriodDays, setNoticePeriodDays] = useState(30);
+  const [companyJoined, setCompanyJoined] = useState("");
+
+  useEffect(() => {
+    apiFetch<{ users: HrUser[] }>("/api/users?role=human-resource")
+      .then((res) => {
+        setHrs(res.users ?? []);
+        if (res.users?.length === 1) {
+          setSelectedHrId(res.users[0]._id);
+        }
+      })
+      .catch(() => {});
+    apiFetch<{ noticePeriodDays?: number; user?: { companyJoined?: string } }>("/api/profile")
+      .then((res) => {
+        if (res.noticePeriodDays) setNoticePeriodDays(res.noticePeriodDays);
+        if (res.user?.companyJoined) setCompanyJoined(res.user.companyJoined);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (letterType === "resignation" && noticePeriodDays > 0) {
+      const earliest = new Date();
+      earliest.setDate(earliest.getDate() + noticePeriodDays);
+      setResignationLastWorkingDay(earliest.toISOString().slice(0, 10));
+    }
+  }, [letterType, noticePeriodDays]);
+
+  async function handleSubmit() {
+    if (!purpose.trim()) {
+      showToast("Please enter a purpose.", "error");
+      return;
+    }
+    if (letterType === "other" && !customType.trim()) {
+      showToast("Please enter a custom letter type.", "error");
+      return;
+    }
+    if (letterType === "internship") {
+      if (!internshipStart || !internshipEnd) {
+        showToast("Please enter the internship start and end dates.", "error");
+        return;
+      }
+      if (new Date(internshipEnd) <= new Date(internshipStart)) {
+        showToast("End date must be after start date.", "error");
+        return;
+      }
+      if (!projectTitle.trim()) {
+        showToast("Please enter a project title.", "error");
+        return;
+      }
+      if (!projectDescription.trim()) {
+        showToast("Please describe what the project does.", "error");
+        return;
+      }
+    }
+    if (letterType === "resignation") {
+      if (!resignationLastWorkingDay) {
+        showToast("Please enter the last working day.", "error");
+        return;
+      }
+      const earliest = new Date();
+      earliest.setDate(earliest.getDate() + noticePeriodDays);
+      if (new Date(resignationLastWorkingDay) < earliest) {
+        showToast(`Last working day must be at least ${noticePeriodDays} days from today (notice period).`, "error");
+        return;
+      }
+    }
+
+    try {
+      setSubmitting(true);
+      await apiFetch("/api/hr/document-letter", {
+        method: "POST",
+        body: JSON.stringify({
+          letterType,
+          purpose: purpose.trim(),
+          customType: customType.trim(),
+          approverId: selectedHrId || undefined,
+          internshipStart: letterType === "internship" ? internshipStart : undefined,
+          internshipEnd: letterType === "internship" ? internshipEnd : undefined,
+          projectTitle: letterType === "internship" ? projectTitle.trim() : undefined,
+          projectDescription: letterType === "internship" ? projectDescription.trim() : undefined,
+          projectAchievements: letterType === "internship" ? projectAchievements.trim() : undefined,
+          resignationLastWorkingDay: letterType === "resignation" ? resignationLastWorkingDay : undefined,
+        }),
+      });
+      showToast("Document letter request sent for approval.");
+      onSuccess();
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Failed to submit request.",
+        "error",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-xl">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+          <div>
+            <h4 className="text-lg font-semibold text-slate-900">
+              Request Document Letter
+            </h4>
+            <p className="mt-0.5 text-sm text-slate-500">
+              Submit a request to HR for a company document letter.
+            </p>
+          </div>
+          <button
+            className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="max-h-[65vh] space-y-4 overflow-y-auto px-6 py-5">
+          <div>
+            <label className="text-xs font-semibold uppercase text-slate-500">
+              Letter Type
+            </label>
+            <select
+              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+              value={letterType}
+              onChange={(e) => setLetterType(e.target.value)}
+            >
+              {LETTER_TYPES.map((lt) => (
+                <option key={lt.value} value={lt.value}>
+                  {lt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {letterType === "other" ? (
+            <div>
+              <label className="text-xs font-semibold uppercase text-slate-500">
+                Custom Letter Type
+              </label>
+              <input
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                placeholder="e.g., Bonafide Certificate"
+                value={customType}
+                onChange={(e) => setCustomType(e.target.value)}
+              />
+            </div>
+          ) : null}
+
+          {letterType === "internship" ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold uppercase text-slate-500">
+                    From Date
+                  </label>
+                  <input
+                    type="date"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                    value={internshipStart}
+                    onChange={(e) => setInternshipStart(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase text-slate-500">
+                    To Date
+                  </label>
+                  <input
+                    type="date"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                    value={internshipEnd}
+                    onChange={(e) => setInternshipEnd(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase text-slate-500">
+                  Project Title <span className="text-red-500">*</span>
+                </label>
+                <input
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                  placeholder="e.g., Task Management Dashboard"
+                  value={projectTitle}
+                  onChange={(e) => setProjectTitle(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase text-slate-500">
+                  What does it do? <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                  rows={2}
+                  placeholder="Briefly describe what the project does"
+                  value={projectDescription}
+                  onChange={(e) => setProjectDescription(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase text-slate-500">
+                  Achievements
+                </label>
+                <textarea
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                  rows={2}
+                  placeholder="What did you achieve? (optional)"
+                  value={projectAchievements}
+                  onChange={(e) => setProjectAchievements(e.target.value)}
+                />
+              </div>
+            </>
+          ) : null}
+
+          {letterType === "resignation" ? (
+            <>
+              <div>
+                <label className="text-xs font-semibold uppercase text-slate-500">
+                  Last Working Day <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                  value={resignationLastWorkingDay}
+                  onChange={(e) => setResignationLastWorkingDay(e.target.value)}
+                  min={new Date(Date.now() + noticePeriodDays * 86400000).toISOString().slice(0, 10)}
+                />
+                <p className="mt-1 text-xs text-slate-400">
+                  Notice period: {noticePeriodDays} days. Earliest last working day is{" "}
+                  {new Date(Date.now() + noticePeriodDays * 86400000).toLocaleDateString("en-IN")}.
+                </p>
+              </div>
+              {companyJoined ? (
+                <p className="text-xs text-slate-500">
+                  Joined company on: {new Date(companyJoined).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+                </p>
+              ) : null}
+            </>
+          ) : null}
+
+          <div>
+            <label className="text-xs font-semibold uppercase text-slate-500">
+              Purpose
+            </label>
+            <textarea
+              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+              rows={3}
+              placeholder="e.g., For visa application, higher education, bank loan..."
+              value={purpose}
+              onChange={(e) => setPurpose(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold uppercase text-slate-500">
+              Assign to HR
+            </label>
+            <select
+              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+              value={selectedHrId}
+              onChange={(e) => setSelectedHrId(e.target.value)}
+            >
+              <option value="">Auto-assign</option>
+              {hrs.map((hr) => (
+                <option key={hr._id} value={hr._id}>
+                  {hr.name} ({hr.email})
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-slate-400">
+              {hrs.length === 0
+                ? "No HR members found. The request will be auto-assigned."
+                : hrs.length > 1
+                  ? "Select a specific HR or leave as auto-assign."
+                  : ""}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">
+          <button
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            type="button"
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+          <button
+            className="rounded-lg bg-slate-950 px-5 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+            type="button"
+            disabled={submitting}
+            onClick={() => void handleSubmit()}
+          >
+            {submitting ? "Submitting..." : "Submit Request"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

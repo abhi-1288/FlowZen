@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Clock,
   History,
+  LayoutDashboard,
   LogOut,
   MessageSquare,
   ShieldCheck,
@@ -27,6 +28,7 @@ import { apiFetch } from "@/lib/client-utils";
 import { useNotificationToast } from "@/lib/toast-context";
 import { ProfileSkeleton, NavButton } from "./profile-hub/chrome";
 import { AttendanceTab } from "./profile-hub/attendance-tab";
+import { DashboardTab } from "./profile-hub/dashboard-tab";
 import { ApprovalsTab, MembersTab, MessagesTab, NotificationsTab } from "./profile-hub/admin-tabs";
 import { FinanceTab } from "./profile-hub/finance-tab";
 import { OnboardingTab, ProfileTab, TimelineTab } from "./profile-hub/profile-tabs";
@@ -49,6 +51,7 @@ const PROFILE_CACHE_TTL_MS = 30_000;
 let profileHubCache: ProfileHubCache | null = null;
 
 export type Tab =
+  | "dashboard"
   | "profile"
   | "timeline"
   | "onboarding"
@@ -59,7 +62,7 @@ export type Tab =
   | "finance"
   | "attendance";
 
-const VALID_TABS = new Set<string>(["profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance"]);
+const VALID_TABS = new Set<string>(["dashboard", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance"]);
 
 
 export function ProfileHub() {
@@ -78,7 +81,7 @@ export function ProfileHub() {
   const initialRoute = typeof window !== "undefined" ? getTabFromPath() : { tab: undefined as Tab | undefined, showInvalid: false };
   const [showInvalidRoute, setShowInvalidRoute] = useState(initialRoute.showInvalid);
   
-  const [tab, setTabState] = useState<Tab>(initialRoute.tab || "profile");
+  const [tab, setTabState] = useState<Tab>(initialRoute.tab || "dashboard");
   
   // Sync tab from URL on popstate (browser back/forward)
   useEffect(() => {
@@ -155,6 +158,7 @@ export function ProfileHub() {
     profile?.company && profile?.companyStatus === "approved",
   );
   const mobileTabs: Tab[] = [
+    "dashboard",
     "profile",
     "timeline",
     "onboarding",
@@ -453,40 +457,48 @@ export function ProfileHub() {
 
   return (
     <main className="min-h-screen bg-[#f7f8fb] text-slate-950">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-slate-800/60 bg-slate-950/95 p-5 text-white backdrop-blur-xl lg:block">
-        <div className="mb-8 flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            <div className="relative h-10 w-10 overflow-hidden rounded-xl shadow-lg shadow-indigo-500/20">
-              <Image
-                src="/Logos/logo.jpg"
-                alt="FlowZen Logo"
-                fill
-                className="object-cover"
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 flex-col border-r border-slate-800/60 bg-slate-950/95 text-white backdrop-blur-xl lg:flex">
+        <div className="shrink-0 p-5">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              <div className="relative h-10 w-10 overflow-hidden rounded-xl shadow-lg shadow-indigo-500/20">
+                <Image
+                  src="/Logos/logo.jpg"
+                  alt="FlowZen Logo"
+                  fill
+                  className="object-cover"
+                />
+              </div>
+              <h1 className="text-xl font-bold tracking-tight text-white">
+                FlowZen
+              </h1>
+            </div>
+            <div className="flex items-center gap-3 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800/80 p-2.5 ring-1 ring-slate-700/50">
+              <AvatarBadge
+                avatarUrl={avatarUrl}
+                name={displayName}
+                size="md"
+                showRing
               />
-            </div>
-            <h1 className="text-xl font-bold tracking-tight text-white">
-              FlowZen
-            </h1>
-          </div>
-          <div className="flex items-center gap-3 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800/80 p-2.5 ring-1 ring-slate-700/50">
-            <AvatarBadge
-              avatarUrl={avatarUrl}
-              name={displayName}
-              size="md"
-              showRing
-            />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-slate-100 capitalize">
-                {displayName}
-              </p>
-              <p className="truncate text-xs text-slate-400 capitalize">
-                {displayRole}
-              </p>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-slate-100 capitalize">
+                  {displayName}
+                </p>
+                <p className="truncate text-xs text-slate-400 capitalize">
+                  {displayRole}
+                </p>
+              </div>
             </div>
           </div>
+          <div className="mt-6 h-px bg-gradient-to-r from-indigo-500/40 via-violet-500/20 to-transparent" />
         </div>
-        <div className="mb-6 h-px bg-gradient-to-r from-indigo-500/40 via-violet-500/20 to-transparent" />
-        <nav className="space-y-1">
+        <nav className="flex-1 space-y-1 overflow-y-auto px-5 pb-5 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-700">
+          <NavButton
+            active={tab === "dashboard"}
+            icon={<LayoutDashboard size={16} />}
+            label="Dashboard"
+            onClick={() => setTab("dashboard")}
+          />
           <NavButton
             active={tab === "profile"}
             icon={<User size={16} />}
@@ -551,14 +563,14 @@ export function ProfileHub() {
             label={`Notifications ${unreadCount ? `(${unreadCount})` : ""}`}
             onClick={() => setTab("notifications")}
           />
+          <Link
+            className="mt-4 flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400 transition-all hover:bg-white/10 hover:text-white"
+            href="/board"
+          >
+            <ChevronRight size={14} className="-ml-0.5" />
+            Back to boards
+          </Link>
         </nav>
-        <Link
-          className="mt-6 flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400 transition-all hover:bg-white/10 hover:text-white"
-          href="/board"
-        >
-          <ChevronRight size={14} className="-ml-0.5" />
-          Back to boards
-        </Link>
       </aside>
 
       <section className="lg:pl-72">
@@ -702,6 +714,23 @@ export function ProfileHub() {
                   </div>
                 </div>
               ) : <>
+              {tab === "dashboard" ? (
+                <DashboardTab
+                  profile={profile}
+                  insights={insights}
+                  notifications={notifications}
+                  approvals={approvals}
+                  attendanceHistory={attendanceHistory}
+                  leaveRequests={leaveRequests}
+                  wfhRequests={wfhRequests}
+                  financeCount={financeCount}
+                  checkOutRequestCount={checkOutRequestCount}
+                  role={String(role)}
+                  company={company}
+                  showToast={showToast}
+                />
+              ) : null}
+
               {tab === "profile" ? (
                 <ProfileTab
                   profile={profile}
