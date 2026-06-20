@@ -141,6 +141,7 @@ export function ProfileTab({
   const [confirmDateDay, setConfirmDateDay] = useState(0);
   const [identityRequesting, setIdentityRequesting] = useState(false);
   const [showDocLetterModal, setShowDocLetterModal] = useState(false);
+  const [docLetterMode, setDocLetterMode] = useState<"request" | "send">("request");
   const managerTeams = Array.isArray(
     (insights?.manager as AnyRecord | undefined)?.teams,
   )
@@ -1586,19 +1587,34 @@ export function ProfileTab({
             <div className="mb-5 border-l-4 border-indigo-500 pl-4">
               <h3 className="text-base font-semibold text-slate-900">Document Letters</h3>
               <p className="mt-0.5 text-sm text-slate-500">
-                Request official company letters (experience, salary certificate, etc.)
+                Request official company letters or send your resignation
               </p>
             </div>
             <p className="mt-4 text-sm text-slate-600">
-              Submit a request to HR for an official document letter. Once approved, you can view and download the PDF.
+              Submit a request to HR for an official document letter or submit your resignation letter.
             </p>
-            <button
-              className="mt-4 rounded-lg bg-slate-950 px-5 py-2 text-sm font-medium text-white hover:bg-slate-800"
-              type="button"
-              onClick={() => setShowDocLetterModal(true)}
-            >
-              Request Document Letter
-            </button>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                className="rounded-lg bg-slate-950 px-5 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                type="button"
+                onClick={() => {
+                  setDocLetterMode("request");
+                  setShowDocLetterModal(true);
+                }}
+              >
+                Request Document Letter
+              </button>
+              <button
+                className="rounded-lg border border-slate-200 bg-white px-5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                type="button"
+                onClick={() => {
+                  setDocLetterMode("send");
+                  setShowDocLetterModal(true);
+                }}
+              >
+                Send Resignation Letter
+              </button>
+            </div>
           </section>
         ) : null}
 
@@ -1664,6 +1680,7 @@ export function ProfileTab({
 
       {showDocLetterModal ? (
         <DocumentLetterModal
+          mode={docLetterMode}
           onClose={() => setShowDocLetterModal(false)}
           onSuccess={() => { setShowDocLetterModal(false); void refresh(true); }}
           showToast={showToast}
@@ -3153,21 +3170,21 @@ export function OnboardingTab({
                                 >
                                   <Copy size={20} />
                                 </button>
-                                            </div>
-                                          </div>
-                                          <button
-                                            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-100 px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-sky-200"
-                                            onClick={() => {
-                                              const joinUrl = `${window.location.origin}/join?code=${item.code}`;
-                                              navigator.clipboard.writeText(joinUrl);
-                                              showToast(
-                                                `${teamName} ${item.label.toLowerCase()} join URL copied.`,
-                                              );
-                                            }}
-                                            type="button"
-                                          >
-                                            <Users size={16} />
-                                            Copy {item.label} Join URL
+                              </div>
+                            </div>
+                            <button
+                              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-100 px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-sky-200"
+                              onClick={() => {
+                                const joinUrl = `${window.location.origin}/join?code=${item.code}`;
+                                navigator.clipboard.writeText(joinUrl);
+                                showToast(
+                                  `${teamName} ${item.label.toLowerCase()} join URL copied.`,
+                                );
+                              }}
+                              type="button"
+                            >
+                              <Users size={16} />
+                              Copy {item.label} Join URL
                             </button>
                           </div>
                         ))}

@@ -287,6 +287,35 @@ export function FinanceMembersView({
         </button>
       </div>
 
+      {(() => {
+        const today = new Date().getDate();
+        if (today >= 20 && today <= 21) {
+          return (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-medium text-amber-800">
+                Salary Reminder
+              </p>
+              <p className="mt-1 text-xs text-amber-700">
+                Generate salaries by the 28th of this month to ensure timely processing.
+              </p>
+            </div>
+          );
+        }
+        if (today >= 22 && today <= 27) {
+          return (
+            <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50 p-4">
+              <p className="text-sm font-medium text-sky-800">
+                Salary Reminder
+              </p>
+              <p className="mt-1 text-xs text-sky-700">
+                Don't forget to generate salaries before the 28th.
+              </p>
+            </div>
+          );
+        }
+        return null;
+      })()}
+
       <ul className="mt-4 space-y-4">
         {(() => {
           const query = searchQuery.toLowerCase().trim();
@@ -543,7 +572,7 @@ export function FinanceMembersView({
                                             : dayData.wfh
                                               ? "bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-200"
                                               : dayData.leave
-                                                ? "bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-200"
+                                                ? "bg-pink-100 text-pink-700 border border-pink-200 hover:bg-pink-200"
                                                 : dayData.absent
                                                   ? "bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100"
                                                   : i === 0
@@ -573,7 +602,7 @@ export function FinanceMembersView({
                   <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-emerald-100 border border-emerald-300"></span> Present</div>
                   <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-amber-100 border border-amber-300"></span> Half-Day</div>
                   <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-blue-100 border border-blue-300"></span> WFH</div>
-                  <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-amber-100 border border-amber-300"></span> Leave</div>
+                  <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-pink-100 border border-pink-300"></span> Leave</div>
                   <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-rose-50 border border-rose-300"></span> Absent</div>
                   <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-purple-100 border border-purple-300"></span> Holiday</div>
                 </div>

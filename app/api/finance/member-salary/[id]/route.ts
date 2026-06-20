@@ -68,7 +68,6 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   const existing = await JoinRequest.findOne({
-    requester: userId,
     company: actor.company,
     kind: "salary-increment",
     status: { $in: ["pending", "hr-approved"] },
@@ -76,7 +75,10 @@ export async function POST(request: Request, { params }: Params) {
   });
 
   if (existing) {
-    return jsonError("A pending salary increment request already exists for this member.", 409);
+    existing.status = "rejected";
+    existing.cancelReason = "Superseded by a new salary update from finance.";
+    existing.cancelledAt = new Date();
+    await existing.save();
   }
 
   const salaryAmount = body.baseSalary;
@@ -115,7 +117,7 @@ export async function POST(request: Request, { params }: Params) {
       targetUser: memberId,
       targetUserName: member.name,
       newBaseSalary: body.baseSalary,
-      oldBaseSalary: member.baseSalary || 0
+      oldBaseSalary: oldSalary
     }
   });
 

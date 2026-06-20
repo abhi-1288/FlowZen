@@ -9,26 +9,37 @@ import { Team } from "@/models/Team";
 import { User } from "@/models/User";
 import { WfhRequest } from "@/models/WfhRequest";
 
-function startOfDay(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  date.setHours(0, 0, 0, 0);
-  return date;
+
+/** Parse a date string and return midnight local time (or null if invalid). */
+function startOfDay(value: string): Date | null {
+  if (!value) return null;
+  // "YYYY-MM-DD" strings must be parsed as LOCAL midnight, not UTC midnight.
+  // Split manually to avoid the UTC-midnight pitfall of new Date("YYYY-MM-DD").
+  const parts = value.split("T")[0].split("-");
+  if (parts.length < 3) return null;
+  const year = Number(parts[0]);
+  const month = Number(parts[1]) - 1; // 0-indexed
+  const day = Number(parts[2]);
+  if (isNaN(year) || isNaN(month) || isNaN(day)) return null;
+  return new Date(year, month, day, 0, 0, 0, 0);
 }
 
-function endOfDay(date: Date) {
-  const value = new Date(date);
-  value.setHours(23, 59, 59, 999);
-  return value;
+/** Return 23:59:59.999 on the same local day as the given date. */
+function endOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
 }
 
-function csvCell(value: unknown) {
+/** Escape a value for CSV output. */
+function csvCell(value: unknown): string {
   const text = String(value ?? "");
-  return `"${text.replace(/"/g, '""')}"`;
+  if (/[",\n\r]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+  return text;
 }
 
 function isoDay(date: Date) {
-  return date.toISOString().slice(0, 10);
+  // Convert to local date string (YYYY-MM-DD) accounting for timezone offset
+  const local = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  return local.toISOString().slice(0, 10);
 }
 
 function memberIdentity(value: unknown, fallback: string) {

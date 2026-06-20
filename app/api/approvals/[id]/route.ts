@@ -337,6 +337,21 @@ export async function PATCH(request: Request, { params }: Params) {
           message: `HR has approved the salary update for ${joinRequest.metadata?.targetUserName || "a member"}. Admin approval required.`,
         });
         emitNotification(String(admin._id));
+
+        const meta = joinRequest.metadata || {};
+        const targetUserId = meta.targetUser;
+        if (targetUserId) {
+          const oldSalary = Number(meta.oldBaseSalary) || 0;
+          const newSalary = Number(meta.newBaseSalary) || 0;
+          await Notification.create({
+            user: targetUserId,
+            company: joinRequest.company,
+            type: "info",
+            title: "Salary Updated",
+            message: `your salary has been ${newSalary >= oldSalary ? "incremented" : "decremented"} by ${Math.abs(newSalary - oldSalary)}. Your current salary is ${newSalary}`,
+          });
+          emitNotification(String(targetUserId));
+        }
       } else if (status === "approved") {
         const metadata = joinRequest.metadata || {};
         const targetUser = await User.findById(metadata.targetUser);
@@ -358,7 +373,7 @@ export async function PATCH(request: Request, { params }: Params) {
             company: joinRequest.company,
             type: "info",
             title: "Salary Updated",
-            message: `your last salary was ${oldSalary} and now ${newSalary >= oldSalary ? "incremented" : "decremented"} with ${Math.abs(newSalary - oldSalary)} and your current salary is ${newSalary}`
+            message: `your salary has been ${newSalary >= oldSalary ? "incremented" : "decremented"} by ${Math.abs(newSalary - oldSalary)}. Your current salary is ${newSalary}`
           });
           emitNotification(String(targetUser._id));
         }
@@ -565,6 +580,10 @@ export async function PATCH(request: Request, { params }: Params) {
         metadata.approvedAt = new Date().toISOString();
         metadata.requesterName = requester.name;
         metadata.requesterRole = requester.role;
+        
+        if (body.letterContent !== undefined) {
+          metadata.letterContent = String(body.letterContent).trim();
+        }
 
         if (String(metadata.letterType ?? "") === "resignation") {
           const existingQuit = await JoinRequest.findOne({

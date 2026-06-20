@@ -19,7 +19,32 @@ export function ApprovalsTab({
   const [salaryAmounts, setSalaryAmounts] = useState<Record<string, string>>({});
   const [rejectModalId, setRejectModalId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
-  const [viewingResignation, setViewingResignation] = useState<AnyRecord | null>(null);
+  const [viewingLetter, setViewingLetter] = useState<AnyRecord | null>(null);
+  const [letterContentDraft, setLetterContentDraft] = useState("");
+
+  function generateFallbackLetter(request: AnyRecord) {
+    const metadata = (request.metadata as any) ?? {};
+    const letterType = String(metadata.letterType ?? "");
+    const purpose = String(metadata.purpose ?? "");
+    const customType = String(metadata.customType ?? "");
+
+    if (letterType === "resignation") {
+      const lastDayStr = metadata.resignationLastWorkingDay ? new Date(metadata.resignationLastWorkingDay).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "[Date]";
+      const reasonStr = purpose ? `\n\nReason for resignation: ${purpose}` : "";
+      return `Dear HR,\n\nPlease accept this letter as formal notification that I am resigning from my position. As per my notice period, my last working day will be ${lastDayStr}.${reasonStr}\n\nThank you for the opportunities I've had during my time with the company. I wish the company continued success in the future.\n\nSincerely,\n`;
+    } else if (letterType === "internship") {
+      const startStr = metadata.internshipStart ? new Date(metadata.internshipStart).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "[Start Date]";
+      const endStr = metadata.internshipEnd ? new Date(metadata.internshipEnd).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "[End Date]";
+      const title = String(metadata.projectTitle ?? "");
+      const desc = String(metadata.projectDescription ?? "");
+      const achievements = String(metadata.projectAchievements ?? "");
+
+      return `Dear HR,\n\nI am writing to formally request an Internship Certificate for my work from ${startStr} to ${endStr}.\n\nDuring this time, I worked on the project "${title}". ${desc}\n${achievements ? `\nKey achievements: ${achievements}\n` : ""}\nPurpose of request: ${purpose}\n\nPlease let me know if you need any further information.\n\nSincerely,\n`;
+    } else {
+      const typeLabel = letterType === "other" && customType ? customType : (letterType.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase()) || "Document Letter");
+      return `Dear HR,\n\nI am writing to formally request a ${typeLabel}.\n\nPurpose of request: ${purpose}\n\nPlease let me know if you need any further information from my side to process this request.\n\nSincerely,\n`;
+    }
+  }
 
   function requestIdOf(request: AnyRecord) {
     const value = request.id ?? request._id;
@@ -69,6 +94,7 @@ export function ApprovalsTab({
     force = false,
     requestKind?: string,
     reason?: string,
+    letterContent?: string,
   ) {
     if (!id) return;
     const salaryAmount = ["salary", "company"].includes(String(requestKind ?? ""))
@@ -78,7 +104,7 @@ export function ApprovalsTab({
     try {
       await apiFetch(`/api/approvals/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ status, force, salaryAmount, reason }),
+        body: JSON.stringify({ status, force, salaryAmount, reason, letterContent }),
       });
       setClearedIds((current) => ({ ...current, [id]: true }));
       showToast(`Request ${status}${force ? " (forced)" : ""}.`);
@@ -109,90 +135,94 @@ export function ApprovalsTab({
           const isDeciding = Boolean(decidingIds[requestId]);
           const metadata = (request.metadata ?? {}) as AnyRecord;
           return (
-          <div
-            className="flex flex-wrap items-center justify-between gap-4 py-4"
-            key={requestId}
-          >
-            <div>
-              <p className="font-medium">
-                {displayNested(request.requester, "name", "User")},{" "}
-                {displayNested(request.requester, "role", "User")}
-              </p>
-              <p className="text-sm text-slate-500">
-                {displayNested(request.requester, "email", "unknown")}{" "}
-                {String(request.kind) === "quit-company-board-transfer"
-                  ? "requested board transfer approval"
-                  : String(request.kind) === "role-transfer"
-                  ? "requested role transfer"
-                  : String(request.kind).startsWith("quit-")
-                  ? "requested to quit"
-                  : String(request.kind) === "identity-code"
-                  ? "requested a unique identity code"
-                  : String(request.kind) === "salary"
-                  ? "requested salary assignment"
-                  : String(request.kind) === "salary-increment"
-                  ? `requested salary update for ${metadata.targetUserName || "a member"}`
-                  : request.kind === "document-letter"
-                  ? `requested a ${String((request.metadata as any)?.letterType ?? "document").replace(/-/g, " ")} letter`
-                  : "requested to join"}{" "}
-                {String(request.kind) === "identity-code"
-                  ? displayNested(request.company, "name", "company")
-                  : String(request.kind) === "salary-increment"
-                  ? ""
-                  : request.kind === "team" || request.kind === "quit-team"
-                  ? displayNested(request.team, "name", "team")
-                  : displayNested(request.company, "name", "company")}
-              </p>
-              {String(request.kind) === "quit-company-board-transfer" ? (
-                <p className="mt-1 text-xs text-slate-500">
-                  {String(request.message ?? "").trim() || "Board transfer approval pending."}
+            <div
+              className="flex flex-wrap items-center justify-between gap-4 py-4"
+              key={requestId}
+            >
+              <div>
+                <p className="font-medium">
+                  {displayNested(request.requester, "name", "User")},{" "}
+                  {displayNested(request.requester, "role", "User")}
                 </p>
-              ) : String(request.kind) === "role-transfer" ? (
-                <p className="mt-1 text-xs text-slate-500">
-                  Role transfer approval pending.
+                <p className="text-sm text-slate-500">
+                  {displayNested(request.requester, "email", "unknown")}{" "}
+                  {String(request.kind) === "quit-company-board-transfer"
+                    ? "requested board transfer approval"
+                    : String(request.kind) === "role-transfer"
+                      ? "requested role transfer"
+                      : String(request.kind).startsWith("quit-")
+                        ? "requested to quit"
+                        : String(request.kind) === "identity-code"
+                          ? "requested a unique identity code"
+                          : String(request.kind) === "salary"
+                            ? "requested salary assignment"
+                            : String(request.kind) === "salary-increment"
+                              ? `requested salary update for ${metadata.targetUserName || "a member"}`
+                              : request.kind === "document-letter"
+                                ? `requested a ${String((request.metadata as any)?.letterType ?? "document").replace(/-/g, " ")} letter`
+                                : "requested to join"}{" "}
+                  {String(request.kind) === "identity-code"
+                    ? displayNested(request.company, "name", "company")
+                    : String(request.kind) === "salary-increment"
+                      ? ""
+                      : request.kind === "team" || request.kind === "quit-team"
+                        ? displayNested(request.team, "name", "team")
+                        : displayNested(request.company, "name", "company")}
                 </p>
-              ) : String(request.kind) === "document-letter" ? (
-                <div className="mt-1 space-y-0.5 text-xs text-slate-500">
-                  <p>Purpose: {String((request.metadata as any)?.purpose ?? "")}</p>
-                  {String((request.metadata as any)?.letterType ?? "") === "resignation" ? (
-                    <>
-                      <p>Last working day: {String((request.metadata as any)?.resignationLastWorkingDay ?? "")}</p>
-                      <p>Notice period: {String((request.metadata as any)?.noticePeriodDays ?? "")} days</p>
-                    </>
-                  ) : null}
-                </div>
-              ) : String(request.kind).startsWith("quit-") ? (
-                <p className="mt-1 text-xs text-slate-500">
-                  {(() => {
-                    const info = quitNoticeInfo(request);
-                    if (!info || info.noticeDays <= 0)
-                      return "No notice period set.";
-                    return `Notice period: ${info.noticeDays} days. Pending: ${info.elapsedDays} days. Remaining: ${info.remainingDays} days.`;
-                  })()}
-                </p>
-              ) : null}
-              {request.kind === "quit-company" && request.replacementHr ? (
-                <p className="mt-1 text-xs text-slate-500">
-                  Replacement HR:{" "}
-                  {displayNested(request.replacementHr, "name", "HR")}
-                </p>
-              ) : null}
-              {request.replacementUser ? (
-                <p className="mt-1 text-xs text-slate-500">
-                  Replacement:{" "}
-                  {displayNested(request.replacementUser, "name", "Member")}
-                </p>
-              ) : null}
-            </div>
-            <div className="flex gap-2">
-                {String(request.kind) === "document-letter" && String((request.metadata as any)?.letterType ?? "") === "resignation" ? (
+                {String(request.kind) === "quit-company-board-transfer" ? (
+                  <p className="mt-1 text-xs text-slate-500">
+                    {String(request.message ?? "").trim() || "Board transfer approval pending."}
+                  </p>
+                ) : String(request.kind) === "role-transfer" ? (
+                  <p className="mt-1 text-xs text-slate-500">
+                    Role transfer approval pending.
+                  </p>
+                ) : String(request.kind) === "document-letter" ? (
+                  <div className="mt-1 space-y-0.5 text-xs text-slate-500">
+                    <p>Purpose: {String((request.metadata as any)?.purpose ?? "")}</p>
+                    {String((request.metadata as any)?.letterType ?? "") === "resignation" ? (
+                      <>
+                        <p>Last working day: {String((request.metadata as any)?.resignationLastWorkingDay ?? "")}</p>
+                        <p>Notice period: {String((request.metadata as any)?.noticePeriodDays ?? "")} days</p>
+                      </>
+                    ) : null}
+                  </div>
+                ) : String(request.kind).startsWith("quit-") ? (
+                  <p className="mt-1 text-xs text-slate-500">
+                    {(() => {
+                      const info = quitNoticeInfo(request);
+                      if (!info || info.noticeDays <= 0)
+                        return "No notice period set.";
+                      return `Notice period: ${info.noticeDays} days. Pending: ${info.elapsedDays} days. Remaining: ${info.remainingDays} days.`;
+                    })()}
+                  </p>
+                ) : null}
+                {request.kind === "quit-company" && request.replacementHr ? (
+                  <p className="mt-1 text-xs text-slate-500">
+                    Replacement HR:{" "}
+                    {displayNested(request.replacementHr, "name", "HR")}
+                  </p>
+                ) : null}
+                {request.replacementUser ? (
+                  <p className="mt-1 text-xs text-slate-500">
+                    Replacement:{" "}
+                    {displayNested(request.replacementUser, "name", "Member")}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex gap-2">
+                {String(request.kind) === "document-letter" ? (
                   <ActionButton
                     variant="secondary"
                     className="px-3"
                     disabled={isDeciding}
-                    onClick={() => setViewingResignation(request)}
+                    onClick={() => {
+                      setViewingLetter(request);
+                      const savedDraft = String((request.metadata as any)?.letterContent ?? "").trim();
+                      setLetterContentDraft(savedDraft ? savedDraft : generateFallbackLetter(request));
+                    }}
                   >
-                    View
+                    Preview & Edit
                   </ActionButton>
                 ) : null}
                 <ActionButton
@@ -210,60 +240,60 @@ export function ApprovalsTab({
                 >
                   {isDeciding ? "Working..." : "Decline"}
                 </ActionButton>
-              {["company", "salary"].includes(String(request.kind ?? "")) ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    className="w-28 rounded-lg border border-slate-200 px-2 py-2 text-sm"
-                    placeholder="Base salary"
-                    type="number"
-                    min={0}
-                    value={salaryAmounts[requestId] ?? ""}
-                    onChange={(e) => setSalaryAmounts((a) => ({ ...a, [requestId]: e.target.value }))}
-                  />
-                <ActionButton
-                  variant="approve"
-                  className="px-3"
-                  disabled={isDeciding || (String(request.kind ?? "") === "salary" && !(Number(salaryAmounts[requestId] ?? 0) > 0))}
-                  onClick={() => decide(requestId, "approved", false, String(request.kind ?? ""))}
-                >
-                  {isDeciding ? "Working..." : "Approve"}
-                </ActionButton>
-                </div>
-              ) : String(request.kind ?? "") === "salary-increment" ? (
-                <ActionButton
-                  variant="approve"
-                  className="px-3"
-                  disabled={isDeciding}
-                  onClick={() => decide(requestId, "approved", false, String(request.kind ?? ""))}
-                >
-                  {isDeciding ? "Working..." : "Approve Update"}
-                </ActionButton>
-              ) : (
-                <ActionButton
-                  variant="approve"
-                  className="px-3"
-                  disabled={(() => {
-                    const info = quitNoticeInfo(request);
-                    return isDeciding || (!!info && !info.canApprove);
-                  })()}
-                  onClick={() => decide(requestId, "approved", false, String(request.kind ?? ""))}
-                >
-                  {isDeciding ? "Working..." : "Approve"}
-                </ActionButton>
-              )}
-              {String(request.kind).startsWith("quit-") ? (
-                <button
-                  className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100"
-                  disabled={isDeciding}
-                  onClick={() => decide(requestId, "approved", true, String(request.kind ?? ""))}
-                  type="button"
-                >
-                  Force accept
-                </button>
-              ) : null}
+                {["company", "salary"].includes(String(request.kind ?? "")) ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      className="w-28 rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                      placeholder="Base salary"
+                      type="number"
+                      min={0}
+                      value={salaryAmounts[requestId] ?? ""}
+                      onChange={(e) => setSalaryAmounts((a) => ({ ...a, [requestId]: e.target.value }))}
+                    />
+                    <ActionButton
+                      variant="approve"
+                      className="px-3"
+                      disabled={isDeciding || (String(request.kind ?? "") === "salary" && !(Number(salaryAmounts[requestId] ?? 0) > 0))}
+                      onClick={() => decide(requestId, "approved", false, String(request.kind ?? ""))}
+                    >
+                      {isDeciding ? "Working..." : "Approve"}
+                    </ActionButton>
+                  </div>
+                ) : String(request.kind ?? "") === "salary-increment" ? (
+                  <ActionButton
+                    variant="approve"
+                    className="px-3"
+                    disabled={isDeciding}
+                    onClick={() => decide(requestId, "approved", false, String(request.kind ?? ""))}
+                  >
+                    {isDeciding ? "Working..." : "Approve Update"}
+                  </ActionButton>
+                ) : (
+                  <ActionButton
+                    variant="approve"
+                    className="px-3"
+                    disabled={(() => {
+                      const info = quitNoticeInfo(request);
+                      return isDeciding || (!!info && !info.canApprove);
+                    })()}
+                    onClick={() => decide(requestId, "approved", false, String(request.kind ?? ""))}
+                  >
+                    {isDeciding ? "Working..." : "Approve"}
+                  </ActionButton>
+                )}
+                {String(request.kind).startsWith("quit-") ? (
+                  <button
+                    className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100"
+                    disabled={isDeciding}
+                    onClick={() => decide(requestId, "approved", true, String(request.kind ?? ""))}
+                    type="button"
+                  >
+                    Force accept
+                  </button>
+                ) : null}
+              </div>
             </div>
-          </div>
-        );
+          );
         })}
         {visibleApprovals.length === 0 ? (
           <p className="py-6 text-sm text-slate-500">No pending approvals.</p>
@@ -315,78 +345,65 @@ export function ApprovalsTab({
         </div>
       ) : null}
 
-      {viewingResignation ? (
+      {viewingLetter ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-          onClick={(e) => { if (e.target === e.currentTarget) setViewingResignation(null); }}
+          onClick={(e) => { if (e.target === e.currentTarget) setViewingLetter(null); }}
         >
-          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-xl">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+          <div className="w-full max-w-4xl rounded-2xl border border-slate-200 bg-white shadow-xl flex flex-col max-h-[90vh]">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4 shrink-0">
               <div>
-                <h4 className="text-lg font-semibold text-slate-900">Resignation Letter Details</h4>
+                <h4 className="text-lg font-semibold text-slate-900">Review & Edit Letter</h4>
                 <p className="mt-0.5 text-sm text-slate-500">
-                  {String((viewingResignation.metadata as any)?.requesterName ?? (viewingResignation.requester as any)?.name ?? "Employee")}
-                  {" "}· {String((viewingResignation.metadata as any)?.requesterRole ?? (viewingResignation.requester as any)?.role ?? "")}
+                  {String((viewingLetter.metadata as any)?.requesterName ?? (viewingLetter.requester as any)?.name ?? "Employee")}
+                  {" "}· {String((viewingLetter.metadata as any)?.requesterRole ?? (viewingLetter.requester as any)?.role ?? "")}
                 </p>
               </div>
               <button
                 className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
                 type="button"
-                onClick={() => setViewingResignation(null)}
+                onClick={() => setViewingLetter(null)}
                 aria-label="Close"
               >
                 <X size={18} />
               </button>
             </div>
-            <div className="max-h-[65vh] space-y-3 overflow-y-auto px-6 py-5 text-sm leading-relaxed text-slate-800">
-              <p>Date: <strong>{new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</strong></p>
-              <br />
-              <p><strong>Subject: Resignation Letter</strong></p>
-              <br />
-              <p>Dear <strong>{(viewingResignation.approver as any)?.name ?? "Human Resource"}</strong>,</p>
-              <br />
-              <p>
-                Please accept this letter as formal notice of my resignation from my position as{" "}
-                <strong>{String((viewingResignation.metadata as any)?.requesterRole ?? (viewingResignation.requester as any)?.role ?? "Member")}</strong>
-                {" "}at <strong>{String((viewingResignation.company as any)?.name ?? "Company")}</strong>.
-                {" "}My last working day will be{" "}
-                <strong>
-                  {new Date(String((viewingResignation.metadata as any)?.resignationLastWorkingDay ?? "")).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
-                </strong>, in accordance with my{" "}
-                <strong>{String((viewingResignation.metadata as any)?.noticePeriodDays ?? "")}-day notice period</strong>.
-              </p>
-              <br />
-              <p>
-                I joined <strong>{String((viewingResignation.company as any)?.name ?? "Company")}</strong> on
-                {" "}<strong>{new Date((viewingResignation.requester as any)?.companyJoined ?? Date.now()).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</strong>,
-                {" "}and I am grateful for the opportunities, support, and experiences I have gained during my tenure. Working with the team has been valuable for my professional and personal growth.
-              </p>
-              <br />
-              <p>
-                I will do my best to ensure a smooth transition of my responsibilities during the notice period. Please let me know how I can assist in this process.
-              </p>
-              <br />
-              <p>Thank you for your guidance and support. I wish the company and the team continued success in the future.</p>
-              <br />
-              <p>Sincerely,</p>
-              <br />
-              <p className="font-semibold">{String((viewingResignation.metadata as any)?.requesterName ?? (viewingResignation.requester as any)?.name ?? "Employee")}</p>
-              {(viewingResignation.requester as any)?.companyIdentityCode ? (
-                <p className="text-xs text-slate-500">ID: {String((viewingResignation.requester as any)?.companyIdentityCode)}</p>
-              ) : null}
-              <p className="capitalize">{String((viewingResignation.metadata as any)?.requesterRole ?? (viewingResignation.requester as any)?.role ?? "")}</p>
-              <p>{String((viewingResignation.company as any)?.name ?? "")}</p>
-              {(viewingResignation.requester as any)?.email ? (
-                <p className="text-slate-500">{String((viewingResignation.requester as any)?.email)}</p>
-              ) : null}
+            <div className="flex-1 overflow-hidden p-6">
+              <textarea
+                className="w-full h-full min-h-[50vh] rounded-lg border border-slate-200 p-4 text-sm leading-relaxed text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                value={letterContentDraft}
+                onChange={(e) => setLetterContentDraft(e.target.value)}
+                placeholder="Draft empty or not provided."
+              />
             </div>
-            <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">
+            <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4 shrink-0">
               <button
                 className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                 type="button"
-                onClick={() => setViewingResignation(null)}
+                onClick={() => setViewingLetter(null)}
               >
-                Close
+                Cancel
+              </button>
+              <button
+                className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                type="button"
+                onClick={() => {
+                  setRejectModalId(String(viewingLetter.id ?? viewingLetter._id ?? ""));
+                  setRejectionReason("");
+                  setViewingLetter(null);
+                }}
+              >
+                Reject Request
+              </button>
+              <button
+                className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                type="button"
+                onClick={() => {
+                  decide(String(viewingLetter.id ?? viewingLetter._id ?? ""), "approved", false, "document-letter", undefined, letterContentDraft);
+                  setViewingLetter(null);
+                }}
+              >
+                Approve & Save Letter
               </button>
             </div>
           </div>
@@ -825,15 +842,14 @@ export function MembersTab({
                     ))}
                   </select>
                 </div>
-            <ActionButton
-              aria-label="Close"
-              variant="ghost"
-              className="h-10 w-10"
-              type="button"
-              onClick={() => { setModalRole(null); setModalSearchQuery(""); setModalSearchInput(""); }}
-            >
-              <X size={18} />
-            </ActionButton>
+                <ActionButton
+                  aria-label="Close"
+                  variant="ghost"
+                  type="button"
+                  onClick={() => { setModalRole(null); setModalSearchQuery(""); setModalSearchInput(""); }}
+                >
+                  <X size={18} />
+                </ActionButton>
               </div>
             </div>
             {modalRole === "others" ? (
@@ -869,12 +885,12 @@ export function MembersTab({
                   placeholder="Search members..."
                   className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-950 focus:ring-0"
                 />
-                  <ActionButton
-                    variant="primary"
-                    onClick={() => setModalSearchQuery(modalSearchInput.trim())}
-                  >
-                    Search
-                  </ActionButton>
+                <ActionButton
+                  variant="primary"
+                  onClick={() => setModalSearchQuery(modalSearchInput.trim())}
+                >
+                  Search
+                </ActionButton>
               </div>
             </div>
             <div className="max-h-[min(55vh,420px)] overflow-y-auto px-6 py-4">
@@ -882,10 +898,10 @@ export function MembersTab({
                 const query = modalSearchQuery.toLowerCase().trim();
                 const filtered = query
                   ? modalMembers.filter((m) => {
-                      const name = String(m.name ?? "").toLowerCase();
-                      const email = String(m.email ?? "").toLowerCase();
-                      return name.includes(query) || email.includes(query);
-                    })
+                    const name = String(m.name ?? "").toLowerCase();
+                    const email = String(m.email ?? "").toLowerCase();
+                    return name.includes(query) || email.includes(query);
+                  })
                   : modalMembers;
                 if (filtered.length === 0) {
                   return <p className="py-8 text-center text-sm text-slate-500">No members match your search.</p>;
@@ -893,126 +909,126 @@ export function MembersTab({
                 return (
                   <ul className="space-y-4">
                     {filtered.map((member) => {
-                    const memberId = String(member.id);
-                    const teams = Array.isArray(member.teams)
-                      ? member.teams.map(String)
-                      : [];
-                    const isSelf = selfId && memberId === selfId;
-                    const joinedBy =
-                      member.joinedBy && typeof member.joinedBy === "object"
-                        ? (member.joinedBy as AnyRecord)
-                        : null;
-                    return (
-                      <li
-                        className="rounded-xl border border-slate-200 bg-white p-4"
-                        key={memberId}
-                      >
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="min-w-0">
-                            <p className="font-semibold">
-                              {String(member.name ?? "Member")}
-                            </p>
-                            <p className="truncate text-sm text-slate-500">
-                              {String(member.email ?? "")}
-                            </p>
-                            {joinedBy?.name ? (
-                              <p className="mt-1 text-xs text-slate-500">
-                                Joined by{" "}
-                                <span className="font-medium text-slate-700">
-                                  {String(joinedBy.name)}
-                                </span>
+                      const memberId = String(member.id);
+                      const teams = Array.isArray(member.teams)
+                        ? member.teams.map(String)
+                        : [];
+                      const isSelf = selfId && memberId === selfId;
+                      const joinedBy =
+                        member.joinedBy && typeof member.joinedBy === "object"
+                          ? (member.joinedBy as AnyRecord)
+                          : null;
+                      return (
+                        <li
+                          className="rounded-xl border border-slate-200 bg-white p-4"
+                          key={memberId}
+                        >
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0">
+                              <p className="font-semibold">
+                                {String(member.name ?? "Member")}
                               </p>
-                            ) : null}
-                          </div>
+                              <p className="truncate text-sm text-slate-500">
+                                {String(member.email ?? "")}
+                              </p>
+                              {joinedBy?.name ? (
+                                <p className="mt-1 text-xs text-slate-500">
+                                  Joined by{" "}
+                                  <span className="font-medium text-slate-700">
+                                    {String(joinedBy.name)}
+                                  </span>
+                                </p>
+                              ) : null}
+                            </div>
 
-                          <div className="grid items-center gap-2">
-                            <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
-                              role: {displayMemberRole(member)}
-                            </span>
-                            <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
-                              salary: {Number(member.baseSalary ?? 0) > 0 ? `Rs. ${Number(member.baseSalary).toLocaleString("en-IN")}` : "not set"}
-                            </span>
-                            <span
-                              className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700"
-                              title={
-                                teams.length
-                                  ? teams.join(", ")
-                                  : "No team joined"
-                              }
-                            >
-                              team: {teams.length ? teams.join(", ") : "-"}
-                            </span>
-                          </div>
+                            <div className="grid items-center gap-2">
+                              <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
+                                role: {displayMemberRole(member)}
+                              </span>
+                              <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
+                                salary: {Number(member.baseSalary ?? 0) > 0 ? `Rs. ${Number(member.baseSalary).toLocaleString("en-IN")}` : "not set"}
+                              </span>
+                              <span
+                                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700"
+                                title={
+                                  teams.length
+                                    ? teams.join(", ")
+                                    : "No team joined"
+                                }
+                              >
+                                team: {teams.length ? teams.join(", ") : "-"}
+                              </span>
+                            </div>
 
-                          <div className="flex flex-wrap gap-2 sm:col-span-3">
-                  <ActionButton
-                    variant="primary"
-                    className="px-3"
-                    type="button"
-                    onClick={() => openSalaryModal(member)}
-                  >
-                    Base Salary
-                  </ActionButton>
-                            {canEditOthersRole && String(member.role ?? "") === "others" ? (
-                              <>
-                                <ActionButton
-                                  variant="secondary"
-                                  className="px-3"
-                                  type="button"
-                                  onClick={() => openCustomRoleModal(member)}
-                                >
-                                  Change Custom Role
-                                </ActionButton>
+                            <div className="flex flex-wrap gap-2 sm:col-span-3">
+                              <ActionButton
+                                variant="primary"
+                                className="px-3"
+                                type="button"
+                                onClick={() => openSalaryModal(member)}
+                              >
+                                Base Salary
+                              </ActionButton>
+                              {canEditOthersRole && String(member.role ?? "") === "others" ? (
+                                <>
+                                  <ActionButton
+                                    variant="secondary"
+                                    className="px-3"
+                                    type="button"
+                                    onClick={() => openCustomRoleModal(member)}
+                                  >
+                                    Change Custom Role
+                                  </ActionButton>
+                                  <ActionButton
+                                    variant="secondary"
+                                    className="px-3"
+                                    type="button"
+                                    onClick={() => openRoleModal(member)}
+                                  >
+                                    Change to Company Role
+                                  </ActionButton>
+                                </>
+                              ) : canEditOthersRole ? (
                                 <ActionButton
                                   variant="secondary"
                                   className="px-3"
                                   type="button"
                                   onClick={() => openRoleModal(member)}
                                 >
-                                  Change to Company Role
+                                  Change Role
                                 </ActionButton>
-                              </>
-                            ) : canEditOthersRole ? (
-                              <ActionButton
-                                variant="secondary"
-                                className="px-3"
-                                type="button"
-                                onClick={() => openRoleModal(member)}
-                              >
-                                Change Role
-                              </ActionButton>
-                            ) : null}
-                          </div>
+                              ) : null}
+                            </div>
 
-                          <div className="flex shrink-0 flex-col gap-2 sm:items-end">
-                            <ActionButton
-                              variant="primary"
-                              className="px-3"
-                              disabled={!!isSelf || invitingFor === memberId}
-                              type="button"
-                              onClick={() => void sendMeetingInvite(memberId)}
-                            >
-                              {invitingFor === memberId
-                                ? "Sending…"
-                                : "Invite to meet"}
-                            </ActionButton>
-                            <ActionButton
-                              variant="danger"
-                              className="px-3"
-                              disabled={!!isSelf || firingFor === memberId}
-                              type="button"
-                              onClick={() => requestFire(member)}
-                            >
-                              {firingFor === memberId ? "Removing…" : "Fire"}
-                            </ActionButton>
+                            <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+                              <ActionButton
+                                variant="primary"
+                                className="px-3"
+                                disabled={!!isSelf || invitingFor === memberId}
+                                type="button"
+                                onClick={() => void sendMeetingInvite(memberId)}
+                              >
+                                {invitingFor === memberId
+                                  ? "Sending…"
+                                  : "Invite to meet"}
+                              </ActionButton>
+                              <ActionButton
+                                variant="danger"
+                                className="px-3"
+                                disabled={!!isSelf || firingFor === memberId}
+                                type="button"
+                                onClick={() => requestFire(member)}
+                              >
+                                {firingFor === memberId ? "Removing…" : "Fire"}
+                              </ActionButton>
+                            </div>
                           </div>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              );
-            })()}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -1471,118 +1487,119 @@ export function MessagesTab({
           const query = messageSearchQuery.toLowerCase().trim();
           const filtered = query
             ? members.filter((m) => {
-                const name = String(m.name ?? "").toLowerCase();
-                const email = String(m.email ?? "").toLowerCase();
-                const role = String(m.role ?? "").toLowerCase();
-                return name.includes(query) || email.includes(query) || role.includes(query);
-              })
+              const name = String(m.name ?? "").toLowerCase();
+              const email = String(m.email ?? "").toLowerCase();
+              const role = String(m.role ?? "").toLowerCase();
+              return name.includes(query) || email.includes(query) || role.includes(query);
+            })
             : members;
           if (filtered.length === 0) {
             return <p className="py-8 text-center text-sm text-slate-500 bg-slate-50 rounded-xl border border-slate-100">No members match your search.</p>;
           }
           return filtered.map((member) => {
-          const memberId = String(member.id ?? member._id ?? "");
-          const name = String(member.name ?? "Member");
-          const roleRaw = String(member.role ?? "employee");
-          const role = formatRole(roleRaw);
-          const email = String(member.email ?? "");
-          const isHighProfile = ["admin", "human-resource", "finance"].includes(roleRaw);
-          const joinDateStr = member.companyJoined
-            ? new Date(String(member.companyJoined)).toLocaleDateString()
-            : member.createdAt
-              ? new Date(String(member.createdAt)).toLocaleDateString()
-              : null;
-          let label: string;
-          if (isHighProfile) {
-            const companyName =
-              member.company && typeof member.company === "object"
-                ? String((member.company as any).name ?? "")
-                : "";
-            label = companyName || "No company";
-          } else {
-            const teamObj =
-              member.team && typeof member.team === "object" ? member.team : null;
-            label = teamObj && (teamObj as any).name
-              ? String((teamObj as any).name)
-              : Array.isArray(member.teams) && member.teams.length
-                ? member.teams.map(String).join(", ")
-                : "No team joined";
-          }
-          const isSelected = !!bulkSelected[memberId];
+            const memberId = String(member.id ?? member._id ?? "");
+            const name = String(member.name ?? "Member");
+            const roleRaw = String(member.role ?? "employee");
+            const role = formatRole(roleRaw);
+            const email = String(member.email ?? "");
+            const isHighProfile = ["admin", "human-resource", "finance"].includes(roleRaw);
+            const joinDateStr = member.companyJoined
+              ? new Date(String(member.companyJoined)).toLocaleDateString()
+              : member.createdAt
+                ? new Date(String(member.createdAt)).toLocaleDateString()
+                : null;
+            let label: string;
+            if (isHighProfile) {
+              const companyName =
+                member.company && typeof member.company === "object"
+                  ? String((member.company as any).name ?? "")
+                  : "";
+              label = companyName || "No company";
+            } else {
+              const teamObj =
+                member.team && typeof member.team === "object" ? member.team : null;
+              label = teamObj && (teamObj as any).name
+                ? String((teamObj as any).name)
+                : Array.isArray(member.teams) && member.teams.length
+                  ? member.teams.map(String).join(", ")
+                  : "No team joined";
+            }
+            const isSelected = !!bulkSelected[memberId];
 
-          return (
-            <button
-              className={`w-full rounded-xl border p-4 text-left transition-all duration-200 ${mode === "bulk"
-                ? isSelected
-                  ? "border-slate-900 bg-slate-950 text-white shadow-md"
+            return (
+              <button
+                className={`w-full rounded-xl border p-4 text-left transition-all duration-200 ${mode === "bulk"
+                  ? isSelected
+                    ? "border-slate-900 bg-slate-950 text-white shadow-md"
+                    : "border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-slate-300"
                   : "border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-slate-300"
-                : "border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-slate-300"
-                }`}
-              key={memberId}
-              type="button"
-              onClick={() => {
-                if (mode === "bulk") {
-                  toggleBulkSelected(memberId);
-                } else {
-                  setChatMember(member);
-                  setChatMessage("");
-                }
-              }}
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p
-                    className={`font-semibold ${mode === "bulk" && isSelected ? "text-white" : "text-slate-900"}`}
-                  >
-                    {name}
-                  </p>
-                  <p
-                    className={`text-sm ${mode === "bulk" && isSelected ? "text-white/70" : "text-slate-500"}`}
-                  >
-                    {email}
-                  </p>
-                </div>
+                  }`}
+                key={memberId}
+                type="button"
+                onClick={() => {
+                  if (mode === "bulk") {
+                    toggleBulkSelected(memberId);
+                  } else {
+                    setChatMember(member);
+                    setChatMessage("");
+                  }
+                }}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p
+                      className={`font-semibold ${mode === "bulk" && isSelected ? "text-white" : "text-slate-900"}`}
+                    >
+                      {name}
+                    </p>
+                    <p
+                      className={`text-sm ${mode === "bulk" && isSelected ? "text-white/70" : "text-slate-500"}`}
+                    >
+                      {email}
+                    </p>
+                  </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-medium ${mode === "bulk" && isSelected
-                      ? "bg-white/10 text-white"
-                      : "bg-slate-100 text-slate-700"
-                      }`}
-                  >
-                    {role}
-                  </span>
-
-                  <span
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${mode === "bulk" && isSelected
-                      ? "border-white/20 bg-white/10 text-white"
-                      : "border-slate-200 bg-white text-slate-700"
-                      }`}
-                    title={isHighProfile ? label : `Team: ${label}`}
-                  >
-                    {isHighProfile ? `Company: ${label}` : `Team: ${label}`}
-                    {joinDateStr ? ` · ${joinDateStr}` : ""}
-                  </span>
-
-                  {mode === "normal" ? (
-                    <span className="inline-flex items-center rounded-lg bg-slate-950 px-3 py-2 text-xs font-semibold text-white">
-                      Chat
-                    </span>
-                  ) : (
+                  <div className="flex flex-wrap items-center gap-2">
                     <span
-                      className={`inline-flex items-center rounded-lg px-3 py-2 text-xs font-semibold ${isSelected
-                        ? "bg-white text-slate-950"
-                        : "bg-slate-950 text-white"
+                      className={`rounded-full px-3 py-1 text-xs font-medium ${mode === "bulk" && isSelected
+                        ? "bg-white/10 text-white"
+                        : "bg-slate-100 text-slate-700"
                         }`}
                     >
-                      {isSelected ? "Selected" : "Select"}
+                      {role}
                     </span>
-                  )}
+
+                    <span
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${mode === "bulk" && isSelected
+                        ? "border-white/20 bg-white/10 text-white"
+                        : "border-slate-200 bg-white text-slate-700"
+                        }`}
+                      title={isHighProfile ? label : `Team: ${label}`}
+                    >
+                      {isHighProfile ? `Company: ${label}` : `Team: ${label}`}
+                      {joinDateStr ? ` · ${joinDateStr}` : ""}
+                    </span>
+
+                    {mode === "normal" ? (
+                      <span className="inline-flex items-center rounded-lg bg-slate-950 px-3 py-2 text-xs font-semibold text-white">
+                        Chat
+                      </span>
+                    ) : (
+                      <span
+                        className={`inline-flex items-center rounded-lg px-3 py-2 text-xs font-semibold ${isSelected
+                          ? "bg-white text-slate-950"
+                          : "bg-slate-950 text-white"
+                          }`}
+                      >
+                        {isSelected ? "Selected" : "Select"}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </button>
-          );
-        });})()}
+              </button>
+            );
+          });
+        })()}
 
         {!loading && messageSearchQuery === "" && members.length === 0 ? (
           <p className="rounded-lg bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">

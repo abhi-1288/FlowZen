@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -77,10 +77,21 @@ export function BoardShell({ boardId }: { boardId?: string }) {
     void fetchNotificationCount();
   }, []);
 
+  const notificationSndRef = useRef<HTMLAudioElement | null>(null);
+
   // Unlock audio on first user interaction (browsers block autoplay)
   useEffect(() => {
     const unlock = () => {
-      try { new AudioContext().resume(); } catch {}
+      const audio = new Audio("/sound/notification_sound.mp3");
+      audio.volume = 0.01;
+      audio.play().then(() => {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.volume = 1;
+        notificationSndRef.current = audio;
+      }).catch(() => {
+        try { new AudioContext().resume(); } catch {}
+      });
       document.removeEventListener("click", unlock);
     };
     document.addEventListener("click", unlock, { once: true });
@@ -117,7 +128,12 @@ export function BoardShell({ boardId }: { boardId?: string }) {
         eventSource.addEventListener("notification:new", () => {
           if (!mounted) return;
           console.log("SSE: notification:new received");
-          new Audio("/sound/notification_sound.mp3").play().catch((err) => console.warn("Notification sound unavailable:", err));
+          if (notificationSndRef.current) {
+            notificationSndRef.current.currentTime = 0;
+            notificationSndRef.current.play().catch(() => {});
+          } else {
+            new Audio("/sound/notification_sound.mp3").play().catch((err) => console.warn("Notification sound unavailable:", err));
+          }
           apiFetch<{ notifications: any[] }>("/api/notifications")
             .then((res) => {
               const latest = res.notifications?.[0];

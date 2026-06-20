@@ -1519,7 +1519,7 @@ function CheckOutRequestsListModal({
                                           : wfh
                                             ? "bg-blue-100 text-blue-700 border border-blue-200 shadow-sm"
                                             : leave
-                                          ? "bg-amber-100 text-amber-900 border border-amber-200 shadow-sm"
+                                          ? "bg-pink-100 text-pink-700 border border-pink-200 shadow-sm"
                                           : weekend
                                           ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm"
                                           : missed
@@ -1550,7 +1550,9 @@ function CheckOutRequestsListModal({
                                 <Calendar className="h-3.5 w-3.5 text-fuchsia-600" />
                               ) : attAbsentStatus ? (
                                 <X className="h-3.5 w-3.5 text-rose-600" />
-                              ) : leave || halfDayStatus ? (
+                              ) : leave ? (
+                                <Check className="h-3.5 w-3.5 text-pink-600" />
+                              ) : halfDayStatus ? (
                                 <Check className="h-3.5 w-3.5 text-amber-600" />
                               ) : today && !checkedIn ? (
                                 <X className="h-3.5 w-3.5 text-rose-600" />
@@ -1568,6 +1570,15 @@ function CheckOutRequestsListModal({
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="mt-6 flex flex-wrap justify-center gap-6 text-xs font-semibold text-slate-600 bg-slate-50 py-3 px-6 rounded-full w-fit mx-auto border border-slate-200">
+          <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-emerald-100 border border-emerald-300"></span> Present</div>
+          <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-amber-100 border border-amber-300"></span> Half-Day</div>
+          <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-blue-100 border border-blue-300"></span> WFH</div>
+          <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-pink-100 border border-pink-300"></span> Leave</div>
+          <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-rose-50 border border-rose-300"></span> Absent</div>
+          <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-fuchsia-100 border border-fuchsia-300"></span> Holiday</div>
         </div>
       </section>
 

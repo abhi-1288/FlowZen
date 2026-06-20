@@ -992,12 +992,14 @@ export async function PATCH(request: Request) {
 
     if (status === "paid") {
       const employeeId = existing.employee;
+      const salarySlipLink = `/salary-slip/${String(existing._id)}`;
       await Notification.create({
         user: employeeId,
         company: actor.company,
         type: "info",
         title: "Salary paid",
         message: `Your salary for ${salary?.month ?? ""} has been marked as paid.`,
+        link: salarySlipLink,
       });
       emitNotification(String(employeeId));
     }

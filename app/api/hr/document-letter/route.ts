@@ -8,7 +8,7 @@ import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
 import { resolveEnrollingHr } from "@/lib/enrolling-hr";
 
-export async function GET() {
+export async function GET(request: Request) {
   const userId = await requireUserId();
   if (!userId) return jsonError("Unauthorized", 401);
 
@@ -18,15 +18,20 @@ export async function GET() {
     const actor = await User.findById(userId).select("role company companyStatus");
     if (!actor) return jsonError("User not found.", 404);
 
-    const isHrOrAdmin =
-      String(actor.role) === "human-resource" ||
-      String(actor.role) === "admin";
+    const url = new URL(request.url);
+    const scope = url.searchParams.get("scope");
+
+    const isHr = String(actor.role) === "human-resource";
+    const isAdmin = String(actor.role) === "admin";
 
     const filter: Record<string, unknown> = {
       kind: "document-letter",
     };
 
-    if (isHrOrAdmin && actor.company) {
+    // scope=company returns all company docs for HR and Admin
+    if (scope === "company" && (isHr || isAdmin) && actor.company) {
+      filter.company = actor.company;
+    } else if (isHr && actor.company) {
       filter.company = actor.company;
     } else {
       filter.requester = userId;
@@ -191,6 +196,11 @@ export async function POST(request: Request) {
       const companyDoc = await Company.findById(companyId).select("noticePeriodDays");
       metadataRecord.resignationLastWorkingDay = resignationLastWorkingDay;
       metadataRecord.noticePeriodDays = companyDoc?.noticePeriodDays ?? 30;
+    }
+
+    const letterContent = String(body.letterContent ?? "").trim();
+    if (letterContent) {
+      metadataRecord.letterContent = letterContent;
     }
 
     const joinRequest = await JoinRequest.create({

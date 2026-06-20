@@ -370,11 +370,92 @@ export function FinanceTab({
         />
       </div>
 
-      <div className="flex gap-2">
-        <button className={tabClass("my")} onClick={() => setFinanceSubTab("my")}>My Requests</button>
-        <button className={tabClass("ops")} onClick={() => setFinanceSubTab("ops")}>Operations</button>
-        <button className={tabClass("reports")} onClick={() => setFinanceSubTab("reports")}>Reports</button>
-      </div>
+      {(() => {
+        const today = new Date().getDate();
+        if (today >= 20 && today <= 21) {
+          return (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-medium text-amber-800">
+                Salary Reminder
+              </p>
+              <p className="mt-1 text-xs text-amber-700">
+                Generate salaries by the 28th of this month to ensure timely processing.
+              </p>
+            </div>
+          );
+        }
+        if (today >= 22 && today <= 27) {
+          return (
+            <div className="rounded-lg border border-sky-200 bg-sky-50 p-4">
+              <p className="text-sm font-medium text-sky-800">
+                Salary Reminder
+              </p>
+              <p className="mt-1 text-xs text-sky-700">
+                Don't forget to generate salaries before the 28th.
+              </p>
+            </div>
+          );
+        }
+        return null;
+      })()}
+
+      {(() => {
+        // Counts for badge display on each sub-tab
+        const myRequestsCount = data.expenses.filter((e) => {
+          const status = String(e.status ?? "");
+          // Show badge for expenses the current user requested that are still actionable
+          return status === "pending" || status === "forwarded";
+        }).length;
+
+        const pendingSalariesCount = data.salaries.filter((s) => String(s.status ?? "") === "pending").length;
+        const pendingBudgetsCount = data.budgets.filter((b) => String(b.status ?? "") === "pending").length;
+        const acceptedExpensesCount = data.expenses.filter((e) => String(e.status ?? "") === "accepted").length;
+        const opsCount = pendingSalariesCount + pendingBudgetsCount + acceptedExpensesCount;
+
+        const pendingInvoicesCount = invoices.filter((inv) => String(inv.status ?? "") === "pending").length;
+
+        const Badge = ({ count }: { count: number }) =>
+          count > 0 ? (
+            <span
+              className={`ml-1.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold leading-none ${
+                financeSubTab === "my" || financeSubTab === "ops" || financeSubTab === "reports"
+                  ? "bg-amber-400 text-amber-900"
+                  : "bg-amber-100 text-amber-700"
+              }`}
+            >
+              {count}
+            </span>
+          ) : null;
+
+        return (
+          <div className="flex gap-2">
+            <button className={tabClass("my")} onClick={() => setFinanceSubTab("my")}>
+              My Requests
+              {myRequestsCount > 0 && (
+                <span className={`ml-1.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold leading-none ${financeSubTab === "my" ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700"}`}>
+                  {myRequestsCount}
+                </span>
+              )}
+            </button>
+            <button className={tabClass("ops")} onClick={() => setFinanceSubTab("ops")}>
+              Operations
+              {opsCount > 0 && (
+                <span className={`ml-1.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold leading-none ${financeSubTab === "ops" ? "bg-white/20 text-white" : "bg-rose-100 text-rose-700"}`}>
+                  {opsCount}
+                </span>
+              )}
+            </button>
+            <button className={tabClass("reports")} onClick={() => setFinanceSubTab("reports")}>
+              Reports
+              {pendingInvoicesCount > 0 && (
+                <span className={`ml-1.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold leading-none ${financeSubTab === "reports" ? "bg-white/20 text-white" : "bg-sky-100 text-sky-700"}`}>
+                  {pendingInvoicesCount}
+                </span>
+              )}
+            </button>
+          </div>
+        );
+      })()}
 
       {data.monthEndGenerated ? (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
@@ -426,7 +507,17 @@ export function FinanceTab({
 
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
             <div className="mb-5 border-l-4 border-rose-500 pl-4">
-              <h3 className="text-base font-semibold text-slate-900">My Expense Requests</h3>
+              <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+                My Expense Requests
+                {data.expenses.length > 0 && (
+                  <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-100 px-1.5 text-[11px] font-bold text-rose-700">{data.expenses.length}</span>
+                )}
+                {data.expenses.filter((e) => ["pending", "forwarded"].includes(String(e.status ?? ""))).length > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                    {data.expenses.filter((e) => ["pending", "forwarded"].includes(String(e.status ?? ""))).length} pending
+                  </span>
+                )}
+              </h3>
               <p className="mt-0.5 text-sm text-slate-500">Track and manage your expense submissions</p>
             </div>
             <div className="mt-4 divide-y divide-slate-200">
@@ -547,13 +638,13 @@ export function FinanceTab({
                             <div className="flex justify-between text-rose-600"><span>Attendance/Leave Deduction:</span> <span>- &#x20B9;{salaryBreakdown.leaveDeduction.toLocaleString("en-IN")}</span></div>
                             {salaryBreakdown.foodDeduction > 0 ? <div className="flex justify-between text-rose-600"><span>Food Deduction:</span> <span>- &#x20B9;{salaryBreakdown.foodDeduction.toLocaleString("en-IN")}</span></div> : null}
                             {salaryBreakdown.travelDeduction > 0 ? <div className="flex justify-between text-rose-600"><span>Travel Accommodation Deduction:</span> <span>- &#x20B9;{salaryBreakdown.travelDeduction.toLocaleString("en-IN")}</span></div> : null}
-                            <div className="flex justify-between text-emerald-600"><span>Total In Hand:</span> <span>&#x20B9;{Math.max(salaryBreakdown.grossSalary + Number(salaryAllowances || 0) - (salaryBreakdown.leaveDeduction + Number(salaryDeductions || 0) + (salaryBreakdown.foodDeduction ?? 0) + (salaryBreakdown.travelDeduction ?? 0))).toLocaleString("en-IN")}</span></div>
+                            <div className="flex justify-between text-emerald-600"><span>Total In Hand:</span> <span>&#x20B9;{Math.max(0, salaryBreakdown.grossSalary + Number(salaryAllowances || 0) - (Number(salaryDeductions || 0) + (salaryBreakdown.foodDeduction ?? 0) + (salaryBreakdown.travelDeduction ?? 0))).toLocaleString("en-IN")}</span></div>
                           </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div><label className="text-xs font-medium text-slate-500 mb-1 block">Manual Allowances (&#x20B9;)</label><input className="w-full rounded-lg border border-slate-200 px-3 py-2" type="number" min="0" value={salaryAllowances} onChange={(e) => setSalaryAllowances(e.target.value)} /></div>
                             <div><label className="text-xs font-medium text-slate-500 mb-1 block">Manual Deductions (&#x20B9;)</label><input className="w-full rounded-lg border border-slate-200 px-3 py-2" type="number" min="0" value={salaryDeductions} onChange={(e) => setSalaryDeductions(e.target.value)} /></div>
                           </div>
-                          <div className="rounded-lg bg-emerald-50 p-3 flex justify-between font-bold text-emerald-700 text-lg mt-2"><span>Net Salary:</span><span>&#x20B9;{Math.max(0, salaryBreakdown.grossSalary + Number(salaryAllowances || 0) - (salaryBreakdown.leaveDeduction + Number(salaryDeductions || 0) + (salaryBreakdown.foodDeduction ?? 0) + (salaryBreakdown.travelDeduction ?? 0))).toLocaleString("en-IN")}</span></div>
+                            <div className="rounded-lg bg-emerald-50 p-3 flex justify-between font-bold text-emerald-700 text-lg mt-2"><span>Net Salary:</span><span>&#x20B9;{Math.max(0, salaryBreakdown.grossSalary + Number(salaryAllowances || 0) - (Number(salaryDeductions || 0) + (salaryBreakdown.foodDeduction ?? 0) + (salaryBreakdown.travelDeduction ?? 0))).toLocaleString("en-IN")}</span></div>
                           <div className="flex justify-between mt-2">
                             <ActionButton variant="secondary" type="button" onClick={() => setSalaryStep(2)}>Back</ActionButton>
                             <ActionButton variant="approve" disabled={salaryGenerating}>{salaryGenerating ? "Generating..." : "Generate Salary"}</ActionButton>
@@ -565,7 +656,14 @@ export function FinanceTab({
                 ) : null}
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
                   <div className="mb-5 border-l-4 border-rose-500 pl-4">
-                    <h3 className="text-base font-semibold text-slate-900">Expense Allocator</h3>
+                    <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+                      Expense Allocator
+                      {data.expenses.filter((e) => String(e.status) === "accepted").length > 0 && (
+                        <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-100 px-1.5 text-[11px] font-bold text-rose-700">
+                          {data.expenses.filter((e) => String(e.status) === "accepted").length} to disburse
+                        </span>
+                      )}
+                    </h3>
                     <p className="mt-0.5 text-sm text-slate-500">Disburse money or hardware for accepted expense requests.</p>
                   </div>
                   <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
@@ -595,7 +693,17 @@ export function FinanceTab({
               </div>
               <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
                 <div className="mb-5 border-l-4 border-sky-500 pl-4">
-                  <h3 className="text-base font-semibold text-slate-900">Invoices{invoices.length > 0 ? <span className="ml-2 inline-block rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">{invoices.length}</span> : null}</h3>
+                  <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+                    Invoices
+                    {invoices.length > 0 && (
+                      <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-sky-100 px-1.5 text-[11px] font-bold text-sky-700">{invoices.length}</span>
+                    )}
+                    {invoices.filter((inv) => String(inv.status ?? "") === "pending").length > 0 && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                        {invoices.filter((inv) => String(inv.status ?? "") === "pending").length} unpaid
+                      </span>
+                    )}
+                  </h3>
                   <p className="mt-0.5 text-sm text-slate-500">Generate client invoices and track payments.</p>
                 </div>
                 <div className="mb-3 flex justify-end">
@@ -658,7 +766,17 @@ export function FinanceTab({
               </section>
               <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
                 <div className="mb-5 border-l-4 border-emerald-500 pl-4">
-                  <h3 className="text-base font-semibold text-slate-900">Salary Records</h3>
+                  <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+                    Salary Records
+                    {data.salaries.length > 0 && (
+                      <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-100 px-1.5 text-[11px] font-bold text-emerald-700">{data.salaries.length}</span>
+                    )}
+                    {data.salaries.filter((s) => String(s.status ?? "") === "pending").length > 0 && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                        {data.salaries.filter((s) => String(s.status ?? "") === "pending").length} pending
+                      </span>
+                    )}
+                  </h3>
                   <p className="mt-0.5 text-sm text-slate-500">Manage monthly salary payouts</p>
                 </div>
                 <div className="mt-4 divide-y divide-slate-200">
@@ -672,6 +790,7 @@ export function FinanceTab({
                         {String(salary.status) === "pending" && actorRole === "finance" ? <ActionButton variant="danger" className="px-3" onClick={() => { setDeleteSalaryId(String(salary.id)); setDeleteSalaryEmployee(displayNested(salary.employee, "name", "Employee")); }}>Delete</ActionButton> : null}
                         {String(salary.status) === "pending" && actorRole === "admin" ? <><ActionButton variant="secondary" className="px-3" onClick={() => updateStatus("salary", String(salary.id), "approved")}>Approve payout</ActionButton><ActionButton variant="danger" className="px-3" onClick={() => updateStatus("salary", String(salary.id), "rejected")}>Reject</ActionButton></> : null}
                         {String(salary.status) === "approved" && actorRole === "finance" ? <ActionButton variant="approve" className="px-3" onClick={() => updateStatus("salary", String(salary.id), "paid")}>Mark paid</ActionButton> : null}
+                        {String(salary.status) === "paid" ? <a href={`/salary-slip/${String(salary.id)}`} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800">View Slip</a> : null}
                       </div>
                     </div>
                   ))}

@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 
 type Props = {
+  mode: "request" | "send";
   onClose: () => void;
   onSuccess: () => void;
   showToast: (text: string, type?: "success" | "error") => void;
@@ -26,8 +27,9 @@ const LETTER_TYPES = [
   { value: "other", label: "Other" },
 ];
 
-export function DocumentLetterModal({ onClose, onSuccess, showToast }: Props) {
-  const [letterType, setLetterType] = useState("experience");
+export function DocumentLetterModal({ mode, onClose, onSuccess, showToast }: Props) {
+  const [letterType, setLetterType] = useState(mode === "send" ? "resignation" : "experience");
+  const availableLetterTypes = LETTER_TYPES.filter(lt => mode === "send" ? lt.value === "resignation" : lt.value !== "resignation");
   const [customType, setCustomType] = useState("");
   const [purpose, setPurpose] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -41,6 +43,45 @@ export function DocumentLetterModal({ onClose, onSuccess, showToast }: Props) {
   const [resignationLastWorkingDay, setResignationLastWorkingDay] = useState("");
   const [noticePeriodDays, setNoticePeriodDays] = useState(30);
   const [companyJoined, setCompanyJoined] = useState("");
+  const [letterContent, setLetterContent] = useState("");
+  const [showPreview, setShowPreview] = useState(false);
+
+  function handlePreview() {
+    if (letterType === "resignation" && !resignationLastWorkingDay) {
+      showToast("Please enter the last working day first.", "error");
+      return;
+    }
+    if (letterType === "internship" && (!internshipStart || !internshipEnd || !projectTitle || !projectDescription)) {
+      showToast("Please fill in all required internship details first.", "error");
+      return;
+    }
+    if (letterType === "other" && !customType.trim()) {
+      showToast("Please enter a custom letter type first.", "error");
+      return;
+    }
+    if (!purpose.trim()) {
+      showToast("Please enter a purpose first.", "error");
+      return;
+    }
+
+    if (!letterContent) {
+      let content = "";
+      if (letterType === "resignation") {
+        const lastDayStr = new Date(resignationLastWorkingDay).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+        const reasonStr = purpose ? `\n\nReason for resignation: ${purpose}` : "";
+        content = `Dear HR,\n\nPlease accept this letter as formal notification that I am resigning from my position. As per my notice period, my last working day will be ${lastDayStr}.${reasonStr}\n\nThank you for the opportunities I've had during my time with the company. I wish the company continued success in the future.\n\nSincerely,\n`;
+      } else if (letterType === "internship") {
+        const startStr = new Date(internshipStart).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+        const endStr = new Date(internshipEnd).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+        content = `Dear HR,\n\nI am writing to formally request an Internship Certificate for my work from ${startStr} to ${endStr}.\n\nDuring this time, I worked on the project "${projectTitle}". ${projectDescription}\n${projectAchievements ? `\nKey achievements: ${projectAchievements}\n` : ""}\nPurpose of request: ${purpose}\n\nPlease let me know if you need any further information.\n\nSincerely,\n`;
+      } else {
+        const typeLabel = letterType === "other" ? customType : LETTER_TYPES.find(l => l.value === letterType)?.label || "Document Letter";
+        content = `Dear HR,\n\nI am writing to formally request a ${typeLabel}.\n\nPurpose of request: ${purpose}\n\nPlease let me know if you need any further information from my side to process this request.\n\nSincerely,\n`;
+      }
+      setLetterContent(content);
+    }
+    setShowPreview(true);
+  }
 
   useEffect(() => {
     apiFetch<{ users: HrUser[] }>("/api/users?role=human-resource")
@@ -122,9 +163,10 @@ export function DocumentLetterModal({ onClose, onSuccess, showToast }: Props) {
           projectDescription: letterType === "internship" ? projectDescription.trim() : undefined,
           projectAchievements: letterType === "internship" ? projectAchievements.trim() : undefined,
           resignationLastWorkingDay: letterType === "resignation" ? resignationLastWorkingDay : undefined,
+          letterContent: letterContent.trim() ? letterContent.trim() : undefined,
         }),
       });
-      showToast("Document letter request sent for approval.");
+      showToast(mode === "send" ? "Resignation letter sent to HR." : "Document letter request sent for approval.");
       onSuccess();
     } catch (err) {
       showToast(
@@ -145,13 +187,25 @@ export function DocumentLetterModal({ onClose, onSuccess, showToast }: Props) {
     >
       <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-xl">
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
-          <div>
-            <h4 className="text-lg font-semibold text-slate-900">
-              Request Document Letter
-            </h4>
-            <p className="mt-0.5 text-sm text-slate-500">
-              Submit a request to HR for a company document letter.
-            </p>
+          <div className="flex items-start gap-3">
+            {showPreview ? (
+              <button
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"
+                type="button"
+                onClick={() => setShowPreview(false)}
+                aria-label="Back"
+              >
+                <ArrowLeft size={18} />
+              </button>
+            ) : null}
+            <div>
+              <h4 className="text-lg font-semibold text-slate-900">
+                {showPreview ? "Edit Letter Content" : mode === "send" ? "Send Resignation Letter" : "Request Document Letter"}
+              </h4>
+              <p className="mt-0.5 text-sm text-slate-500">
+                {showPreview ? "Customize the text before submitting." : mode === "send" ? "Submit your resignation letter to HR." : "Submit a request to HR for a company document letter."}
+              </p>
+            </div>
           </div>
           <button
             className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
@@ -163,6 +217,19 @@ export function DocumentLetterModal({ onClose, onSuccess, showToast }: Props) {
           </button>
         </div>
 
+        {showPreview ? (
+          <div className="max-h-[65vh] space-y-4 overflow-y-auto px-6 py-5">
+            <div>
+              <label className="text-xs font-semibold uppercase text-slate-500">Letter Content</label>
+              <textarea
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                rows={12}
+                value={letterContent}
+                onChange={(e) => setLetterContent(e.target.value)}
+              />
+            </div>
+          </div>
+        ) : (
         <div className="max-h-[65vh] space-y-4 overflow-y-auto px-6 py-5">
           <div>
             <label className="text-xs font-semibold uppercase text-slate-500">
@@ -173,7 +240,7 @@ export function DocumentLetterModal({ onClose, onSuccess, showToast }: Props) {
               value={letterType}
               onChange={(e) => setLetterType(e.target.value)}
             >
-              {LETTER_TYPES.map((lt) => (
+              {availableLetterTypes.map((lt) => (
                 <option key={lt.value} value={lt.value}>
                   {lt.label}
                 </option>
@@ -322,24 +389,47 @@ export function DocumentLetterModal({ onClose, onSuccess, showToast }: Props) {
                   : ""}
             </p>
           </div>
+
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={handlePreview}
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            >
+              {letterContent ? "Edit Letter Content" : "Preview & Edit Letter Content"}
+            </button>
+          </div>
         </div>
+        )}
 
         <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">
-          <button
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            type="button"
-            onClick={onClose}
-          >
-            Cancel
-          </button>
-          <button
-            className="rounded-lg bg-slate-950 px-5 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-            type="button"
-            disabled={submitting}
-            onClick={() => void handleSubmit()}
-          >
-            {submitting ? "Submitting..." : "Submit Request"}
-          </button>
+          {showPreview ? (
+            <button
+              className="rounded-lg bg-slate-950 px-5 py-2 text-sm font-medium text-white"
+              type="button"
+              onClick={() => setShowPreview(false)}
+            >
+              Done Editing
+            </button>
+          ) : (
+            <>
+              <button
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                type="button"
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-lg bg-slate-950 px-5 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                type="button"
+                disabled={submitting}
+                onClick={() => void handleSubmit()}
+              >
+                {submitting ? "Submitting..." : (mode === "send" ? "Send Letter" : "Submit Request")}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
