@@ -64,8 +64,8 @@ export async function GET(request: Request, { params }: Params) {
     }
 
     const [employee, companyDoc, policy] = await Promise.all([
-      User.findById(salary.employee).select("name email role companyIdentityCode baseSalary companyJoined createdAt"),
-      Company.findById(salary.company).select("name"),
+      User.findById(salary.employee).select("name email role companyIdentityCode baseSalary companyJoined createdAt pfNumber pfDeductionAmount esicNumber esicDeductionAmount"),
+      Company.findById(salary.company).select("name icon"),
       CompanyPolicy.findOne({ company: salary.company }),
     ]);
 
@@ -195,14 +195,26 @@ export async function GET(request: Request, { params }: Params) {
 
     let foodDeduction = 0;
     let travelDeduction = 0;
-    let finalSalary = Math.max(0, grossSalary + Number(salary.allowances) - Number(salary.deductions));
+    let pfDeduction = 0;
+    let esicDeduction = 0;
     if (policy) {
       const isFoodOptedOut = policy.foodOptedOutMembers?.some((id: any) => String(id) === String(employee._id));
       const isTravelOptedOut = policy.travelOptedOutMembers?.some((id: any) => String(id) === String(employee._id));
       if (!isFoodOptedOut) foodDeduction = Math.max(0, Number(policy.foodAmount ?? 0));
       if (!isTravelOptedOut) travelDeduction = Math.max(0, Number(policy.travelAccommodationAmount ?? 0));
-      finalSalary = Math.max(0, finalSalary - foodDeduction - travelDeduction);
+      const pfPercentage = Number((policy as any).pfPercentage ?? 12);
+      const esicPercentage = Number((policy as any).esicPercentage ?? 0.75);
+      const empPfAmount = Number((employee as any).pfDeductionAmount ?? 0);
+      const empEsicAmount = Number((employee as any).esicDeductionAmount ?? 0);
+      if ((employee as any).pfNumber) {
+        pfDeduction = empPfAmount > 0 ? roundCurrency(empPfAmount) : roundCurrency(grossSalary * pfPercentage / 100);
+      }
+      if ((employee as any).esicNumber) {
+        esicDeduction = empEsicAmount > 0 ? roundCurrency(empEsicAmount) : roundCurrency(grossSalary * esicPercentage / 100);
+      }
     }
+    const finalSalary = Math.max(0, Number(salary.netSalary ?? 0));
+    const periodAdjusted = !!(companyJoined && companyJoined > startOfDay(periodStart) && companyJoined <= startOfDay(periodEnd));
 
     return NextResponse.json({
       slip: {
@@ -220,9 +232,12 @@ export async function GET(request: Request, { params }: Params) {
         email: employee.email,
         role: employee.role,
         identityCode: employee.companyIdentityCode,
+        pfNumber: (employee as any).pfNumber ?? "",
+        esicNumber: (employee as any).esicNumber ?? "",
       },
       company: {
         name: companyDoc.name,
+        icon: (companyDoc as any).icon ?? "",
       },
       breakdown: {
         monthlySalary,
@@ -235,7 +250,12 @@ export async function GET(request: Request, { params }: Params) {
         grossSalary,
         foodDeduction,
         travelDeduction,
+        pfDeduction,
+        esicDeduction,
         finalSalary,
+        periodStart: toDateKey(effectiveStart),
+        periodEnd: toDateKey(effectiveEnd),
+        periodAdjusted,
       },
     });
   } catch (error) {

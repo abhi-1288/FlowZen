@@ -474,6 +474,16 @@ export function MembersTab({
   const [savingCustomRoleModal, setSavingCustomRoleModal] = useState(false);
   const [modalSearchQuery, setModalSearchQuery] = useState("");
   const [modalSearchInput, setModalSearchInput] = useState("");
+  const [pfEsicModalMember, setPfEsicModalMember] = useState<AnyRecord | null>(null);
+  const [pfEsicInput, setPfEsicInput] = useState({ pfNumber: "", pfDeductionAmount: "", esicNumber: "", esicDeductionAmount: "" });
+  const [savingPfEsic, setSavingPfEsic] = useState(false);
+  const [docModalMember, setDocModalMember] = useState<AnyRecord | null>(null);
+  const [docModalData, setDocModalData] = useState<{
+    member: { name: string; email: string; role: string };
+    categories: { name: string; mandatory: boolean; fields: { label: string; type: string }[] }[];
+    documents: { category: string; fileName: string; fileUrl: string; fileType: string; fileSize: number; fieldValues: { label: string; value: string }[] }[];
+  } | null>(null);
+  const [loadingDocModal, setLoadingDocModal] = useState(false);
 
   function openSalaryModal(member: AnyRecord) {
     setSalaryInput(String(Math.max(0, Number(member.baseSalary ?? 0)) > 0 ? Number(member.baseSalary) : ""));
@@ -488,6 +498,36 @@ export function MembersTab({
   function openCustomRoleModal(member: AnyRecord) {
     setCustomRoleInput(String(member.customRole ?? ""));
     setCustomRoleModalMember(member);
+  }
+
+  function openPfEsicModal(member: AnyRecord) {
+    setPfEsicInput({
+      pfNumber: String(member.pfNumber ?? ""),
+      pfDeductionAmount: String(Number(member.pfDeductionAmount ?? 0) > 0 ? Number(member.pfDeductionAmount) : ""),
+      esicNumber: String(member.esicNumber ?? ""),
+      esicDeductionAmount: String(Number(member.esicDeductionAmount ?? 0) > 0 ? Number(member.esicDeductionAmount) : ""),
+    });
+    setPfEsicModalMember(member);
+  }
+
+  async function openDocModal(member: AnyRecord) {
+    const memberId = String(member.id ?? "");
+    if (!memberId) return;
+    try {
+      setLoadingDocModal(true);
+      setDocModalMember(member);
+      const res = await apiFetch<{
+        member: { name: string; email: string; role: string };
+        categories: { name: string; mandatory: boolean; fields: { label: string; type: string }[] }[];
+        documents: { category: string; fileName: string; fileUrl: string; fileType: string; fileSize: number; fieldValues: { label: string; value: string }[] }[];
+      }>(`/api/hr/member-documents/${memberId}`);
+      setDocModalData(res);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to load documents.", "error");
+      setDocModalMember(null);
+    } finally {
+      setLoadingDocModal(false);
+    }
   }
 
   async function saveSalaryModal() {
@@ -551,6 +591,31 @@ export function MembersTab({
       showToast(err instanceof Error ? err.message : "Unable to update custom role.", "error");
     } finally {
       setSavingCustomRoleModal(false);
+    }
+  }
+
+  async function savePfEsicModal() {
+    const member = pfEsicModalMember;
+    const memberId = String(member?.id ?? "");
+    if (!memberId) return;
+    try {
+      setSavingPfEsic(true);
+      await apiFetch(`/api/hr/member-pf-esic/${memberId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          pfNumber: pfEsicInput.pfNumber,
+          pfDeductionAmount: pfEsicInput.pfDeductionAmount ? Number(pfEsicInput.pfDeductionAmount) : 0,
+          esicNumber: pfEsicInput.esicNumber,
+          esicDeductionAmount: pfEsicInput.esicDeductionAmount ? Number(pfEsicInput.esicDeductionAmount) : 0,
+        }),
+      });
+      showToast("PF & ESIC details saved.");
+      setPfEsicModalMember(null);
+      await refresh(true);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to save PF/ESIC details.", "error");
+    } finally {
+      setSavingPfEsic(false);
     }
   }
 
@@ -969,6 +1034,22 @@ export function MembersTab({
                               >
                                 Base Salary
                               </ActionButton>
+                              <ActionButton
+                                variant="secondary"
+                                className="px-3"
+                                type="button"
+                                onClick={() => openPfEsicModal(member)}
+                              >
+                                PF & ESIC
+                              </ActionButton>
+                              <ActionButton
+                                variant="secondary"
+                                className="px-3"
+                                type="button"
+                                onClick={() => void openDocModal(member)}
+                              >
+                                Documents
+                              </ActionButton>
                               {canEditOthersRole && String(member.role ?? "") === "others" ? (
                                 <>
                                   <ActionButton
@@ -1240,6 +1321,107 @@ export function MembersTab({
               >
                 {savingCustomRoleModal ? "Saving..." : "Save role"}
               </ActionButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {pfEsicModalMember ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-slate-900">PF & ESIC Details</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Update PF and ESIC information for{" "}
+              <strong>{String(pfEsicModalMember.name ?? "")}</strong>.
+            </p>
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">PF Account Number</label>
+                <input className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm" type="text" placeholder="Enter PF number" value={pfEsicInput.pfNumber} onChange={(e) => setPfEsicInput({ ...pfEsicInput, pfNumber: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">PF Monthly Deduction (&#x20B9;)</label>
+                <input className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm" type="number" min="0" placeholder="Leave empty to use company %" value={pfEsicInput.pfDeductionAmount} onChange={(e) => setPfEsicInput({ ...pfEsicInput, pfDeductionAmount: e.target.value })} />
+              </div>
+              <hr className="border-slate-100" />
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">ESIC Account Number</label>
+                <input className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm" type="text" placeholder="Enter ESIC number" value={pfEsicInput.esicNumber} onChange={(e) => setPfEsicInput({ ...pfEsicInput, esicNumber: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">ESIC Monthly Deduction (&#x20B9;)</label>
+                <input className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm" type="number" min="0" placeholder="Leave empty to use company %" value={pfEsicInput.esicDeductionAmount} onChange={(e) => setPfEsicInput({ ...pfEsicInput, esicDeductionAmount: e.target.value })} />
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-3">
+              <ActionButton variant="secondary" onClick={() => setPfEsicModalMember(null)} type="button">Cancel</ActionButton>
+              <ActionButton variant="primary" disabled={savingPfEsic} onClick={() => void savePfEsicModal()} type="button">{savingPfEsic ? "Saving..." : "Save details"}</ActionButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {docModalMember ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-slate-900">Documents</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Documents uploaded by <strong>{String(docModalMember.name ?? "")}</strong>.
+            </p>
+            <div className="mt-4 space-y-3">
+              {loadingDocModal ? (
+                <p className="text-sm text-slate-400">Loading...</p>
+              ) : docModalData ? (
+                docModalData.categories.length === 0 ? (
+                  <p className="text-sm text-slate-400">No document categories defined.</p>
+                ) : (
+                    docModalData.categories.map((cat) => {
+                      const doc = docModalData.documents.find((d) => d.category === cat.name);
+                      return (
+                        <div key={cat.name} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-slate-800">{cat.name}</span>
+                                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${cat.mandatory ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"}`}>
+                                  {cat.mandatory ? "Required" : "Optional"}
+                                </span>
+                              </div>
+                              {doc ? (
+                                <p className="mt-0.5 text-xs text-slate-500 truncate">{doc.fileName} ({(doc.fileSize / 1024).toFixed(0)} KB)</p>
+                              ) : (
+                                <p className="mt-0.5 text-xs text-slate-400">Not uploaded</p>
+                              )}
+                            </div>
+                            {doc ? (
+                              <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer"
+                                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 transition"
+                              >
+                                View
+                              </a>
+                            ) : (
+                              <span className="text-xs text-slate-400">—</span>
+                            )}
+                          </div>
+                          {doc && doc.fieldValues && doc.fieldValues.length > 0 ? (
+                            <div className="mt-2 border-t border-slate-200 pt-2 space-y-1">
+                              {doc.fieldValues.map((fv, fi) => (
+                                <p key={fi} className="text-xs text-slate-600">
+                                  <span className="font-medium text-slate-700">{fv.label}:</span> {fv.value}
+                                </p>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                  })
+                )
+              ) : (
+                <p className="text-sm text-slate-400">Unable to load documents.</p>
+              )}
+            </div>
+            <div className="mt-5 flex justify-end gap-3">
+              <ActionButton variant="secondary" onClick={() => { setDocModalMember(null); setDocModalData(null); }} type="button">Close</ActionButton>
             </div>
           </div>
         </div>

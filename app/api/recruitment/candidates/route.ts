@@ -1,0 +1,113 @@
+import { NextResponse } from "next/server";
+import { connectDb } from "@/lib/db";
+import { ATSCandidate } from "@/models/ATSCandidate";
+import { ATSJob } from "@/models/ATSJob";
+import { ATSTimeline } from "@/models/ATSTimeline";
+import { ATSAuditLog } from "@/models/ATSAuditLog";
+import { User } from "@/models/User";
+import { isObjectId, jsonError, requireUserId, serializeDoc, serializeDocs } from "@/lib/api";
+import { emitToUser } from "@/lib/socket-emit";
+
+const HR_ROLES = ["admin", "human-resource"];
+
+export async function GET(request: Request) {
+  const userId = await requireUserId();
+  if (!userId) return jsonError("Unauthorized", 401);
+
+  await connectDb();
+  const user = await User.findById(userId);
+  if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  if (!user.company) return jsonError("No company found.", 400);
+
+  const { searchParams } = new URL(request.url);
+  const stage = searchParams.get("stage");
+  const jobId = searchParams.get("jobId");
+  const search = searchParams.get("search");
+
+  const filter: Record<string, unknown> = { company: user.company };
+  if (stage) filter.stage = stage;
+  if (jobId && isObjectId(jobId)) filter.job = jobId;
+  if (search) {
+    filter.$or = [
+      { firstName: { $regex: search, $options: "i" } },
+      { lastName: { $regex: search, $options: "i" } },
+      { email: { $regex: search, $options: "i" } },
+    ];
+  }
+
+  const candidates = await ATSCandidate.find(filter)
+    .sort({ createdAt: -1 })
+    .populate("assignedRecruiter", "name email")
+    .populate("job", "title");
+
+  return NextResponse.json({ candidates: serializeDocs(candidates) });
+}
+
+export async function POST(request: Request) {
+  const userId = await requireUserId();
+  if (!userId) return jsonError("Unauthorized", 401);
+
+  const body = await request.json();
+  if (!body.firstName || !body.firstName.trim()) return jsonError("First name is required.");
+  if (!body.email || !body.email.trim()) return jsonError("Email is required.");
+  if (!body.job) return jsonError("Job is required.");
+
+  await connectDb();
+  const user = await User.findById(userId);
+  if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  if (!user.company) return jsonError("No company found.", 400);
+
+  const job = await ATSJob.findOne({ _id: body.job, company: user.company });
+  if (!job) return jsonError("Job not found.", 404);
+
+  const candidate = await ATSCandidate.create({
+    firstName: String(body.firstName).trim(),
+    lastName: String(body.lastName ?? "").trim(),
+    email: String(body.email).trim().toLowerCase(),
+    phone: String(body.phone ?? "").trim(),
+    currentCompany: String(body.currentCompany ?? "").trim(),
+    experienceYears: Number(body.experienceYears) || 0,
+    currentCTC: Number(body.currentCTC) || 0,
+    expectedCTC: Number(body.expectedCTC) || 0,
+    noticePeriod: Number(body.noticePeriod) || 0,
+    source: body.source || "Other",
+    stage: "applied",
+    rating: Number(body.rating) || 0,
+    notes: String(body.notes ?? "").trim(),
+    portfolioUrl: String(body.portfolioUrl ?? "").trim(),
+    linkedInUrl: String(body.linkedInUrl ?? "").trim(),
+    assignedRecruiter: isObjectId(body.assignedRecruiter) ? body.assignedRecruiter : null,
+    job: job._id,
+    company: user.company,
+  });
+
+  await ATSTimeline.create({
+    candidate: candidate._id,
+    job: job._id,
+    action: "applied",
+    metadata: { source: body.source || "Other" },
+    actor: userId,
+    company: user.company,
+  });
+
+  await ATSAuditLog.create({
+    actor: userId,
+    action: "create-candidate",
+    entityType: "ATSCandidate",
+    entityId: candidate._id,
+    metadata: { name: `${candidate.firstName} ${candidate.lastName}`, job: job.title },
+    company: user.company,
+  });
+
+  if (candidate.assignedRecruiter) {
+    emitToUser(String(candidate.assignedRecruiter), "notification:new", {
+      message: `Candidate ${candidate.firstName} ${candidate.lastName} assigned to you.`,
+    });
+  }
+
+  const populated = await ATSCandidate.findById(candidate._id)
+    .populate("assignedRecruiter", "name email")
+    .populate("job", "title");
+
+  return NextResponse.json({ candidate: serializeDoc(populated!) }, { status: 201 });
+}

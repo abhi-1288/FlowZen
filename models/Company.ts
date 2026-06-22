@@ -32,7 +32,14 @@ const CompanySchema = new Schema(
       }
     ],
     wfhCheckInMode: { type: String, enum: ["all-day", "wfh-only"], default: "all-day" },
-    minWorkHours: { type: Number, default: 8 }
+    minWorkHours: { type: Number, default: 8 },
+    icon: { type: String, default: "" },
+    requiredDocuments: [{
+      name: { type: String, required: true },
+      mandatory: { type: Boolean, default: false },
+      acceptedFileTypes: [{ type: String }],
+      fields: [{ label: { type: String, required: true }, type: { type: String, default: "text" } }]
+    }]
   },
   { timestamps: true }
 );

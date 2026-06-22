@@ -20,9 +20,12 @@ type SlipData = {
     email: string;
     role: string;
     identityCode: string;
+    pfNumber?: string;
+    esicNumber?: string;
   };
   company: {
     name: string;
+    icon: string;
   };
   breakdown: {
     monthlySalary: number;
@@ -35,7 +38,12 @@ type SlipData = {
     grossSalary: number;
     foodDeduction: number;
     travelDeduction: number;
+    pfDeduction: number;
+    esicDeduction: number;
     finalSalary: number;
+    periodStart: string;
+    periodEnd: string;
+    periodAdjusted: boolean;
   };
 };
 
@@ -88,7 +96,12 @@ export default function SalarySlipPage() {
         <div className="p-8 print:p-6">
           {/* Header */}
           <div className="border-b-2 border-slate-900 pb-4 text-center">
-            <h1 className="text-xl font-bold text-slate-900">{company.name}</h1>
+            <div className="flex items-center justify-center gap-3">
+              {company.icon ? (
+                <img src={company.icon} alt="" className="h-10 w-10 rounded-lg object-cover" />
+              ) : null}
+              <h1 className="text-xl font-bold text-slate-900">{company.name}</h1>
+            </div>
             <p className="mt-1 text-sm text-slate-500">Salary Slip</p>
           </div>
 
@@ -100,6 +113,14 @@ export default function SalarySlipPage() {
             </span>
           </div>
 
+          {/* Period */}
+          <div className="mt-2 text-xs text-slate-500">
+            Period: {breakdown.periodStart} to {breakdown.periodEnd}
+            {breakdown.periodAdjusted ? (
+              <span className="ml-2 text-amber-600">⚠ Period adjusted — employee joined on {breakdown.periodStart}</span>
+            ) : null}
+          </div>
+
           {/* Employee Details */}
           <div className="mt-4 rounded-lg border border-slate-200 p-4">
             <h2 className="mb-2 text-xs font-semibold uppercase text-slate-500">Employee Details</h2>
@@ -108,6 +129,12 @@ export default function SalarySlipPage() {
               <p><span className="text-slate-500">Email:</span> <span className="text-slate-900">{employee.email}</span></p>
               <p><span className="text-slate-500">Role:</span> <span className="text-slate-900 capitalize">{employee.role.replace("-", " ")}</span></p>
               <p><span className="text-slate-500">ID:</span> <span className="text-slate-900">{employee.identityCode || "—"}</span></p>
+              {employee.pfNumber ? (
+                <p><span className="text-slate-500">PF:</span> <span className="text-slate-900">{employee.pfNumber}</span></p>
+              ) : null}
+              {employee.esicNumber ? (
+                <p><span className="text-slate-500">ESIC:</span> <span className="text-slate-900">{employee.esicNumber}</span></p>
+              ) : null}
             </div>
           </div>
 
@@ -169,15 +196,21 @@ export default function SalarySlipPage() {
                   <span className="text-slate-500">Travel Deduction</span>
                   <span className="font-medium text-slate-900">{formatINR(breakdown.travelDeduction)}</span>
                 </div>
-                {slip.deductions > 0 ? (
+                {employee.pfNumber ? (
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Other Deductions</span>
-                    <span className="font-medium text-slate-900">{formatINR(slip.deductions)}</span>
+                    <span className="text-slate-500">PF {employee.pfNumber}</span>
+                    <span className="font-medium text-slate-900">{formatINR(breakdown.pfDeduction)}</span>
+                  </div>
+                ) : null}
+                {employee.esicNumber ? (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">ESIC {employee.esicNumber}</span>
+                    <span className="font-medium text-slate-900">{formatINR(breakdown.esicDeduction)}</span>
                   </div>
                 ) : null}
                 <div className="border-t border-slate-100 pt-1.5 flex justify-between font-semibold">
                   <span className="text-slate-700">Total Deductions</span>
-                  <span className="text-slate-900">{formatINR(breakdown.leaveDeduction + breakdown.foodDeduction + breakdown.travelDeduction + slip.deductions)}</span>
+                  <span className="text-slate-900">{formatINR(breakdown.leaveDeduction + breakdown.foodDeduction + breakdown.travelDeduction + breakdown.pfDeduction + breakdown.esicDeduction)}</span>
                 </div>
               </div>
             </div>

@@ -34,9 +34,13 @@ type LetterData = {
     role: string;
     companyIdentityCode?: string;
     companyJoined?: string;
+    pfNumber?: string;
+    pfDeductionAmount?: number;
+    esicNumber?: string;
+    esicDeductionAmount?: number;
   };
   approver?: { _id: string; name: string; role: string };
-  company: { _id: string; name: string };
+  company: { _id: string; name: string; icon?: string };
   createdAt: string;
 };
 
@@ -600,6 +604,7 @@ export default function LetterPage() {
   }
 
   const companyName = data.company?.name ?? "Company";
+  const companyIcon = data.company?.icon ?? "";
   const type = data.metadata?.letterType ?? "";
   const title = LETTER_TITLES[type] || "Certificate";
 
@@ -619,11 +624,37 @@ export default function LetterPage() {
 
       <div className="mx-auto max-w-[210mm] bg-white p-10 shadow-lg print:mx-auto print:min-h-screen print:shadow-none print:p-6 print:text-[11px]">
         <div className="mb-8 text-center print:mb-4">
-          <h2 className="text-2xl font-bold uppercase tracking-wide text-slate-900 print:text-xl">
-            {companyName}
-          </h2>
+          <div className="flex items-center justify-center gap-3">
+            {companyIcon ? (
+              <img src={companyIcon} alt="" className="h-10 w-10 rounded-lg object-cover" />
+            ) : null}
+            <h2 className="text-2xl font-bold uppercase tracking-wide text-slate-900 print:text-xl">
+              {companyName}
+            </h2>
+          </div>
           <div className="mx-auto mt-3 h-0.5 w-20 bg-indigo-600 print:mt-1" />
         </div>
+
+        {data.requester?.pfNumber || data.requester?.esicNumber ? (
+          <div className="mb-6 flex flex-wrap items-center justify-center gap-4 text-xs text-slate-600 print:mb-3 print:text-[9px]">
+            {data.requester?.pfNumber ? (
+              <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1">
+                PF: <strong className="text-slate-800">{data.requester.pfNumber}</strong>
+                {data.requester.pfDeductionAmount ? (
+                  <span className="ml-1 text-slate-400">(₹{data.requester.pfDeductionAmount})</span>
+                ) : null}
+              </span>
+            ) : null}
+            {data.requester?.esicNumber ? (
+              <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1">
+                ESIC: <strong className="text-slate-800">{data.requester.esicNumber}</strong>
+                {data.requester.esicDeductionAmount ? (
+                  <span className="ml-1 text-slate-400">(₹{data.requester.esicDeductionAmount})</span>
+                ) : null}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
 
         {type === "salary-certificate" ? (
           <SalaryCertificateContent data={data} salary={salary} policy={policy} signatories={signatories} />

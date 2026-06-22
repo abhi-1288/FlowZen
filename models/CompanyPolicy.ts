@@ -6,6 +6,8 @@ const policySchema = new mongoose.Schema({
   travelAccommodationAmount: { type: Number, default: 0 },
   foodOptedOutMembers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   travelOptedOutMembers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  pfPercentage: { type: Number, default: 12 },
+  esicPercentage: { type: Number, default: 0.75 },
 }, { timestamps: true });
 
 if (process.env.NODE_ENV === "development") {

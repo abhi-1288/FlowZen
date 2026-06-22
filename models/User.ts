@@ -102,6 +102,10 @@ const UserSchema = new Schema(
     customRole: { type: String, default: "", trim: true, maxlength: 80 },
     companyIdentityCode: { type: String, trim: true, unique: true, sparse: true, index: true },
     baseSalary: { type: Number, default: 0 },
+    pfNumber: { type: String, default: "" },
+    pfDeductionAmount: { type: Number, default: 0 },
+    esicNumber: { type: String, default: "" },
+    esicDeductionAmount: { type: Number, default: 0 },
     salaryHistory: [
       {
         amount: { type: Number, required: true },
@@ -109,6 +113,15 @@ const UserSchema = new Schema(
         type: { type: String, default: "increment" }
       }
     ],
+    documents: [{
+      category: { type: String, required: true },
+      fileName: { type: String, required: true },
+      fileType: { type: String, required: true },
+      fileSize: { type: Number, required: true },
+      fileUrl: { type: String, required: true },
+      uploadedAt: { type: Date, default: Date.now },
+      fieldValues: [{ label: { type: String }, value: { type: String } }],
+    }],
     roleHistory: [
       {
         oldRole: { type: String, required: true },

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Bell, CheckSquare, Users, Wallet, Clock, User, Building2, ExternalLink, FileText } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import type { AnyRecord } from "./shared";
@@ -68,6 +69,7 @@ export function DashboardTab({
   const [docFilter, setDocFilter] = useState<"all" | "approved" | "rejected">("all");
   const [activeDocTab, setActiveDocTab] = useState<"other" | "my">("other");
   const [viewingRejected, setViewingRejected] = useState<AnyRecord | null>(null);
+  const [missingDocs, setMissingDocs] = useState<{ name: string }[]>([]);
   const currentUserId = String(profile?._id ?? "");
 
   function generateFallbackLetter(request: AnyRecord) {
@@ -113,7 +115,21 @@ export function DashboardTab({
       .catch(() => {});
   }
 
-  useEffect(refreshLetters, []);
+  useEffect(() => {
+    refreshLetters();
+    apiFetch<{
+      categories: { name: string; mandatory: boolean }[];
+      documents: { category: string }[];
+    }>("/api/profile/documents")
+      .then((res) => {
+        const uploaded = new Set((res.documents ?? []).map((d) => d.category));
+        const missing = (res.categories ?? [])
+          .filter((c) => c.mandatory && !uploaded.has(c.name))
+          .map((c) => ({ name: c.name }));
+        setMissingDocs(missing);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (["human-resource", "admin"].includes(role)) {
@@ -132,6 +148,26 @@ export function DashboardTab({
           {companyName ? `${companyName}  ·  ` : ""}{today}
         </p>
       </div>
+
+      {/* Missing Documents Alert */}
+      {missingDocs.length > 0 ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <FileText size={20} className="mt-0.5 shrink-0 text-amber-600" />
+            <div>
+              <p className="text-sm font-semibold text-amber-800">Required documents not uploaded</p>
+              <p className="mt-1 text-sm text-amber-700">
+                You have not uploaded the following required document{missingDocs.length > 1 ? "s" : ""}:{" "}
+                <span className="font-medium">
+                  {missingDocs.map((d) => d.name).join(", ")}
+                </span>
+                . Please upload them in your{" "}
+                <Link href="/profile/documents" className="underline hover:text-amber-900">Documents</Link>.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Stats Row */}
       <div className="grid gap-4 sm:grid-cols-3">
@@ -473,9 +509,6 @@ export function DashboardTab({
         </div>
       ) : null}
 
-      {/* Salary Slips Section */}
-      <SalarySlipsSection />
-
       {/* Role-specific sections */}
       {role === "human-resource" && insights?.hr ? (
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -654,78 +687,6 @@ export function DashboardTab({
           </div>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function SalarySlipsSection() {
-  const [salaries, setSalaries] = useState<AnyRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    apiFetch<{ salaries: AnyRecord[] }>("/api/finance/salary-slip?employee=me")
-      .then((res) => setSalaries(res.salaries ?? []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  const paidSalaries = salaries.filter((s) => String(s.status ?? "") === "paid");
-
-  if (loading) {
-    return (
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
-          <Wallet size={16} className="text-slate-500" />
-          Salary Slips
-        </h2>
-        <p className="text-sm text-slate-500">Loading...</p>
-      </div>
-    );
-  }
-
-  if (paidSalaries.length === 0) return null;
-
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
-        <Wallet size={16} className="text-slate-500" />
-        Salary Slips
-      </h2>
-      <div className="space-y-2">
-        {paidSalaries.map((s) => {
-          const month = String(s.month ?? "");
-          const label = month
-            ? new Date(month + "-01").toLocaleDateString("en-IN", { month: "long", year: "numeric" })
-            : "—";
-          return (
-            <div
-              key={String(s._id ?? s.id ?? "")}
-              className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-slate-900">{label}</p>
-                <p className="text-xs text-slate-500">
-                  {s.paidAt
-                    ? `Paid on ${new Date(String(s.paidAt)).toLocaleDateString("en-IN", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}`
-                    : ""}
-                </p>
-              </div>
-              <a
-                href={`/salary-slip/${String(s._id ?? s.id ?? "")}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="shrink-0 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
-              >
-                View
-              </a>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }

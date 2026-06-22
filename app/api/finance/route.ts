@@ -104,7 +104,7 @@ async function computeSalaryBreakdown(params: {
     _id: employeeId,
     company: actorCompany,
     companyStatus: "approved",
-  }).select("_id name baseSalary companyJoined createdAt");
+  }).select("_id name baseSalary companyJoined createdAt pfNumber pfDeductionAmount esicNumber esicDeductionAmount");
   if (!employee)
     return { error: "Employee not found in this company." as const };
 
@@ -261,12 +261,13 @@ async function computeSalaryBreakdown(params: {
   const payableDays = Math.max(0, totalDays - totalUnpaidDays);
   const leaveDeduction = roundCurrency(dailySalary * totalUnpaidDays);
   const grossSalary = roundCurrency(dailySalary * payableDays);
-  const totalDeductions = leaveDeduction + manualDeductions;
-  let finalSalary = Math.max(0, grossSalary + allowances - manualDeductions);
 
   const policy = await CompanyPolicy.findOne({ company: actorCompany });
   let foodDeduction = 0;
   let travelDeduction = 0;
+  let pfDeduction = 0;
+  let esicDeduction = 0;
+  let finalSalary = Math.max(0, grossSalary + allowances - manualDeductions);
   if (policy) {
     const isFoodOptedOut = policy.foodOptedOutMembers?.some(
       (id: any) => String(id) === employeeId,
@@ -281,7 +282,20 @@ async function computeSalaryBreakdown(params: {
       travelDeduction = Math.max(0, Number(policy.travelAccommodationAmount ?? 0));
     }
     finalSalary = Math.max(0, finalSalary - foodDeduction - travelDeduction);
+
+    const pfPct = Number((policy as any).pfPercentage ?? 12);
+    const esicPct = Number((policy as any).esicPercentage ?? 0.75);
+    const empPfAmount = Number((employee as any).pfDeductionAmount ?? 0);
+    const empEsicAmount = Number((employee as any).esicDeductionAmount ?? 0);
+    if ((employee as any).pfNumber) {
+      pfDeduction = empPfAmount > 0 ? roundCurrency(empPfAmount) : roundCurrency(grossSalary * pfPct / 100);
+    }
+    if ((employee as any).esicNumber) {
+      esicDeduction = empEsicAmount > 0 ? roundCurrency(empEsicAmount) : roundCurrency(grossSalary * esicPct / 100);
+    }
+    finalSalary = Math.max(0, finalSalary - pfDeduction - esicDeduction);
   }
+  const totalDeductions = leaveDeduction + manualDeductions + pfDeduction + esicDeduction;
 
   return {
     breakdown: {
@@ -293,6 +307,8 @@ async function computeSalaryBreakdown(params: {
       payableDays,
       dailySalary: roundCurrency(dailySalary),
       leaveDeduction,
+      pfDeduction,
+      esicDeduction,
       allowances,
       manualDeductions,
       totalDeductions,
@@ -733,7 +749,15 @@ export async function POST(request: Request) {
         errorMessage.includes("not found") ? 404 : 400,
       );
     }
-    return NextResponse.json({ breakdown: computed.breakdown });
+    return NextResponse.json({
+      breakdown: computed.breakdown,
+      employee: {
+        pfNumber: String((computed.employee as any).pfNumber ?? ""),
+        pfDeductionAmount: Number((computed.employee as any).pfDeductionAmount ?? 0),
+        esicNumber: String((computed.employee as any).esicNumber ?? ""),
+        esicDeductionAmount: Number((computed.employee as any).esicDeductionAmount ?? 0),
+      },
+    });
   }
 
   if (action === "generate-salary") {
@@ -744,6 +768,20 @@ export async function POST(request: Request) {
       return jsonError("Salary period dates are required.");
     const allowances = Math.max(0, Number(body.allowances ?? 0));
     const manualDeductions = Math.max(0, Number(body.deductions ?? 0));
+
+    const pfNumber = String(body.pfNumber ?? "").trim();
+    const pfDeductionAmount = Math.max(0, Number(body.pfDeductionAmount ?? 0));
+    const esicNumber = String(body.esicNumber ?? "").trim();
+    const esicDeductionAmount = Math.max(0, Number(body.esicDeductionAmount ?? 0));
+    if (pfNumber || esicNumber || pfDeductionAmount > 0 || esicDeductionAmount > 0) {
+      const updateData: Record<string, string | number> = {};
+      if (pfNumber) updateData.pfNumber = pfNumber;
+      if (esicNumber) updateData.esicNumber = esicNumber;
+      if (pfDeductionAmount > 0) updateData.pfDeductionAmount = pfDeductionAmount;
+      if (esicDeductionAmount > 0) updateData.esicDeductionAmount = esicDeductionAmount;
+      await User.updateOne({ _id: employeeId }, { $set: updateData });
+    }
+
     const computed = await computeSalaryBreakdown({
       actorCompany: actor.company,
       employeeId,

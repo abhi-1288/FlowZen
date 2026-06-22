@@ -39,9 +39,9 @@ export async function GET(request: Request) {
 
     const requests = await JoinRequest.find(filter)
       .sort({ createdAt: -1 })
-      .populate("requester", "name email role companyIdentityCode companyJoined")
+      .populate("requester", "name email role companyIdentityCode companyJoined pfNumber pfDeductionAmount esicNumber esicDeductionAmount")
       .populate("approver", "name role")
-      .populate("company", "name")
+      .populate("company", "name icon")
       .lean();
 
     return NextResponse.json({ requests });

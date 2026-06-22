@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import {
   AlertCircle,
   Bell,
+  Briefcase,
   Building2,
   Calendar,
   CalendarCheck,
@@ -15,6 +16,7 @@ import {
   CheckSquare,
   ChevronRight,
   Clock,
+  FileText,
   History,
   LayoutDashboard,
   LogOut,
@@ -32,6 +34,7 @@ import { DashboardTab } from "./profile-hub/dashboard-tab";
 import { ApprovalsTab, MembersTab, MessagesTab, NotificationsTab } from "./profile-hub/admin-tabs";
 import { FinanceTab } from "./profile-hub/finance-tab";
 import { OnboardingTab, ProfileTab, TimelineTab } from "./profile-hub/profile-tabs";
+import { DocumentsTab } from "./profile-hub/documents-tab";
 import { AnyRecord, AvatarBadge, formatRoleWithCustom } from "./profile-hub/shared";
 
 type ProfileHubCache = {
@@ -60,14 +63,16 @@ export type Tab =
   | "approvals"
   | "notifications"
   | "finance"
-  | "attendance";
+  | "attendance"
+  | "documents";
 
-const VALID_TABS = new Set<string>(["dashboard", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance"]);
+const VALID_TABS = new Set<string>(["dashboard", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents"]);
 
 
 export function ProfileHub() {
   const { data: session } = useSession();
   const router = useRouter();
+  const pathname = usePathname();
 
   // Parse tab from window location directly (reliable, not dependent on router)
   const getTabFromPath = (): { tab: Tab | undefined; showInvalid: boolean } => {
@@ -93,6 +98,13 @@ export function ProfileHub() {
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
+
+  // Sync tab when pathname changes (Link clicks, router.push, etc.)
+  useEffect(() => {
+    const { tab: t, showInvalid } = getTabFromPath();
+    setShowInvalidRoute(showInvalid);
+    if (t) setTabState(t);
+  }, [pathname]);
 
   const setTab = (newTab: Tab) => {
     setTabState(newTab);
@@ -165,6 +177,7 @@ export function ProfileHub() {
     ...(["human-resource", "admin", "finance"].includes(String(role))
       ? (["members"] as Tab[])
       : []),
+    "documents",
     ...(hasCompany ? (["messages"] as Tab[]) : []),
     ...(hasCompany ? (["finance"] as Tab[]) : []),
     "approvals",
@@ -507,7 +520,7 @@ export function ProfileHub() {
           </div>
           <div className="mt-6 h-px bg-gradient-to-r from-indigo-500/40 via-violet-500/20 to-transparent" />
         </div>
-        <nav className="flex-1 space-y-1 overflow-y-auto px-5 pb-5 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-700">
+        <nav className="flex-1 space-y-1 overflow-y-auto px-5 pb-5 sidebar-scrollbar">
           <NavButton
             active={tab === "dashboard"}
             icon={<LayoutDashboard size={16} />}
@@ -542,6 +555,21 @@ export function ProfileHub() {
               onClick={() => setTab("members")}
             />
           ) : null}
+          {["admin", "human-resource"].includes(String(role)) ? (
+            <Link
+              href="/recruitment/dashboard"
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400 transition-all hover:bg-white/10 hover:text-white"
+            >
+              <Briefcase size={16} />
+              Recruitment
+            </Link>
+          ) : null}
+          <NavButton
+            active={tab === "documents"}
+            icon={<FileText size={16} />}
+            label="Documents"
+            onClick={() => setTab("documents")}
+          />
           <NavButton
             active={tab === "approvals"}
             icon={<CheckSquare size={16} />}
@@ -784,6 +812,10 @@ export function ProfileHub() {
                   showToast={showToast}
                   refresh={load}
                 />
+              ) : null}
+
+              {tab === "documents" ? (
+                <DocumentsTab actorRole={String(role)} showToast={showToast} />
               ) : null}
 
               {tab === "messages" ? (

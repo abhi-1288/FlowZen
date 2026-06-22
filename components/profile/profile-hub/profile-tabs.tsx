@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import { CodePanel, JoinPanel } from "./admin-tabs";
+import { ImageCropModal } from "./image-crop-modal";
 import {
   ActionButton,
   AnyRecord,
@@ -57,6 +58,7 @@ export function ProfileTab({
   const [deleting, setDeleting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [avatarDeleteModal, setAvatarDeleteModal] = useState(false);
+  const [avatarCropFile, setAvatarCropFile] = useState<File | null>(null);
   const [deletingAvatar, setDeletingAvatar] = useState(false);
   const [salaryRequesting, setSalaryRequesting] = useState(false);
   const [policyInfo, setPolicyInfo] = useState<{
@@ -246,9 +248,9 @@ export function ProfileTab({
     }
   }
 
-  async function uploadAvatar(file: File) {
+  async function uploadAvatar(blob: Blob) {
     const data = new FormData();
-    data.append("avatar", file);
+    data.append("avatar", blob, "avatar.png");
     setUploading(true);
     try {
       const response = await fetch("/api/profile/image", {
@@ -260,6 +262,7 @@ export function ProfileTab({
         throw new Error(payload.error ?? "Unable to upload avatar.");
       }
       showToast("Avatar updated.");
+      setAvatarCropFile(null);
       await refresh();
     } finally {
       setUploading(false);
@@ -688,7 +691,8 @@ export function ProfileTab({
                   disabled={uploading}
                   onChange={(event) => {
                     const file = event.target.files?.[0];
-                    if (file) void uploadAvatar(file);
+                    if (file) setAvatarCropFile(file);
+                    event.target.value = "";
                   }}
                   type="file"
                 />
@@ -1102,6 +1106,7 @@ export function ProfileTab({
                 Attendance rules: &lt; {Math.floor(minWorkHours / 2)} hrs = absent, &ge; {Math.floor(minWorkHours / 2)} hrs and &lt; {minWorkHours} hrs = half-day, &ge; {minWorkHours} hrs = present
               </p>
             </div>
+
           </section>
         ) : null}
 
@@ -1819,6 +1824,15 @@ export function ProfileTab({
         </div>
       ) : null}
 
+      {avatarCropFile ? (
+        <ImageCropModal
+          file={avatarCropFile}
+          aspect={1}
+          onCancel={() => setAvatarCropFile(null)}
+          onDone={(blob) => void uploadAvatar(blob)}
+        />
+      ) : null}
+
       {setupModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
@@ -2313,6 +2327,10 @@ export function OnboardingTab({
   const [cancelJoinModal, setCancelJoinModal] = useState(false);
   const [cancelJoinConfirmText, setCancelJoinConfirmText] = useState("");
   const [cancellingJoin, setCancellingJoin] = useState(false);
+  const [companyIconUploading, setCompanyIconUploading] = useState(false);
+  const [companyIconDeleteModal, setCompanyIconDeleteModal] = useState(false);
+  const [deletingCompanyIcon, setDeletingCompanyIcon] = useState(false);
+  const [companyIconCropFile, setCompanyIconCropFile] = useState<File | null>(null);
   const createdTeamsCount = Number(managerInsight?.createdTeamsCount ?? managerTeams.length);
   const teamLimit = role === "human-resource" ? 2 : role === "admin" ? 10 : 5;
   const canCreateMoreTeams = createdTeamsCount < teamLimit;
@@ -2372,6 +2390,55 @@ export function OnboardingTab({
     setTeamName("");
     showToast("Team created.");
     await refresh();
+  }
+
+  async function uploadCompanyIcon(blob: Blob) {
+    const data = new FormData();
+    data.append("icon", blob, "icon.png");
+    setCompanyIconUploading(true);
+    try {
+      const response = await fetch("/api/company/icon", {
+        method: "POST",
+        body: data,
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to upload icon.");
+      }
+      showToast("Company icon updated.", "success");
+      setCompanyIconCropFile(null);
+      await refresh();
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Failed to upload icon.",
+        "error",
+      );
+    } finally {
+      setCompanyIconUploading(false);
+    }
+  }
+
+  async function deleteCompanyIcon() {
+    try {
+      setDeletingCompanyIcon(true);
+      const response = await fetch("/api/company/icon", {
+        method: "DELETE",
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to delete company icon.");
+      }
+      showToast("Company icon deleted.");
+      setCompanyIconDeleteModal(false);
+      await refresh();
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Unable to delete company icon.",
+        "error",
+      );
+    } finally {
+      setDeletingCompanyIcon(false);
+    }
   }
 
   async function requestManagerQuit() {
@@ -2604,18 +2671,67 @@ export function OnboardingTab({
     <div className="grid gap-5 xl:grid-cols-2">
       {role === "admin" && company?.status !== "taken-down" ? (
         profile?.companyStatus === "approved" ? (
-          <CodePanel
-            title="Onboarding"
-            code={company?.adminJoinCode ? String(company.adminJoinCode) : undefined}
-            label="Admin code"
-            empty="Register a company to generate onboarding codes."
-            showToast={showToast}
-            secondaryCodes={
-              company?.joinCode
-                ? [{ code: String(company.joinCode), label: "HR code" }]
-                : []
-            }
-          />
+          <>
+            <CodePanel
+              title="Onboarding"
+              code={company?.adminJoinCode ? String(company.adminJoinCode) : undefined}
+              label="Admin code"
+              empty="Register a company to generate onboarding codes."
+              showToast={showToast}
+              secondaryCodes={
+                company?.joinCode
+                  ? [{ code: String(company.joinCode), label: "HR code" }]
+                  : []
+              }
+            />
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+              <div className="mb-4 flex items-center gap-2">
+                <Building2 size={18} />
+                <h3 className="text-lg font-semibold uppercase tracking-wide text-slate-700">
+                  Company Icon
+                </h3>
+              </div>
+              <div className="flex items-center gap-4">
+                <img
+                  src={company?.icon ? String(company.icon) : "/Logos/logo.jpg"}
+                  alt="Company icon"
+                  className="h-16 w-16 rounded-xl border border-slate-200 object-cover"
+                />
+                {company?.icon ? (
+                  <button
+                    aria-label="Delete company icon"
+                    className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-rose-200 px-4 text-sm font-medium text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                    onClick={() => setCompanyIconDeleteModal(true)}
+                    type="button"
+                  >
+                    <Trash2 size={16} />
+                    Delete Icon
+                  </button>
+                ) : (
+                  <>
+                    {companyIconUploading ? (
+                      <span className="text-sm text-slate-500">Uploading...</span>
+                    ) : (
+                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                        <Camera size={16} />
+                        Upload icon
+                        <input
+                          accept="image/png,image/jpeg,image/webp"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) setCompanyIconCropFile(file);
+                            e.target.value = "";
+                          }}
+                          type="file"
+                        />
+                      </label>
+                    )}
+                  </>
+                )}
+              </div>
+            </section>
+          </>
         ) : (
           <>
             {company ? null : (
@@ -2935,6 +3051,41 @@ export function OnboardingTab({
             </div>
           </div>
         </div>
+      ) : null}
+
+      {companyIconDeleteModal ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h4 className="text-lg font-semibold">Delete company icon?</h4>
+            <p className="mt-2 text-sm text-slate-600">
+              This will permanently remove your current company icon. You can upload a new one afterwards.
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
+                onClick={() => setCompanyIconDeleteModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={deletingCompanyIcon}
+                onClick={() => void deleteCompanyIcon()}
+              >
+                {deletingCompanyIcon ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {companyIconCropFile ? (
+        <ImageCropModal
+          file={companyIconCropFile}
+          aspect={1}
+          onCancel={() => setCompanyIconCropFile(null)}
+          onDone={(blob) => void uploadCompanyIcon(blob)}
+        />
       ) : null}
 
       {cancelJoinModal ? (

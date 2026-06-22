@@ -1,6 +1,6 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/client-utils";
-import { ActionButton, AnyRecord, displayNested, formatRoleWithCustom } from "./shared";
+import { ActionButton, AnyRecord, displayNested, formatRole, formatRoleWithCustom } from "./shared";
 
 type FinanceData = {
   month: string;
@@ -39,6 +39,8 @@ export function FinanceTab({
     payableDays: number;
     dailySalary: number;
     leaveDeduction: number;
+    pfDeduction: number;
+    esicDeduction: number;
     allowances: number;
     manualDeductions: number;
     totalDeductions: number;
@@ -49,6 +51,10 @@ export function FinanceTab({
     periodStart: string;
     periodEnd: string;
   } | null>(null);
+  const [memberPfNumber, setMemberPfNumber] = useState("");
+  const [memberPfAmount, setMemberPfAmount] = useState("");
+  const [memberEsicNumber, setMemberEsicNumber] = useState("");
+  const [memberEsicAmount, setMemberEsicAmount] = useState("");
   const [salaryGenerating, setSalaryGenerating] = useState(false);
   const [budgetForm, setBudgetForm] = useState({ boardId: "", totalBudget: "", teamSpendingLimit: "", resourceBudget: "", deadline: "", assignedTo: "" });
   const [showBudgetModal, setShowBudgetModal] = useState(false);
@@ -72,6 +78,14 @@ export function FinanceTab({
   // Leave impact
   const [leaveImpacts, setLeaveImpacts] = useState<{ employeeName: string; leaves: number; deduction: number }[]>([]);
 
+  // Salary overview modal
+  const [showSalaryModal, setShowSalaryModal] = useState(false);
+  const [salaryModalTab, setSalaryModalTab] = useState<"unpaid" | "paid">("unpaid");
+  const [expandedRoles, setExpandedRoles] = useState<Set<string>>(new Set());
+
+  // Personal salary slips
+  const [mySlips, setMySlips] = useState<AnyRecord[]>([]);
+  const [slipsLoading, setSlipsLoading] = useState(true);
 
   const [financeSubTab, setFinanceSubTab] = useState<"my" | "ops" | "reports">("my");
 
@@ -154,6 +168,15 @@ export function FinanceTab({
       .catch(() => { });
   }, [data]);
 
+  // Load personal salary slips
+  useEffect(() => {
+    setSlipsLoading(true);
+    apiFetch<{ salaries: AnyRecord[] }>("/api/finance/salary-slip?employee=me")
+      .then((res) => setMySlips(res.salaries ?? []))
+      .catch(() => setMySlips([]))
+      .finally(() => setSlipsLoading(false));
+  }, [month]);
+
   async function calculateSalary(event: FormEvent) {
     event.preventDefault();
     try {
@@ -167,6 +190,10 @@ export function FinanceTab({
         }),
       });
       setSalaryBreakdown(res.breakdown);
+      setMemberPfNumber(res.employee?.pfNumber ?? "");
+      setMemberPfAmount(String(Number(res.employee?.pfDeductionAmount ?? 0) > 0 ? Number(res.employee?.pfDeductionAmount) : ""));
+      setMemberEsicNumber(res.employee?.esicNumber ?? "");
+      setMemberEsicAmount(String(Number(res.employee?.esicDeductionAmount ?? 0) > 0 ? Number(res.employee?.esicDeductionAmount) : ""));
       setSalaryAllowances("");
       setSalaryDeductions("");
       setSalaryStep(3);
@@ -189,6 +216,10 @@ export function FinanceTab({
           periodEnd: salaryPeriod.end,
           allowances: salaryAllowances,
           deductions: salaryDeductions,
+          pfNumber: memberPfNumber,
+          pfDeductionAmount: memberPfAmount ? Number(memberPfAmount) : 0,
+          esicNumber: memberEsicNumber,
+          esicDeductionAmount: memberEsicAmount ? Number(memberEsicAmount) : 0,
         }),
       });
       showToast("Salary record generated and sent for approval.", "success");
@@ -339,7 +370,27 @@ export function FinanceTab({
   // Salary edit (removed in favor of regenerate)
   const salaryFormRef = useRef<HTMLDivElement>(null);
 
+  const memberRoleMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of data?.members ?? []) {
+      map.set(String(m.id), String(m.role));
+    }
+    return map;
+  }, [data?.members]);
 
+  const getSalaryRole = (salary: AnyRecord): string => {
+    const empId = String((salary.employee as AnyRecord)?._id ?? (salary.employee as AnyRecord)?.id ?? "");
+    return memberRoleMap.get(empId) || displayNested(salary.employee, "role", "employee");
+  };
+
+  const toggleRole = (role: string) => {
+    setExpandedRoles((prev) => {
+      const next = new Set(prev);
+      if (next.has(role)) next.delete(role);
+      else next.add(role);
+      return next;
+    });
+  };
 
   if (!data) {
     return <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)]">Loading finance...</section>;
@@ -370,29 +421,49 @@ export function FinanceTab({
         />
       </div>
 
-      {(() => {
+      {isFinanceOrAdmin && (() => {
         const today = new Date().getDate();
         if (today >= 20 && today <= 21) {
           return (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-              <p className="text-sm font-medium text-amber-800">
-                Salary Reminder
-              </p>
-              <p className="mt-1 text-xs text-amber-700">
-                Generate salaries by the 28th of this month to ensure timely processing.
-              </p>
+            <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <div>
+                <p className="text-sm font-medium text-amber-800">
+                  Salary Reminder
+                </p>
+                <p className="mt-1 text-xs text-amber-700">
+                  Generate salaries by the 28th of this month to ensure timely processing.
+                </p>
+              </div>
+              {actorRole === "finance" ? (
+                <button
+                  className="shrink-0 rounded-lg bg-amber-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-900"
+                  onClick={() => setShowSalaryModal(true)}
+                >
+                  View
+                </button>
+              ) : null}
             </div>
           );
         }
         if (today >= 22 && today <= 27) {
           return (
-            <div className="rounded-lg border border-sky-200 bg-sky-50 p-4">
-              <p className="text-sm font-medium text-sky-800">
-                Salary Reminder
-              </p>
-              <p className="mt-1 text-xs text-sky-700">
-                Don't forget to generate salaries before the 28th.
-              </p>
+            <div className="flex items-center justify-between rounded-lg border border-sky-200 bg-sky-50 p-4">
+              <div>
+                <p className="text-sm font-medium text-sky-800">
+                  Salary Reminder
+                </p>
+                <p className="mt-1 text-xs text-sky-700">
+                  Don't forget to generate salaries before the 28th.
+                </p>
+              </div>
+              {actorRole === "finance" ? (
+                <button
+                  className="shrink-0 rounded-lg bg-sky-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-900"
+                  onClick={() => setShowSalaryModal(true)}
+                >
+                  View
+                </button>
+              ) : null}
             </div>
           );
         }
@@ -638,13 +709,40 @@ export function FinanceTab({
                             <div className="flex justify-between text-rose-600"><span>Attendance/Leave Deduction:</span> <span>- &#x20B9;{salaryBreakdown.leaveDeduction.toLocaleString("en-IN")}</span></div>
                             {salaryBreakdown.foodDeduction > 0 ? <div className="flex justify-between text-rose-600"><span>Food Deduction:</span> <span>- &#x20B9;{salaryBreakdown.foodDeduction.toLocaleString("en-IN")}</span></div> : null}
                             {salaryBreakdown.travelDeduction > 0 ? <div className="flex justify-between text-rose-600"><span>Travel Accommodation Deduction:</span> <span>- &#x20B9;{salaryBreakdown.travelDeduction.toLocaleString("en-IN")}</span></div> : null}
-                            <div className="flex justify-between text-emerald-600"><span>Total In Hand:</span> <span>&#x20B9;{Math.max(0, salaryBreakdown.grossSalary + Number(salaryAllowances || 0) - (Number(salaryDeductions || 0) + (salaryBreakdown.foodDeduction ?? 0) + (salaryBreakdown.travelDeduction ?? 0))).toLocaleString("en-IN")}</span></div>
+                             <div className="flex justify-between text-emerald-600"><span>Total In Hand:</span> <span>&#x20B9;{Math.max(0, salaryBreakdown.grossSalary + Number(salaryAllowances || 0) - (Number(salaryDeductions || 0) + (salaryBreakdown.foodDeduction ?? 0) + (salaryBreakdown.travelDeduction ?? 0))).toLocaleString("en-IN")}</span></div>
                           </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div><label className="text-xs font-medium text-slate-500 mb-1 block">Manual Allowances (&#x20B9;)</label><input className="w-full rounded-lg border border-slate-200 px-3 py-2" type="number" min="0" value={salaryAllowances} onChange={(e) => setSalaryAllowances(e.target.value)} /></div>
                             <div><label className="text-xs font-medium text-slate-500 mb-1 block">Manual Deductions (&#x20B9;)</label><input className="w-full rounded-lg border border-slate-200 px-3 py-2" type="number" min="0" value={salaryDeductions} onChange={(e) => setSalaryDeductions(e.target.value)} /></div>
                           </div>
-                            <div className="rounded-lg bg-emerald-50 p-3 flex justify-between font-bold text-emerald-700 text-lg mt-2"><span>Net Salary:</span><span>&#x20B9;{Math.max(0, salaryBreakdown.grossSalary + Number(salaryAllowances || 0) - (Number(salaryDeductions || 0) + (salaryBreakdown.foodDeduction ?? 0) + (salaryBreakdown.travelDeduction ?? 0))).toLocaleString("en-IN")}</span></div>
+
+                          {/* PF & ESIC */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-xs font-medium text-slate-500 mb-1 block">PF Account No.</label>
+                              <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" type="text" placeholder="Enter PF number" value={memberPfNumber} onChange={(e) => setMemberPfNumber(e.target.value)} />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-slate-500 mb-1 block">
+                                PF Amount (&#x20B9;)
+                                {(salaryBreakdown.pfDeduction ?? 0) > 0 ? <span className="ml-1 text-rose-600">(-&#x20B9;{salaryBreakdown.pfDeduction.toLocaleString("en-IN")})</span> : null}
+                              </label>
+                              <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" type="number" min="0" placeholder="Leave empty for auto %" value={memberPfAmount} onChange={(e) => setMemberPfAmount(e.target.value)} />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-slate-500 mb-1 block">ESIC Account No.</label>
+                              <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" type="text" placeholder="Enter ESIC number" value={memberEsicNumber} onChange={(e) => setMemberEsicNumber(e.target.value)} />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-slate-500 mb-1 block">
+                                ESIC Amount (&#x20B9;)
+                                {(salaryBreakdown.esicDeduction ?? 0) > 0 ? <span className="ml-1 text-rose-600">(-&#x20B9;{salaryBreakdown.esicDeduction.toLocaleString("en-IN")})</span> : null}
+                              </label>
+                              <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" type="number" min="0" placeholder="Leave empty for auto %" value={memberEsicAmount} onChange={(e) => setMemberEsicAmount(e.target.value)} />
+                            </div>
+                          </div>
+
+                            <div className="rounded-lg bg-emerald-50 p-3 flex justify-between font-bold text-emerald-700 text-lg mt-2"><span>Net Salary:</span><span>&#x20B9;{Math.max(0, salaryBreakdown.grossSalary + Number(salaryAllowances || 0) - (Number(salaryDeductions || 0) + (salaryBreakdown.foodDeduction ?? 0) + (salaryBreakdown.travelDeduction ?? 0) + (memberPfAmount ? Number(memberPfAmount) : (salaryBreakdown.pfDeduction ?? 0)) + (memberEsicAmount ? Number(memberEsicAmount) : (salaryBreakdown.esicDeduction ?? 0)))).toLocaleString("en-IN")}</span></div>
                           <div className="flex justify-between mt-2">
                             <ActionButton variant="secondary" type="button" onClick={() => setSalaryStep(2)}>Back</ActionButton>
                             <ActionButton variant="approve" disabled={salaryGenerating}>{salaryGenerating ? "Generating..." : "Generate Salary"}</ActionButton>
@@ -900,6 +998,63 @@ export function FinanceTab({
               </div>
             </section>
           ) : null}
+
+          {/* Personal Salary Slip */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+            <div className="mb-5 border-l-4 border-emerald-500 pl-4">
+              <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                My Salary Slip
+              </h3>
+              <p className="mt-0.5 text-sm text-slate-500">
+                {month
+                  ? `Salary slip for ${new Date(month + "-01").toLocaleDateString("en-IN", { month: "long", year: "numeric" })}`
+                  : "Select a month to view your salary slip"}
+              </p>
+            </div>
+            <div className="mt-4">
+              {slipsLoading ? (
+                <p className="text-sm text-slate-500">Loading...</p>
+              ) : (() => {
+                const slip = mySlips.find(
+                  (s) => String(s.month ?? "") === month && String(s.status ?? "") === "paid"
+                );
+                if (!slip) {
+                  return (
+                    <p className="text-sm text-slate-500">
+                      No salary slip available for this month yet.
+                    </p>
+                  );
+                }
+                const slipId = String(slip._id ?? slip.id ?? "");
+                return (
+                  <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">
+                        {new Date(month + "-01").toLocaleDateString("en-IN", { month: "long", year: "numeric" })}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {slip.paidAt
+                          ? `Paid on ${new Date(String(slip.paidAt)).toLocaleDateString("en-IN", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })}`
+                          : ""}
+                      </p>
+                    </div>
+                    <a
+                      href={`/salary-slip/${slipId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+                    >
+                      View Slip
+                    </a>
+                  </div>
+                );
+              })()}
+            </div>
+          </section>
         </div>
       ) : null}
 
@@ -989,6 +1144,195 @@ export function FinanceTab({
                 <ActionButton variant="primary">Create</ActionButton>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {showSalaryModal ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
+          <div className="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <h4 className="text-lg font-semibold text-slate-900">Salary Overview</h4>
+              <ActionButton variant="ghost" onClick={() => { setShowSalaryModal(false); setExpandedRoles(new Set()); }}>Close</ActionButton>
+            </div>
+            <div className="flex gap-2 border-b border-slate-200 px-6 py-3">
+              <button
+                className={`rounded-lg px-4 py-1.5 text-xs font-medium transition-all ${
+                  salaryModalTab === "unpaid"
+                    ? "bg-rose-600 text-white"
+                    : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+                onClick={() => setSalaryModalTab("unpaid")}
+              >
+                Unpaid
+              </button>
+              <button
+                className={`rounded-lg px-4 py-1.5 text-xs font-medium transition-all ${
+                  salaryModalTab === "paid"
+                    ? "bg-emerald-600 text-white"
+                    : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+                onClick={() => setSalaryModalTab("paid")}
+              >
+                Paid
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {(() => {
+                const statusFilter = salaryModalTab === "unpaid" ? ["pending", "approved"] : ["paid"];
+                const filteredSalaries = data.salaries.filter((s) =>
+                  statusFilter.includes(String(s.status ?? ""))
+                );
+
+                const salariedEmpIds = new Set<string>();
+                for (const s of data.salaries) {
+                  const eid = String((s.employee as AnyRecord)?._id ?? (s.employee as AnyRecord)?.id ?? "");
+                  if (eid) salariedEmpIds.add(eid);
+                }
+
+                const grouped: Record<string, AnyRecord[]> = {};
+                for (const salary of filteredSalaries) {
+                  const role = getSalaryRole(salary);
+                  if (!grouped[role]) grouped[role] = [];
+                  grouped[role].push(salary);
+                }
+
+                if (salaryModalTab === "unpaid") {
+                  for (const member of data.members) {
+                    const memberId = String(member.id);
+                    if (!salariedEmpIds.has(memberId)) {
+                      const role = String(member.role ?? "employee");
+                      if (!grouped[role]) grouped[role] = [];
+                      grouped[role].push({ __isMember: true, member } as any);
+                    }
+                  }
+                }
+
+                const roleKeys = Object.keys(grouped).sort();
+                if (roleKeys.length === 0) {
+                  return (
+                    <p className="py-8 text-center text-sm text-slate-500">
+                      No {salaryModalTab} salary records found.
+                    </p>
+                  );
+                }
+                return roleKeys.map((role) => {
+                  const isOpen = expandedRoles.has(role);
+                  const items = grouped[role];
+                  const salaryItems = items.filter((s) => !(s as any).__isMember);
+                  const memberItems = items.filter((s) => (s as any).__isMember);
+                  const totalAmount = salaryItems.reduce(
+                    (sum, s) => sum + Number(s.netSalary ?? 0),
+                    0
+                  );
+                  return (
+                    <div className="mb-3 rounded-lg border border-slate-200 overflow-hidden" key={role}>
+                      <button
+                        className="flex w-full items-center justify-between bg-slate-50 px-4 py-3 text-left transition-colors hover:bg-slate-100"
+                        onClick={() => toggleRole(role)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-xs transition-transform ${
+                              isOpen ? "rotate-90" : ""
+                            }`}
+                          >
+                            ▶
+                          </span>
+                          <span className="text-sm font-semibold capitalize text-slate-900">
+                            {formatRole(role)}
+                          </span>
+                          <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-200 px-1.5 text-[11px] font-bold text-slate-700">
+                            {items.length}
+                          </span>
+                        </div>
+                        {salaryModalTab === "unpaid" && totalAmount > 0 ? (
+                          <span className="text-sm font-medium text-slate-600">
+                            ₹{totalAmount.toLocaleString("en-IN")}
+                          </span>
+                        ) : salaryModalTab === "paid" ? (
+                          <span className="text-sm font-medium text-slate-600">
+                            ₹{totalAmount.toLocaleString("en-IN")}
+                          </span>
+                        ) : null}
+                      </button>
+                      {isOpen ? (
+                        <div className="divide-y divide-slate-100">
+                          {salaryItems.map((salary) => {
+                            const empName = displayNested(
+                              salary.employee,
+                              "name",
+                              "Employee"
+                            );
+                            const empRole = formatRoleWithCustom(
+                              getSalaryRole(salary),
+                              (salary.employee as AnyRecord)?.customRole
+                            );
+                            return (
+                              <div
+                                className="flex items-center justify-between px-4 py-2.5 text-sm"
+                                key={String(salary.id)}
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-medium text-slate-900">
+                                    {empName}
+                                  </p>
+                                  <p className="text-xs text-slate-400 capitalize">
+                                    {empRole}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-3 shrink-0">
+                                  <span className="font-semibold text-slate-800">
+                                    ₹{Number(salary.netSalary ?? 0).toLocaleString("en-IN")}
+                                  </span>
+                                  <span
+                                    className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                                      String(salary.status) === "paid"
+                                        ? "bg-emerald-100 text-emerald-700"
+                                        : String(salary.status) === "approved"
+                                          ? "bg-blue-100 text-blue-700"
+                                          : "bg-amber-100 text-amber-700"
+                                    }`}
+                                  >
+                                    {String(salary.status)}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {memberItems.map((entry) => {
+                            const member = (entry as any).member as AnyRecord;
+                            return (
+                              <div
+                                className="flex items-center justify-between px-4 py-2.5 text-sm"
+                                key={String(member.id)}
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-medium text-slate-900">
+                                    {String(member.name ?? "Unknown")}
+                                  </p>
+                                  <p className="text-xs text-slate-400 capitalize">
+                                    {formatRoleWithCustom(
+                                      String(member.role ?? "employee"),
+                                      member.customRole
+                                    )}
+                                  </p>
+                                </div>
+                                <div className="shrink-0">
+                                  <span className="inline-block rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                                    Not generated
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                });
+              })()}
+            </div>
           </div>
         </div>
       ) : null}

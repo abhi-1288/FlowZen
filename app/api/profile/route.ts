@@ -205,7 +205,7 @@ export async function GET() {
     const companyId = typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
     const [members, teams] = await Promise.all([
       User.find({ company: companyId, companyStatus: "approved" })
-        .select("name email role customRole team teamStatus activeTeams membershipHistory companyJoined createdAt baseSalary")
+        .select("name email role customRole team teamStatus activeTeams membershipHistory companyJoined createdAt baseSalary pfNumber pfDeductionAmount esicNumber esicDeductionAmount")
         .populate("membershipHistory.inviter", "name role")
         .sort({ role: 1, name: 1 }),
       Team.find({ company: companyId }).select("name manager employees"),

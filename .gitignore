@@ -11,6 +11,9 @@ out/
 build/
 dist/
 
+# Public/uploads
+public/uploads/
+
 # environment
 .env
 .env.local

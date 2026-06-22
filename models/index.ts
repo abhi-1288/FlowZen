@@ -1,5 +1,12 @@
 // Central model registration and re-exports
 export * from "./Attendance";
+export * from "./ATSJob";
+export * from "./ATSCandidate";
+export * from "./ATSInterview";
+export * from "./ATSOffer";
+export * from "./ATSTimeline";
+export * from "./ATSReferral";
+export * from "./ATSAuditLog";
 export * from "./Board";
 export * from "./ClientInvoice";
 export * from "./CompanyPolicy";
