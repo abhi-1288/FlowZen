@@ -55,6 +55,29 @@ export async function PATCH(request: Request, { params }: Params) {
     company: user.company,
   });
 
+  const candidateName = `${candidate.firstName} ${candidate.lastName}`.trim();
+  const jobTitle = (candidate.job as any)?.title || "a position";
+
+  const hrAndAdmin = await User.find({
+    company: user.company,
+    role: { $in: ["admin", "human-resource"] },
+  });
+  for (const u of hrAndAdmin) {
+    if (String(u._id) === String(userId)) continue;
+    await Notification.create({
+      user: u._id,
+      company: user.company,
+      type: "info",
+      title: "Candidate Stage Changed",
+      message: `${candidateName} moved from ${fromStage} to ${toStage} for ${jobTitle}.`,
+      link: `/recruitment/candidates/${candidate._id}`,
+    });
+    emitToUser(String(u._id), "notification:new", {
+      message: `${candidateName} moved to ${toStage} for ${jobTitle}.`,
+    });
+    emitToUser(String(u._id), "recruitment:update", { type: "stage-changed", candidateId: String(candidate._id) });
+  }
+
   if (toStage === "manager-round") {
     const managers = await User.find({ company: user.company, role: "project-manager" });
     for (const manager of managers) {
@@ -62,12 +85,18 @@ export async function PATCH(request: Request, { params }: Params) {
         user: manager._id,
         type: "info",
         title: "Manager Round Ready",
-        message: `${candidate.firstName} ${candidate.lastName} reached Manager Round for ${(candidate.job as any)?.title || "a position"}.`,
+        message: `${candidateName} reached Manager Round for ${jobTitle}.`,
       });
       emitToUser(String(manager._id), "notification:new", {
-        message: `${candidate.firstName} ${candidate.lastName} reached Manager Round.`,
+        message: `${candidateName} reached Manager Round.`,
       });
+      emitToUser(String(manager._id), "recruitment:update", { type: "stage-changed", candidateId: String(candidate._id) });
     }
+  }
+
+  const otherRecruitmentRoles = await User.find({ company: user.company, role: { $in: ["project-manager", "qa-tester", "finance"] }, _id: { $ne: userId } });
+  for (const u of otherRecruitmentRoles) {
+    emitToUser(String(u._id), "recruitment:update", { type: "stage-changed", candidateId: String(candidate._id) });
   }
 
   const refreshed = await ATSCandidate.findById(candidate._id)

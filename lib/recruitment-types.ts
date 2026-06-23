@@ -1,3 +1,11 @@
+export const CURRENCY_SYMBOLS: Record<string, string> = {
+  INR: "₹",
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  JPY: "¥",
+};
+
 export type Stage =
   | "applied"
   | "screening"
@@ -59,7 +67,9 @@ export type ATSJob = {
   employmentType: EmploymentType;
   salaryRangeMin: number;
   salaryRangeMax: number;
+  currency: string;
   openings: number;
+  autoCloseDate: string | null;
   description: string;
   requiredSkills: string[];
   status: JobStatus;
@@ -88,6 +98,19 @@ export type ATSCandidate = {
   portfolioUrl: string;
   linkedInUrl: string;
   assignedRecruiter: { id: string; name: string; email: string } | string | null;
+  assignedTeam: Array<{
+    role: string;
+    user: { id: string; name: string } | string;
+    roundType: string;
+    status: string;
+    feedback: string;
+  }>;
+  stageChangeRequest: {
+    requestedStage: string;
+    requestedBy: { id: string; name: string } | string | null;
+    feedback: string;
+    status: string;
+  };
   job: { id: string; title: string } | string;
   company: string;
   createdAt: string;
@@ -122,6 +145,8 @@ export type ATSOffer = {
   candidate: { id: string; firstName: string; lastName: string } | string;
   job: { id: string; title: string } | string;
   offeredCTC: number;
+  pfAmount: number;
+  esicAmount: number;
   joiningDate: string | null;
   designation: string;
   department: string;

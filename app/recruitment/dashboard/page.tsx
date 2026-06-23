@@ -8,7 +8,7 @@ import { STAGE_LABELS, type Stage } from "@/lib/recruitment-types";
 export default function RecruitmentDashboardPage() {
   const { dashboard, loading, fetchDashboard } = useRecruitmentStore();
 
-  useEffect(() => { void fetchDashboard(); }, [fetchDashboard]);
+  useEffect(() => { if (!dashboard) void fetchDashboard(); }, [dashboard, fetchDashboard]);
 
   if (loading || !dashboard) {
     return (

@@ -3,8 +3,10 @@ import { connectDb } from "@/lib/db";
 import { ATSJob } from "@/models/ATSJob";
 import { ATSCandidate } from "@/models/ATSCandidate";
 import { ATSAuditLog } from "@/models/ATSAuditLog";
+import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { isObjectId, jsonError, requireUserId, serializeDoc, serializeDocs } from "@/lib/api";
+import { emitToUser } from "@/lib/socket-emit";
 
 const HR_ROLES = ["admin", "human-resource"];
 
@@ -25,7 +27,7 @@ export async function GET(request: Request) {
   if (status) filter.status = status;
   if (department) filter.department = department;
 
-  const jobs = await ATSJob.find(filter).sort({ createdAt: -1 });
+  const jobs = await ATSJob.find(filter).populate("company", "name").sort({ createdAt: -1 });
 
   const jobsWithCount = await Promise.all(
     jobs.map(async (job: any) => {
@@ -57,7 +59,9 @@ export async function POST(request: Request) {
     employmentType: body.employmentType || "full-time",
     salaryRangeMin: Number(body.salaryRangeMin) || 0,
     salaryRangeMax: Number(body.salaryRangeMax) || 0,
+    currency: String(body.currency || "INR").trim(),
     openings: Number(body.openings) || 1,
+    autoCloseDate: body.autoCloseDate ? new Date(body.autoCloseDate) : null,
     description: String(body.description ?? "").trim(),
     requiredSkills: Array.isArray(body.requiredSkills) ? body.requiredSkills.map(String) : [],
     status: body.status || "draft",
@@ -73,6 +77,22 @@ export async function POST(request: Request) {
     metadata: { title: job.title },
     company: user.company,
   });
+
+  const admins = await User.find({ company: user.company, role: "admin" });
+  for (const admin of admins) {
+    if (String(admin._id) === String(userId)) continue;
+    await Notification.create({
+      user: admin._id,
+      company: user.company,
+      type: "info",
+      title: "New Job Opening",
+      message: `${job.title} has been created by ${user.name || user.email}.`,
+      link: `/recruitment/jobs/${job._id}`,
+    });
+    emitToUser(String(admin._id), "notification:new", {
+      message: `New job opening: ${job.title}.`,
+    });
+  }
 
   return NextResponse.json({ job: serializeDoc(job) }, { status: 201 });
 }

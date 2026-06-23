@@ -10,7 +10,7 @@ export default function OffersPage() {
   const { offers, loading, fetchOffers, updateOffer } = useRecruitmentStore();
   const [statusFilter, setStatusFilter] = useState("");
 
-  useEffect(() => { void fetchOffers(); }, [fetchOffers]);
+  useEffect(() => { if (offers.length === 0) void fetchOffers(); }, [offers.length, fetchOffers]);
 
   const filtered = statusFilter
     ? offers.filter((o) => o.status === statusFilter)

@@ -28,8 +28,23 @@ const ATSCandidateSchema = new Schema(
     portfolioUrl: { type: String, default: "" },
     linkedInUrl: { type: String, default: "" },
     assignedRecruiter: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
+    assignedTeam: [{
+      role: { type: String, enum: ["project-manager", "qa-tester", "finance", "human-resource"] },
+      user: { type: Schema.Types.ObjectId, ref: "User" },
+      roundType: { type: String, default: "" },
+      status: { type: String, enum: ["assigned", "in-progress", "completed"], default: "assigned" },
+      feedback: { type: String, enum: ["", "suitable", "not-suitable", "on-hold"], default: "" },
+    }],
+    stageChangeRequest: {
+      requestedStage: { type: String, default: "" },
+      requestedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+      feedback: { type: String, default: "" },
+      status: { type: String, enum: ["", "pending", "approved", "rejected"], default: "" },
+    },
     job: { type: Schema.Types.ObjectId, ref: "ATSJob", required: true, index: true },
     company: { type: Schema.Types.ObjectId, ref: "Company", required: true, index: true },
+    magicTokenHash: { type: String, default: "", select: false },
+    magicTokenExpiresAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

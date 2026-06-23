@@ -35,6 +35,7 @@ import { ApprovalsTab, MembersTab, MessagesTab, NotificationsTab } from "./profi
 import { FinanceTab } from "./profile-hub/finance-tab";
 import { OnboardingTab, ProfileTab, TimelineTab } from "./profile-hub/profile-tabs";
 import { DocumentsTab } from "./profile-hub/documents-tab";
+import { CareersTab } from "./profile-hub/careers-tab";
 import { AnyRecord, AvatarBadge, formatRoleWithCustom } from "./profile-hub/shared";
 
 type ProfileHubCache = {
@@ -47,6 +48,8 @@ type ProfileHubCache = {
   wfhRequests: AnyRecord[];
   financeCount: number;
   checkOutRequestCount: number;
+  jobsCount: number;
+  recruitmentCount: number;
   fetchedAt: number;
 };
 
@@ -64,9 +67,10 @@ export type Tab =
   | "notifications"
   | "finance"
   | "attendance"
-  | "documents";
+  | "documents"
+  | "careers";
 
-const VALID_TABS = new Set<string>(["dashboard", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents"]);
+const VALID_TABS = new Set<string>(["dashboard", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers"]);
 
 
 export function ProfileHub() {
@@ -126,6 +130,8 @@ export function ProfileHub() {
   const [wfhRequests, setWfhRequests] = useState<AnyRecord[]>([]);
   const [financeCount, setFinanceCount] = useState(0);
   const [checkOutRequestCount, setCheckOutRequestCount] = useState(0);
+  const [jobsCount, setJobsCount] = useState(0);
+  const [recruitmentCount, setRecruitmentCount] = useState(0);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
@@ -143,6 +149,8 @@ export function ProfileHub() {
     setWfhRequests(profileHubCache.wfhRequests);
     setFinanceCount(profileHubCache.financeCount);
     setCheckOutRequestCount(profileHubCache.checkOutRequestCount);
+    setJobsCount(profileHubCache.jobsCount);
+    setRecruitmentCount(profileHubCache.recruitmentCount);
     setLoading(false);
   }, []);
 
@@ -177,6 +185,7 @@ export function ProfileHub() {
     ...(["human-resource", "admin", "finance"].includes(String(role))
       ? (["members"] as Tab[])
       : []),
+    "careers",
     "documents",
     ...(hasCompany ? (["messages"] as Tab[]) : []),
     ...(hasCompany ? (["finance"] as Tab[]) : []),
@@ -212,6 +221,7 @@ export function ProfileHub() {
         setWfhRequests(cached.wfhRequests);
         setFinanceCount(cached.financeCount);
         setCheckOutRequestCount(cached.checkOutRequestCount);
+        setJobsCount(cached.jobsCount);
         setLoading(false);
         void load(true);
         return;
@@ -266,6 +276,7 @@ export function ProfileHub() {
       const nextWfhRequests = wfhResult.requests;
       let nextFinanceCount = financeCount;
       let nextCheckOutRequestCount = checkOutRequestCount;
+      let nextJobsCount = jobsCount;
 
       setAttendanceHistory(nextAttendanceHistory);
       setLeaveRequests(nextLeaveRequests);
@@ -291,6 +302,23 @@ export function ProfileHub() {
         }
       }
 
+      if (actualHasCompany) {
+        const jobsResult = await apiFetch<{ jobs: AnyRecord[] }>("/api/profile/jobs").catch(() => null);
+        if (jobsResult) {
+          nextJobsCount = jobsResult.jobs.length;
+          setJobsCount(nextJobsCount);
+        }
+      }
+
+      let nextRecruitmentCount = recruitmentCount;
+      if (["admin", "human-resource", "project-manager", "qa-tester", "finance"].includes(String(actualRole)) && actualHasCompany) {
+        const countRes = await apiFetch<{ count: number }>("/api/recruitment/assigned-count").catch(() => null);
+        if (countRes) {
+          nextRecruitmentCount = countRes.count;
+          setRecruitmentCount(nextRecruitmentCount);
+        }
+      }
+
       profileHubCache = {
         profile: nextProfile,
         insights: nextInsights,
@@ -301,6 +329,8 @@ export function ProfileHub() {
         wfhRequests: nextWfhRequests,
         financeCount: nextFinanceCount,
         checkOutRequestCount: nextCheckOutRequestCount,
+        jobsCount: nextJobsCount,
+        recruitmentCount: nextRecruitmentCount,
         fetchedAt: Date.now(),
       };
     } finally {
@@ -521,6 +551,7 @@ export function ProfileHub() {
           <div className="mt-6 h-px bg-gradient-to-r from-indigo-500/40 via-violet-500/20 to-transparent" />
         </div>
         <nav className="flex-1 space-y-1 overflow-y-auto px-5 pb-5 sidebar-scrollbar">
+          <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Users</p>
           <NavButton
             active={tab === "dashboard"}
             icon={<LayoutDashboard size={16} />}
@@ -545,6 +576,12 @@ export function ProfileHub() {
             label="Onboarding"
             onClick={() => setTab("onboarding")}
           />
+          <NavButton
+            active={tab === "careers"}
+            icon={<Briefcase size={16} />}
+            label={`Careers${jobsCount ? ` (${jobsCount})` : ""}`}
+            onClick={() => setTab("careers")}
+          />
           <div className="my-3 h-px bg-slate-800/40" />
           <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Admin</p>
           {["human-resource", "admin", "finance"].includes(String(role)) ? (
@@ -555,13 +592,14 @@ export function ProfileHub() {
               onClick={() => setTab("members")}
             />
           ) : null}
-          {["admin", "human-resource"].includes(String(role)) ? (
+          {["admin", "human-resource", "project-manager", "qa-tester", "finance"].includes(String(role)) ? (
             <Link
-              href="/recruitment/dashboard"
+              href="/recruitment/candidates"
               className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400 transition-all hover:bg-white/10 hover:text-white"
             >
               <Briefcase size={16} />
               Recruitment
+              {recruitmentCount > 0 ? <span className="ml-auto rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold text-white">{recruitmentCount}</span> : null}
             </Link>
           ) : null}
           <NavButton
@@ -692,7 +730,9 @@ export function ProfileHub() {
                         ? `Approvals (${approvals.length})`
                         : item === "notifications" && unreadCount > 0
                           ? `Notifications (${unreadCount})`
-                          : item.charAt(0).toUpperCase() + item.slice(1);
+                          : item === "careers" && jobsCount > 0
+                            ? `Careers (${jobsCount})`
+                            : item.charAt(0).toUpperCase() + item.slice(1);
 
               return (
                 <button
@@ -816,6 +856,10 @@ export function ProfileHub() {
 
               {tab === "documents" ? (
                 <DocumentsTab actorRole={String(role)} showToast={showToast} />
+              ) : null}
+
+              {tab === "careers" ? (
+                <CareersTab />
               ) : null}
 
               {tab === "messages" ? (

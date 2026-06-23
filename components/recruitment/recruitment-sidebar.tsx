@@ -21,7 +21,10 @@ const navItems = [
 
 export function RecruitmentSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { data: session } = useSession();
+  const role = session?.user?.role;
+  const isHr = role === "admin" || role === "human-resource";
 
   return (
     <aside className="hidden w-60 shrink-0 border-r border-slate-200 bg-white md:flex md:flex-col">
@@ -32,18 +35,20 @@ export function RecruitmentSidebar() {
           </div>
           <div>
             <h1 className="text-sm font-bold tracking-tight">Recruitment</h1>
-            <p className="text-[10px] text-slate-500 capitalize">{session?.user?.name}</p>
+            <p className="text-[10px] text-slate-500 capitalize">{session?.user?.name}: {session?.user?.role}</p>
+            <p className="text-[10px] text-slate-500 capitalize">Company: {session?.user?.company || "—"}</p>
           </div>
         </div>
       </div>
 
       <nav className="flex-1 space-y-1 p-3">
-        {navItems.map((item) => {
+        {navItems.filter((item) => isHr || item.href === "/recruitment/candidates").map((item) => {
           const isActive = !!(pathname && (pathname === item.href || pathname.startsWith(item.href + "/")));
           return (
             <Link
               key={item.href}
               href={item.href}
+              onMouseEnter={() => router.prefetch(item.href)}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition",
                 isActive

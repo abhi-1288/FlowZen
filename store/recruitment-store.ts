@@ -57,6 +57,8 @@ type RecruitmentStore = {
   updateCandidate: (id: string, data: Partial<ATSCandidate>) => Promise<void>;
   moveCandidateStage: (candidateId: string, toStage: Stage) => Promise<void>;
   convertToEmployee: (candidateId: string) => Promise<void>;
+  deleteCandidate: (candidateId: string) => Promise<void>;
+  silentRefreshCandidates: () => Promise<void>;
 
   fetchInterviews: (params?: Record<string, string>) => Promise<void>;
   createInterview: (data: Partial<ATSInterview>) => Promise<void>;
@@ -245,6 +247,26 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
     }
   },
 
+  deleteCandidate: async (candidateId) => {
+    set({ saving: true, error: null });
+    try {
+      await apiFetch(`/api/recruitment/candidates/${candidateId}`, { method: "DELETE" });
+      set((state) => ({
+        candidates: state.candidates.filter((c) => c.id !== candidateId),
+        activeCandidate: state.activeCandidate?.id === candidateId ? null : state.activeCandidate,
+      }));
+    } finally {
+      set({ saving: false });
+    }
+  },
+
+  silentRefreshCandidates: async () => {
+    try {
+      const { candidates } = await apiFetch<{ candidates: ATSCandidate[] }>("/api/recruitment/candidates");
+      set({ candidates });
+    } catch {}
+  },
+
   fetchInterviews: async (params) => {
     set({ loading: true, error: null });
     try {
@@ -261,7 +283,7 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
   createInterview: async (data) => {
     set({ saving: true, error: null });
     try {
-      const { interview } = await apiFetch<{ interview: ATSInterview }>("/api/recruitment/interviews", {
+      const { interview } = await apiFetch<{ interview: ATSInterview }>(`/api/recruitment/candidates/${data.candidate}/interviews`, {
         method: "POST",
         body: JSON.stringify(data),
       });
@@ -317,7 +339,7 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
   createOffer: async (data) => {
     set({ saving: true, error: null });
     try {
-      const { offer } = await apiFetch<{ offer: ATSOffer }>("/api/recruitment/offers", {
+      const { offer } = await apiFetch<{ offer: ATSOffer }>(`/api/recruitment/candidates/${data.candidate}/offer`, {
         method: "POST",
         body: JSON.stringify(data),
       });

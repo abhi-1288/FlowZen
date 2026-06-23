@@ -9,6 +9,7 @@ import { isObjectId, jsonError, requireUserId, serializeDoc, serializeDocs } fro
 import { emitToUser } from "@/lib/socket-emit";
 
 const HR_ROLES = ["admin", "human-resource"];
+const ALL_ROLES = [...HR_ROLES, "project-manager", "qa-tester", "finance"];
 
 export async function GET(request: Request) {
   const userId = await requireUserId();
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
 
   await connectDb();
   const user = await User.findById(userId);
-  if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  if (!user || !ALL_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
   if (!user.company) return jsonError("No company found.", 400);
 
   const { searchParams } = new URL(request.url);
@@ -34,13 +35,36 @@ export async function GET(request: Request) {
       { email: { $regex: search, $options: "i" } },
     ];
   }
+  if (!HR_ROLES.includes(user.role)) {
+    filter["assignedTeam.user"] = userId;
+  }
 
   const candidates = await ATSCandidate.find(filter)
     .sort({ createdAt: -1 })
     .populate("assignedRecruiter", "name email")
+    .populate("assignedTeam.user", "name email")
     .populate("job", "title");
 
-  return NextResponse.json({ candidates: serializeDocs(candidates) });
+  const candidateIds = candidates.map((c: any) => c._id);
+  const upcomingInterviews = await import("@/models/ATSInterview").then(({ ATSInterview }) =>
+    ATSInterview.find({ candidate: { $in: candidateIds }, status: "scheduled", company: user.company })
+      .select("candidate roundType scheduledAt")
+      .sort({ scheduledAt: 1 })
+      .lean()
+  );
+  const interviewMap: Record<string, any[]> = {};
+  for (const iv of upcomingInterviews) {
+    const cid = String((iv as any).candidate);
+    if (!interviewMap[cid]) interviewMap[cid] = [];
+    interviewMap[cid].push(iv);
+  }
+
+  const serialized = serializeDocs(candidates).map((c: any) => ({
+    ...c,
+    upcomingInterviews: interviewMap[c.id] || [],
+  }));
+
+  return NextResponse.json({ candidates: serialized });
 }
 
 export async function POST(request: Request) {

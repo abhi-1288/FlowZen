@@ -20,7 +20,9 @@ export default function EditJobPage() {
       setEmploymentType(activeJob.employmentType);
       setSalaryRangeMin(String(activeJob.salaryRangeMin));
       setSalaryRangeMax(String(activeJob.salaryRangeMax));
+      setCurrency(activeJob.currency || "INR");
       setOpenings(String(activeJob.openings));
+      setAutoCloseDate(activeJob.autoCloseDate ? activeJob.autoCloseDate.split("T")[0] : "");
       setDescription(activeJob.description);
       setRequiredSkills(activeJob.requiredSkills.join(", "));
       setStatus(activeJob.status);
@@ -33,7 +35,9 @@ export default function EditJobPage() {
   const [employmentType, setEmploymentType] = useState("full-time");
   const [salaryRangeMin, setSalaryRangeMin] = useState("0");
   const [salaryRangeMax, setSalaryRangeMax] = useState("0");
+  const [currency, setCurrency] = useState("INR");
   const [openings, setOpenings] = useState("1");
+  const [autoCloseDate, setAutoCloseDate] = useState("");
   const [description, setDescription] = useState("");
   const [requiredSkills, setRequiredSkills] = useState("");
   const [status, setStatus] = useState("draft");
@@ -42,8 +46,8 @@ export default function EditJobPage() {
     e.preventDefault();
     await updateJob(id, {
       title, department, location, employmentType: employmentType as any,
-      salaryRangeMin: Number(salaryRangeMin), salaryRangeMax: Number(salaryRangeMax),
-      openings: Number(openings), description,
+      salaryRangeMin: Number(salaryRangeMin), salaryRangeMax: Number(salaryRangeMax), currency,
+      openings: Number(openings), autoCloseDate: autoCloseDate || null, description,
       requiredSkills: requiredSkills.split(",").map((s) => s.trim()).filter(Boolean),
       status: status as any,
     });
@@ -96,8 +100,22 @@ export default function EditJobPage() {
             <input value={salaryRangeMax} onChange={(e) => setSalaryRangeMax(e.target.value)} type="number" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
           </label>
           <label className="block">
+            <span className="mb-1 block text-sm font-medium text-slate-700">Currency</span>
+            <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none">
+              <option value="INR">₹ INR</option>
+              <option value="USD">$ USD</option>
+              <option value="EUR">€ EUR</option>
+              <option value="GBP">£ GBP</option>
+              <option value="JPY">¥ JPY</option>
+            </select>
+          </label>
+          <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Openings</span>
             <input value={openings} onChange={(e) => setOpenings(e.target.value)} type="number" min="1" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-slate-700">Auto-Close Date</span>
+            <input value={autoCloseDate} onChange={(e) => setAutoCloseDate(e.target.value)} type="date" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
           </label>
         </div>
         <label className="block">

@@ -12,7 +12,9 @@ const ATSJobSchema = new Schema(
     },
     salaryRangeMin: { type: Number, default: 0 },
     salaryRangeMax: { type: Number, default: 0 },
+    currency: { type: String, default: "INR", trim: true },
     openings: { type: Number, default: 1, min: 1 },
+    autoCloseDate: { type: Date, default: null },
     description: { type: String, default: "", maxlength: 5000 },
     requiredSkills: [{ type: String, trim: true }],
     status: {

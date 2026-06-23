@@ -10,7 +10,7 @@ import { isObjectId, jsonError, requireUserId, serializeDocs } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
 
 type Params = { params: Promise<{ id: string }> };
-const HR_ROLES = ["admin", "human-resource"];
+const ALL_ROLES = ["admin", "human-resource", "project-manager", "qa-tester", "finance"];
 
 export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
@@ -20,7 +20,7 @@ export async function GET(_request: Request, { params }: Params) {
 
   await connectDb();
   const user = await User.findById(userId);
-  if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  if (!user || !ALL_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
   if (!user.company) return jsonError("No company found.", 400);
 
   const interviews = await ATSInterview.find({ candidate: id, company: user.company })
@@ -44,7 +44,7 @@ export async function POST(request: Request, { params }: Params) {
 
   await connectDb();
   const user = await User.findById(userId);
-  if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  if (!user || !ALL_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
   if (!user.company) return jsonError("No company found.", 400);
 
   const candidate = await ATSCandidate.findOne({ _id: id, company: user.company }).populate("job", "title");
@@ -82,16 +82,50 @@ export async function POST(request: Request, { params }: Params) {
     company: user.company,
   });
 
+  const roundToStage: Record<string, string> = {
+    screening: "screening",
+    technical: "technical-interview",
+    manager: "manager-round",
+    hr: "hr-round",
+  };
+  const stageOrder = ["applied", "screening", "technical-interview", "manager-round", "hr-round", "offer", "joined", "rejected"];
+  const currentStage = candidate.stage;
+  const targetStage = roundToStage[body.roundType || "screening"];
+  if (targetStage) {
+    const currentIdx = stageOrder.indexOf(currentStage);
+    const targetIdx = stageOrder.indexOf(targetStage);
+    if (targetIdx > currentIdx && targetIdx >= 0) {
+      candidate.stage = targetStage;
+      await candidate.save();
+      await ATSTimeline.create({
+        candidate: candidate._id,
+        job: jobId,
+        action: "stage-changed",
+        metadata: { from: currentStage, to: targetStage, reason: "Interview scheduled" },
+        actor: userId,
+        company: user.company,
+      });
+    }
+  }
+
+  const meetingInfo = body.meetingLink ? `\nMeeting Link: ${body.meetingLink}` : "";
+  const ivDate = new Date(body.scheduledAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
   emitToUser(String(body.interviewer), "notification:new", {
-    message: `Interview scheduled for ${candidate.firstName} ${candidate.lastName} (${body.roundType || "screening"}).`,
+    message: `Interview scheduled for ${candidate.firstName} ${candidate.lastName} (${body.roundType || "screening"}) on ${ivDate}.${meetingInfo}`,
   });
 
   await Notification.create({
     user: body.interviewer,
     type: "info",
     title: "Interview Scheduled",
-    message: `You have an interview with ${candidate.firstName} ${candidate.lastName} on ${new Date(body.scheduledAt).toLocaleDateString()}.`,
+    body: `${body.roundType || "Screening"} round with ${candidate.firstName} ${candidate.lastName} on ${ivDate}.${meetingInfo}`,
   });
+
+  const recUsers = await User.find({ company: user.company, role: { $in: ["admin", "human-resource", "project-manager", "qa-tester", "finance"] }, _id: { $ne: userId } });
+  for (const ru of recUsers) {
+    emitToUser(String(ru._id), "recruitment:update", { type: "interview-scheduled", candidateId: String(candidate._id) });
+  }
 
   const populated = await ATSInterview.findById(interview._id)
     .populate("interviewer", "name email")

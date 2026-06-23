@@ -5,6 +5,8 @@ const ATSOfferSchema = new Schema(
     candidate: { type: Schema.Types.ObjectId, ref: "ATSCandidate", required: true, index: true },
     job: { type: Schema.Types.ObjectId, ref: "ATSJob", required: true, index: true },
     offeredCTC: { type: Number, required: true },
+    pfAmount: { type: Number, default: 0 },
+    esicAmount: { type: Number, default: 0 },
     joiningDate: { type: Date, default: null },
     designation: { type: String, required: true, trim: true, maxlength: 200 },
     department: { type: String, default: "", trim: true, maxlength: 100 },

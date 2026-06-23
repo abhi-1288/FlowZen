@@ -2,10 +2,10 @@ import { Schema, model, models, type InferSchemaType } from "mongoose";
 
 const InterviewFeedbackSchema = new Schema(
   {
-    technicalSkills: { type: Number, default: 0, min: 1, max: 5 },
-    communication: { type: Number, default: 0, min: 1, max: 5 },
-    problemSolving: { type: Number, default: 0, min: 1, max: 5 },
-    cultureFit: { type: Number, default: 0, min: 1, max: 5 },
+    technicalSkills: { type: Number, default: 1, min: 1, max: 5 },
+    communication: { type: Number, default: 1, min: 1, max: 5 },
+    problemSolving: { type: Number, default: 1, min: 1, max: 5 },
+    cultureFit: { type: Number, default: 1, min: 1, max: 5 },
     overallRecommendation: {
       type: String,
       enum: ["strong-hire", "hire", "hold", "reject"],

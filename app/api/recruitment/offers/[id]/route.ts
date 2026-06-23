@@ -20,6 +20,8 @@ export async function PATCH(request: Request, { params }: Params) {
   const body = await request.json();
   const updates: Record<string, unknown> = {};
   if (body.offeredCTC !== undefined) updates.offeredCTC = Number(body.offeredCTC);
+  if (body.pfAmount !== undefined) updates.pfAmount = Number(body.pfAmount);
+  if (body.esicAmount !== undefined) updates.esicAmount = Number(body.esicAmount);
   if (body.joiningDate !== undefined) updates.joiningDate = body.joiningDate ? new Date(body.joiningDate) : null;
   if (body.designation !== undefined) updates.designation = String(body.designation).trim();
   if (body.department !== undefined) updates.department = String(body.department).trim();

@@ -4,7 +4,7 @@ import { ATSInterview } from "@/models/ATSInterview";
 import { User } from "@/models/User";
 import { isObjectId, jsonError, requireUserId, serializeDocs } from "@/lib/api";
 
-const HR_ROLES = ["admin", "human-resource"];
+const ALL_ROLES = ["admin", "human-resource", "project-manager", "qa-tester", "finance"];
 
 export async function GET(request: Request) {
   const userId = await requireUserId();
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
 
   await connectDb();
   const user = await User.findById(userId);
-  if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  if (!user || !ALL_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
   if (!user.company) return jsonError("No company found.", 400);
 
   const { searchParams } = new URL(request.url);

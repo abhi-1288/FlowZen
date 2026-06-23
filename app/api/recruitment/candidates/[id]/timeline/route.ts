@@ -5,7 +5,7 @@ import { User } from "@/models/User";
 import { isObjectId, jsonError, requireUserId, serializeDocs } from "@/lib/api";
 
 type Params = { params: Promise<{ id: string }> };
-const HR_ROLES = ["admin", "human-resource"];
+const ALL_ROLES = ["admin", "human-resource", "project-manager", "qa-tester", "finance"];
 
 export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
@@ -15,7 +15,7 @@ export async function GET(_request: Request, { params }: Params) {
 
   await connectDb();
   const user = await User.findById(userId);
-  if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  if (!user || !ALL_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
   if (!user.company) return jsonError("No company found.", 400);
 
   const timeline = await ATSTimeline.find({ candidate: id, company: user.company })

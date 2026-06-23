@@ -179,6 +179,9 @@ export function LandingPage() {
             >
               <FaGithub size={20} />
             </motion.a>
+            <Link href="/careers" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">
+              Careers
+            </Link>
             <Link href="/login" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">
               Log in
             </Link>
@@ -583,6 +586,10 @@ export function LandingPage() {
           >
             Portfolio
           </a>
+          <span className="text-slate-600">·</span>
+          <Link href="/careers" className="text-indigo-400 hover:text-indigo-300 transition-colors font-medium">
+            Careers
+          </Link>
         </p>
       </footer>
     </div>

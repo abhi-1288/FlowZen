@@ -6,6 +6,7 @@ import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
 
 type Params = { params: Promise<{ id: string }> };
 const HR_ROLES = ["admin", "human-resource"];
+const ALL_ROLES = [...HR_ROLES, "project-manager", "qa-tester", "finance"];
 
 export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
@@ -15,11 +16,12 @@ export async function GET(_request: Request, { params }: Params) {
 
   await connectDb();
   const user = await User.findById(userId);
-  if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  if (!user || !ALL_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
   if (!user.company) return jsonError("No company found.", 400);
 
   const candidate = await ATSCandidate.findOne({ _id: id, company: user.company })
     .populate("assignedRecruiter", "name email")
+    .populate("assignedTeam.user", "name email")
     .populate("job", "title department");
 
   if (!candidate) return jsonError("Candidate not found.", 404);

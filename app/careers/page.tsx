@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Briefcase, Building2, MapPin, Clock, DollarSign, X, CheckCircle, Loader2, ExternalLink } from "lucide-react";
+import Link from "next/link";
+import { Briefcase, Building2, MapPin } from "lucide-react";
+import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
 
 type CompanyInfo = {
   id: string;
@@ -19,6 +21,8 @@ type JobInfo = {
   salaryRangeMax: number;
   description: string;
   requiredSkills: string[];
+  currency: string;
+  autoCloseDate: string | null;
   company: CompanyInfo;
 };
 
@@ -27,13 +31,16 @@ type CompanyGroup = {
   jobs: JobInfo[];
 };
 
+function slugify(text: string) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 export default function CareersPage() {
   const [companies, setCompanies] = useState<CompanyGroup[]>([]);
   const [loading, setLoading] = useState(true);
-  const [applyingTo, setApplyingTo] = useState<JobInfo | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState("");
 
   useEffect(() => {
     fetch("/api/public/jobs")
@@ -42,37 +49,6 @@ export default function CareersPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
-
-  async function handleApply(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!applyingTo) return;
-    setSubmitting(true);
-    setError("");
-
-    const form = new FormData(e.currentTarget);
-    const res = await fetch(`/api/public/jobs/${applyingTo.id}/apply`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        firstName: String(form.get("firstName") || ""),
-        lastName: String(form.get("lastName") || ""),
-        email: String(form.get("email") || ""),
-        phone: String(form.get("phone") || ""),
-        currentCompany: String(form.get("currentCompany") || ""),
-        experienceYears: Number(form.get("experienceYears") || 0),
-        notes: String(form.get("notes") || ""),
-      }),
-    });
-
-    setSubmitting(false);
-    if (!res.ok) {
-      const data = await res.json();
-      setError(data.error ?? "Application failed. Please try again.");
-      return;
-    }
-    setSuccess(true);
-    setTimeout(() => { setSuccess(false); setApplyingTo(null); }, 3000);
-  }
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50">
@@ -114,8 +90,8 @@ export default function CareersPage() {
           </div>
         ) : (
           <div className="mt-12 space-y-12">
-            {companies.map((group) => (
-              <section key={group.company.id}>
+            {companies.map((group, index) => (
+              <section key={group.company?.id ?? index}>
                 <div className="mb-6 flex items-center gap-3">
                   {group.company.icon ? (
                     <img src={group.company.icon} alt="" className="h-10 w-10 rounded-lg object-cover" />
@@ -131,9 +107,10 @@ export default function CareersPage() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {group.jobs.map((job) => (
-                    <article
+                    <Link
                       key={job.id}
-                      className="group rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md hover:border-indigo-200"
+                      href={`/careers/jobs/${slugify(group.company.name)}/${job.id}`}
+                      className="group block rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md hover:border-indigo-200"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <h3 className="text-base font-semibold text-slate-900">{job.title}</h3>
@@ -155,9 +132,8 @@ export default function CareersPage() {
                           </span>
                         )}
                         {job.salaryRangeMin > 0 && (
-                          <span className="inline-flex items-center gap-1">
-                            <DollarSign size={12} />
-                            {job.salaryRangeMin.toLocaleString()} - {job.salaryRangeMax.toLocaleString()}
+                          <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+                            {CURRENCY_SYMBOLS[job.currency] || "₹"}{job.salaryRangeMin.toLocaleString()} - {CURRENCY_SYMBOLS[job.currency] || "₹"}{job.salaryRangeMax.toLocaleString()}
                           </span>
                         )}
                       </div>
@@ -176,13 +152,15 @@ export default function CareersPage() {
                       {job.description && (
                         <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-slate-500">{job.description}</p>
                       )}
-                      <button
-                        onClick={() => { setApplyingTo(job); setSuccess(false); setError(""); }}
-                        className="mt-4 w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
-                      >
+                      {job.autoCloseDate && (
+                        <p className="mt-2 text-xs text-slate-400">
+                          Closes: {new Date(job.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                        </p>
+                      )}
+                      <span className="mt-4 block w-full rounded-lg bg-indigo-600 px-4 py-2 text-center text-sm font-medium text-white transition hover:bg-indigo-700">
                         Apply Now
-                      </button>
-                    </article>
+                      </span>
+                    </Link>
                   ))}
                 </div>
               </section>
@@ -190,75 +168,6 @@ export default function CareersPage() {
           </div>
         )}
       </section>
-
-      {applyingTo && !success && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 px-4">
-          <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-              <div>
-                <h2 className="text-base font-semibold text-slate-900">Apply for {applyingTo.title}</h2>
-                <p className="text-xs text-slate-500">{applyingTo.company.name}</p>
-              </div>
-              <button onClick={() => setApplyingTo(null)} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-                <X size={18} />
-              </button>
-            </div>
-            <form className="space-y-4 p-6" onSubmit={handleApply}>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-slate-700">First Name *</span>
-                  <input name="firstName" required className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-slate-700">Last Name</span>
-                  <input name="lastName" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-                </label>
-              </div>
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">Email *</span>
-                <input name="email" type="email" required className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">Phone</span>
-                <input name="phone" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-slate-700">Current Company</span>
-                  <input name="currentCompany" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-slate-700">Years of Experience</span>
-                  <input name="experienceYears" type="number" min="0" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-                </label>
-              </div>
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">Cover Letter / Notes</span>
-                <textarea name="notes" rows={3} className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-              </label>
-              {error && <p className="text-sm text-rose-600">{error}</p>}
-              <button
-                type="submit"
-                disabled={submitting}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
-                {submitting ? "Submitting..." : "Submit Application"}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {success && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 px-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-8 text-center shadow-2xl">
-            <CheckCircle className="mx-auto h-12 w-12 text-emerald-500" />
-            <h2 className="mt-4 text-lg font-semibold text-slate-900">Application Submitted!</h2>
-            <p className="mt-1 text-sm text-slate-500">Your application has been received. The team will review it and get back to you.</p>
-          </div>
-        </div>
-      )}
     </main>
   );
 }

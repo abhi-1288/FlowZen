@@ -10,7 +10,7 @@ export default function InterviewsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  useEffect(() => { void fetchInterviews(); }, [fetchInterviews]);
+  useEffect(() => { if (interviews.length === 0) void fetchInterviews(); }, [interviews.length, fetchInterviews]);
 
   const filtered = statusFilter
     ? interviews.filter((i) => i.status === statusFilter)

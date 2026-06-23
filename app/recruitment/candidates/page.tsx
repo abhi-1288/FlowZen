@@ -13,7 +13,7 @@ export default function CandidatesPage() {
   const [stageFilter, setStageFilter] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  useEffect(() => { void fetchCandidates(); }, [fetchCandidates]);
+  useEffect(() => { if (candidates.length === 0) void fetchCandidates(); }, [candidates.length, fetchCandidates]);
 
   const filtered = candidates.filter((c) => {
     if (stageFilter && c.stage !== stageFilter) return false;
@@ -75,6 +75,9 @@ export default function CandidatesPage() {
                       candidate.stage === "rejected" ? "bg-rose-50 text-rose-700" :
                       "bg-slate-100 text-slate-600"
                     }`}>{STAGE_LABELS[candidate.stage]}</span>
+                    {(candidate as any).upcomingInterviews?.length > 0 && (
+                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">Interview Scheduled</span>
+                    )}
                     {candidate.rating > 0 && (
                       <span className="text-xs text-amber-500">{'★'.repeat(candidate.rating)}</span>
                     )}

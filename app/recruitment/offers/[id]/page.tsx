@@ -52,8 +52,8 @@ export default function OfferDetailPage() {
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-            <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Offered CTC</p>
-            <p className="mt-1 text-lg font-bold text-slate-900">₹{Number(offer.offeredCTC).toLocaleString()}</p>
+            <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Designation</p>
+            <p className="mt-1 text-sm font-medium text-slate-900">{offer.designation}</p>
           </div>
           <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
             <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Department</p>
@@ -65,6 +65,38 @@ export default function OfferDetailPage() {
               <p className="mt-1 text-sm font-medium text-slate-900">{new Date(offer.joiningDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</p>
             </div>
           )}
+        </div>
+
+        <div className="mt-6 rounded-xl border border-slate-200 bg-white">
+          <div className="border-b border-slate-100 px-5 py-3">
+            <p className="text-sm font-semibold text-slate-900">Salary Breakdown (Per Annum)</p>
+          </div>
+          <div className="space-y-0 divide-y divide-slate-100 px-5 py-3">
+            <div className="flex items-center justify-between py-2">
+              <span className="text-sm text-slate-600">Gross CTC</span>
+              <span className="text-sm font-semibold text-slate-900">₹{Number(offer.offeredCTC).toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between py-2">
+              <span className="text-sm text-slate-600">PF Deduction</span>
+              <span className="text-sm text-rose-600">- ₹{Number(offer.pfAmount || 0).toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between py-2">
+              <span className="text-sm text-slate-600">ESIC Deduction</span>
+              <span className="text-sm text-rose-600">- ₹{Number(offer.esicAmount || 0).toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between py-2">
+              <span className="text-sm font-semibold text-slate-900">Net Take-Home (Approx)</span>
+              <span className="text-sm font-semibold text-emerald-600">₹{Number(offer.offeredCTC - (offer.pfAmount || 0) - (offer.esicAmount || 0)).toLocaleString()}</span>
+            </div>
+          </div>
+          {offer.pfAmount || offer.esicAmount ? (
+            <div className="border-t border-slate-200 bg-slate-50 px-5 py-3">
+              <p className="text-xs text-slate-500">Deductions are as per company policy and applicable statutory guidelines.</p>
+            </div>
+          ) : null}
+          <div className="border-t border-slate-200 px-5 py-3">
+            <p className="text-xs text-slate-400 italic">Note: A detailed offer letter will be provided after joining the company.</p>
+          </div>
         </div>
 
         <div className="mt-6 flex gap-3">

@@ -9,7 +9,7 @@ export default function ReferralsPage() {
   const [candidateId, setCandidateId] = useState("");
   const [bonusEligible, setBonusEligible] = useState(false);
 
-  useEffect(() => { void fetchReferrals(); }, [fetchReferrals]);
+  useEffect(() => { if (referrals.length === 0) void fetchReferrals(); }, [referrals.length, fetchReferrals]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

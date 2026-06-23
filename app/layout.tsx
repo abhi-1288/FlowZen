@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { SessionProvider } from "@/components/providers/session-provider";
 import { ToastProvider } from "@/lib/toast-context";
+import { GlobalNotificationListener } from "@/components/global-notification-listener";
 // @ts-ignore: Allow importing global CSS without type declarations
 import "./globals.css";
 
@@ -25,7 +26,10 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <SessionProvider>
-          <ToastProvider>{children}</ToastProvider>
+          <ToastProvider>
+            <GlobalNotificationListener />
+            {children}
+          </ToastProvider>
         </SessionProvider>
       </body>
     </html>

@@ -1,16 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Calendar, FileText, MessageSquare, Send, Star, Upload, UserPlus, Download, Briefcase, CheckCircle, XCircle } from "lucide-react";
+import { ArrowLeft, Calendar, FileText, MessageSquare, Send, Star, Upload, UserPlus, Download, Briefcase, CheckCircle, XCircle, ChevronDown, Trash2, UserCheck } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
-import { STAGE_LABELS, type Stage, STAGES } from "@/lib/recruitment-types";
-import { cn } from "@/lib/client-utils";
+import { STAGE_LABELS, type Stage, STAGES, type ATSCandidate } from "@/lib/recruitment-types";
+import { cn, apiFetch } from "@/lib/client-utils";
+import { useSession } from "next-auth/react";
 
 export default function CandidateProfilePage() {
   const params = useParams()!;
   const id = params.id as string;
   const router = useRouter();
+  const { data: session } = useSession();
+  const role = session?.user?.role;
+  const isHr = role === "admin" || role === "human-resource";
+
   const {
     activeCandidate, timeline, interviews, loading,
     fetchCandidate, fetchTimeline, updateCandidate,
@@ -20,8 +25,49 @@ export default function CandidateProfilePage() {
 
   const [activeTab, setActiveTab] = useState<"timeline" | "interviews" | "notes">("timeline");
   const [noteText, setNoteText] = useState("");
+  const [candidateList, setCandidateList] = useState<any[]>([]);
+  const [assignRole, setAssignRole] = useState("project-manager");
+  const [assignRoundType, setAssignRoundType] = useState("technical");
+  const [assignUsers, setAssignUsers] = useState<any[]>([]);
+  const [assignSelectedUser, setAssignSelectedUser] = useState("");
+  const [showAssignForm, setShowAssignForm] = useState(false);
+  const [stageFeedback, setStageFeedback] = useState("suitable");
+  const [submitting, setSubmitting] = useState(false);
+
+  const jobId = activeCandidate && typeof activeCandidate.job === "object" ? (activeCandidate.job as any).id : null;
 
   useEffect(() => { void fetchCandidate(id); void fetchTimeline(id); }, [id, fetchCandidate, fetchTimeline]);
+
+  const [candidateInterviews, setCandidateInterviews] = useState<any[]>([]);
+  const [ivRefreshKey, setIvRefreshKey] = useState(0);
+
+  useEffect(() => {
+    apiFetch<{ interviews: any[] }>(`/api/recruitment/candidates/${id}/interviews`)
+      .then((res) => setCandidateInterviews(res.interviews || []))
+      .catch(() => {});
+  }, [id, ivRefreshKey]);
+
+  const fetchSameJobCandidates = useCallback(async () => {
+    if (!jobId) return;
+    try {
+      const res = await apiFetch<{ candidates: any[] }>(`/api/recruitment/candidates?jobId=${jobId}`);
+      setCandidateList(res.candidates || []);
+    } catch {}
+  }, [jobId]);
+
+  useEffect(() => { void fetchSameJobCandidates(); }, [fetchSameJobCandidates]);
+
+  const fetchUsersByRole = useCallback(async (r: string) => {
+    try {
+      const res = await apiFetch<{ users: any[] }>(`/api/recruitment/users-by-role?role=${r}`);
+      setAssignUsers(res.users || []);
+      setAssignSelectedUser(res.users?.[0]?.id || "");
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (showAssignForm) void fetchUsersByRole(assignRole);
+  }, [showAssignForm, assignRole, fetchUsersByRole]);
 
   if (loading && !activeCandidate) {
     return (
@@ -43,6 +89,20 @@ export default function CandidateProfilePage() {
   const jobTitle = activeCandidate.job && typeof activeCandidate.job === "object"
     ? (activeCandidate.job as any).title
     : "";
+
+  const timelineLabels: Record<string, string> = {
+    applied: "Application Submitted",
+    "resume-uploaded": "Resume Uploaded",
+    "interview-scheduled": "Interview Scheduled",
+    "interview-completed": "Interview Completed",
+    "offer-generated": "Offer Generated",
+    "offer-accepted": "Offer Accepted",
+    "offer-rejected": "Offer Rejected",
+    "stage-changed": "Stage Updated",
+    joined: "Joined",
+    rejected: "Not Selected",
+    "note-added": "Note Added",
+  };
 
   const timelineIcons: Record<string, any> = {
     applied: UserPlus,
@@ -77,13 +137,79 @@ export default function CandidateProfilePage() {
     setNoteText("");
   }
 
+  async function handleAssign() {
+    if (!assignSelectedUser) return;
+    try {
+      await apiFetch(`/api/recruitment/candidates/${id}/assign-interviewer`, {
+        method: "POST",
+        body: JSON.stringify({ role: assignRole, roundType: assignRoundType, assigneeId: assignSelectedUser }),
+      });
+      setShowAssignForm(false);
+      void fetchCandidate(id);
+    } catch (e) {
+      console.error("Assign failed:", e);
+    }
+  }
+
+  async function handleRemoveAssignment(roleToRemove: string) {
+    try {
+      await apiFetch(`/api/recruitment/candidates/${id}/assign-interviewer`, {
+        method: "DELETE",
+        body: JSON.stringify({ role: roleToRemove }),
+      });
+      void fetchCandidate(id);
+    } catch (e) {
+      console.error("Remove failed:", e);
+    }
+  }
+
+  async function handleStageDone() {
+    setSubmitting(true);
+    try {
+      await apiFetch(`/api/recruitment/candidates/${id}/stage-change-request`, {
+        method: "POST",
+        body: JSON.stringify({ feedback: stageFeedback }),
+      });
+      void fetchCandidate(id);
+    } catch (e) {
+      console.error("Stage request failed:", e);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function handleCandidateSwitch(candidateId: string) {
+    router.push(`/recruitment/candidates/${candidateId}`);
+  }
+
+  const assignedTeam: Array<{ role: string; user: any; roundType: string; status: string; feedback: string }> = (activeCandidate as any).assignedTeam || [];
+  const myAssignment = assignedTeam.find((a: any) => String(a.user?.id || a.user) === String(session?.user?.id));
+  const stageRequest = (activeCandidate as any).stageChangeRequest || {};
   const currentStageIndex = STAGES.indexOf(activeCandidate.stage);
 
   return (
     <div className="p-6">
-      <button onClick={() => router.back()} className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900">
-        <ArrowLeft size={16} /> Back
-      </button>
+      <div className="mb-4 flex items-center gap-3">
+        <button onClick={() => router.back()} className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900">
+          <ArrowLeft size={16} /> Back
+        </button>
+        {candidateList.length > 1 && (
+          <div className="relative">
+            <select
+              value={id}
+              onChange={(e) => handleCandidateSwitch(e.target.value)}
+              className="appearance-none rounded-lg border border-slate-200 bg-white px-3 py-1.5 pr-8 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              {candidateList.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.firstName} {c.lastName} ({c.id.slice(-6)})
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          </div>
+        )}
+      </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex items-start justify-between flex-wrap gap-4">
@@ -131,11 +257,7 @@ export default function CandidateProfilePage() {
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {activeCandidate.resumeUrl && (
-            <a
-              href={activeCandidate.resumeUrl}
-              target="_blank"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-            >
+            <a href={activeCandidate.resumeUrl} target="_blank" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
               <Download size={14} /> Resume
             </a>
           )}
@@ -143,18 +265,58 @@ export default function CandidateProfilePage() {
             <Upload size={14} /> Upload Resume
             <input type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={handleResumeUpload} />
           </label>
-          {activeCandidate.linkedInUrl && (
-            <a href={activeCandidate.linkedInUrl} target="_blank" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-sky-600 hover:bg-sky-50">
+          {(activeCandidate as any).linkedInUrl && (
+            <a href={(activeCandidate as any).linkedInUrl} target="_blank" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-sky-600 hover:bg-sky-50">
               LinkedIn
             </a>
           )}
-          {activeCandidate.portfolioUrl && (
-            <a href={activeCandidate.portfolioUrl} target="_blank" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+          {(activeCandidate as any).portfolioUrl && (
+            <a href={(activeCandidate as any).portfolioUrl} target="_blank" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
               Portfolio
             </a>
           )}
         </div>
 
+        {/* Assigned Team */}
+        {assignedTeam.length > 0 && (
+          <div className="mt-4 rounded-lg bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Assigned Interviewers</p>
+            <div className="space-y-1.5">
+              {assignedTeam.map((a: any) => (
+                <div key={a.role} className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded bg-slate-200 px-1.5 py-0.5 font-medium capitalize">{a.role}</span>
+                    <span className="text-slate-500">{a.roundType}</span>
+                    {a.user?.name ? (
+                      <span className="text-slate-700">{a.user.name}</span>
+                    ) : (
+                      <span className="text-amber-600">Unassigned</span>
+                    )}
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                      a.status === "completed" ? "bg-emerald-50 text-emerald-700" :
+                      a.status === "in-progress" ? "bg-amber-50 text-amber-700" :
+                      "bg-slate-200 text-slate-500"
+                    }`}>{a.status}</span>
+                    {a.feedback && (
+                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                        a.feedback === "suitable" ? "bg-emerald-50 text-emerald-700" :
+                        a.feedback === "not-suitable" ? "bg-rose-50 text-rose-700" :
+                        "bg-amber-50 text-amber-700"
+                      }`}>{a.feedback}</span>
+                    )}
+                  </div>
+                  {isHr && (
+                    <button onClick={() => handleRemoveAssignment(a.role)} className="text-rose-400 hover:text-rose-600">
+                      <Trash2 size={12} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Stage */}
         <div className="mt-4">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Stage</p>
@@ -164,48 +326,131 @@ export default function CandidateProfilePage() {
               "bg-indigo-50 text-indigo-700"
             }`}>{STAGE_LABELS[activeCandidate.stage]}</span>
           </div>
-          <div className="mt-2 flex items-center gap-1">
-            {STAGES.map((stage, idx) => (
-              <div key={stage} className="flex items-center flex-1">
-                <button
-                  onClick={() => void handleStageChange(stage)}
-                  className={cn(
-                    "flex-1 rounded-lg px-2 py-1 text-xs font-medium transition text-center",
-                    idx === currentStageIndex ? "bg-slate-950 text-white" :
-                    idx < currentStageIndex ? "bg-emerald-50 text-emerald-700" :
-                    "bg-slate-100 text-slate-400 hover:bg-slate-200"
-                  )}
-                >
-                  {STAGE_LABELS[stage]}
-                </button>
-                {idx < STAGES.length - 1 && <div className="h-px flex-1 bg-slate-200" />}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            onClick={() => setModal({ type: "schedule-interview", candidateId: id })}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
-          >
-            <Calendar size={14} /> Schedule Interview
-          </button>
-          <button
-            onClick={() => setModal({ type: "generate-offer", candidateId: id })}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
-          >
-            <FileText size={14} /> Generate Offer
-          </button>
-          {activeCandidate.stage === "joined" && (
-            <button
-              onClick={handleConvert}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700"
-            >
-              <Briefcase size={14} /> Convert To Employee
-            </button>
+          {isHr && (
+            <div className="mt-2 flex items-center gap-1">
+              {STAGES.map((stage, idx) => (
+                <div key={stage} className="flex items-center flex-1">
+                  <button
+                    onClick={() => void handleStageChange(stage)}
+                    className={cn(
+                      "flex-1 rounded-lg px-2 py-1 text-xs font-medium transition text-center",
+                      idx === currentStageIndex ? "bg-slate-950 text-white" :
+                      idx < currentStageIndex ? "bg-emerald-50 text-emerald-700" :
+                      "bg-slate-100 text-slate-400 hover:bg-slate-200"
+                    )}
+                  >
+                    {STAGE_LABELS[stage]}
+                  </button>
+                  {idx < STAGES.length - 1 && <div className="h-px flex-1 bg-slate-200" />}
+                </div>
+              ))}
+            </div>
           )}
         </div>
+
+        {/* Actions */}
+        <div className="mt-4 flex flex-wrap gap-2">
+          {isHr && (
+            <>
+              <button
+                onClick={() => setModal({ type: "schedule-interview", candidateId: id })}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+              >
+                <Calendar size={14} /> Schedule Interview
+              </button>
+              <button
+                onClick={() => setModal({ type: "generate-offer", candidateId: id })}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                <FileText size={14} /> Generate Offer
+              </button>
+              <button
+                onClick={() => setShowAssignForm(!showAssignForm)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                <UserPlus size={14} /> Assign Interviewer
+              </button>
+              {activeCandidate.stage === "joined" && (
+                <button onClick={handleConvert} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700">
+                  <Briefcase size={14} /> Convert To Employee
+                </button>
+              )}
+              {activeCandidate.stage === "rejected" && (
+                <button onClick={async () => {
+                  if (confirm("Delete this candidate's account? This cannot be undone.")) {
+                    const { deleteCandidate } = useRecruitmentStore.getState();
+                    await deleteCandidate(id);
+                    router.push("/recruitment/candidates");
+                  }
+                }} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50">
+                  <XCircle size={14} /> Delete Account
+                </button>
+              )}
+            </>
+          )}
+
+          {/* Stage change request for assigned non-HR */}
+          {!isHr && myAssignment && myAssignment.status !== "completed" && (
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-amber-50 p-2">
+              <span className="text-xs font-medium text-amber-700">Complete your round:</span>
+              <select
+                value={stageFeedback}
+                onChange={(e) => setStageFeedback(e.target.value)}
+                className="rounded border border-amber-200 bg-white px-2 py-1 text-xs outline-none"
+              >
+                <option value="suitable">Suitable</option>
+                <option value="not-suitable">Not Suitable</option>
+                <option value="on-hold">On Hold</option>
+              </select>
+              <button
+                onClick={handleStageDone}
+                disabled={submitting}
+                className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+              >
+                <UserCheck size={14} /> {submitting ? "Submitting..." : "Mark Done"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Assign Interviewer Form */}
+        {showAssignForm && isHr && (
+          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Assign Interviewer</p>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="block">
+                <span className="mb-1 block text-xs text-slate-500">Role</span>
+                <select value={assignRole} onChange={(e) => { setAssignRole(e.target.value); void fetchUsersByRole(e.target.value); }} className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none">
+                  <option value="project-manager">Project Manager</option>
+                  <option value="qa-tester">QA Tester</option>
+                  <option value="finance">Finance</option>
+                  <option value="human-resource">HR</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs text-slate-500">Round Type</span>
+                <select value={assignRoundType} onChange={(e) => setAssignRoundType(e.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none">
+                  <option value="screening">Screening</option>
+                  <option value="technical">Technical</option>
+                  <option value="manager">Manager</option>
+                  <option value="hr">HR</option>
+                </select>
+              </label>
+              <label className="block min-w-[180px]">
+                <span className="mb-1 block text-xs text-slate-500">User</span>
+                <select value={assignSelectedUser} onChange={(e) => setAssignSelectedUser(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none">
+                  {assignUsers.length === 0 && <option value="">No users found</option>}
+                  {assignUsers.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                  ))}
+                </select>
+              </label>
+              <button onClick={handleAssign} className="rounded-lg bg-slate-950 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800">
+                Assign
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-6">
@@ -239,12 +484,22 @@ export default function CandidateProfilePage() {
                         <Icon size={14} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-slate-900 capitalize">{entry.action.replace(/-/g, " ")}</p>
+                        <p className="text-sm font-medium text-slate-900">{timelineLabels[entry.action] || entry.action.replace(/-/g, " ")}</p>
                         <p className="text-xs text-slate-500">
                           by {actorName} · {new Date(entry.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                         </p>
                         {entry.metadata && Object.keys(entry.metadata).length > 0 && (
-                          <p className="mt-1 text-xs text-slate-400">{JSON.stringify(entry.metadata)}</p>
+                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-400">
+                            {Object.entries(entry.metadata).map(([key, val]) => {
+                              const label = key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
+                              return (
+                                <span key={key} className="inline-flex items-center gap-1">
+                                  <span className="font-medium text-slate-500">{label}:</span>
+                                  <span>{String(val)}</span>
+                                </span>
+                              );
+                            })}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -256,10 +511,10 @@ export default function CandidateProfilePage() {
 
           {activeTab === "interviews" && (
             <div className="space-y-3">
-              {interviews.length === 0 ? (
+              {candidateInterviews.length === 0 ? (
                 <p className="text-sm text-slate-500">No interviews scheduled.</p>
               ) : (
-                interviews.map((interview) => {
+                candidateInterviews.map((interview) => {
                   const interviewerName = interview.interviewer && typeof interview.interviewer === "object"
                     ? (interview.interviewer as any).name : "";
                   return (
@@ -299,16 +554,10 @@ export default function CandidateProfilePage() {
                       )}
                       {interview.status === "scheduled" && (
                         <div className="mt-2 flex gap-2">
-                          <button
-                            onClick={() => setModal({ type: "add-feedback", interviewId: interview.id })}
-                            className="rounded-lg bg-slate-950 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800"
-                          >
+                          <button onClick={() => setModal({ type: "add-feedback", interviewId: interview.id })} className="rounded-lg bg-slate-950 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800">
                             Add Feedback
                           </button>
-                          <button
-                            onClick={() => setModal({ type: "edit-interview", interviewId: interview.id })}
-                            className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                          >
+                          <button onClick={() => setModal({ type: "edit-interview", interviewId: interview.id })} className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
                             Reschedule
                           </button>
                         </div>
@@ -348,14 +597,19 @@ export default function CandidateProfilePage() {
         </div>
       </div>
 
-      <InterviewModals candidateId={id} />
+      <InterviewModals candidateId={id} assignedTeam={assignedTeam} candidateInterviews={candidateInterviews} onIvChange={() => setIvRefreshKey((k) => k + 1)} />
       <OfferModal candidateId={id} />
     </div>
   );
 }
 
-function ScheduleInterviewModal({ candidateId }: { candidateId: string }) {
+function ScheduleInterviewModal({ candidateId, assignedTeam, onIvChange }: { candidateId: string; assignedTeam: any[]; onIvChange: () => void }) {
   const { setModal, createInterview } = useRecruitmentStore();
+
+  const assignedOptions = assignedTeam.filter((a: any) => {
+    const uid = a.user?.id || a.user?._id;
+    return uid && a.status !== "completed";
+  });
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -367,6 +621,7 @@ function ScheduleInterviewModal({ candidateId }: { candidateId: string }) {
       scheduledAt: String(form.get("scheduledAt") || ""),
       meetingLink: String(form.get("meetingLink") || ""),
     });
+    onIvChange();
     setModal(null);
   }
 
@@ -390,8 +645,25 @@ function ScheduleInterviewModal({ candidateId }: { candidateId: string }) {
             </select>
           </label>
           <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">Interviewer ID</span>
-            <input name="interviewer" required placeholder="User ID" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+            <span className="mb-1 block text-sm font-medium text-slate-700">Interviewer</span>
+            {assignedOptions.length > 0 ? (
+              <select name="interviewer" required className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none">
+                <option value="">Select an interviewer...</option>
+                {assignedOptions.map((a: any) => {
+                  const uid = a.user?.id || a.user?._id;
+                  return (
+                    <option key={uid} value={uid}>
+                      {a.user.name} ({a.role} — {a.roundType})
+                    </option>
+                  );
+                })}
+              </select>
+            ) : (
+              <input name="interviewer" required placeholder="User ID" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+            )}
+            {assignedOptions.length === 0 && (
+              <p className="mt-1 text-xs text-amber-600">No assigned interviewers. Assign one first or type a User ID above.</p>
+            )}
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Scheduled At</span>
@@ -408,9 +680,9 @@ function ScheduleInterviewModal({ candidateId }: { candidateId: string }) {
   );
 }
 
-function AddFeedbackModal({ interviewId }: { interviewId: string }) {
-  const { setModal, addFeedback, interviews } = useRecruitmentStore();
-  const interview = interviews.find((i) => i.id === interviewId);
+function AddFeedbackModal({ interviewId, candidateInterviews, onIvChange }: { interviewId: string; candidateInterviews: any[]; onIvChange: () => void }) {
+  const { setModal, addFeedback } = useRecruitmentStore();
+  const interview = candidateInterviews.find((i) => i.id === interviewId);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -423,6 +695,7 @@ function AddFeedbackModal({ interviewId }: { interviewId: string }) {
       overallRecommendation: String(form.get("recommendation") || "hold") as any,
       notes: String(form.get("notes") || ""),
     });
+    onIvChange();
     setModal(null);
   }
 
@@ -466,9 +739,9 @@ function AddFeedbackModal({ interviewId }: { interviewId: string }) {
   );
 }
 
-function EditInterviewModal({ interviewId }: { interviewId: string }) {
-  const { setModal, updateInterview, interviews } = useRecruitmentStore();
-  const interview = interviews.find((i) => i.id === interviewId);
+function EditInterviewModal({ interviewId, candidateInterviews, onIvChange }: { interviewId: string; candidateInterviews: any[]; onIvChange: () => void }) {
+  const { setModal, updateInterview } = useRecruitmentStore();
+  const interview = candidateInterviews.find((i) => i.id === interviewId);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -481,6 +754,7 @@ function EditInterviewModal({ interviewId }: { interviewId: string }) {
     const status = String(form.get("status") || "");
     if (status) updates.status = status;
     await updateInterview(interviewId, updates);
+    onIvChange();
     setModal(null);
   }
 
@@ -517,13 +791,13 @@ function EditInterviewModal({ interviewId }: { interviewId: string }) {
   );
 }
 
-function InterviewModals({ candidateId }: { candidateId: string }) {
+function InterviewModals({ candidateId, assignedTeam, candidateInterviews, onIvChange }: { candidateId: string; assignedTeam: any[]; candidateInterviews: any[]; onIvChange: () => void }) {
   const { modal } = useRecruitmentStore();
 
   if (!modal) return null;
-  if (modal.type === "schedule-interview") return <ScheduleInterviewModal candidateId={candidateId} />;
-  if (modal.type === "add-feedback") return <AddFeedbackModal interviewId={modal.interviewId} />;
-  if (modal.type === "edit-interview") return <EditInterviewModal interviewId={modal.interviewId} />;
+  if (modal.type === "schedule-interview") return <ScheduleInterviewModal candidateId={candidateId} assignedTeam={assignedTeam} onIvChange={onIvChange} />;
+  if (modal.type === "add-feedback") return <AddFeedbackModal interviewId={modal.interviewId} candidateInterviews={candidateInterviews} onIvChange={onIvChange} />;
+  if (modal.type === "edit-interview") return <EditInterviewModal interviewId={modal.interviewId} candidateInterviews={candidateInterviews} onIvChange={onIvChange} />;
   return null;
 }
 
@@ -537,6 +811,8 @@ function OfferModal({ candidateId }: { candidateId: string }) {
     await createOffer({
       candidate: candidateId,
       offeredCTC: Number(form.get("offeredCTC") || 0),
+      pfAmount: Number(form.get("pfAmount") || 0),
+      esicAmount: Number(form.get("esicAmount") || 0),
       joiningDate: String(form.get("joiningDate") || ""),
       designation: String(form.get("designation") || ""),
       department: String(form.get("department") || ""),
@@ -566,6 +842,14 @@ function OfferModal({ candidateId }: { candidateId: string }) {
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Department</span>
             <input name="department" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-slate-700">PF Amount (per year)</span>
+            <input name="pfAmount" type="number" min="0" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" placeholder="0" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-slate-700">ESIC Amount (per year)</span>
+            <input name="esicAmount" type="number" min="0" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" placeholder="0" />
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Joining Date</span>

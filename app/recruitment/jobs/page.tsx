@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Plus, Search, Eye, Pencil, Archive, Globe } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Archive, Globe, Share2, Check } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import type { EmploymentType, JobStatus } from "@/lib/recruitment-types";
 
@@ -15,8 +15,9 @@ export default function JobsPage() {
   const { jobs, loading, fetchJobs, updateJob, setModal } = useRecruitmentStore();
   const [statusFilter, setStatusFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [copiedJobId, setCopiedJobId] = useState<string | null>(null);
 
-  useEffect(() => { void fetchJobs(); }, [fetchJobs]);
+  useEffect(() => { if (jobs.length === 0) void fetchJobs(); }, [jobs.length, fetchJobs]);
 
   const filtered = jobs.filter((j) => {
     if (statusFilter && j.status !== statusFilter) return false;
@@ -89,7 +90,7 @@ export default function JobsPage() {
                   {job.status}
                 </span>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+              <div className="mt-3 flex flex-wrap gap-x-2 gap-y-1 text-xs text-slate-500">
                 <span>{job.location || "Remote"}</span>
                 <span>&middot;</span>
                 <span>{job.employmentType}</span>
@@ -97,6 +98,12 @@ export default function JobsPage() {
                   <>
                     <span>&middot;</span>
                     <span>{(job as any).applicantsCount} applicants</span>
+                  </>
+                )}
+                {job.autoCloseDate && (
+                  <>
+                    <span>&middot;</span>
+                    <span>Closes: {new Date(job.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
                   </>
                 )}
               </div>
@@ -113,6 +120,19 @@ export default function JobsPage() {
                 >
                   <Pencil size={14} /> Edit
                 </button>
+                {job.status === "open" && (
+                  <button
+                    onClick={() => {
+                      const c = typeof job.company === "object" ? (job.company as any)?.name || "" : "";
+                      const slug = c.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                      const url = slug ? `${window.location.origin}/careers/jobs/${slug}/${job.id}` : "";
+                      if (url) navigator.clipboard.writeText(url).then(() => { setCopiedJobId(job.id); setTimeout(() => setCopiedJobId(null), 2000); });
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                  >
+                    {copiedJobId === job.id ? <Check size={14} /> : <Share2 size={14} />} {copiedJobId === job.id ? "Copied" : "Share"}
+                  </button>
+                )}
                 {job.status === "draft" && isAdmin && (
                   <button
                     onClick={() => { void updateJob(job.id, { status: "open" as JobStatus }); }}
@@ -156,9 +176,11 @@ function JobModals() {
       department: String(form.get("department") || ""),
       location: String(form.get("location") || ""),
       employmentType: String(form.get("employmentType") || "full-time") as EmploymentType,
+      currency: String(form.get("currency") || "INR"),
       salaryRangeMin: Number(form.get("salaryRangeMin") || 0),
       salaryRangeMax: Number(form.get("salaryRangeMax") || 0),
       openings: Number(form.get("openings") || 1),
+      autoCloseDate: String(form.get("autoCloseDate") || ""),
       description: String(form.get("description") || ""),
       requiredSkills: String(form.get("requiredSkills") || "").split(",").map((s) => s.trim()).filter(Boolean),
       status: "draft" as JobStatus,
@@ -213,8 +235,22 @@ function JobModals() {
               <input name="salaryRangeMax" type="number" defaultValue={editingJob?.salaryRangeMax || 0} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
             </label>
             <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700">Currency</span>
+              <select name="currency" defaultValue={editingJob?.currency || "INR"} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none">
+                <option value="INR">₹ INR</option>
+                <option value="USD">$ USD</option>
+                <option value="EUR">€ EUR</option>
+                <option value="GBP">£ GBP</option>
+                <option value="JPY">¥ JPY</option>
+              </select>
+            </label>
+            <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700">Openings</span>
               <input name="openings" type="number" min="1" defaultValue={editingJob?.openings || 1} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700">Auto-Close Date</span>
+              <input name="autoCloseDate" type="date" defaultValue={editingJob?.autoCloseDate ? editingJob.autoCloseDate.split("T")[0] : ""} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
             </label>
           </div>
           <label className="block">

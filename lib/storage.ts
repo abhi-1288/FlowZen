@@ -1,78 +1,68 @@
 import { promises as fs } from "fs";
 import path from "path";
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { v2 as cloudinary } from "cloudinary";
 
 const SUBDIR = "documents";
 
-function hasR2Config() {
+function hasCloudinaryConfig() {
   return Boolean(
-    process.env.R2_ENDPOINT &&
-    process.env.R2_ACCESS_KEY_ID &&
-    process.env.R2_SECRET_ACCESS_KEY &&
-    process.env.R2_BUCKET_NAME
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET
   );
 }
 
-let s3Client: S3Client | null = null;
+let configured = false;
 
-function getS3Client() {
-  if (!s3Client) {
-    s3Client = new S3Client({
-      region: "auto",
-      endpoint: process.env.R2_ENDPOINT!,
-      credentials: {
-        accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-      },
+function ensureConfig() {
+  if (!configured) {
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
     });
+    configured = true;
   }
-  return s3Client;
 }
 
 export async function saveDocument(
   file: File,
   key: string,
+  subdir = SUBDIR,
 ): Promise<{ url: string; fileName: string; fileType: string; fileSize: number }> {
   const buffer = Buffer.from(await file.arrayBuffer());
   const fileName = file.name;
   const fileType = file.type;
   const fileSize = buffer.length;
 
-  if (process.env.NODE_ENV === "production" && hasR2Config()) {
-    const client = getS3Client();
-    await client.send(
-      new PutObjectCommand({
-        Bucket: process.env.R2_BUCKET_NAME!,
-        Key: `${SUBDIR}/${key}`,
-        Body: buffer,
-        ContentType: fileType,
-      }),
-    );
-    const url = `${process.env.R2_ENDPOINT}/${process.env.R2_BUCKET_NAME}/${SUBDIR}/${key}`;
-    return { url, fileName, fileType, fileSize };
+  if (process.env.NODE_ENV === "production" && hasCloudinaryConfig()) {
+    ensureConfig();
+    const publicId = `${subdir}/${key.replace(/\.[^.]+$/, "")}`;
+    const dataUri = `data:${fileType};base64,${buffer.toString("base64")}`;
+    const result = await cloudinary.uploader.upload(dataUri, {
+      public_id: publicId,
+      resource_type: "auto",
+    });
+    return { url: result.secure_url, fileName, fileType, fileSize };
   }
 
-  const dir = path.join(process.cwd(), "public", "uploads", SUBDIR);
+  const dir = path.join(process.cwd(), "public", "uploads", subdir);
   await fs.mkdir(dir, { recursive: true });
   const filePath = path.join(dir, key);
   await fs.writeFile(filePath, buffer);
-  const url = `/uploads/${SUBDIR}/${key}`;
+  const url = `/uploads/${subdir}/${key}`;
   return { url, fileName, fileType, fileSize };
 }
 
-export async function deleteDocument(key: string) {
-  if (process.env.NODE_ENV === "production" && hasR2Config()) {
-    const client = getS3Client();
-    await client.send(
-      new DeleteObjectCommand({
-        Bucket: process.env.R2_BUCKET_NAME!,
-        Key: `${SUBDIR}/${key}`,
-      }),
-    );
+export async function deleteDocument(key: string, subdir = SUBDIR) {
+  if (process.env.NODE_ENV === "production" && hasCloudinaryConfig()) {
+    ensureConfig();
+    const publicId = `${subdir}/${key.replace(/\.[^.]+$/, "")}`;
+    await cloudinary.uploader.destroy(publicId);
     return;
   }
 
-  const filePath = path.join(process.cwd(), "public", "uploads", SUBDIR, key);
+  const filePath = path.join(process.cwd(), "public", "uploads", subdir, key);
   try {
     await fs.unlink(filePath);
   } catch {

@@ -8,7 +8,10 @@ import { Building2, Briefcase } from "lucide-react";
 export default function FullKanbanPage() {
   const { candidates, jobs, fetchCandidates, fetchJobs } = useRecruitmentStore();
 
-  useEffect(() => { void fetchCandidates(); void fetchJobs(); }, [fetchCandidates, fetchJobs]);
+  useEffect(() => {
+    if (candidates.length === 0) void fetchCandidates();
+    if (jobs.length === 0) void fetchJobs();
+  }, [candidates.length, jobs.length, fetchCandidates, fetchJobs]);
 
   const grouped = useMemo(() => {
     const map: Record<string, { jobTitle: string; candidates: typeof candidates }> = {};

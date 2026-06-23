@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { ArrowLeft, Plus, Pencil, Eye, Trash2, Globe, Archive } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Eye, Trash2, Globe, Archive, Share2, Check } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
-import { STAGE_LABELS, type Stage, type Source, type JobStatus } from "@/lib/recruitment-types";
+import { CURRENCY_SYMBOLS, STAGE_LABELS, type Stage, type Source, type JobStatus } from "@/lib/recruitment-types";
 
 export default function JobDetailPage() {
   const params = useParams()!;
@@ -16,6 +16,7 @@ export default function JobDetailPage() {
   const isAdmin = role === "admin";
   const { activeJob, candidates, loading, fetchJob, fetchCandidates, setModal, deleteJob, updateJob } = useRecruitmentStore();
   const [candidateFilter, setCandidateFilter] = useState("");
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => { void fetchJob(id); void fetchCandidates({ jobId: id }); }, [id, fetchJob, fetchCandidates]);
 
@@ -63,11 +64,27 @@ export default function JobDetailPage() {
           </div>
           <p className="mt-1 text-sm text-slate-500">{activeJob.department} &middot; {activeJob.location || "Remote"} &middot; {activeJob.employmentType}</p>
           {activeJob.salaryRangeMin > 0 || activeJob.salaryRangeMax > 0 ? (
-            <p className="text-sm text-slate-500">Salary: ₹{activeJob.salaryRangeMin.toLocaleString()} - ₹{activeJob.salaryRangeMax.toLocaleString()}</p>
+            <p className="text-sm text-slate-500">Salary: {CURRENCY_SYMBOLS[activeJob.currency] || "₹"}{activeJob.salaryRangeMin.toLocaleString()} - {CURRENCY_SYMBOLS[activeJob.currency] || "₹"}{activeJob.salaryRangeMax.toLocaleString()}</p>
           ) : null}
           <p className="text-sm text-slate-500">{activeJob.openings} opening{activeJob.openings > 1 ? "s" : ""} &middot; {candidates.length} candidate{candidates.length !== 1 ? "s" : ""}</p>
+          {activeJob.autoCloseDate && (
+            <p className="text-sm text-slate-500">Auto-closes: {new Date(activeJob.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+          )}
         </div>
         <div className="flex gap-2">
+          {activeJob.status === "open" && (
+            <button
+              onClick={() => {
+                const c = typeof activeJob.company === "object" ? (activeJob.company as any)?.name || "" : "";
+                const slug = c.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                const url = slug ? `${window.location.origin}/careers/jobs/${slug}/${id}` : "";
+                if (url) navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50"
+            >
+              {copied ? <Check size={15} /> : <Share2 size={15} />} {copied ? "Copied" : "Share"}
+            </button>
+          )}
           {activeJob.status === "draft" && isAdmin && (
             <button
               onClick={() => { void updateJob(id, { status: "open" as JobStatus }); }}
