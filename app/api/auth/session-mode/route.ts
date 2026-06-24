@@ -18,15 +18,15 @@ export async function POST(request: Request) {
   }
 
   const value = rawCookie.split("=").slice(1).join("=").trim();
+  const secure = cookieName.startsWith("__Secure-");
 
   const response = NextResponse.json({ ok: true });
-  response.cookies.set(cookieName, value, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    secure: cookieName.startsWith("__Secure-"),
-    maxAge: rememberMe ? 30 * 24 * 60 * 60 : undefined,
-  });
+
+  let cookie = `${cookieName}=${value}; Path=/; HttpOnly; SameSite=Lax`;
+  if (secure) cookie += "; Secure";
+  if (rememberMe) cookie += `; Max-Age=${30 * 24 * 60 * 60}`;
+
+  response.headers.set("Set-Cookie", cookie);
 
   return response;
 }

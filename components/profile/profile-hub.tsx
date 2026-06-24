@@ -358,6 +358,7 @@ export function ProfileHub() {
   }
 
   const notificationSndRef = useRef<HTMLAudioElement | null>(null);
+  const silentLoadThrottleRef = useRef(0);
 
   // Unlock audio on first user interaction (browsers block autoplay)
   useEffect(() => {
@@ -408,6 +409,11 @@ export function ProfileHub() {
             })
             .catch(() => {});
           void reloadNotifications();
+          const now = Date.now();
+          if (now - silentLoadThrottleRef.current > 3000) {
+            silentLoadThrottleRef.current = now;
+            void load(true);
+          }
         });
 
         eventSource.onerror = () => {

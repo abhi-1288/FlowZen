@@ -3,9 +3,9 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Layout, Users, Zap, CheckCircle, Lock, MousePointer2, Clock, DollarSign, Building2 } from "lucide-react";
+import { ArrowRight, ArrowUp, Layout, Users, Zap, CheckCircle, Lock, MousePointer2, Clock, DollarSign, Building2, UserPlus, ChevronDown } from "lucide-react";
 import { FaGithub } from "react-icons/fa";
-import { motion, useScroll, useTransform, AnimatePresence, Variants } from "framer-motion";
+import { motion, useScroll, useTransform, AnimatePresence, Variants, useInView } from "framer-motion";
 
 export function LandingPage() {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -78,8 +78,14 @@ export function LandingPage() {
     {
       icon: DollarSign,
       title: "Finance & Invoicing",
-      desc: "Manage salaries, expenses, project budgets, resource requests, and generate printable client invoices.",
+      desc: "Manage salaries, expenses, project budgets, resource requests, automated monthly payroll, and generate printable client invoices.",
       color: "emerald"
+    },
+    {
+      icon: UserPlus,
+      title: "Recruitment & Hiring",
+      desc: "Full recruitment lifecycle — job postings, candidate applications, interview scheduling & feedback, offer letters with CTC breakdown, and convert-to-employee with welcome emails.",
+      color: "violet"
     },
     {
       icon: Building2,
@@ -120,6 +126,10 @@ export function LandingPage() {
       card: "hover:border-cyan-500/40",
       icon: "bg-cyan-500/10 text-cyan-400 group-hover:bg-cyan-500/20 group-hover:shadow-[0_0_30px_-5px_rgba(6,182,212,0.4)]",
     },
+    violet: {
+      card: "hover:border-violet-500/40",
+      icon: "bg-violet-500/10 text-violet-400 group-hover:bg-violet-500/20 group-hover:shadow-[0_0_30px_-5px_rgba(139,92,246,0.4)]",
+    },
   } as const;
 
   return (
@@ -156,18 +166,18 @@ export function LandingPage() {
         className={`fixed top-0 left-0 right-0 z-50 transition-colors duration-500 ${scrolled ? "bg-ink/80 backdrop-blur-md border-b border-white/10 py-4 shadow-lg" : "bg-transparent py-6"
           }`}
       >
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 group">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 sm:gap-3 group shrink-0">
             <motion.div
               whileHover={{ rotate: 90, scale: 1.1 }}
               transition={{ type: "spring", stiffness: 400, damping: 10 }}
-              className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/25 overflow-hidden relative"
+              className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/25 overflow-hidden relative"
             >
               <Image src="/Logos/logo.jpg" alt="FlowZen Logo" fill className="object-cover" />
             </motion.div>
-            <span className="font-bold text-2xl tracking-tight text-white group-hover:text-indigo-200 transition-colors">FlowZen</span>
+            <span className="font-bold text-lg sm:text-2xl tracking-tight text-white group-hover:text-indigo-200 transition-colors">FlowZen</span>
           </Link>
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2 sm:gap-6">
             <motion.a
               href="https://github.com/abhi-1288/FlowZen"
               target="_blank"
@@ -177,18 +187,18 @@ export function LandingPage() {
               className="text-slate-400 hover:text-white transition-colors"
               aria-label="View source on GitHub"
             >
-              <FaGithub size={20} />
+              <FaGithub size={18} />
             </motion.a>
-            <Link href="/careers" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">
+            <Link href="/careers" className="hidden sm:inline text-sm font-medium text-slate-300 hover:text-white transition-colors">
               Careers
             </Link>
-            <Link href="/login" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">
+            <Link href="/login" className="hidden sm:inline text-sm font-medium text-slate-300 hover:text-white transition-colors">
               Log in
             </Link>
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Link
                 href="/signup"
-                className="px-6 py-2.5 rounded-full bg-white text-ink text-sm font-semibold hover:bg-slate-200 transition-colors shadow-lg shadow-white/10"
+                className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-full bg-white text-ink text-xs sm:text-sm font-semibold hover:bg-slate-200 transition-colors shadow-lg shadow-white/10 whitespace-nowrap"
               >
                 Sign up
               </Link>
@@ -197,9 +207,9 @@ export function LandingPage() {
         </div>
       </motion.nav>
 
-      <main className="relative z-10 pt-32">
+      <main className="relative z-10 pt-20 sm:pt-32">
         {/* Hero Section */}
-        <section className="px-6 max-w-7xl mx-auto flex flex-col items-center text-center min-h-[85vh] justify-center">
+        <section className="px-4 sm:px-6 max-w-7xl mx-auto flex flex-col items-center text-center min-h-[70vh] sm:min-h-[85vh] justify-center">
           <AnimatePresence>
             {isLoaded && (
               <motion.div
@@ -209,19 +219,19 @@ export function LandingPage() {
                 className="max-w-4xl w-full flex flex-col items-center"
               >
                 <motion.div variants={itemVariants}>
-                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 text-indigo-300 text-sm font-medium mb-8 border border-indigo-500/20 backdrop-blur-sm hover:bg-indigo-500/20 transition-colors cursor-default">
-                    <Zap className="w-4 h-4 text-indigo-400 animate-pulse" />
-                    <span>Kanban · Attendance · Finance · HR — all in one place</span>
+                  <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-indigo-500/10 text-indigo-300 text-[10px] sm:text-sm font-medium mb-6 sm:mb-8 border border-indigo-500/20 backdrop-blur-sm hover:bg-indigo-500/20 transition-colors cursor-default max-w-[90vw]">
+                    <Zap className="w-3 h-3 sm:w-4 sm:h-4 text-indigo-400 animate-pulse shrink-0" />
+                    <span className="truncate">Kanban · Attendance · Finance · HR · Recruitment</span>
                   </div>
                 </motion.div>
 
-                <motion.h1 variants={itemVariants} className="text-6xl md:text-8xl font-extrabold tracking-tight mb-8 leading-[1.1] text-white">
+                <motion.h1 variants={itemVariants} className="text-4xl sm:text-6xl md:text-8xl font-extrabold tracking-tight mb-6 sm:mb-8 leading-[1.1] text-white">
                   Find your team's <br className="hidden md:block" />
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-400 animate-gradient-x inline-block">flow state</span>
                 </motion.h1>
 
-                <motion.p variants={itemVariants} className="text-xl md:text-2xl text-slate-400 mb-12 max-w-3xl mx-auto leading-relaxed">
-                  FlowZen is the all-in-one workflow platform where teams manage kanban boards, attendance, finance, HR, approvals, and roles in one beautifully animated workspace.
+                <motion.p variants={itemVariants} className="text-base sm:text-xl md:text-2xl text-slate-400 mb-8 sm:mb-12 max-w-3xl mx-auto leading-relaxed px-2 sm:px-0">
+                  FlowZen is the all-in-one workflow platform where teams manage kanban boards, attendance, finance, HR, recruitment, approvals, and roles in one beautifully animated workspace.
                 </motion.p>
 
                 <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto">
@@ -436,6 +446,48 @@ export function LandingPage() {
           </div>
         </section>
 
+        {/* Stats Section */}
+        <section className="py-24 px-6 border-t border-white/5 relative overflow-hidden">
+          <div className="max-w-7xl mx-auto relative z-10">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="text-center mb-16"
+            >
+              <p className="text-sm font-semibold tracking-widest uppercase text-indigo-400 mb-3">Trusted by high-performing teams</p>
+              <h2 className="text-3xl md:text-5xl font-bold text-white">FlowZen by the numbers</h2>
+            </motion.div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12">
+              {([
+                { value: 15000, suffix: "+", label: "Tasks Completed", prefix: "" },
+                { value: 500, suffix: "+", label: "Active Teams", prefix: "" },
+                { value: 99.9, suffix: "%", label: "Uptime", prefix: "" },
+                { value: 24, suffix: "/7", label: "Support", prefix: "" },
+              ] as const).map((stat, i) => (
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: i * 0.15 }}
+                  className="text-center group"
+                >
+                  <div className="inline-flex items-baseline gap-0.5">
+                    <span className="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-white to-slate-300 group-hover:from-indigo-300 group-hover:to-purple-300 transition-all duration-700">
+                      {stat.prefix}
+                      <Counter target={stat.value} />
+                    </span>
+                    <span className="text-2xl md:text-3xl font-bold text-indigo-400">{stat.suffix}</span>
+                  </div>
+                  <p className="mt-2 text-sm text-slate-500 font-medium uppercase tracking-wider">{stat.label}</p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* Highlight Section */}
         <section className="py-32 px-6 border-t border-white/5 relative overflow-hidden">
           <div className="max-w-7xl mx-auto relative z-10 flex flex-col md:flex-row items-center gap-20">
@@ -457,10 +509,11 @@ export function LandingPage() {
                 {[
                   "Real-time kanban boards with drag-and-drop task management",
                   "Attendance check-in/check-out with location & WFH modes",
-                  "Finance module: salaries, expenses, budgets, and invoices",
+                  "Finance module: salaries, expenses, budgets, invoices, and automated payroll",
+                  "Full recruitment pipeline: jobs, candidates, interviews, offers, and hiring",
                   "Multi-step approval workflows for joins, leaves, and quits",
                   "Seven user roles with granular board-level permissions",
-                  "HR tools: policies, broadcasts, meeting invites, and role changes"
+                  "HR tools: policies, broadcasts, meeting invites, recruitment, and role changes"
                 ].map((item, i) => (
                   <motion.li
                     key={i}
@@ -532,6 +585,48 @@ export function LandingPage() {
           </div>
         </section>
 
+        {/* FAQ Section */}
+        <section className="py-32 px-6 border-t border-white/5 relative overflow-hidden bg-slate-900/20">
+          <div className="max-w-4xl mx-auto relative z-10">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="text-center mb-16"
+            >
+              <p className="text-sm font-semibold tracking-widest uppercase text-indigo-400 mb-3">Got questions?</p>
+              <h2 className="text-4xl md:text-5xl font-bold text-white">Frequently Asked Questions</h2>
+            </motion.div>
+            <div className="space-y-4">
+              {[
+                {
+                  q: "Is FlowZen free to use?",
+                  a: "Yes! FlowZen offers a free tier for small teams. Upgrade to a paid plan when you need more boards, advanced finance features, or priority support."
+                },
+                {
+                  q: "Can I use FlowZen without creating a company?",
+                  a: "Absolutely. You can use kanban boards and basic features as an individual. Company features (HR, finance, recruitment) become available once you register or join a company."
+                },
+                {
+                  q: "How does the recruitment pipeline work?",
+                  a: "HR and admins can create job postings, manage candidates through pipeline stages (new → screening → interview → offered → hired), schedule interviews with feedback, and generate offer letters with full CTC breakdowns."
+                },
+                {
+                  q: "What kind of support do you offer?",
+                  a: "We provide 24/7 email support for all users, with priority live chat for paid plans. Our documentation covers everything from setup to advanced features."
+                },
+                {
+                  q: "Is my data secure?",
+                  a: "Yes. All data is encrypted in transit (TLS) and at rest. We use MongoDB Atlas for database hosting with automated backups, and NextAuth for secure authentication with JWT-based sessions."
+                },
+              ].map((faq, i) => (
+                <FaqItem key={i} question={faq.q} answer={faq.a} index={i} />
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* CTA Section */}
         <section className="py-40 px-6 text-center border-t border-white/5 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-indigo-950/20 to-indigo-900/40 pointer-events-none"></div>
@@ -544,7 +639,7 @@ export function LandingPage() {
           >
             <h2 className="text-5xl md:text-7xl font-extrabold mb-8 text-white tracking-tight">Ready to find your flow?</h2>
             <p className="text-2xl text-slate-300 mb-12 max-w-2xl mx-auto">
-              Join the high-performing teams that are already managing boards, attendance, finance, and HR with FlowZen.
+              Join the high-performing teams that are already managing boards, attendance, finance, HR, and recruitment with FlowZen.
             </p>
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Link
@@ -592,7 +687,85 @@ export function LandingPage() {
           </Link>
         </p>
       </footer>
+
+      {/* Back to Top */}
+      <AnimatePresence>
+        {scrolled && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.5 }}
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            className="fixed bottom-8 right-8 z-50 w-12 h-12 rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 transition-colors flex items-center justify-center"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            aria-label="Back to top"
+          >
+            <ArrowUp size={20} />
+          </motion.button>
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+function Counter({ target }: { target: number }) {
+  const [count, setCount] = useState(0);
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-100px" });
+
+  useEffect(() => {
+    if (!inView) return;
+    const duration = 2000;
+    const steps = 60;
+    const increment = target / steps;
+    let current = 0;
+    const timer = setInterval(() => {
+      current += increment;
+      if (current >= target) {
+        setCount(target);
+        clearInterval(timer);
+      } else {
+        setCount(Math.floor(current));
+      }
+    }, duration / steps);
+    return () => clearInterval(timer);
+  }, [inView, target]);
+
+  return <span ref={ref}>{count.toLocaleString()}</span>;
+}
+
+function FaqItem({ question, answer, index }: { question: string; answer: string; index: number }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.4, delay: index * 0.1 }}
+      className={`rounded-2xl border transition-all duration-300 cursor-pointer ${open ? "border-indigo-500/40 bg-indigo-500/5" : "border-white/5 bg-slate-900/40 hover:border-white/10 hover:bg-slate-800/60"}`}
+      onClick={() => setOpen(!open)}
+    >
+      <div className="flex items-center justify-between px-6 py-5">
+        <h3 className={`text-lg font-semibold transition-colors ${open ? "text-white" : "text-slate-300"}`}>{question}</h3>
+        <motion.div
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+          className={`shrink-0 ml-4 ${open ? "text-indigo-400" : "text-slate-500"}`}
+        >
+          <ChevronDown size={20} />
+        </motion.div>
+      </div>
+      <motion.div
+        initial={false}
+        animate={{ height: open ? "auto" : 0, opacity: open ? 1 : 0 }}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
+        className="overflow-hidden"
+      >
+        <div className="px-6 pb-5 text-slate-400 leading-relaxed">{answer}</div>
+      </motion.div>
+    </motion.div>
   );
 }
 

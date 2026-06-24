@@ -102,6 +102,7 @@ const UserSchema = new Schema(
     customRole: { type: String, default: "", trim: true, maxlength: 80 },
     companyIdentityCode: { type: String, trim: true, unique: true, sparse: true, index: true },
     baseSalary: { type: Number, default: 0 },
+    salaryCurrency: { type: String, default: "INR", trim: true },
     pfNumber: { type: String, default: "" },
     pfDeductionAmount: { type: Number, default: 0 },
     esicNumber: { type: String, default: "" },

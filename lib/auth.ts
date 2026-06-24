@@ -58,7 +58,7 @@ const oauthProviders = [
 export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60
+    maxAge: 365 * 24 * 60 * 60
   },
   pages: {
     signIn: "/login"
@@ -192,10 +192,32 @@ export const authOptions: NextAuthOptions = {
       if (user?.role) token.role = user.role;
       if ((user as any)?.passwordResetRequired) token.passwordResetRequired = true;
       if (typeof (user as any)?.rememberMe === "boolean") token.rememberMe = (user as any).rememberMe;
+
+      // Periodically verify the user still exists in the database (every 15 min).
+      // If the user document was deleted, invalidate the session immediately.
+      if (token.sub) {
+        const lastCheck = (token as any)._userCheckAt as number | undefined;
+        const now = Date.now();
+        if (!lastCheck || now - lastCheck > 15 * 60 * 1000) {
+          try {
+            await connectDb();
+            const exists = await User.exists({ _id: token.sub });
+            if (!exists) return null!;
+            (token as any)._userCheckAt = now;
+          } catch {
+            // DB unreachable – keep the session alive
+          }
+        }
+      }
+
       return token;
     },
     async session({ session, token }) {
-      if (session.user && token.sub) {
+      if (!token || !token.sub) {
+        if (session) session.expires = new Date(0).toISOString();
+        return session;
+      }
+      if (session.user) {
         session.user.id = token.sub;
         session.user.role = token.role as "employee" | "project-manager" | "qa-tester" | "human-resource" | "finance" | "admin" | "others" | undefined;
         session.user.passwordResetRequired = Boolean(token.passwordResetRequired);
@@ -204,14 +226,16 @@ export const authOptions: NextAuthOptions = {
         try {
           await connectDb();
           const user = await User.findById(token.sub).populate("company", "name").populate("team", "name");
-          if (user) {
-            session.user.role = user.role as "employee" | "project-manager" | "qa-tester" | "human-resource" | "finance" | "admin" | "others";
-            const team = user.team as any;
-            session.user.company = (user.company as any)?.name || null;
-            session.user.team = team?.name || null;
-            session.user.teamId = team?._id ? String(team._id) : (typeof user.team === "string" ? user.team : null);
-            session.user.managedTeamCount = await Team.countDocuments({ manager: user._id });
+          if (!user) {
+            session.expires = new Date(0).toISOString();
+            return session;
           }
+          session.user.role = user.role as "employee" | "project-manager" | "qa-tester" | "human-resource" | "finance" | "admin" | "others";
+          const team = user.team as any;
+          session.user.company = (user.company as any)?.name || null;
+          session.user.team = team?.name || null;
+          session.user.teamId = team?._id ? String(team._id) : (typeof user.team === "string" ? user.team : null);
+          session.user.managedTeamCount = await Team.countDocuments({ manager: user._id });
         } catch (error) {
           console.error("Failed to fetch company/team in session:", error);
         }

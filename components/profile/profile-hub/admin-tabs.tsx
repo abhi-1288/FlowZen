@@ -2,7 +2,8 @@ import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import { Bell, Building2, Check, Clipboard, ExternalLink, Trash2, Users, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { apiFetch } from "@/lib/client-utils";
-import { ActionButton, AnyRecord, AvatarBadge, displayNested, formatRole, formatRoleWithCustom } from "./shared";
+import { ActionButton, AnyRecord, AvatarBadge, displayNested, formatRole, formatRoleWithCustom, SectionHeader, EmptyState } from "./shared";
+import { Modal } from "./modal";
 import { FinanceMembersView } from "./finance-members-tab";
 
 export function ApprovalsTab({
@@ -17,6 +18,8 @@ export function ApprovalsTab({
   const [decidingIds, setDecidingIds] = useState<Record<string, boolean>>({});
   const [clearedIds, setClearedIds] = useState<Record<string, boolean>>({});
   const [salaryAmounts, setSalaryAmounts] = useState<Record<string, string>>({});
+  const [approvalSalaryPeriod, setApprovalSalaryPeriod] = useState<Record<string, "monthly" | "yearly">>({});
+  const [approvalSalaryCurrency, setApprovalSalaryCurrency] = useState<Record<string, string>>({});
   const [rejectModalId, setRejectModalId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [viewingLetter, setViewingLetter] = useState<AnyRecord | null>(null);
@@ -97,14 +100,19 @@ export function ApprovalsTab({
     letterContent?: string,
   ) {
     if (!id) return;
-    const salaryAmount = ["salary", "company"].includes(String(requestKind ?? ""))
-      ? Math.max(0, Number(salaryAmounts[id] ?? 0))
+    const isSalaryKind = ["salary", "company"].includes(String(requestKind ?? ""));
+    const salaryAmount = isSalaryKind
+      ? (() => {
+          const raw = Number(salaryAmounts[id] ?? 0);
+          return approvalSalaryPeriod[id] === "yearly" ? Math.round(raw / 12) : Math.max(0, raw);
+        })()
       : undefined;
+    const salaryCurrency = isSalaryKind ? (approvalSalaryCurrency[id] || "INR") : undefined;
     setDecidingIds((current) => ({ ...current, [id]: true }));
     try {
       await apiFetch(`/api/approvals/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ status, force, salaryAmount, reason, letterContent }),
+        body: JSON.stringify({ status, force, salaryAmount, salaryCurrency, reason, letterContent }),
       });
       setClearedIds((current) => ({ ...current, [id]: true }));
       showToast(`Request ${status}${force ? " (forced)" : ""}.`);
@@ -125,10 +133,7 @@ export function ApprovalsTab({
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
-      <div className="mb-5 border-l-4 border-indigo-500 pl-4">
-        <h3 className="text-base font-semibold text-slate-900">Pending Approvals</h3>
-        <p className="mt-0.5 text-sm text-slate-500">Review and manage approval requests</p>
-      </div>
+      <SectionHeader title="Pending Approvals" description="Review and manage approval requests" accent="indigo" />
       <div className="mt-5 divide-y divide-slate-200">
         {visibleApprovals.map((request) => {
           const requestId = requestIdOf(request);
@@ -242,14 +247,48 @@ export function ApprovalsTab({
                 </ActionButton>
                 {["company", "salary"].includes(String(request.kind ?? "")) ? (
                   <div className="flex items-center gap-2">
+                    <select
+                      className="rounded-lg border border-slate-200 bg-white px-1.5 py-2 text-xs"
+                      value={approvalSalaryCurrency[requestId] ?? "INR"}
+                      onChange={(e) => setApprovalSalaryCurrency((a) => ({ ...a, [requestId]: e.target.value }))}
+                    >
+                      <option value="INR">₹ INR</option>
+                      <option value="USD">$ USD</option>
+                      <option value="EUR">€ EUR</option>
+                      <option value="GBP">£ GBP</option>
+                      <option value="JPY">¥ JPY</option>
+                    </select>
+                    <div className="flex rounded-lg border border-slate-200">
+                      <button
+                        type="button"
+                        className={`rounded-l-lg px-2 py-2 text-xs font-medium transition ${(approvalSalaryPeriod[requestId] ?? "monthly") === "monthly" ? "bg-slate-950 text-white" : "bg-white text-slate-600 hover:text-slate-900"}`}
+                        onClick={() => setApprovalSalaryPeriod((a) => ({ ...a, [requestId]: "monthly" }))}
+                      >
+                        /month
+                      </button>
+                      <button
+                        type="button"
+                        className={`rounded-r-lg px-2 py-2 text-xs font-medium transition ${approvalSalaryPeriod[requestId] === "yearly" ? "bg-slate-950 text-white" : "bg-white text-slate-600 hover:text-slate-900"}`}
+                        onClick={() => setApprovalSalaryPeriod((a) => ({ ...a, [requestId]: "yearly" }))}
+                      >
+                        /year
+                      </button>
+                    </div>
                     <input
-                      className="w-28 rounded-lg border border-slate-200 px-2 py-2 text-sm"
-                      placeholder="Base salary"
+                      className="w-24 rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                      placeholder="Amount"
                       type="number"
                       min={0}
                       value={salaryAmounts[requestId] ?? ""}
                       onChange={(e) => setSalaryAmounts((a) => ({ ...a, [requestId]: e.target.value }))}
                     />
+                    {Number(salaryAmounts[requestId] ?? 0) > 0 ? (
+                      <span className="text-xs text-slate-500">
+                        {approvalSalaryPeriod[requestId] === "yearly"
+                          ? `≈${approvalSalaryCurrency[requestId] === "USD" ? "$" : approvalSalaryCurrency[requestId] === "EUR" ? "€" : approvalSalaryCurrency[requestId] === "GBP" ? "£" : approvalSalaryCurrency[requestId] === "JPY" ? "¥" : "₹"}${Math.round(Number(salaryAmounts[requestId]) / 12).toLocaleString("en-IN")}/mo`
+                          : `≈${approvalSalaryCurrency[requestId] === "USD" ? "$" : approvalSalaryCurrency[requestId] === "EUR" ? "€" : approvalSalaryCurrency[requestId] === "GBP" ? "£" : approvalSalaryCurrency[requestId] === "JPY" ? "¥" : "₹"}${(Number(salaryAmounts[requestId]) * 12).toLocaleString("en-IN")}/yr`}
+                      </span>
+                    ) : null}
                     <ActionButton
                       variant="approve"
                       className="px-3"
@@ -296,119 +335,71 @@ export function ApprovalsTab({
           );
         })}
         {visibleApprovals.length === 0 ? (
-          <p className="py-6 text-sm text-slate-500">No pending approvals.</p>
+          <EmptyState message="No pending approvals." />
         ) : null}
       </div>
 
-      {rejectModalId ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-          onClick={(e) => { if (e.target === e.currentTarget) setRejectModalId(null); }}
-        >
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl">
-            <div className="border-b border-slate-100 px-6 py-4">
-              <h4 className="text-lg font-semibold text-slate-900">Rejection Reason</h4>
-              <p className="mt-0.5 text-sm text-slate-500">Provide a reason for declining this letter request.</p>
-            </div>
-            <div className="px-6 py-5">
-              <textarea
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                rows={3}
-                placeholder="e.g., Insufficient documentation, request doesn't meet company policy..."
-                value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-              />
-            </div>
-            <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">
-              <button
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                type="button"
-                onClick={() => setRejectModalId(null)}
-              >
-                Cancel
-              </button>
-              <button
-                className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 hover:bg-red-700"
-                type="button"
-                disabled={!rejectionReason.trim()}
-                onClick={() => {
-                  if (rejectModalId) {
-                    decide(rejectModalId, "rejected", false, "document-letter", rejectionReason.trim());
-                    setRejectModalId(null);
-                  }
-                }}
-              >
-                Reject
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <Modal
+        open={!!rejectModalId}
+        onClose={() => setRejectModalId(null)}
+        title="Rejection Reason"
+        description="Provide a reason for declining this letter request."
+        maxWidth="max-w-md"
+        footer={
+          <>
+            <ActionButton variant="secondary" onClick={() => setRejectModalId(null)}>Cancel</ActionButton>
+            <ActionButton variant="danger" disabled={!rejectionReason.trim()} onClick={() => {
+              if (rejectModalId) {
+                decide(rejectModalId, "rejected", false, "document-letter", rejectionReason.trim());
+                setRejectModalId(null);
+              }
+            }}>Reject</ActionButton>
+          </>
+        }
+      >
+        <textarea
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+          rows={3}
+          placeholder="e.g., Insufficient documentation, request doesn't meet company policy..."
+          value={rejectionReason}
+          onChange={(e) => setRejectionReason(e.target.value)}
+        />
+      </Modal>
 
-      {viewingLetter ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-          onClick={(e) => { if (e.target === e.currentTarget) setViewingLetter(null); }}
-        >
-          <div className="w-full max-w-4xl rounded-2xl border border-slate-200 bg-white shadow-xl flex flex-col max-h-[90vh]">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4 shrink-0">
-              <div>
-                <h4 className="text-lg font-semibold text-slate-900">Review & Edit Letter</h4>
-                <p className="mt-0.5 text-sm text-slate-500">
-                  {String((viewingLetter.metadata as any)?.requesterName ?? (viewingLetter.requester as any)?.name ?? "Employee")}
-                  {" "}· {String((viewingLetter.metadata as any)?.requesterRole ?? (viewingLetter.requester as any)?.role ?? "")}
-                </p>
-              </div>
-              <button
-                className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
-                type="button"
-                onClick={() => setViewingLetter(null)}
-                aria-label="Close"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-hidden p-6">
-              <textarea
-                className="w-full h-full min-h-[50vh] rounded-lg border border-slate-200 p-4 text-sm leading-relaxed text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                value={letterContentDraft}
-                onChange={(e) => setLetterContentDraft(e.target.value)}
-                placeholder="Draft empty or not provided."
-              />
-            </div>
-            <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4 shrink-0">
-              <button
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                type="button"
-                onClick={() => setViewingLetter(null)}
-              >
-                Cancel
-              </button>
-              <button
-                className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-                type="button"
-                onClick={() => {
-                  setRejectModalId(String(viewingLetter.id ?? viewingLetter._id ?? ""));
-                  setRejectionReason("");
-                  setViewingLetter(null);
-                }}
-              >
-                Reject Request
-              </button>
-              <button
-                className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-                type="button"
-                onClick={() => {
-                  decide(String(viewingLetter.id ?? viewingLetter._id ?? ""), "approved", false, "document-letter", undefined, letterContentDraft);
-                  setViewingLetter(null);
-                }}
-              >
-                Approve & Save Letter
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <Modal
+        open={!!viewingLetter}
+        onClose={() => setViewingLetter(null)}
+        title="Review & Edit Letter"
+        description={
+          viewingLetter ? `${String((viewingLetter.metadata as any)?.requesterName ?? (viewingLetter.requester as any)?.name ?? "Employee")} · ${String((viewingLetter.metadata as any)?.requesterRole ?? (viewingLetter.requester as any)?.role ?? "")}` : undefined
+        }
+        maxWidth="max-w-4xl"
+        footer={
+          <>
+            <ActionButton variant="secondary" onClick={() => setViewingLetter(null)}>Cancel</ActionButton>
+            <ActionButton variant="danger" onClick={() => {
+              if (viewingLetter) {
+                setRejectModalId(String(viewingLetter.id ?? viewingLetter._id ?? ""));
+                setRejectionReason("");
+                setViewingLetter(null);
+              }
+            }}>Reject Request</ActionButton>
+            <ActionButton variant="primary" onClick={() => {
+              if (viewingLetter) {
+                decide(String(viewingLetter.id ?? viewingLetter._id ?? ""), "approved", false, "document-letter", undefined, letterContentDraft);
+                setViewingLetter(null);
+              }
+            }}>Approve & Save Letter</ActionButton>
+          </>
+        }
+      >
+        <textarea
+          className="w-full min-h-[50vh] rounded-lg border border-slate-200 p-4 text-sm leading-relaxed text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          value={letterContentDraft}
+          onChange={(e) => setLetterContentDraft(e.target.value)}
+          placeholder="Draft empty or not provided."
+        />
+      </Modal>
     </section>
   );
 }
@@ -466,6 +457,7 @@ export function MembersTab({
   const [salaryModalMember, setSalaryModalMember] = useState<AnyRecord | null>(null);
   const [salaryInput, setSalaryInput] = useState("");
   const [salaryPeriodType, setSalaryPeriodType] = useState<"monthly" | "yearly">("monthly");
+  const [salaryCurrency, setSalaryCurrency] = useState("INR");
   const [savingSalaryModal, setSavingSalaryModal] = useState(false);
   const [roleModalMember, setRoleModalMember] = useState<AnyRecord | null>(null);
   const [newRoleValue, setNewRoleValue] = useState("");
@@ -489,6 +481,7 @@ export function MembersTab({
   function openSalaryModal(member: AnyRecord) {
     setSalaryInput(String(Math.max(0, Number(member.baseSalary ?? 0)) > 0 ? Number(member.baseSalary) : ""));
     setSalaryPeriodType("monthly");
+    setSalaryCurrency(String(member.salaryCurrency ?? "INR"));
     setSalaryModalMember(member);
   }
 
@@ -545,7 +538,7 @@ export function MembersTab({
       setSavingSalaryModal(true);
       await apiFetch(`/api/hr/member-salary/${memberId}`, {
         method: "POST",
-        body: JSON.stringify({ baseSalary }),
+        body: JSON.stringify({ baseSalary, currency: salaryCurrency }),
       });
       showToast("Base salary saved.");
       setSalaryModalMember(null);
@@ -823,12 +816,7 @@ export function MembersTab({
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
-      <div className="mb-5 border-l-4 border-indigo-500 pl-4">
-        <h3 className="text-base font-semibold text-slate-900">Members</h3>
-        <p className="mt-0.5 text-sm text-slate-500">
-          Click a role to view people and send a meeting invite.
-        </p>
-      </div>
+      <SectionHeader title="Company Members" description="Manage roles, salaries, and memberships." accent="indigo" />
       <div className="mb-5 flex items-center gap-2">
         <div className="rounded-xl bg-slate-50 px-5 py-3 ring-1 ring-slate-100">
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Total members</p>
@@ -1014,7 +1002,10 @@ export function MembersTab({
                                 role: {displayMemberRole(member)}
                               </span>
                               <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
-                                salary: {Number(member.baseSalary ?? 0) > 0 ? `Rs. ${Number(member.baseSalary).toLocaleString("en-IN")}` : "not set"}
+                                salary: {(() => {
+                                  const sym = String(member.salaryCurrency ?? "INR") === "USD" ? "$" : String(member.salaryCurrency ?? "INR") === "EUR" ? "€" : String(member.salaryCurrency ?? "INR") === "GBP" ? "£" : String(member.salaryCurrency ?? "INR") === "JPY" ? "¥" : "₹";
+                                  return Number(member.baseSalary ?? 0) > 0 ? `${sym} ${Number(member.baseSalary).toLocaleString("en-IN")}` : "not set";
+                                })()}
                               </span>
                               <span
                                 className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700"
@@ -1213,33 +1204,53 @@ export function MembersTab({
               Set base salary for{" "}
               <strong>{String(salaryModalMember.name ?? "")}</strong>.
             </p>
-            <div className="mt-4 flex rounded-lg border border-slate-200 p-1">
-              <button
-                type="button"
-                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${salaryPeriodType === "monthly" ? "bg-slate-950 text-white" : "text-slate-600 hover:text-slate-900"}`}
-                onClick={() => setSalaryPeriodType("monthly")}
+            <div className="mt-4 flex gap-2">
+              <select
+                className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm"
+                value={salaryCurrency}
+                onChange={(e) => setSalaryCurrency(e.target.value)}
               >
-                Per Month
-              </button>
-              <button
-                type="button"
-                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${salaryPeriodType === "yearly" ? "bg-slate-950 text-white" : "text-slate-600 hover:text-slate-900"}`}
-                onClick={() => setSalaryPeriodType("yearly")}
-              >
-                Per Year
-              </button>
+                <option value="INR">₹ INR</option>
+                <option value="USD">$ USD</option>
+                <option value="EUR">€ EUR</option>
+                <option value="GBP">£ GBP</option>
+                <option value="JPY">¥ JPY</option>
+              </select>
+              <div className="flex flex-1 rounded-lg border border-slate-200 p-1">
+                <button
+                  type="button"
+                  className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${salaryPeriodType === "monthly" ? "bg-slate-950 text-white" : "text-slate-600 hover:text-slate-900"}`}
+                  onClick={() => setSalaryPeriodType("monthly")}
+                >
+                  Per Month
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${salaryPeriodType === "yearly" ? "bg-slate-950 text-white" : "text-slate-600 hover:text-slate-900"}`}
+                  onClick={() => setSalaryPeriodType("yearly")}
+                >
+                  Per Year
+                </button>
+              </div>
             </div>
-            <input
-              className="mt-4 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
-              min={0}
-              placeholder={salaryPeriodType === "monthly" ? "Monthly base salary" : "Yearly base salary"}
-              type="number"
-              value={salaryInput}
-              onChange={(e) => setSalaryInput(e.target.value)}
-            />
-            {salaryPeriodType === "yearly" && Number(salaryInput) > 0 && (
+            <div className="mt-4 flex items-center gap-2">
+              <span className="text-lg font-semibold text-slate-700">
+                {salaryCurrency === "USD" ? "$" : salaryCurrency === "EUR" ? "€" : salaryCurrency === "GBP" ? "£" : salaryCurrency === "JPY" ? "¥" : "₹"}
+              </span>
+              <input
+                className="flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
+                min={0}
+                placeholder={salaryPeriodType === "monthly" ? "Monthly base salary" : "Yearly base salary"}
+                type="number"
+                value={salaryInput}
+                onChange={(e) => setSalaryInput(e.target.value)}
+              />
+            </div>
+            {Number(salaryInput) > 0 && (
               <p className="mt-1.5 text-xs text-slate-500">
-                ≈ ₹{Math.round(Number(salaryInput) / 12).toLocaleString("en-IN")}/month
+                {salaryPeriodType === "yearly"
+                  ? `≈${salaryCurrency === "USD" ? "$" : salaryCurrency === "EUR" ? "€" : salaryCurrency === "GBP" ? "£" : salaryCurrency === "JPY" ? "¥" : "₹"}${Math.round(Number(salaryInput) / 12).toLocaleString("en-IN")}/month`
+                  : `≈${salaryCurrency === "USD" ? "$" : salaryCurrency === "EUR" ? "€" : salaryCurrency === "GBP" ? "£" : salaryCurrency === "JPY" ? "¥" : "₹"}${(Number(salaryInput) * 12).toLocaleString("en-IN")}/year`}
               </p>
             )}
             <div className="mt-5 flex justify-end gap-3">
@@ -1583,12 +1594,7 @@ export function MessagesTab({
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
-      <div className="mb-5 border-l-4 border-sky-500 pl-4">
-        <h3 className="text-base font-semibold text-slate-900">Messages</h3>
-        <p className="mt-0.5 text-sm text-slate-500">
-          Send a message to anyone in your company.
-        </p>
-      </div>
+      <SectionHeader title="Messages" description="Send messages to your team or the entire company." accent="sky" />
       <div className="mb-4">
         <span className="rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 ring-1 ring-slate-100">
           {members.length} members
@@ -1938,12 +1944,7 @@ export function NotificationsTab({
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
-      <div className="mb-5 border-l-4 border-violet-500 pl-4">
-        <h3 className="text-base font-semibold text-slate-900">Notifications</h3>
-        <p className="mt-0.5 text-sm text-slate-500">
-          Join requests, project updates, and deadline notices.
-        </p>
-      </div>
+      <SectionHeader title="Notifications" description="Join requests, project updates, and deadline notices." accent="violet" />
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <label className="text-xs font-medium text-slate-500">From</label>

@@ -12,7 +12,7 @@ export async function POST(request: Request, { params }: Params) {
   if (!userId) return jsonError("Unauthorized", 401);
   if (!isObjectId(memberId)) return jsonError("Invalid member id.");
 
-  let body: { baseSalary?: number };
+  let body: { baseSalary?: number; currency?: string };
   try {
     body = await request.json();
   } catch (err) {
@@ -23,6 +23,8 @@ export async function POST(request: Request, { params }: Params) {
   if (!Number.isFinite(salaryAmount) || salaryAmount <= 0) {
     return jsonError("Enter a valid base salary.");
   }
+
+  const currency = typeof body.currency === "string" && body.currency.trim() ? body.currency.trim().toUpperCase() : undefined;
 
   await connectDb();
 
@@ -52,6 +54,7 @@ export async function POST(request: Request, { params }: Params) {
 
   const oldSalary = Math.max(0, Number(member.baseSalary ?? 0));
   member.baseSalary = salaryAmount;
+  if (currency) member.salaryCurrency = currency;
   if (!Array.isArray(member.salaryHistory)) member.salaryHistory = [];
   member.salaryHistory.push({
     amount: salaryAmount,

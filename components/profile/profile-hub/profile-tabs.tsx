@@ -910,15 +910,17 @@ export function ProfileTab({
         <section className={sectionClass}>
           <SectionHeader title="Compensation" description="Salary details" accent="rose" />
           <dl className="mt-4 space-y-3 text-sm">
-            {inApprovedCompany ? (
-              <Row
-                label="Base Salary"
-                value={
-                  effectiveBaseSalary > 0
-                    ? `₹${effectiveBaseSalary.toLocaleString("en-IN")}`
-                    : undefined
-                }
-              />
+            {inApprovedCompany && effectiveBaseSalary > 0 ? (
+              <>
+                <Row
+                  label="Base Salary (Monthly)"
+                  value={`₹${effectiveBaseSalary.toLocaleString("en-IN")}`}
+                />
+                <Row
+                  label="Base Salary (Yearly)"
+                  value={`₹${(effectiveBaseSalary * 12).toLocaleString("en-IN")}`}
+                />
+              </>
             ) : null}
           </dl>
           {inApprovedCompany && !insights?.hasSalary ? (

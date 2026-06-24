@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { execSync } from "child_process";
+import pkg from "@/package.json";
 
 interface ReleaseEntry {
   type: "feature" | "fix" | "improvement" | "technical" | "other";
@@ -86,7 +87,8 @@ function formatDate(raw: string): string {
 export async function GET() {
   try {
     const hash = execSync("git log -1 --format=%H", { encoding: "utf-8" }).trim();
-    const date = execSync("git log -1 --format=%cd --date=short", { encoding: "utf-8" }).trim();
+    const lastIso = execSync("git log -1 --format=%cI", { encoding: "utf-8" }).trim();
+    const firstIso = execSync("git log --reverse --format=%cI --max-count=1", { encoding: "utf-8" }).trim();
     const commits = execSync("git log --oneline -30", { encoding: "utf-8" }).trim().split("\n").filter(Boolean);
     const total = execSync("git rev-list --count HEAD", { encoding: "utf-8" }).trim();
     const tag = execSync("git describe --tags --always 2>nul", { encoding: "utf-8" }).trim();
@@ -101,20 +103,23 @@ export async function GET() {
     const knownIssues: string[] = [];
 
     return NextResponse.json({
-      version: `v1.0.0-build.${total}`,
+      version: `v${pkg.version}`,
       tag: tag === hash ? null : tag,
-      lastUpdate: formatDate(date),
-      rawDate: date,
+      released: formatDate(firstIso),
+      lastUpdate: formatDate(lastIso),
+      rawDate: lastIso,
       commitHash: hash.slice(0, 7),
       totalCommits: Number(total),
       releaseNotes,
       knownIssues,
     });
   } catch {
+    const now = new Date().toISOString();
     return NextResponse.json({
-      version: "v1.0.0",
+      version: `v${pkg.version}`,
+      released: "N/A",
       lastUpdate: "N/A",
-      rawDate: new Date().toISOString().slice(0, 10),
+      rawDate: now,
       totalCommits: 0,
       releaseNotes: [],
       knownIssues: [],

@@ -7,17 +7,19 @@ FlowZen is a full-stack team productivity platform built with Next.js App Router
 - **Kanban Boards** — Real-time drag-and-drop task management with priorities, due dates, assignees, leads, comments, attachments, activity logs, and auto-expired columns.
 - **Attendance Tracking** — Check-in/check-out with location logging, WFH modes (all-day / wfh-only), scheduled WFH dates, holiday management, and attendance report export.
 - **Leave Management** — Multi-step approval workflow (HR → Manager), leave requests with start/end dates, reason, and type.
-- **Finance Module** — Salary management per member, expense requests & bills, project budgets (allocated/spent/remaining), client invoice generation (printable PDF), resource/asset requests, yearly revenue reports, and leave impact calculations.
-- **HR Management** — Member role changes, employee termination, company policy management, HR messages/broadcasts, and meeting invites.
-- **Role-Based Access** — 7 user roles (Employee, Project Manager, QA Tester, Human Resource, Finance, Admin, Others) with granular board-level permissions.
+- **Finance Module** — Salary management per member, expense requests & bills, project budgets (allocated/spent/remaining), client invoice generation (printable PDF), resource/asset requests, yearly revenue reports, leave impact calculations, and automated monthly salary generation via payroll processing.
+- **HR Management** — Member role changes, employee termination, company policy management (including food & travel accommodation amounts), HR messages/broadcasts, and meeting invites.
+- **Recruitment & Hiring** — Full recruitment lifecycle: job posting, candidate applications with magic-link portal, interview scheduling & feedback, offer letter generation (with CTC, perks, food/travel allowances), candidate portal for offer acceptance/rejection, and convert-to-employee with welcome email.
+- **Role-Based Access** — 7 user roles (Employee, Project Manager, QA Tester, Human Resource, Finance, Admin, Others) with granular board-level permissions. Profile hub tabs gated by company status and role.
 - **Multi-Step Approval Workflows** — Join requests (HR → Admin), leave requests (HR → Manager), and quit requests with replacement tracking.
 - **Company & Team Management** — Company registration with identity codes, team creation with invite codes, freeze/takedown company, kick/quit team, and approval-based onboarding.
-- **Authentication** — Email/password with 6-digit OTP verification, magic-link password reset, and 5 social OAuth providers (Google, Azure AD / Microsoft, Apple, GitHub, Discord).
-- **Real-Time Updates** — Dual system: SSE (primary, current) via EventHub and legacy Socket.IO for instant board, notification, and event streaming.
-- **Notifications** — Join requests, approvals, system updates, task events, and HR messages — all with read/unread tracking.
-- **Profile Center** — 9-tab hub with general settings, company/team/board management, attendance, leave, finance, admin tools, and notifications.
+- **Authentication** — Email/password with 6-digit OTP verification, magic-link password reset, and 5 social OAuth providers (Google, Azure AD / Microsoft, Apple, GitHub, Discord). "Remember me" session persistence control.
+- **Real-Time Updates** — Dual system: SSE (primary) via EventHub and legacy Socket.IO for instant board, notification, and event streaming.
+- **Notifications** — Join requests, approvals, system updates, task events, and HR messages — all with read/unread tracking, paginated listing (15 per page), and date-range filtering.
+- **Profile Center** — Multi-tab hub with dashboard, profile, timeline, onboarding, members, careers, documents, messages, finance, approvals, attendance, and notifications — all role-gated.
 - **Avatar Upload** — Local filesystem uploads (max 2MB, PNG/JPG/WEBP).
 - **Invoice Generation** — Printable client invoices with items, tax, and totals.
+- **Offer Letters** — Generate and preview offer letters with full CTC breakdown, perks, food & travel allowances (from company policy). Downloadable HTML and candidate-facing portal view.
 
 ## Tech Stack
 
@@ -124,6 +126,15 @@ Run `npm run seed:demo` after setting `MONGODB_URI` to create or refresh these v
 - `/board` — board list / workspace selector
 - `/board/[id]` — individual board workspace with real-time collaboration
 - `/invoice/[id]` — printable client invoice PDF
+- `/recruitment/candidates` — candidate list with pipeline stages
+- `/recruitment/candidates/[id]` — candidate profile with timeline, interviews, offer, stage management
+- `/recruitment/candidates/[id]/offer` — offer letter preview in new tab
+- `/recruitment/jobs` — job listing management
+- `/recruitment/offers` — offer management dashboard
+- `/recruitment/offers/[id]/letter` — HR-facing offer letter preview
+- `/careers` — public careers page listing open positions
+- `/careers/jobs/[companyName]/[id]` — public job detail page with apply form
+- `/candidate-portal` — magic-link authenticated candidate dashboard (timeline, interviews, offer acceptance)
 
 ## Onboarding Flow
 
@@ -135,6 +146,16 @@ Run `npm run seed:demo` after setting `MONGODB_URI` to create or refresh these v
 6. All requests, approvals, rejections, and system events generate real-time notifications.
 7. **Leave requests** follow a separate multi-step chain (HR → Manager).
 8. **Quit requests** require HR to identify a replacement before final approval.
+
+## Recruitment Flow
+
+1. **HR/Admin** creates job postings from the recruitment dashboard with title, description, salary range, required skills, and employment type.
+2. **Candidates** apply via the public careers page (`/careers`), receiving an email with a unique magic-link token for their portal.
+3. **Interviewers** (assigned by HR) view candidate details, schedule interviews, and submit feedback with ratings.
+4. **HR/Admin** generates offer letters with full CTC breakdown, perks, food & travel allowances, and office location — previewable before sending.
+5. Once sent, **candidates** view and accept/reject offers from their portal. Accepted offers auto-advance the candidate stage to `joined`.
+6. **HR** converts `joined` candidates to employees by setting a password — a welcome email with credentials is sent automatically.
+7. Throughout the process, the candidate portal provides a timeline of all events, interview history, and the latest offer status.
 
 ## User Roles (7)
 
@@ -150,16 +171,21 @@ Run `npm run seed:demo` after setting `MONGODB_URI` to create or refresh these v
 
 ## Project Structure
 
-- `app/api` — 50+ API route handlers for auth, boards, columns, tasks, comments, attachments, company, team, profile, approvals, attendance, finance, HR, events, notifications, messages, and more.
+- `app/api` — 70+ API route handlers for auth, boards, columns, tasks, comments, attachments, company, team, profile, approvals, attendance, finance, HR, recruitment (jobs, candidates, interviews, offers, letters), events, notifications, messages, and more.
 - `app/board/[id]` — board workspace and task collaboration route.
-- `app/profile/[[...tab]]` — 9-tab profile hub with settings, company, teams, boards, attendance, leave, finance, admin, and notifications.
+- `app/profile/[[...tab]]` — multi-tab profile hub with dashboard, settings, company, teams, boards, attendance, leave, finance, admin, members, documents, messages, approvals, careers, and notifications.
 - `app/invoice/[id]` — printable client invoice PDF.
 - `app/join` — company/team join via invitation code.
+- `app/recruitment` — full recruitment dashboard: candidate pipeline, job management, offer management, and candidate detail pages.
+- `app/careers` — public career listings with job detail pages and candidate application.
+- `app/candidate-portal` — magic-link authenticated candidate dashboard with timeline, interviews, and offer acceptance.
 - `components/boards` — board canvas, columns, task cards, modals, and board UI.
-- `components/profile` — profile dashboard, attendance, finance, admin tools, and WFH assignment.
+- `components/profile` — profile hub tabs, attendance, finance, admin tools, WFH assignment, and members management.
+- `components/recruitment` — recruitment-specific components: candidate cards, interview forms, offer modals, convert-to-employee.
 - `components/landing` — landing page UI.
 - `store/board-store.ts` — Zustand store for boards, columns, tasks, modals, and backend sync.
-- `models` — 15 Mongoose models for User, Board, Column, Task, Company, Team, JoinRequest, Notification, LeaveRequest, Attendance, Holiday, FinanceSalary, ClientInvoice, ExpenseRequest, ExpenseBill, ProjectBudget, and ResourceRequest.
-- `lib` — shared database, auth, API, realtime (EventHub SSE + Socket.IO), mailer, code generators, board access, and type utilities.
-- `types` — TypeScript type declarations for NextAuth, Socket.IO, and module shims.
+- `store/recruitment-store.ts` — Zustand store for recruitment state: jobs, candidates, filters, offer generation.
+- `models` — 18+ Mongoose models for User, Board, Column, Task, Company, Team, JoinRequest, Notification, LeaveRequest, Attendance, Holiday, FinanceSalary, ClientInvoice, ExpenseRequest, ExpenseBill, ProjectBudget, ResourceRequest, ATSJob, ATSCandidate, ATSOffer, ATSInterview, and CompanyPolicy.
+- `lib` — shared database, auth, API, realtime (EventHub SSE + Socket.IO), mailer, code generators, board access, recruitment types, and type utilities.
+- `types` — TypeScript type declarations for NextAuth, Socket.IO, recruitment types, and module shims.
 - `pages/api/socket.ts` — legacy Socket.IO server (Pages Router) for real-time events.

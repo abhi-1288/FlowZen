@@ -126,6 +126,7 @@ export async function GET() {
 
   insights.hasSalary = inApprovedCompany && baseSalaryValue > 0;
   insights.baseSalary = inApprovedCompany ? baseSalaryValue : 0;
+  insights.salaryCurrency = String(user.salaryCurrency ?? "INR");
 
   if (inApprovedCompany && !["human-resource", "admin"].includes(safeRole)) {
     insights.enrolledByHr = await resolveEnrollingHr(user);
@@ -248,6 +249,7 @@ export async function GET() {
           role: member.role ?? "employee",
           customRole: member.customRole ?? "",
           baseSalary: Math.max(0, Number(member.baseSalary ?? 0)),
+          salaryCurrency: String(member.salaryCurrency ?? "INR"),
           teamStatus: member.teamStatus ?? "none",
           teams: teamNames,
           hasTeam: teamNames.length > 0,

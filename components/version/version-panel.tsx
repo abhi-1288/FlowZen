@@ -14,6 +14,7 @@ interface ReleaseGroup {
 interface VersionData {
   version: string;
   tag: string | null;
+  released: string;
   lastUpdate: string;
   rawDate: string;
   commitHash: string;
@@ -33,6 +34,7 @@ const prefixColors: Record<string, string> = {
 function timeAgo(raw: string): string {
   const now = Date.now();
   const then = new Date(raw).getTime();
+  if (isNaN(then)) return raw;
   const diff = Math.floor((now - then) / 1000);
   if (diff < 60) return "just now";
   if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
@@ -62,7 +64,7 @@ export function VersionPanel() {
       <div className="grid grid-cols-3 divide-x divide-slate-200 bg-slate-50/80">
         {[
           { label: "Version", value: data.version },
-          { label: "Released", value: data.lastUpdate },
+          { label: "Released", value: data.released || "N/A" },
           { label: "Last updated", value: timeAgo(data.rawDate) },
         ].map((item) => (
           <div key={item.label} className="px-4 py-3">

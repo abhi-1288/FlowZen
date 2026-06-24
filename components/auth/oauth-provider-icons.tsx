@@ -23,6 +23,7 @@ export function OAuthProviderIcons({ callbackUrl = "/board" }: { callbackUrl?: s
             key={provider.id}
             onClick={() => signIn(provider.id, { callbackUrl })}
             title={`Continue with ${provider.label}`}
+            suppressHydrationWarning
             type="button"
           >
             <Icon aria-hidden="true" size={20} />

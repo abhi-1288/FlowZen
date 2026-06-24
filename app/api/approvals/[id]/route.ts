@@ -136,6 +136,7 @@ export async function PATCH(request: Request, { params }: Params) {
     let status = validStatuses.includes(body.status) ? body.status : "rejected";
     const force = Boolean(body.force);
     const rejectionReason = String(body.reason ?? "").trim();
+    const salaryCurrency = typeof body.salaryCurrency === "string" && body.salaryCurrency.trim() ? body.salaryCurrency.trim().toUpperCase() : undefined;
 
     await connectDb();
     const joinRequest = await JoinRequest.findById(id);
@@ -222,6 +223,7 @@ export async function PATCH(request: Request, { params }: Params) {
         requester.company = joinRequest.company;
         requester.companyJoined = new Date();
         requester.baseSalary = salaryAmount;
+        if (salaryCurrency) requester.salaryCurrency = salaryCurrency;
         if (salaryAmount > 0) {
           if (!Array.isArray(requester.salaryHistory)) requester.salaryHistory = [];
           requester.salaryHistory.push({
@@ -287,6 +289,7 @@ export async function PATCH(request: Request, { params }: Params) {
       if (status === "approved") {
         const salaryAmount = Math.max(0, Number(body.salaryAmount ?? 0));
         requester.baseSalary = salaryAmount;
+        if (salaryCurrency) requester.salaryCurrency = salaryCurrency;
         if (salaryAmount > 0) {
           if (!Array.isArray(requester.salaryHistory)) requester.salaryHistory = [];
           requester.salaryHistory.push({
