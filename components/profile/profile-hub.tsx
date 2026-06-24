@@ -120,6 +120,11 @@ export function ProfileHub() {
   const [insights, setInsights] = useState<AnyRecord | null>(null);
   const [approvals, setApprovals] = useState<AnyRecord[]>([]);
   const [notifications, setNotifications] = useState<AnyRecord[]>([]);
+  const [notificationPage, setNotificationPage] = useState(1);
+  const [notificationTotalPages, setNotificationTotalPages] = useState(1);
+  const [notificationFromDate, setNotificationFromDate] = useState("");
+  const [notificationToDate, setNotificationToDate] = useState("");
+  const [unreadCount, setUnreadCount] = useState(0);
   const [toast, setToast] = useState<{
     text: string;
     type: "success" | "error";
@@ -158,7 +163,7 @@ export function ProfileHub() {
   const displayRole = formatRoleWithCustom(String(role), profile?.customRole);
   const displayName = String(profile?.name ?? session?.user?.name ?? "User");
   const avatarUrl = profile?.avatarUrl ? String(profile.avatarUrl) : "";
-  const unreadCount = notifications.filter((item) => !item.readAt).length;
+
   const pendingLeaveCount = leaveRequests.filter((r) =>
     ["pending", "hr-approved", "manager-approved"].includes(String(r.status)),
   ).length;
@@ -230,7 +235,7 @@ export function ProfileHub() {
 
       if (!silent) setLoading(true);
 
-      const [profileResult, approvalsResult, notificationResult] =
+      const [profileResult, approvalsResult] =
         await Promise.all([
           apiFetch<{ user: AnyRecord; insights?: AnyRecord }>(
             "/api/profile",
@@ -239,22 +244,16 @@ export function ProfileHub() {
           apiFetch<{ requests: AnyRecord[] }>("/api/approvals").catch(() => ({
             requests: [],
           })),
-
-          apiFetch<{ notifications: AnyRecord[] }>("/api/notifications").catch(
-            () => ({ notifications: [] }),
-          ),
         ]);
 
       if (profileResult) setProfile(profileResult.user);
       if (profileResult?.insights) setInsights(profileResult.insights);
 
       setApprovals(approvalsResult?.requests ?? []);
-      setNotifications(notificationResult?.notifications ?? []);
 
       const nextProfile = profileResult?.user ?? profile;
       const nextInsights = profileResult?.insights ?? insights;
       const nextApprovals = approvalsResult?.requests ?? [];
-      const nextNotifications = notificationResult?.notifications ?? [];
 
       // Use the freshly fetched profile to determine role/company, avoids stale closure
       const actualRole = session?.user?.role ?? String(nextProfile?.role ?? "employee");
@@ -324,7 +323,7 @@ export function ProfileHub() {
         profile: nextProfile,
         insights: nextInsights,
         approvals: nextApprovals,
-        notifications: nextNotifications,
+        notifications: [],
         attendanceHistory: nextAttendanceHistory,
         leaveRequests: nextLeaveRequests,
         wfhRequests: nextWfhRequests,
@@ -336,6 +335,25 @@ export function ProfileHub() {
       };
     } finally {
       if (!silent) setLoading(false);
+    }
+  }
+
+  async function reloadNotifications(page?: number, from?: string, to?: string) {
+    const params = new URLSearchParams();
+    params.set("page", String(page ?? notificationPage));
+    params.set("limit", "15");
+    const f = from ?? notificationFromDate;
+    const t = to ?? notificationToDate;
+    if (f) params.set("from", f);
+    if (t) params.set("to", t);
+    const res = await apiFetch<{ notifications: AnyRecord[]; total: number; page: number; totalPages: number; unreadCount: number }>(
+      `/api/notifications?${params.toString()}`,
+    ).catch(() => null);
+    if (res) {
+      setNotifications(res.notifications);
+      setNotificationPage(res.page);
+      setNotificationTotalPages(res.totalPages);
+      setUnreadCount(res.unreadCount);
     }
   }
 
@@ -361,6 +379,7 @@ export function ProfileHub() {
 
   useEffect(() => {
     void load();
+    void reloadNotifications();
   }, []);
 
   useEffect(() => {
@@ -381,13 +400,14 @@ export function ProfileHub() {
           } else {
             new Audio("/sound/notification_sound.mp3").play().catch((err) => console.warn("Notification sound unavailable:", err));
           }
-          apiFetch<{ notifications: AnyRecord[] }>("/api/notifications")
+          apiFetch<{ notifications: AnyRecord[]; unreadCount: number }>("/api/notifications?limit=1")
             .then((res) => {
               const latest = res.notifications?.[0];
               if (latest) showNotificationToast(String(latest.title ?? "Notification"), String(latest.body ?? ""));
+              setUnreadCount(res.unreadCount);
             })
             .catch(() => {});
-          void load(true);
+          void reloadNotifications();
         });
 
         eventSource.onerror = () => {
@@ -410,22 +430,22 @@ export function ProfileHub() {
 
   async function markAllRead() {
     await apiFetch("/api/notifications", { method: "PATCH" });
-    await load();
+    await reloadNotifications();
   }
 
   async function markNotificationRead(id: string) {
     await apiFetch(`/api/notifications/${id}`, { method: "PATCH" });
-    await load();
+    await reloadNotifications();
   }
 
   async function deleteAllNotifications() {
     await apiFetch("/api/notifications", { method: "DELETE" });
-    await load();
+    await reloadNotifications();
   }
 
   async function deleteNotification(id: string) {
     await apiFetch(`/api/notifications/${id}`, { method: "DELETE" });
-    await load();
+    await reloadNotifications();
   }
 
   const timeline = useMemo(() => {
@@ -886,6 +906,20 @@ export function ProfileHub() {
                   deleteAll={deleteAllNotifications}
                   markRead={markNotificationRead}
                   deleteOne={deleteNotification}
+                  page={notificationPage}
+                  totalPages={notificationTotalPages}
+                  fromDate={notificationFromDate}
+                  toDate={notificationToDate}
+                  onPageChange={(p) => {
+                    setNotificationPage(p);
+                    reloadNotifications(p);
+                  }}
+                  onDateFilterChange={(from, to) => {
+                    setNotificationFromDate(from);
+                    setNotificationToDate(to);
+                    setNotificationPage(1);
+                    reloadNotifications(1, from, to);
+                  }}
                 />
               ) : null}
 

@@ -1897,12 +1897,24 @@ export function NotificationsTab({
   deleteAll,
   markRead,
   deleteOne,
+  page,
+  totalPages,
+  fromDate,
+  toDate,
+  onPageChange,
+  onDateFilterChange,
 }: {
   notifications: AnyRecord[];
   markAllRead: () => Promise<void>;
   deleteAll: () => Promise<void>;
   markRead: (id: string) => Promise<void>;
   deleteOne: (id: string) => Promise<void>;
+  page: number;
+  totalPages: number;
+  fromDate: string;
+  toDate: string;
+  onPageChange: (page: number) => void;
+  onDateFilterChange: (from: string, to: string) => void;
 }) {
   function getNotificationGroup(date: Date): string {
     const now = new Date();
@@ -1932,21 +1944,50 @@ export function NotificationsTab({
           Join requests, project updates, and deadline notices.
         </p>
       </div>
-      <div className="mb-5 flex gap-2">
-        <ActionButton
-          variant="secondary"
-          className="px-3"
-          onClick={markAllRead}
-        >
-          <Check size={16} /> Mark all read
-        </ActionButton>
-        <ActionButton
-          variant="danger"
-          className="px-3"
-          onClick={deleteAll}
-        >
-          <Trash2 size={16} /> Delete all
-        </ActionButton>
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-slate-500">From</label>
+          <input
+            type="date"
+            className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+            value={fromDate}
+            onChange={(e) => onDateFilterChange(e.target.value, toDate)}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-slate-500">To</label>
+          <input
+            type="date"
+            className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+            value={toDate}
+            onChange={(e) => onDateFilterChange(fromDate, e.target.value)}
+          />
+        </div>
+        {(fromDate || toDate) ? (
+          <ActionButton
+            variant="secondary"
+            className="px-3 text-xs"
+            onClick={() => onDateFilterChange("", "")}
+          >
+            <X size={14} /> Clear
+          </ActionButton>
+        ) : null}
+        <div className="ml-auto flex gap-2">
+          <ActionButton
+            variant="secondary"
+            className="px-3"
+            onClick={markAllRead}
+          >
+            <Check size={16} /> Mark all read
+          </ActionButton>
+          <ActionButton
+            variant="danger"
+            className="px-3"
+            onClick={deleteAll}
+          >
+            <Trash2 size={16} /> Delete all
+          </ActionButton>
+        </div>
       </div>
       <div className="space-y-5">
         {notifications.length === 0 ? (
@@ -2029,6 +2070,31 @@ export function NotificationsTab({
           })
         )}
       </div>
+      {totalPages > 1 ? (
+        <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-4">
+          <p className="text-sm text-slate-500">
+            Page {page} of {totalPages}
+          </p>
+          <div className="flex gap-2">
+            <ActionButton
+              variant="secondary"
+              className="px-3"
+              disabled={page <= 1}
+              onClick={() => onPageChange(page - 1)}
+            >
+              Previous
+            </ActionButton>
+            <ActionButton
+              variant="secondary"
+              className="px-3"
+              disabled={page >= totalPages}
+              onClick={() => onPageChange(page + 1)}
+            >
+              Next
+            </ActionButton>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
