@@ -62,6 +62,12 @@ export async function PATCH(request: Request, { params }: Params) {
     company: user.company,
   });
 
+  // Mark the interviewer's unread interview notifications as read
+  await Notification.updateMany(
+    { user: userId, readAt: null, title: { $regex: /interview/i } },
+    { $set: { readAt: new Date() } }
+  );
+
   const interviewerName = user.name || "An interviewer";
   const cand = await ATSCandidate.findById(interview.candidate).select("firstName lastName").lean();
   const candidateName = cand ? `${cand.firstName} ${cand.lastName}`.trim() : "the candidate";

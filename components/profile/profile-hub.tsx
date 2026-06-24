@@ -177,21 +177,22 @@ export function ProfileHub() {
   const hasCompany = Boolean(
     profile?.company && profile?.companyStatus === "approved",
   );
+  const canViewMembersTab = hasCompany && ["human-resource", "admin", "finance"].includes(String(role));
+  const canViewFinanceTab = hasCompany && ["finance", "admin"].includes(String(role));
+  const canViewCompanyTabs = hasCompany;
   const mobileTabs: Tab[] = [
     "dashboard",
     "profile",
     "timeline",
     "onboarding",
-    ...(["human-resource", "admin", "finance"].includes(String(role))
-      ? (["members"] as Tab[])
-      : []),
+    ...(canViewMembersTab ? (["members"] as Tab[]) : []),
     "careers",
-    "documents",
-    ...(hasCompany ? (["messages"] as Tab[]) : []),
-    ...(hasCompany ? (["finance"] as Tab[]) : []),
-    "approvals",
+    ...(canViewCompanyTabs ? (["documents"] as Tab[]) : []),
+    ...(canViewCompanyTabs ? (["messages"] as Tab[]) : []),
+    ...(canViewFinanceTab ? (["finance"] as Tab[]) : []),
+    ...(canViewCompanyTabs ? (["approvals"] as Tab[]) : []),
     "notifications",
-    "attendance",
+    ...(canViewCompanyTabs ? (["attendance"] as Tab[]) : []),
   ];
 
   const { showNotificationToast } = useNotificationToast();
@@ -582,9 +583,13 @@ export function ProfileHub() {
             label={`Careers${jobsCount ? ` (${jobsCount})` : ""}`}
             onClick={() => setTab("careers")}
           />
-          <div className="my-3 h-px bg-slate-800/40" />
-          <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Admin</p>
-          {["human-resource", "admin", "finance"].includes(String(role)) ? (
+          {canViewMembersTab || canViewCompanyTabs ? (
+            <>
+              <div className="my-3 h-px bg-slate-800/40" />
+              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Admin</p>
+            </>
+          ) : null}
+          {canViewMembersTab ? (
             <NavButton
               active={tab === "members"}
               icon={<Users size={16} />}
@@ -592,7 +597,7 @@ export function ProfileHub() {
               onClick={() => setTab("members")}
             />
           ) : null}
-          {["admin", "human-resource", "project-manager", "qa-tester", "finance"].includes(String(role)) ? (
+          {canViewCompanyTabs && ["admin", "human-resource", "project-manager", "qa-tester", "finance"].includes(String(role)) ? (
             <Link
               href="/recruitment/candidates"
               className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400 transition-all hover:bg-white/10 hover:text-white"
@@ -602,19 +607,23 @@ export function ProfileHub() {
               {recruitmentCount > 0 ? <span className="ml-auto rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold text-white">{recruitmentCount}</span> : null}
             </Link>
           ) : null}
-          <NavButton
-            active={tab === "documents"}
-            icon={<FileText size={16} />}
-            label="Documents"
-            onClick={() => setTab("documents")}
-          />
-          <NavButton
-            active={tab === "approvals"}
-            icon={<CheckSquare size={16} />}
-            label={`Approvals ${approvals.length ? `(${approvals.length})` : ""}`}
-            onClick={() => setTab("approvals")}
-          />
-          {hasCompany ? (
+          {canViewCompanyTabs ? (
+            <NavButton
+              active={tab === "documents"}
+              icon={<FileText size={16} />}
+              label="Documents"
+              onClick={() => setTab("documents")}
+            />
+          ) : null}
+          {canViewCompanyTabs ? (
+            <NavButton
+              active={tab === "approvals"}
+              icon={<CheckSquare size={16} />}
+              label={`Approvals ${approvals.length ? `(${approvals.length})` : ""}`}
+              onClick={() => setTab("approvals")}
+            />
+          ) : null}
+          {canViewCompanyTabs ? (
             <NavButton
               active={tab === "messages"}
               icon={<MessageSquare size={16} />}
@@ -622,22 +631,26 @@ export function ProfileHub() {
               onClick={() => setTab("messages")}
             />
           ) : null}
-          <div className="my-3 h-px bg-slate-800/40" />
-          <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Finance</p>
-          {hasCompany ? (
+          {canViewFinanceTab ? (
+            <>
+              <div className="my-3 h-px bg-slate-800/40" />
+              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Finance</p>
+              <NavButton
+                active={tab === "finance"}
+                icon={<Wallet size={16} />}
+                label={`Finance${financeCount ? ` (${financeCount})` : ""}`}
+                onClick={() => setTab("finance")}
+              />
+            </>
+          ) : null}
+          {canViewCompanyTabs ? (
             <NavButton
-              active={tab === "finance"}
-              icon={<Wallet size={16} />}
-              label={`Finance${financeCount ? ` (${financeCount})` : ""}`}
-              onClick={() => setTab("finance")}
+              active={tab === "attendance"}
+              icon={<CalendarCheck size={16} />}
+              label={`Attendance ${pendingAttendanceCount ? `(${pendingAttendanceCount})` : ""}`}
+              onClick={() => setTab("attendance")}
             />
           ) : null}
-          <NavButton
-            active={tab === "attendance"}
-            icon={<CalendarCheck size={16} />}
-            label={`Attendance ${pendingAttendanceCount ? `(${pendingAttendanceCount})` : ""}`}
-            onClick={() => setTab("attendance")}
-          />
           <NavButton
             active={tab === "notifications"}
             icon={<Bell size={16} />}
@@ -837,7 +850,7 @@ export function ProfileHub() {
                 />
               ) : null}
 
-              {tab === "approvals" ? (
+              {tab === "approvals" && canViewCompanyTabs ? (
                 <ApprovalsTab
                   approvals={approvals}
                   refresh={load}
@@ -845,7 +858,7 @@ export function ProfileHub() {
                 />
               ) : null}
 
-              {tab === "members" ? (
+              {tab === "members" && canViewMembersTab ? (
                 <MembersTab
                   insights={insights}
                   actorRole={String(role)}
@@ -854,7 +867,7 @@ export function ProfileHub() {
                 />
               ) : null}
 
-              {tab === "documents" ? (
+              {tab === "documents" && canViewCompanyTabs ? (
                 <DocumentsTab actorRole={String(role)} showToast={showToast} />
               ) : null}
 
@@ -862,7 +875,7 @@ export function ProfileHub() {
                 <CareersTab />
               ) : null}
 
-              {tab === "messages" ? (
+              {tab === "messages" && canViewCompanyTabs ? (
                 <MessagesTab showToast={showToast} />
               ) : null}
 
@@ -876,11 +889,11 @@ export function ProfileHub() {
                 />
               ) : null}
 
-              {tab === "finance" ? (
+              {tab === "finance" && canViewFinanceTab ? (
                 <FinanceTab actorRole={String(role)} profileId={String(profile?.id ?? session?.user?.id ?? "")} showToast={showToast} />
               ) : null}
 
-              {tab === "attendance" ? (
+              {tab === "attendance" && canViewCompanyTabs ? (
                 <AttendanceTab profile={profile} showToast={showToast} />
               ) : null}
             </>}

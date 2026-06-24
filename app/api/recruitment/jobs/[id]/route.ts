@@ -106,7 +106,7 @@ export async function DELETE(_request: Request, { params }: Params) {
 
   await connectDb();
   const user = await User.findById(userId);
-  if (!user || user.role !== "admin") return jsonError("Forbidden", 403);
+  if (!user) return jsonError("Forbidden", 403);
   if (!user.company) return jsonError("No company found.", 400);
 
   const job = await ATSJob.findOneAndDelete({ _id: id, company: user.company });

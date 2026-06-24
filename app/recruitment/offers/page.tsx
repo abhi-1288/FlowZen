@@ -76,20 +76,12 @@ export default function OffersPage() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {offer.status === "draft" && (
-                      <>
-                        <button
-                          onClick={() => void updateOffer(offer.id, { status: "sent" })}
-                          className="rounded-lg bg-slate-950 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800"
-                        >
-                          Mark Sent
-                        </button>
-                        <button
-                          onClick={() => void updateOffer(offer.id, { status: "accepted" })}
-                          className="rounded-lg border border-emerald-200 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
-                        >
-                          Accept
-                        </button>
-                      </>
+                      <button
+                        onClick={() => void updateOffer(offer.id, { status: "sent" })}
+                        className="rounded-lg bg-slate-950 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800"
+                      >
+                        Mark Sent
+                      </button>
                     )}
                     {offer.status === "sent" && (
                       <>
@@ -107,13 +99,12 @@ export default function OffersPage() {
                         </button>
                       </>
                     )}
-                    <a
-                      href={`/api/recruitment/offers/${offer.id}/letter`}
-                      target="_blank"
+                    <button
+                      onClick={() => router.push(`/recruitment/offers/${offer.id}/letter`)}
                       className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
                     >
                       <ExternalLink size={12} /> Letter
-                    </a>
+                    </button>
                     <button
                       onClick={() => router.push(`/recruitment/offers/${offer.id}`)}
                       className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"

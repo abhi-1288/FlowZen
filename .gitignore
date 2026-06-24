@@ -13,6 +13,7 @@ dist/
 
 # Public/uploads
 public/uploads/
+public/screenshot/
 
 # environment
 .env

@@ -10,7 +10,6 @@ import { User } from "@/models/User";
 import { Task } from "@/models/Task";
 import { emitNotification } from "@/lib/realtime";
 import { ensureCompanyIdentityCode } from "@/lib/company-identity";
-import { FinanceSalary } from "@/models/FinanceSalary";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -263,22 +262,6 @@ export async function PATCH(request: Request, { params }: Params) {
           at: new Date(),
         });
         await Company.updateOne({ _id: joinRequest.company }, { $addToSet: { members: requester._id } });
-        if (salaryAmount > 0) {
-          const currentMonth = new Date().toISOString().slice(0, 7);
-          await FinanceSalary.findOneAndUpdate(
-            { company: joinRequest.company, employee: requester._id, month: currentMonth },
-            {
-              $set: {
-                baseSalary: salaryAmount,
-                allowances: 0,
-                deductions: 0,
-                netSalary: salaryAmount,
-                status: "pending",
-              },
-            },
-            { upsert: true },
-          );
-        }
       } else {
         requester.company = null;
         requester.companyJoined = null;
@@ -302,7 +285,6 @@ export async function PATCH(request: Request, { params }: Params) {
 
     if (joinRequest.kind === "salary") {
       if (status === "approved") {
-        const currentMonth = new Date().toISOString().slice(0, 7);
         const salaryAmount = Math.max(0, Number(body.salaryAmount ?? 0));
         requester.baseSalary = salaryAmount;
         if (salaryAmount > 0) {
@@ -313,11 +295,6 @@ export async function PATCH(request: Request, { params }: Params) {
             type: "increment",
           });
         }
-        await FinanceSalary.findOneAndUpdate(
-          { company: joinRequest.company, employee: requester._id, month: currentMonth },
-          { $set: { baseSalary: salaryAmount, allowances: 0, deductions: 0, netSalary: salaryAmount, status: "pending" } },
-          { upsert: true },
-        );
       }
     }
 
@@ -408,15 +385,6 @@ export async function PATCH(request: Request, { params }: Params) {
           at: new Date(),
         });
         await Team.updateOne({ _id: teamId }, { $addToSet: { employees: requester._id } });
-        const teamApprover = await User.findById(joinRequest.approver).select("role");
-        if (String(teamApprover?.role ?? "") === "human-resource") {
-          const currentMonth = new Date().toISOString().slice(0, 7);
-          await FinanceSalary.findOneAndUpdate(
-            { company: joinRequest.company, employee: requester._id, month: currentMonth },
-            { $setOnInsert: { baseSalary: 0, allowances: 0, deductions: 0, netSalary: 0, status: "pending" } },
-            { upsert: true },
-          );
-        }
       } else {
         requester.team = null;
         requester.teamJoined = null;

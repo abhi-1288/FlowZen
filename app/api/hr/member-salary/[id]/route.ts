@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { isObjectId, jsonError, requireUserId } from "@/lib/api";
 import { resolveEnrollingHr } from "@/lib/enrolling-hr";
-import { FinanceSalary } from "@/models/FinanceSalary";
 import { User } from "@/models/User";
 
 type Params = { params: Promise<{ id: string }> };
@@ -60,21 +59,6 @@ export async function POST(request: Request, { params }: Params) {
     type: salaryAmount >= oldSalary ? "increment" : "decrement",
   });
   await member.save();
-
-  const currentMonth = new Date().toISOString().slice(0, 7);
-  await FinanceSalary.findOneAndUpdate(
-    { company: actor.company, employee: member._id, month: currentMonth },
-    {
-      $set: {
-        baseSalary: salaryAmount,
-        allowances: 0,
-        deductions: 0,
-        netSalary: salaryAmount,
-        status: "pending",
-      },
-    },
-    { upsert: true },
-  );
 
   return NextResponse.json({
     ok: true,

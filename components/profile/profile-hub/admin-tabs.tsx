@@ -465,6 +465,7 @@ export function MembersTab({
   const [selectedOtherRole, setSelectedOtherRole] = useState("all");
   const [salaryModalMember, setSalaryModalMember] = useState<AnyRecord | null>(null);
   const [salaryInput, setSalaryInput] = useState("");
+  const [salaryPeriodType, setSalaryPeriodType] = useState<"monthly" | "yearly">("monthly");
   const [savingSalaryModal, setSavingSalaryModal] = useState(false);
   const [roleModalMember, setRoleModalMember] = useState<AnyRecord | null>(null);
   const [newRoleValue, setNewRoleValue] = useState("");
@@ -487,6 +488,7 @@ export function MembersTab({
 
   function openSalaryModal(member: AnyRecord) {
     setSalaryInput(String(Math.max(0, Number(member.baseSalary ?? 0)) > 0 ? Number(member.baseSalary) : ""));
+    setSalaryPeriodType("monthly");
     setSalaryModalMember(member);
   }
 
@@ -533,11 +535,12 @@ export function MembersTab({
   async function saveSalaryModal() {
     const member = salaryModalMember;
     const memberId = String(member?.id ?? "");
-    const baseSalary = Number(salaryInput);
-    if (!memberId || !(baseSalary > 0)) {
+    const rawSalary = Number(salaryInput);
+    if (!memberId || !(rawSalary > 0)) {
       showToast("Enter a valid base salary.", "error");
       return;
     }
+    const baseSalary = salaryPeriodType === "yearly" ? Math.round(rawSalary / 12) : rawSalary;
     try {
       setSavingSalaryModal(true);
       await apiFetch(`/api/hr/member-salary/${memberId}`, {
@@ -1207,17 +1210,38 @@ export function MembersTab({
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <h3 className="text-lg font-semibold text-slate-900">Set base salary</h3>
             <p className="mt-1 text-sm text-slate-500">
-              Set monthly base salary for{" "}
+              Set base salary for{" "}
               <strong>{String(salaryModalMember.name ?? "")}</strong>.
             </p>
+            <div className="mt-4 flex rounded-lg border border-slate-200 p-1">
+              <button
+                type="button"
+                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${salaryPeriodType === "monthly" ? "bg-slate-950 text-white" : "text-slate-600 hover:text-slate-900"}`}
+                onClick={() => setSalaryPeriodType("monthly")}
+              >
+                Per Month
+              </button>
+              <button
+                type="button"
+                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${salaryPeriodType === "yearly" ? "bg-slate-950 text-white" : "text-slate-600 hover:text-slate-900"}`}
+                onClick={() => setSalaryPeriodType("yearly")}
+              >
+                Per Year
+              </button>
+            </div>
             <input
               className="mt-4 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
               min={0}
-              placeholder="Monthly base salary"
+              placeholder={salaryPeriodType === "monthly" ? "Monthly base salary" : "Yearly base salary"}
               type="number"
               value={salaryInput}
               onChange={(e) => setSalaryInput(e.target.value)}
             />
+            {salaryPeriodType === "yearly" && Number(salaryInput) > 0 && (
+              <p className="mt-1.5 text-xs text-slate-500">
+                ≈ ₹{Math.round(Number(salaryInput) / 12).toLocaleString("en-IN")}/month
+              </p>
+            )}
             <div className="mt-5 flex justify-end gap-3">
               <ActionButton
                 variant="secondary"

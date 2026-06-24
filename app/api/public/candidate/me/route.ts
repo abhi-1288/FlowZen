@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { ATSCandidate } from "@/models/ATSCandidate";
+import { ATSOffer } from "@/models/ATSOffer";
 import { ATSInterview } from "@/models/ATSInterview";
 import { ATSTimeline } from "@/models/ATSTimeline";
 import { jsonError, serializeDoc } from "@/lib/api";
@@ -31,9 +32,14 @@ export async function GET(request: Request) {
     .sort({ scheduledAt: 1 })
     .populate("interviewer", "name");
 
+  const offer = await ATSOffer.findOne({ candidate: candidate._id, company: candidate.company })
+    .populate("job", "title")
+    .sort({ createdAt: -1 });
+
   return NextResponse.json({
     candidate: serializeDoc(candidate),
     timeline: timeline.map((t: any) => serializeDoc(t)),
     interviews: interviews.map((i: any) => serializeDoc(i)),
+    offer: offer ? serializeDoc(offer) : null,
   });
 }

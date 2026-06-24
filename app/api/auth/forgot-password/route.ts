@@ -29,9 +29,11 @@ export async function POST(request: Request) {
   await user.save();
 
   const origin =
-    process.env.NEXTAUTH_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    new URL(request.url).origin;
+    process.env.NODE_ENV === "development"
+      ? new URL(request.url).origin
+      : process.env.NEXT_PUBLIC_APP_URL ||
+        new URL(request.url).origin ||
+        process.env.NEXTAUTH_URL;
   const magicLink = `${origin}/reset-password?token=${encodeURIComponent(token)}`;
 
   try {

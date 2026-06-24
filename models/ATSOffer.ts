@@ -11,6 +11,8 @@ const ATSOfferSchema = new Schema(
     designation: { type: String, required: true, trim: true, maxlength: 200 },
     department: { type: String, default: "", trim: true, maxlength: 100 },
     offerLetterUrl: { type: String, default: "" },
+    officeLocation: { type: String, default: "", trim: true, maxlength: 500 },
+    perks: { type: String, default: "", trim: true, maxlength: 2000 },
     status: {
       type: String,
       enum: ["draft", "sent", "accepted", "rejected"],

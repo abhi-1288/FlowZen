@@ -23,6 +23,7 @@ type ModalState =
   | { type: "add-feedback"; interviewId: string }
   | { type: "generate-offer"; candidateId: string }
   | { type: "view-offer"; offerId: string }
+  | { type: "view-job-description"; jobId: string }
   | { type: "submit-referral" }
   | null;
 
@@ -56,7 +57,7 @@ type RecruitmentStore = {
   createCandidate: (data: Partial<ATSCandidate>) => Promise<ATSCandidate>;
   updateCandidate: (id: string, data: Partial<ATSCandidate>) => Promise<void>;
   moveCandidateStage: (candidateId: string, toStage: Stage) => Promise<void>;
-  convertToEmployee: (candidateId: string) => Promise<void>;
+  convertToEmployee: (candidateId: string, password: string) => Promise<void>;
   deleteCandidate: (candidateId: string) => Promise<void>;
   silentRefreshCandidates: () => Promise<void>;
 
@@ -238,10 +239,13 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
     }
   },
 
-  convertToEmployee: async (candidateId) => {
+  convertToEmployee: async (candidateId, password) => {
     set({ saving: true, error: null });
     try {
-      await apiFetch(`/api/recruitment/candidates/${candidateId}/convert`, { method: "POST" });
+      await apiFetch(`/api/recruitment/candidates/${candidateId}/convert`, {
+        method: "POST",
+        body: JSON.stringify({ password }),
+      });
     } finally {
       set({ saving: false });
     }

@@ -69,7 +69,7 @@ export default function OfferDetailPage() {
 
         <div className="mt-6 rounded-xl border border-slate-200 bg-white">
           <div className="border-b border-slate-100 px-5 py-3">
-            <p className="text-sm font-semibold text-slate-900">Salary Breakdown (Per Annum)</p>
+            <p className="text-sm font-semibold text-slate-900">Salary Breakdown (₹/year)</p>
           </div>
           <div className="space-y-0 divide-y divide-slate-100 px-5 py-3">
             <div className="flex items-center justify-between py-2">
@@ -91,7 +91,7 @@ export default function OfferDetailPage() {
           </div>
           {offer.pfAmount || offer.esicAmount ? (
             <div className="border-t border-slate-200 bg-slate-50 px-5 py-3">
-              <p className="text-xs text-slate-500">Deductions are as per company policy and applicable statutory guidelines.</p>
+              <p className="text-xs text-slate-500">Food &amp; travel accommodation deductions are applied as per company policy. See the full offer letter for the complete breakdown.</p>
             </div>
           ) : null}
           <div className="border-t border-slate-200 px-5 py-3">
@@ -101,18 +101,10 @@ export default function OfferDetailPage() {
 
         <div className="mt-6 flex gap-3">
           <a
-            href={`/api/recruitment/offers/${offer.id}/letter`}
-            target="_blank"
+            href={`/recruitment/offers/${offer.id}/letter`}
             className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
           >
-            <FileText size={16} /> Download Offer Letter
-          </a>
-          <a
-            href={`/api/recruitment/offers/${offer.id}/letter`}
-            target="_blank"
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
-          >
-            <ExternalLink size={16} /> Preview
+            <FileText size={16} /> View Offer Letter
           </a>
         </div>
       </div>

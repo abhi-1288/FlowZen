@@ -151,6 +151,8 @@ export type ATSOffer = {
   designation: string;
   department: string;
   offerLetterUrl: string;
+  officeLocation: string;
+  perks: string;
   status: OfferStatus;
   createdBy: string;
   company: string;

@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { CheckCircle, XCircle, Clock, Briefcase, Building2, MapPin, DollarSign, User, Mail, CalendarDays, FileText, StickyNote, Video, ExternalLink } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Briefcase, Building2, MapPin, DollarSign, User, Mail, CalendarDays, FileText, StickyNote, Video, ExternalLink, Loader2 } from "lucide-react";
 import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
 
 type CandidateData = {
@@ -43,6 +43,18 @@ type InterviewData = {
   interviewer: { id: string; name: string } | string;
 };
 
+type OfferData = {
+  id: string;
+  offeredCTC: number;
+  pfAmount: number;
+  esicAmount: number;
+  joiningDate: string | null;
+  designation: string;
+  department: string;
+  status: string;
+  createdAt: string;
+};
+
 const STAGE_LABELS: Record<string, string> = {
   applied: "Application Submitted",
   screening: "Screening",
@@ -77,8 +89,12 @@ function CandidatePortalInner() {
   const [candidate, setCandidate] = useState<CandidateData | null>(null);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [interviews, setInterviews] = useState<InterviewData[]>([]);
+  const [offer, setOffer] = useState<OfferData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [offerActionLoading, setOfferActionLoading] = useState(false);
+  const [offerActionError, setOfferActionError] = useState("");
+  const [confirmAction, setConfirmAction] = useState<"accept" | "reject" | null>(null);
 
   useEffect(() => {
     if (!token) { setError("No access token provided."); setLoading(false); return; }
@@ -87,10 +103,41 @@ function CandidatePortalInner() {
         if (!r.ok) { const d = await r.json(); throw new Error(d.error || "Invalid link."); }
         return r.json();
       })
-      .then((data) => { setCandidate(data.candidate); setTimeline(data.timeline ?? []); setInterviews(data.interviews ?? []); })
+      .then((data) => { setCandidate(data.candidate); setTimeline(data.timeline ?? []); setInterviews(data.interviews ?? []); setOffer(data.offer ?? null); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [token]);
+
+  async function handleOfferAction(action: "accept" | "reject") {
+    if (!token) return;
+    setOfferActionLoading(true);
+    setOfferActionError("");
+    setConfirmAction(null);
+    try {
+      const res = await fetch(`/api/public/candidate/me/offer?token=${encodeURIComponent(token)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Something went wrong.");
+      setOffer(data.offer);
+      if (action === "accept") {
+        setCandidate((prev) => prev ? { ...prev, stage: "joined" } : prev);
+      }
+      const refreshRes = await fetch(`/api/public/candidate/me?token=${encodeURIComponent(token)}`);
+      if (refreshRes.ok) {
+        const refreshData = await refreshRes.json();
+        setCandidate(refreshData.candidate);
+        setTimeline(refreshData.timeline ?? []);
+        setInterviews(refreshData.interviews ?? []);
+      }
+    } catch (e: any) {
+      setOfferActionError(e.message);
+    } finally {
+      setOfferActionLoading(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -229,6 +276,128 @@ function CandidatePortalInner() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* --- Offer Letter --- */}
+        {offer && (
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">Offer Letter</h3>
+              <span className={`rounded-full px-3 py-1 text-xs font-medium ${
+                offer.status === "sent" || offer.status === "accepted" ? "bg-emerald-50 text-emerald-700" :
+                offer.status === "draft" ? "bg-amber-50 text-amber-700" :
+                "bg-rose-50 text-rose-700"
+              }`}>{offer.status}</span>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Designation</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{offer.designation}</p>
+              </div>
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Department</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">{offer.department || "N/A"}</p>
+              </div>
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Offered CTC</p>
+                <p className="mt-1 text-sm font-medium text-slate-900">₹{Number(offer.offeredCTC).toLocaleString()}/year</p>
+              </div>
+              {offer.joiningDate && (
+                <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Joining Date</p>
+                  <p className="mt-1 text-sm font-medium text-slate-900">{new Date(offer.joiningDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</p>
+                </div>
+              )}
+            </div>
+            <div className="mt-4 flex gap-3">
+              <a
+                href={`/api/public/candidate/me/letter?token=${encodeURIComponent(token ?? "")}`}
+                target="_blank"
+                className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"
+              >
+                <FileText size={16} /> View Offer Letter
+              </a>
+            </div>
+
+            {(offer.status === "draft" || offer.status === "sent") && (
+              <div className="mt-6 border-t border-slate-100 pt-5">
+                <p className="text-sm font-medium text-slate-700">Do you accept this offer?</p>
+                <div className="mt-3 flex gap-3">
+                  <button
+                    onClick={() => setConfirmAction("accept")}
+                    disabled={offerActionLoading}
+                    className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {offerActionLoading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+                    Accept Offer
+                  </button>
+                  <button
+                    onClick={() => setConfirmAction("reject")}
+                    disabled={offerActionLoading}
+                    className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-white px-5 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-50 disabled:opacity-50"
+                  >
+                    Decline
+                  </button>
+                </div>
+                {offerActionError && (
+                  <p className="mt-2 text-xs text-rose-500">{offerActionError}</p>
+                )}
+              </div>
+            )}
+
+            {offer.status === "accepted" && (
+              <div className="mt-6 border-t border-slate-100 pt-5">
+                <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+                  <CheckCircle size={18} />
+                  You have accepted this offer. Welcome aboard!
+                </div>
+              </div>
+            )}
+
+            {offer.status === "rejected" && (
+              <div className="mt-6 border-t border-slate-100 pt-5">
+                <div className="flex items-center gap-2 rounded-lg bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                  <XCircle size={18} />
+                  You have declined this offer.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* --- Confirmation Modal --- */}
+        {confirmAction && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+            <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
+              <h3 className="text-lg font-bold text-slate-900">
+                {confirmAction === "accept" ? "Accept Offer?" : "Decline Offer?"}
+              </h3>
+              <p className="mt-2 text-sm text-slate-500">
+                {confirmAction === "accept"
+                  ? "Are you sure you want to accept this offer? This action cannot be undone."
+                  : "Are you sure you want to decline this offer? This action cannot be undone."}
+              </p>
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  onClick={() => setConfirmAction(null)}
+                  disabled={offerActionLoading}
+                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleOfferAction(confirmAction)}
+                  disabled={offerActionLoading}
+                  className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${
+                    confirmAction === "accept" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"
+                  }`}
+                >
+                  {offerActionLoading && <Loader2 size={14} className="animate-spin" />}
+                  {confirmAction === "accept" ? "Yes, Accept" : "Yes, Decline"}
+                </button>
+              </div>
             </div>
           </div>
         )}
