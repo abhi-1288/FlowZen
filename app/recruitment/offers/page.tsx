@@ -51,6 +51,7 @@ export default function OffersPage() {
               : "Unknown";
             const jobTitle = offer.job && typeof offer.job === "object"
               ? (offer.job as any).title : "";
+            const salaryPeriodLabel = offer.salaryType === "per-month" ? "mo" : "yr";
 
             return (
               <div key={offer.id} className="rounded-lg border border-slate-200 bg-white p-4 transition hover:shadow-sm">
@@ -70,7 +71,7 @@ export default function OffersPage() {
                       <span>{offer.designation}</span>
                       {jobTitle && <><span>&middot;</span><span>{jobTitle}</span></>}
                       <span>&middot;</span>
-                      <span>₹{Number(offer.offeredCTC).toLocaleString()}</span>
+                      <span>₹{Number(offer.offeredCTC).toLocaleString()}/{salaryPeriodLabel}</span>
                       {offer.joiningDate && <><span>&middot;</span><span>Joins {new Date(offer.joiningDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span></>}
                     </div>
                   </div>

@@ -10,6 +10,7 @@ type LetterOffer = {
   job: { title: string; department: string; location: string };
   company: { name: string; icon?: string };
   offeredCTC: number;
+  salaryType?: "per-annum" | "per-month";
   pfAmount: number;
   esicAmount: number;
   joiningDate: string | null;
@@ -72,6 +73,9 @@ export default function OfferLetterPage() {
   const netTakeHome = Number(offer.offeredCTC) - pfAmt - esicAmt - foodAmt - travelAmt;
   const companyName = offer.company?.name ?? "Company";
   const companyIcon = offer.company?.icon ?? "";
+  const isMonthlySalary = offer.salaryType === "per-month";
+  const compensationPeriod = isMonthlySalary ? "Per Month" : "Per Annum";
+  const amountPeriodLabel = isMonthlySalary ? "month" : "year";
 
   return (
     <div className="min-h-screen bg-slate-100 print:bg-white">
@@ -175,13 +179,13 @@ export default function OfferLetterPage() {
 
           {/* --- Compensation Table --- */}
           <div className="mt-6 print:mt-4">
-            <h3 className="mb-3 text-sm font-semibold text-slate-900 print:mb-2">Compensation Summary (Per Annum)</h3>
+            <h3 className="mb-3 text-sm font-semibold text-slate-900 print:mb-2">Compensation Summary ({compensationPeriod})</h3>
             <div className="overflow-hidden rounded-lg border border-slate-200">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-slate-100">
                     <th className="px-4 py-2.5 text-left font-semibold text-slate-700 print:px-2 print:py-1">Component</th>
-                    <th className="px-4 py-2.5 text-right font-semibold text-slate-700 print:px-2 print:py-1">Amount (₹/year)</th>
+                    <th className="px-4 py-2.5 text-right font-semibold text-slate-700 print:px-2 print:py-1">Amount (per {amountPeriodLabel})</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">

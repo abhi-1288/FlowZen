@@ -77,13 +77,23 @@ export default function JobDetailPage() {
       body: formData,
     });
 
-    setSubmitting(false);
-    if (!res.ok) {
-      const data = await res.json();
-      setError(data.error ?? "Application failed. Please try again.");
-      return;
+    try {
+      if (!res.ok) {
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          setError(data.error ?? `Server error (${res.status})`);
+        } catch {
+          setError(`Server error (${res.status}). Please try again.`);
+        }
+        return;
+      }
+      setSuccess(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-    setSuccess(true);
   }
 
   if (loading) {

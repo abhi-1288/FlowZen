@@ -2,11 +2,16 @@ import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { ATSJob } from "@/models/ATSJob";
 import { ATSCandidate } from "@/models/ATSCandidate";
+import { ATSInterview } from "@/models/ATSInterview";
+import { ATSOffer } from "@/models/ATSOffer";
+import { ATSTimeline } from "@/models/ATSTimeline";
+import { ATSReferral } from "@/models/ATSReferral";
 import { ATSAuditLog } from "@/models/ATSAuditLog";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
+import { deleteFileByUrl } from "@/lib/storage";
 
 type Params = { params: Promise<{ id: string }> };
 const HR_ROLES = ["admin", "human-resource"];
@@ -50,6 +55,7 @@ export async function PATCH(request: Request, { params }: Params) {
   if (body.employmentType !== undefined) updates.employmentType = body.employmentType;
   if (body.salaryRangeMin !== undefined) updates.salaryRangeMin = Number(body.salaryRangeMin);
   if (body.salaryRangeMax !== undefined) updates.salaryRangeMax = Number(body.salaryRangeMax);
+  if (body.salaryType !== undefined) updates.salaryType = body.salaryType;
   if (body.currency !== undefined) updates.currency = String(body.currency).trim();
   if (body.openings !== undefined) updates.openings = Number(body.openings);
   if (body.autoCloseDate !== undefined) updates.autoCloseDate = body.autoCloseDate ? new Date(body.autoCloseDate) : null;
@@ -106,20 +112,37 @@ export async function DELETE(_request: Request, { params }: Params) {
 
   await connectDb();
   const user = await User.findById(userId);
-  if (!user) return jsonError("Forbidden", 403);
+  if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
   if (!user.company) return jsonError("No company found.", 400);
 
-  const job = await ATSJob.findOneAndDelete({ _id: id, company: user.company });
+  const job = await ATSJob.findOne({ _id: id, company: user.company });
   if (!job) return jsonError("Job not found.", 404);
 
-  await ATSCandidate.updateMany({ job: id }, { $set: { stage: "rejected" } });
+  const candidates = await ATSCandidate.find({ job: id, company: user.company });
+  const candidateIds = (candidates as any[]).map((c) => c._id);
+
+  for (const candidate of candidates) {
+    if (candidate.resumeUrl) {
+      await deleteFileByUrl(candidate.resumeUrl);
+    }
+  }
+
+  if (candidateIds.length > 0) {
+    await ATSInterview.deleteMany({ candidate: { $in: candidateIds } });
+    await ATSOffer.deleteMany({ candidate: { $in: candidateIds } });
+    await ATSTimeline.deleteMany({ candidate: { $in: candidateIds } });
+    await ATSReferral.deleteMany({ candidate: { $in: candidateIds } });
+    await ATSCandidate.deleteMany({ _id: { $in: candidateIds } });
+  }
+
+  await ATSJob.deleteOne({ _id: id });
 
   await ATSAuditLog.create({
     actor: userId,
     action: "delete-job",
     entityType: "ATSJob",
     entityId: job._id,
-    metadata: { title: job.title },
+    metadata: { title: job.title, deletedCandidates: candidateIds.length },
     company: user.company,
   });
 

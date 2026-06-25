@@ -39,6 +39,7 @@ export const STAGE_LABELS: Record<Stage, string> = {
 };
 
 export type EmploymentType = "full-time" | "part-time" | "contract" | "internship";
+export type SalaryType = "per-annum" | "per-month";
 export type JobStatus = "draft" | "open" | "closed";
 export type Source = "Referral" | "LinkedIn" | "Company Website" | "Naukri" | "Indeed" | "Walk-In" | "Other";
 export type RoundType = "screening" | "technical" | "manager" | "hr";
@@ -67,6 +68,7 @@ export type ATSJob = {
   employmentType: EmploymentType;
   salaryRangeMin: number;
   salaryRangeMax: number;
+  salaryType: SalaryType;
   currency: string;
   openings: number;
   autoCloseDate: string | null;
@@ -145,6 +147,7 @@ export type ATSOffer = {
   candidate: { id: string; firstName: string; lastName: string } | string;
   job: { id: string; title: string } | string;
   offeredCTC: number;
+  salaryType: SalaryType;
   pfAmount: number;
   esicAmount: number;
   joiningDate: string | null;

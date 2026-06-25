@@ -29,6 +29,7 @@ export default function OfferDetailPage() {
     : "Unknown";
   const jobTitle = offer.job && typeof offer.job === "object"
     ? (offer.job as any).title : "";
+  const salaryPeriodLabel = offer.salaryType === "per-month" ? "month" : "year";
 
   return (
     <div className="p-6 max-w-2xl">
@@ -69,7 +70,7 @@ export default function OfferDetailPage() {
 
         <div className="mt-6 rounded-xl border border-slate-200 bg-white">
           <div className="border-b border-slate-100 px-5 py-3">
-            <p className="text-sm font-semibold text-slate-900">Salary Breakdown (₹/year)</p>
+            <p className="text-sm font-semibold text-slate-900">Salary Breakdown (per {salaryPeriodLabel})</p>
           </div>
           <div className="space-y-0 divide-y divide-slate-100 px-5 py-3">
             <div className="flex items-center justify-between py-2">

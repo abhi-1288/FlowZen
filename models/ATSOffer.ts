@@ -5,6 +5,11 @@ const ATSOfferSchema = new Schema(
     candidate: { type: Schema.Types.ObjectId, ref: "ATSCandidate", required: true, index: true },
     job: { type: Schema.Types.ObjectId, ref: "ATSJob", required: true, index: true },
     offeredCTC: { type: Number, required: true },
+    salaryType: {
+      type: String,
+      enum: ["per-annum", "per-month"],
+      default: "per-annum",
+    },
     pfAmount: { type: Number, default: 0 },
     esicAmount: { type: Number, default: 0 },
     joiningDate: { type: Date, default: null },

@@ -24,6 +24,7 @@ type ModalState =
   | { type: "generate-offer"; candidateId: string }
   | { type: "view-offer"; offerId: string }
   | { type: "view-job-description"; jobId: string }
+  | { type: "delete-job"; jobId: string }
   | { type: "submit-referral" }
   | null;
 

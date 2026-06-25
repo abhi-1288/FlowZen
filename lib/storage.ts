@@ -69,3 +69,31 @@ export async function deleteDocument(key: string, subdir = SUBDIR) {
     // file may not exist
   }
 }
+
+export async function deleteFileByUrl(url: string) {
+  if (!url) return;
+
+  if (url.startsWith("/uploads/")) {
+    const filePath = path.join(process.cwd(), "public", url);
+    try {
+      await fs.unlink(filePath);
+    } catch {
+      // file may not exist
+    }
+  } else if (process.env.NODE_ENV === "production" && hasCloudinaryConfig() && url.includes("cloudinary")) {
+    ensureConfig();
+    try {
+      const urlObj = new URL(url);
+      const segments = urlObj.pathname.split("/");
+      const uploadIdx = segments.findIndex((s) => s === "upload");
+      if (uploadIdx !== -1 && uploadIdx + 2 < segments.length) {
+        let start = uploadIdx + 1;
+        if (segments[start]?.startsWith("v")) start++;
+        const publicId = segments.slice(start).join("/").replace(/\.[^.]+$/, "");
+        await cloudinary.uploader.destroy(publicId);
+      }
+    } catch {
+      // fail silently
+    }
+  }
+}

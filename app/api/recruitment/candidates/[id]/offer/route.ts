@@ -56,6 +56,7 @@ export async function POST(request: Request, { params }: Params) {
     candidate: candidate._id,
     job: jobId,
     offeredCTC: Number(body.offeredCTC),
+    salaryType: body.salaryType === "per-month" ? "per-month" : "per-annum",
     pfAmount: Number(body.pfAmount || 0),
     esicAmount: Number(body.esicAmount || 0),
     joiningDate: body.joiningDate ? new Date(body.joiningDate) : null,
@@ -107,6 +108,7 @@ export async function POST(request: Request, { params }: Params) {
   const pfAmt = Number(body.pfAmount || 0);
   const esicAmt = Number(body.esicAmount || 0);
   const candidateName = `${candidate.firstName} ${candidate.lastName}`;
+  const salaryPeriodLabel = offer.salaryType === "per-month" ? "month" : "year";
 
   try {
     await sendMail({

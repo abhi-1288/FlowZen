@@ -59,6 +59,7 @@ export async function POST(request: Request) {
     employmentType: body.employmentType || "full-time",
     salaryRangeMin: Number(body.salaryRangeMin) || 0,
     salaryRangeMax: Number(body.salaryRangeMax) || 0,
+    salaryType: body.salaryType || "per-annum",
     currency: String(body.currency || "INR").trim(),
     openings: Number(body.openings) || 1,
     autoCloseDate: body.autoCloseDate ? new Date(body.autoCloseDate) : null,

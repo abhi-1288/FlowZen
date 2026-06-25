@@ -3,16 +3,16 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Plus, Search, Eye, Pencil, Archive, Globe, Share2, Check } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Archive, Globe, Share2, Check, Trash2 } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
-import type { EmploymentType, JobStatus } from "@/lib/recruitment-types";
+import type { EmploymentType, JobStatus, SalaryType } from "@/lib/recruitment-types";
 
 export default function JobsPage() {
   const router = useRouter();
   const { data: session } = useSession();
   const role = session?.user?.role ?? "";
   const isAdmin = role === "admin";
-  const { jobs, loading, fetchJobs, updateJob, setModal } = useRecruitmentStore();
+  const { jobs, loading, fetchJobs, updateJob, deleteJob, setModal } = useRecruitmentStore();
   const [statusFilter, setStatusFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedJobId, setCopiedJobId] = useState<string | null>(null);
@@ -94,6 +94,12 @@ export default function JobsPage() {
                 <span>{job.location || "Remote"}</span>
                 <span>&middot;</span>
                 <span>{job.employmentType}</span>
+                {job.salaryRangeMin > 0 || job.salaryRangeMax > 0 ? (
+                  <>
+                    <span>&middot;</span>
+                    <span>{(job as any).currencySymbol || "₹"}{job.salaryRangeMin.toLocaleString()} - {(job as any).currencySymbol || "₹"}{job.salaryRangeMax.toLocaleString()}{job.salaryType === "per-month" ? "/mo" : "/yr"}</span>
+                  </>
+                ) : null}
                 {(job as any).applicantsCount !== undefined && (
                   <>
                     <span>&middot;</span>
@@ -149,6 +155,14 @@ export default function JobsPage() {
                     <Archive size={14} /> Close
                   </button>
                 )}
+                {job.status !== "open" && (
+                  <button
+                    onClick={() => setModal({ type: "delete-job", jobId: job.id })}
+                    className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                  >
+                    <Trash2 size={14} /> Delete
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -161,10 +175,42 @@ export default function JobsPage() {
 }
 
 function JobModals() {
-  const { modal, setModal, createJob, updateJob, jobs } = useRecruitmentStore();
+  const { modal, setModal, createJob, updateJob, deleteJob, jobs, saving } = useRecruitmentStore();
   const editingJob = modal?.type === "edit-job" ? jobs.find((j) => j.id === modal.jobId) : null;
+  const deletingJob = modal?.type === "delete-job" ? jobs.find((j) => j.id === modal.jobId) : null;
 
-  if (!modal || (modal.type !== "create-job" && modal.type !== "edit-job")) return null;
+  if (!modal) return null;
+
+  if (modal.type === "delete-job" && deletingJob) {
+    return (
+      <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/35 px-4">
+        <div className="w-full max-w-sm rounded-lg bg-white shadow-soft">
+          <div className="p-5">
+            <h2 className="text-base font-semibold text-slate-900">Delete Job</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Delete "{deletingJob.title}"? This will permanently delete the job and all associated candidates, interviews, offers, and uploaded resumes.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => setModal(null)}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { void deleteJob(deletingJob.id); setModal(null); }}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (modal.type !== "create-job" && modal.type !== "edit-job") return null;
 
   const isEdit = modal.type === "edit-job";
 
@@ -179,6 +225,7 @@ function JobModals() {
       currency: String(form.get("currency") || "INR"),
       salaryRangeMin: Number(form.get("salaryRangeMin") || 0),
       salaryRangeMax: Number(form.get("salaryRangeMax") || 0),
+      salaryType: String(form.get("salaryType") || "per-annum") as SalaryType,
       openings: Number(form.get("openings") || 1),
       autoCloseDate: String(form.get("autoCloseDate") || ""),
       description: String(form.get("description") || ""),
@@ -245,6 +292,13 @@ function JobModals() {
               </select>
             </label>
             <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700">Salary Type</span>
+              <select name="salaryType" defaultValue={editingJob?.salaryType || "per-annum"} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none">
+                <option value="per-annum">Per Annum</option>
+                <option value="per-month">Per Month</option>
+              </select>
+            </label>
+            <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700">Openings</span>
               <input name="openings" type="number" min="1" defaultValue={editingJob?.openings || 1} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
             </label>
@@ -261,8 +315,8 @@ function JobModals() {
             <span className="mb-1 block text-sm font-medium text-slate-700">Description</span>
             <textarea name="description" defaultValue={editingJob?.description || ""} rows={4} className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
           </label>
-          <button type="submit" className="w-full rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800">
-            {isEdit ? "Save Changes" : "Create Job"}
+          <button type="submit" disabled={saving} className="w-full rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50">
+            {saving ? "Saving..." : isEdit ? "Save Changes" : "Create Job"}
           </button>
         </form>
       </div>

@@ -64,7 +64,7 @@ export default function JobDetailPage() {
           </div>
           <p className="mt-1 text-sm text-slate-500">{activeJob.department} &middot; {activeJob.location || "Remote"} &middot; {activeJob.employmentType}</p>
           {activeJob.salaryRangeMin > 0 || activeJob.salaryRangeMax > 0 ? (
-            <p className="text-sm text-slate-500">Salary: {CURRENCY_SYMBOLS[activeJob.currency] || "₹"}{activeJob.salaryRangeMin.toLocaleString()} - {CURRENCY_SYMBOLS[activeJob.currency] || "₹"}{activeJob.salaryRangeMax.toLocaleString()}</p>
+            <p className="text-sm text-slate-500">Salary: {CURRENCY_SYMBOLS[activeJob.currency] || "₹"}{activeJob.salaryRangeMin.toLocaleString()} - {CURRENCY_SYMBOLS[activeJob.currency] || "₹"}{activeJob.salaryRangeMax.toLocaleString()}{activeJob.salaryType === "per-month" ? " per month" : " per annum"}</p>
           ) : null}
           <p className="text-sm text-slate-500">{activeJob.openings} opening{activeJob.openings > 1 ? "s" : ""} &middot; {candidates.length} candidate{candidates.length !== 1 ? "s" : ""}</p>
           {activeJob.autoCloseDate && (
@@ -119,6 +119,14 @@ export default function JobDetailPage() {
           >
             <Plus size={15} /> Add Candidate
           </button>
+          {activeJob.status !== "open" && (
+            <button
+              onClick={() => setModal({ type: "delete-job", jobId: id })}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+            >
+              <Trash2 size={15} /> Delete
+            </button>
+          )}
         </div>
       </div>
 
@@ -194,7 +202,41 @@ export default function JobDetailPage() {
         </div>
       </div>
 
+      <DeleteJobModal id={id} />
       <CandidateModal jobId={id} />
+    </div>
+  );
+}
+
+function DeleteJobModal({ id }: { id: string }) {
+  const router = useRouter();
+  const { modal, setModal, deleteJob, activeJob } = useRecruitmentStore();
+  if (modal?.type !== "delete-job") return null;
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/35 px-4">
+      <div className="w-full max-w-sm rounded-lg bg-white shadow-soft">
+        <div className="p-5">
+          <h2 className="text-base font-semibold text-slate-900">Delete Job</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Delete "{activeJob?.title}"? This will permanently delete the job and all associated candidates, interviews, offers, and uploaded resumes.
+          </p>
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              onClick={() => setModal(null)}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={async () => { await deleteJob(id); setModal(null); router.push("/recruitment/jobs"); }}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

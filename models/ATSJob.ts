@@ -12,6 +12,7 @@ const ATSJobSchema = new Schema(
     },
     salaryRangeMin: { type: Number, default: 0 },
     salaryRangeMax: { type: Number, default: 0 },
+    salaryType: { type: String, enum: ["per-annum", "per-month"], default: "per-annum" },
     currency: { type: String, default: "INR", trim: true },
     openings: { type: Number, default: 1, min: 1 },
     autoCloseDate: { type: Date, default: null },

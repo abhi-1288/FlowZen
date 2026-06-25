@@ -29,7 +29,7 @@ const ATSCandidateSchema = new Schema(
     linkedInUrl: { type: String, default: "" },
     assignedRecruiter: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
     assignedTeam: [{
-      role: { type: String, enum: ["project-manager", "qa-tester", "finance", "human-resource"] },
+      role: { type: String, enum: ["project-manager", "qa-tester", "finance", "human-resource", "admin"] },
       user: { type: Schema.Types.ObjectId, ref: "User" },
       roundType: { type: String, default: "" },
       status: { type: String, enum: ["assigned", "in-progress", "completed"], default: "assigned" },
