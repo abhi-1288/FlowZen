@@ -456,7 +456,7 @@ export default function CandidateProfilePage() {
                 onChange={handleResumeUpload}
               />
             </label>
-            <p className="text-[10px] text-slate-400">Max file size: 5 KB</p>
+            <p className="text-[10px] text-slate-400">Max file size: 2 MB</p>
           </div>
           {(activeCandidate as any).linkedInUrl && (
             <a
