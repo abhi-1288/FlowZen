@@ -1113,9 +1113,15 @@ function CheckOutRequestsListModal({
                     variant="secondary"
                     className="flex-1"
                     onClick={() => {
+                      if (remainingWfhDays <= 0) {
+                        showToast("WFH quota used up.", "error");
+                        return;
+                      }
                       setShowAskModal(false);
                       setShowWfhFormModal(true);
                     }}
+                    disabled={remainingWfhDays <= 0}
+                    title={remainingWfhDays <= 0 ? "WFH quota used up." : "Request WFH."}
                   >
                     WFH
                   </ActionButton>

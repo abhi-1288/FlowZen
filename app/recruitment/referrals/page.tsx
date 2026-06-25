@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 import { UserPlus } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
+import { useShallow } from "zustand/react/shallow";
 
 export default function ReferralsPage() {
-  const { referrals, loading, fetchReferrals, createReferral, setModal } = useRecruitmentStore();
+  const { referrals, loading, fetchReferrals, createReferral, setModal } = useRecruitmentStore(
+    useShallow((s) => ({ referrals: s.referrals, loading: s.loading, fetchReferrals: s.fetchReferrals, createReferral: s.createReferral, setModal: s.setModal }))
+  );
   const [candidateId, setCandidateId] = useState("");
   const [bonusEligible, setBonusEligible] = useState(false);
 

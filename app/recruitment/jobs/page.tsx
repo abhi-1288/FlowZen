@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Plus, Search, Eye, Pencil, Archive, Globe, Share2, Check, Trash2 } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
+import { useShallow } from "zustand/react/shallow";
 import type { EmploymentType, JobStatus, SalaryType } from "@/lib/recruitment-types";
 
 export default function JobsPage() {
@@ -12,18 +13,20 @@ export default function JobsPage() {
   const { data: session } = useSession();
   const role = session?.user?.role ?? "";
   const isAdmin = role === "admin";
-  const { jobs, loading, fetchJobs, updateJob, deleteJob, setModal } = useRecruitmentStore();
+  const { jobs, loading, fetchJobs, updateJob, deleteJob, setModal } = useRecruitmentStore(
+    useShallow((s) => ({ jobs: s.jobs, loading: s.loading, fetchJobs: s.fetchJobs, updateJob: s.updateJob, deleteJob: s.deleteJob, setModal: s.setModal }))
+  );
   const [statusFilter, setStatusFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedJobId, setCopiedJobId] = useState<string | null>(null);
 
   useEffect(() => { if (jobs.length === 0) void fetchJobs(); }, [jobs.length, fetchJobs]);
 
-  const filtered = jobs.filter((j) => {
+  const filtered = useMemo(() => jobs.filter((j) => {
     if (statusFilter && j.status !== statusFilter) return false;
     if (searchQuery && !j.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
-  });
+  }), [jobs, statusFilter, searchQuery]);
 
   return (
     <div className="p-6">

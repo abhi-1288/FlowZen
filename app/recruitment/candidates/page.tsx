@@ -1,28 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, ChevronDown, ChevronUp } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
+import { useShallow } from "zustand/react/shallow";
 import { STAGE_LABELS, type Stage } from "@/lib/recruitment-types";
 
 export default function CandidatesPage() {
   const router = useRouter();
-  const { candidates, loading, fetchCandidates } = useRecruitmentStore();
+  const { candidates, loading, fetchCandidates } = useRecruitmentStore(
+    useShallow((s) => ({ candidates: s.candidates, loading: s.loading, fetchCandidates: s.fetchCandidates }))
+  );
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => { if (candidates.length === 0) void fetchCandidates(); }, [candidates.length, fetchCandidates]);
 
-  const filtered = candidates.filter((c) => {
+  const filtered = useMemo(() => candidates.filter((c) => {
     if (stageFilter && c.stage !== stageFilter) return false;
     if (search) {
       const q = search.toLowerCase();
       if (!c.firstName.toLowerCase().includes(q) && !c.lastName.toLowerCase().includes(q) && !c.email.toLowerCase().includes(q)) return false;
     }
     return true;
-  });
+  }), [candidates, stageFilter, search]);
 
   const stages = ["applied", "screening", "technical-interview", "manager-round", "hr-round", "offer", "joined", "rejected"];
 

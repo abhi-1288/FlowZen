@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -22,6 +22,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
+import { useShallow } from "zustand/react/shallow";
 import {
   STAGE_LABELS,
   CURRENCY_SYMBOLS,
@@ -41,11 +42,11 @@ export default function CandidateProfilePage() {
   const { data: session } = useSession();
   const role = session?.user?.role;
   const isHr = role === "admin" || role === "human-resource";
+  const mountedRef = useRef(true);
 
   const {
     activeCandidate,
     timeline,
-    interviews,
     loading,
     fetchCandidate,
     fetchTimeline,
@@ -54,9 +55,20 @@ export default function CandidateProfilePage() {
     convertToEmployee,
     uploadResume,
     setModal,
-    offers,
-    fetchOffers,
-  } = useRecruitmentStore();
+  } = useRecruitmentStore(
+    useShallow((s) => ({
+      activeCandidate: s.activeCandidate,
+      timeline: s.timeline,
+      loading: s.loading,
+      fetchCandidate: s.fetchCandidate,
+      fetchTimeline: s.fetchTimeline,
+      updateCandidate: s.updateCandidate,
+      moveCandidateStage: s.moveCandidateStage,
+      convertToEmployee: s.convertToEmployee,
+      uploadResume: s.uploadResume,
+      setModal: s.setModal,
+    }))
+  );
 
   const [activeTab, setActiveTab] = useState<
     "timeline" | "interviews" | "notes"
@@ -86,13 +98,12 @@ export default function CandidateProfilePage() {
   useEffect(() => {
     void fetchCandidate(id);
     void fetchTimeline(id);
-    void fetchOffers();
-  }, [id, fetchCandidate, fetchTimeline, fetchOffers]);
+  }, [id, fetchCandidate, fetchTimeline]);
 
   useEffect(() => {
     apiFetch<{ offer: ATSOffer | null }>(`/api/recruitment/candidates/${id}/offer`)
-      .then((res) => setCandidateOffer(res.offer))
-      .catch(() => setCandidateOffer(null));
+      .then((res) => { if (mountedRef.current) setCandidateOffer(res.offer); })
+      .catch(() => { if (mountedRef.current) setCandidateOffer(null); });
   }, [id]);
 
   const [candidateInterviews, setCandidateInterviews] = useState<any[]>([]);
@@ -102,7 +113,7 @@ export default function CandidateProfilePage() {
     apiFetch<{ interviews: any[] }>(
       `/api/recruitment/candidates/${id}/interviews`,
     )
-      .then((res) => setCandidateInterviews(res.interviews || []))
+      .then((res) => { if (mountedRef.current) setCandidateInterviews(res.interviews || []); })
       .catch(() => {});
   }, [id, ivRefreshKey]);
 
@@ -128,6 +139,11 @@ export default function CandidateProfilePage() {
       setAssignUsers(res.users || []);
       setAssignSelectedUser(res.users?.[0]?.id || "");
     } catch {}
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
   }, []);
 
   useEffect(() => {
@@ -430,15 +446,18 @@ export default function CandidateProfilePage() {
               <Download size={14} /> Resume
             </a>
           )}
-          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
-            <Upload size={14} /> Upload Resume
-            <input
-              type="file"
-              className="hidden"
-              accept=".pdf,.doc,.docx"
-              onChange={handleResumeUpload}
-            />
-          </label>
+          <div className="flex flex-col gap-1">
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+              <Upload size={14} /> Upload Resume
+              <input
+                type="file"
+                className="hidden"
+                accept=".pdf,.doc,.docx"
+                onChange={handleResumeUpload}
+              />
+            </label>
+            <p className="text-[10px] text-slate-400">Max file size: 5 KB</p>
+          </div>
           {(activeCandidate as any).linkedInUrl && (
             <a
               href={(activeCandidate as any).linkedInUrl}

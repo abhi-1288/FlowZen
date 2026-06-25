@@ -241,17 +241,29 @@ export default function JobDetailPage() {
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700">Resume / CV *</span>
-              <div className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-500 file:hidden">
-                <Upload size={16} className="shrink-0 text-slate-400" />
-                  <input
-                    type="file"
-                    accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                    required
-                    onChange={(e) => setResumeFile(e.target.files?.[0] ?? null)}
-                    className="w-full text-sm outline-none file:mr-2 file:cursor-pointer file:rounded file:border-0 file:bg-indigo-50 file:px-2 file:py-0.5 file:text-xs file:font-medium file:text-indigo-700 hover:file:bg-indigo-100"
-                  />
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-500 file:hidden">
+                  <Upload size={16} className="shrink-0 text-slate-400" />
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                      required
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null;
+                        if (file && file.size > 5 * 1024) {
+                          setError("File exceeds 5 KB limit.");
+                          e.target.value = "";
+                          return;
+                        }
+                        setError("");
+                        setResumeFile(file);
+                      }}
+                      className="w-full text-sm outline-none file:mr-2 file:cursor-pointer file:rounded file:border-0 file:bg-indigo-50 file:px-2 file:py-0.5 file:text-xs file:font-medium file:text-indigo-700 hover:file:bg-indigo-100"
+                    />
+                </div>
+                <p className="text-[10px] text-slate-400">Max file size: 5 KB</p>
+                {resumeFile && <p className="mt-1 text-xs text-slate-500">{resumeFile.name}</p>}
               </div>
-              {resumeFile && <p className="mt-1 text-xs text-slate-500">{resumeFile.name}</p>}
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="block">

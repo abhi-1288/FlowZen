@@ -391,8 +391,8 @@ function DocumentsUploadSection({
     setPendingCategory(null);
     if (!file || !cat) return;
 
-    if (file.size > 20 * 1024 * 1024) {
-      showToast("File exceeds 20 MB limit.", "error");
+    if (file.size > 5 * 1024) {
+      showToast("File exceeds 5 KB limit.", "error");
       return;
     }
 
@@ -572,12 +572,15 @@ function DocumentsUploadSection({
                 ) : (
                   <>
                     <div className="flex-1" />
-                    <button type="button"
-                      className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 transition"
-                      onClick={() => handlePickFile(cat.name)}
-                    >
-                      Upload
-                    </button>
+                    <div className="flex flex-col items-end gap-1">
+                      <button type="button"
+                        className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 transition"
+                        onClick={() => handlePickFile(cat.name)}
+                      >
+                        Upload
+                      </button>
+                      <p className="text-[10px] text-slate-400">Max file size: 5 KB</p>
+                    </div>
                   </>
                 )}
               </div>

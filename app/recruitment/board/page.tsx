@@ -2,11 +2,14 @@
 
 import { useEffect, useMemo } from "react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
+import { useShallow } from "zustand/react/shallow";
 import { RecruitmentKanbanBoard } from "@/components/recruitment/recruitment-kanban-board";
 import { Building2, Briefcase } from "lucide-react";
 
 export default function FullKanbanPage() {
-  const { candidates, jobs, fetchCandidates, fetchJobs } = useRecruitmentStore();
+  const { candidates, jobs, fetchCandidates, fetchJobs } = useRecruitmentStore(
+    useShallow((s) => ({ candidates: s.candidates, jobs: s.jobs, fetchCandidates: s.fetchCandidates, fetchJobs: s.fetchJobs }))
+  );
 
   useEffect(() => {
     if (candidates.length === 0) void fetchCandidates();

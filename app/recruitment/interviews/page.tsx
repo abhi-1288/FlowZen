@@ -1,20 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Calendar, ChevronDown, ChevronUp } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
+import { useShallow } from "zustand/react/shallow";
 import { cn } from "@/lib/client-utils";
 
 export default function InterviewsPage() {
-  const { interviews, loading, fetchInterviews, updateInterview, setModal } = useRecruitmentStore();
+  const { interviews, loading, fetchInterviews, updateInterview, setModal } = useRecruitmentStore(
+    useShallow((s) => ({ interviews: s.interviews, loading: s.loading, fetchInterviews: s.fetchInterviews, updateInterview: s.updateInterview, setModal: s.setModal }))
+  );
   const [statusFilter, setStatusFilter] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => { if (interviews.length === 0) void fetchInterviews(); }, [interviews.length, fetchInterviews]);
 
-  const filtered = statusFilter
+  const filtered = useMemo(() => statusFilter
     ? interviews.filter((i) => i.status === statusFilter)
-    : interviews;
+    : interviews,
+  [interviews, statusFilter]);
 
   return (
     <div className="p-6">

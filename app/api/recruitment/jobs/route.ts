@@ -29,12 +29,17 @@ export async function GET(request: Request) {
 
   const jobs = await ATSJob.find(filter).populate("company", "name").sort({ createdAt: -1 });
 
-  const jobsWithCount = await Promise.all(
-    jobs.map(async (job: any) => {
-      const candidateCount = await ATSCandidate.countDocuments({ job: job._id, company: user.company });
-      return { ...serializeDoc(job), applicantsCount: candidateCount };
-    })
-  );
+  const jobIds = jobs.map((j: any) => j._id);
+  const counts = await ATSCandidate.aggregate([
+    { $match: { job: { $in: jobIds }, company: user.company } },
+    { $group: { _id: "$job", count: { $sum: 1 } } },
+  ]);
+  const countMap: Record<string, number> = {};
+  for (const c of counts) countMap[String(c._id)] = c.count;
+  const jobsWithCount = jobs.map((job: any) => ({
+    ...serializeDoc(job),
+    applicantsCount: countMap[String(job._id)] ?? 0,
+  }));
 
   return NextResponse.json({ jobs: jobsWithCount });
 }

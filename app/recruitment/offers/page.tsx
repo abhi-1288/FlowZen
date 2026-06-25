@@ -1,20 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, ExternalLink } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
+import { useShallow } from "zustand/react/shallow";
 
 export default function OffersPage() {
   const router = useRouter();
-  const { offers, loading, fetchOffers, updateOffer } = useRecruitmentStore();
+  const { offers, loading, fetchOffers, updateOffer } = useRecruitmentStore(
+    useShallow((s) => ({ offers: s.offers, loading: s.loading, fetchOffers: s.fetchOffers, updateOffer: s.updateOffer }))
+  );
   const [statusFilter, setStatusFilter] = useState("");
 
   useEffect(() => { if (offers.length === 0) void fetchOffers(); }, [offers.length, fetchOffers]);
 
-  const filtered = statusFilter
+  const filtered = useMemo(() => statusFilter
     ? offers.filter((o) => o.status === statusFilter)
-    : offers;
+    : offers,
+  [offers, statusFilter]);
 
   return (
     <div className="p-6">

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 
 export function RecruitmentSSEListener() {
   const silentRefreshCandidates = useRecruitmentStore((s) => s.silentRefreshCandidates);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let eventSource: EventSource | null = null;
@@ -14,7 +15,14 @@ export function RecruitmentSSEListener() {
       eventSource = new EventSource("/api/events", { withCredentials: true });
 
       eventSource.addEventListener("recruitment:update", () => {
-        silentRefreshCandidates();
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+          silentRefreshCandidates();
+        }, 2000);
+      });
+
+      eventSource.addEventListener("notification:new", () => {
+        // handled by sidebar
       });
 
       eventSource.onerror = () => {
@@ -28,6 +36,7 @@ export function RecruitmentSSEListener() {
     return () => {
       eventSource?.close();
       clearTimeout(reconnectTimer);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [silentRefreshCandidates]);
 

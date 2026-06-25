@@ -193,16 +193,25 @@ export const authOptions: NextAuthOptions = {
       if ((user as any)?.passwordResetRequired) token.passwordResetRequired = true;
       if (typeof (user as any)?.rememberMe === "boolean") token.rememberMe = (user as any).rememberMe;
 
-      // Periodically verify the user still exists in the database (every 15 min).
-      // If the user document was deleted, invalidate the session immediately.
+      // Periodically refresh user data from the database (every 15 min).
+      // This caches company, team, and role in the token so the session
+      // callback can read them without a DB query on every request.
       if (token.sub) {
         const lastCheck = (token as any)._userCheckAt as number | undefined;
         const now = Date.now();
         if (!lastCheck || now - lastCheck > 15 * 60 * 1000) {
           try {
             await connectDb();
-            const exists = await User.exists({ _id: token.sub });
-            if (!exists) return null!;
+            const userDoc = await User.findById(token.sub)
+              .populate("company", "name")
+              .populate("team", "name");
+            if (!userDoc) return null!;
+            token.role = userDoc.role;
+            const team = userDoc.team as any;
+            (token as any).company = (userDoc.company as any)?.name || null;
+            (token as any).team = team?.name || null;
+            (token as any).teamId = team?._id ? String(team._id) : (typeof userDoc.team === "string" ? userDoc.team : null);
+            (token as any).managedTeamCount = await Team.countDocuments({ manager: userDoc._id });
             (token as any)._userCheckAt = now;
           } catch {
             // DB unreachable – keep the session alive
@@ -222,23 +231,12 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role as "employee" | "project-manager" | "qa-tester" | "human-resource" | "finance" | "admin" | "others" | undefined;
         session.user.passwordResetRequired = Boolean(token.passwordResetRequired);
         if (typeof token.rememberMe !== "undefined") session.user.rememberMe = token.rememberMe;
-        
-        try {
-          await connectDb();
-          const user = await User.findById(token.sub).populate("company", "name").populate("team", "name");
-          if (!user) {
-            session.expires = new Date(0).toISOString();
-            return session;
-          }
-          session.user.role = user.role as "employee" | "project-manager" | "qa-tester" | "human-resource" | "finance" | "admin" | "others";
-          const team = user.team as any;
-          session.user.company = (user.company as any)?.name || null;
-          session.user.team = team?.name || null;
-          session.user.teamId = team?._id ? String(team._id) : (typeof user.team === "string" ? user.team : null);
-          session.user.managedTeamCount = await Team.countDocuments({ manager: user._id });
-        } catch (error) {
-          console.error("Failed to fetch company/team in session:", error);
-        }
+
+        // Read cached data from token — no DB query on every request
+        session.user.company = (token as any).company || null;
+        session.user.team = (token as any).team || null;
+        session.user.teamId = (token as any).teamId || null;
+        session.user.managedTeamCount = (token as any).managedTeamCount || 0;
       }
       return session;
     }

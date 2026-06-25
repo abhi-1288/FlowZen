@@ -409,6 +409,9 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
   },
 
   uploadResume: async (candidateId, file) => {
+    if (file.size > 5 * 1024) {
+      throw new Error("File exceeds 5 KB limit.");
+    }
     set({ saving: true, error: null });
     try {
       const formData = new FormData();

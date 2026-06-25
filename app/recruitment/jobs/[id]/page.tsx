@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { ArrowLeft, Plus, Pencil, Eye, Trash2, Globe, Archive, Share2, Check } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
+import { useShallow } from "zustand/react/shallow";
 import { CURRENCY_SYMBOLS, STAGE_LABELS, type Stage, type Source, type JobStatus } from "@/lib/recruitment-types";
 
 export default function JobDetailPage() {
@@ -14,15 +15,18 @@ export default function JobDetailPage() {
   const { data: session } = useSession();
   const role = session?.user?.role ?? "";
   const isAdmin = role === "admin";
-  const { activeJob, candidates, loading, fetchJob, fetchCandidates, setModal, deleteJob, updateJob } = useRecruitmentStore();
+  const { activeJob, candidates, loading, fetchJob, fetchCandidates, setModal, deleteJob, updateJob } = useRecruitmentStore(
+    useShallow((s) => ({ activeJob: s.activeJob, candidates: s.candidates, loading: s.loading, fetchJob: s.fetchJob, fetchCandidates: s.fetchCandidates, setModal: s.setModal, deleteJob: s.deleteJob, updateJob: s.updateJob }))
+  );
   const [candidateFilter, setCandidateFilter] = useState("");
   const [copied, setCopied] = useState(false);
 
   useEffect(() => { void fetchJob(id); void fetchCandidates({ jobId: id }); }, [id, fetchJob, fetchCandidates]);
 
-  const filtered = candidateFilter
+  const filtered = useMemo(() => candidateFilter
     ? candidates.filter((c) => c.stage === candidateFilter)
-    : candidates;
+    : candidates,
+  [candidates, candidateFilter]);
 
   if (loading && !activeJob) {
     return (
