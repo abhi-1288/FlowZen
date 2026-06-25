@@ -250,8 +250,8 @@ export default function JobDetailPage() {
                       required
                       onChange={(e) => {
                         const file = e.target.files?.[0] ?? null;
-                        if (file && file.size > 5 * 1024) {
-                          setError("File exceeds 5 KB limit.");
+                        if (file && file.size > 2 * 1024 * 1024) {
+                          setError("File exceeds 2 MB limit.");
                           e.target.value = "";
                           return;
                         }
@@ -261,7 +261,7 @@ export default function JobDetailPage() {
                       className="w-full text-sm outline-none file:mr-2 file:cursor-pointer file:rounded file:border-0 file:bg-indigo-50 file:px-2 file:py-0.5 file:text-xs file:font-medium file:text-indigo-700 hover:file:bg-indigo-100"
                     />
                 </div>
-                <p className="text-[10px] text-slate-400">Max file size: 5 KB</p>
+                <p className="text-[10px] text-slate-400">Max file size: 2 MB</p>
                 {resumeFile && <p className="mt-1 text-xs text-slate-500">{resumeFile.name}</p>}
               </div>
             </label>
