@@ -391,8 +391,8 @@ function DocumentsUploadSection({
     setPendingCategory(null);
     if (!file || !cat) return;
 
-    if (file.size > 5 * 1024) {
-      showToast("File exceeds 5 KB limit.", "error");
+    if (file.size > 2 * 1024 * 1024) {
+      showToast("File exceeds 2 MB limit.", "error");
       return;
     }
 
@@ -579,7 +579,7 @@ function DocumentsUploadSection({
                       >
                         Upload
                       </button>
-                      <p className="text-[10px] text-slate-400">Max file size: 5 KB</p>
+                      <p className="text-[10px] text-slate-400">Max file size: 2 MB</p>
                     </div>
                   </>
                 )}
