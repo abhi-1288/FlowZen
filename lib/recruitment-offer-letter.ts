@@ -169,6 +169,7 @@ export function renderRecruitmentOfferLetterHtml(input: RecruitmentOfferLetterIn
     .signature-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 48px; row-gap: 40px; }
     .signature-block { display: flex; flex-direction: column; align-items: center; }
     .signature-role { margin: 0 0 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0; color: #94a3b8; }
+    .signature-merged { margin: 0 0 8px; font-size: 14px; font-weight: 600; color: #0f172a; text-align: center; }
     .signature-line { width: 192px; height: 40px; border-bottom: 1px solid #94a3b8; margin-bottom: 4px; }
     .signature-company { margin: 0; font-size: 14px; font-weight: 600; color: #0f172a; }
     .footer { margin-top: 48px; border-top: 1px solid #e2e8f0; padding-top: 16px; text-align: center; font-size: 12px; color: #94a3b8; }
@@ -187,7 +188,7 @@ export function renderRecruitmentOfferLetterHtml(input: RecruitmentOfferLetterIn
       .section-title { margin: 16px 0 8px; }
       .compensation th, .compensation td { padding: 4px 8px; }
       .perks { margin-top: 8px; padding: 8px; }
-      .perks h4, .signatures-label, .signature-role { font-size: 10px; }
+      .perks h4, .signatures-label, .signature-role, .signature-merged { font-size: 10px; }
       .signatures { margin-top: 24px; }
       .signatures-label { margin-bottom: 16px; }
       .signature-grid { column-gap: 24px; row-gap: 12px; }
@@ -248,23 +249,10 @@ export function renderRecruitmentOfferLetterHtml(input: RecruitmentOfferLetterIn
       <p class="signatures-label">Authorized Signatories</p>
       <div class="signature-grid">
         ${isSigned ? `
-        <div class="signature-block">
-          <p class="signature-role">HR Name</p>
+        <div class="signature-block" style="grid-column:1/-1;">
+          <p class="signature-merged">${escapeHtml(signedByName)} / ${escapeHtml(signedByRole)} / ${escapeHtml(signedAt)}</p>
           <div class="signature-line"></div>
-          <p class="signature-company">${escapeHtml(signedByName)}</p>
-        </div>
-        <div class="signature-block">
-          <p class="signature-role">HR Role</p>
-          <div class="signature-line"></div>
-          <p class="signature-company">${escapeHtml(signedByRole)}</p>
-        </div>
-        <div class="signature-block">
-          <p class="signature-role">Signed Date &amp; Time</p>
-          <div class="signature-line"></div>
-          <p class="signature-company">${escapeHtml(signedAt)}</p>
-        </div>
-        <div style="grid-column:1/-1;text-align:center;padding-top:8px;">
-          <p style="margin:0;font-size:12px;color:#64748b;font-style:italic;">Electronically signed through FlowZen HRMS.</p>
+          <p class="signature-company">${escapeHtml(companyName)} Authority</p>
         </div>
         ` : `
         <div class="signature-block">

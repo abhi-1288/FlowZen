@@ -281,13 +281,12 @@ function CandidatePortalInner() {
         )}
 
         {/* --- Offer Letter --- */}
-        {offer && (
+        {offer && offer.status !== "draft" && (
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-900">Offer Letter</h3>
               <span className={`rounded-full px-3 py-1 text-xs font-medium ${
                 offer.status === "sent" || offer.status === "accepted" ? "bg-emerald-50 text-emerald-700" :
-                offer.status === "draft" ? "bg-amber-50 text-amber-700" :
                 "bg-rose-50 text-rose-700"
               }`}>{offer.status}</span>
             </div>
@@ -321,7 +320,7 @@ function CandidatePortalInner() {
               </a>
             </div>
 
-            {(offer.status === "draft" || offer.status === "sent") && (
+            {offer.status === "sent" && (
               <div className="mt-6 border-t border-slate-100 pt-5">
                 <p className="text-sm font-medium text-slate-700">Do you accept this offer?</p>
                 <div className="mt-3 flex gap-3">

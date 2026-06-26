@@ -2,15 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, ExternalLink } from "lucide-react";
+import { FileText, ExternalLink, ChevronRight, ChevronDown, PenSquare, Send } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
 
 export default function OffersPage() {
   const router = useRouter();
-  const { offers, loading, fetchOffers, updateOffer } = useRecruitmentStore(
-    useShallow((s) => ({ offers: s.offers, loading: s.loading, fetchOffers: s.fetchOffers, updateOffer: s.updateOffer }))
+  const { offers, loading, fetchOffers, updateOffer, signOffer } = useRecruitmentStore(
+    useShallow((s) => ({ offers: s.offers, loading: s.loading, fetchOffers: s.fetchOffers, updateOffer: s.updateOffer, signOffer: s.signOffer }))
   );
+  const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState("");
 
   useEffect(() => { if (offers.length === 0) void fetchOffers(); }, [offers.length, fetchOffers]);
@@ -20,10 +21,28 @@ export default function OffersPage() {
     : offers,
   [offers, statusFilter]);
 
+  const grouped = useMemo(() => {
+    const map = new Map<string, typeof offers>();
+    for (const offer of filtered) {
+      const jobTitle = offer.job && typeof offer.job === "object" ? (offer.job as any).title : "Unknown Job";
+      if (!map.has(jobTitle)) map.set(jobTitle, []);
+      map.get(jobTitle)!.push(offer);
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [filtered]);
+
+  const toggleJob = (title: string) => {
+    setExpandedJobs((prev) => {
+      const next = new Set(prev);
+      if (next.has(title)) next.delete(title); else next.add(title);
+      return next;
+    });
+  };
+
   return (
     <div className="p-6">
       <h1 className="text-2xl font-semibold text-slate-900">Offers</h1>
-      <p className="mt-1 text-sm text-slate-500">{offers.length} total</p>
+      <p className="mt-1 text-sm text-slate-500">{offers.length} offers across {grouped.length} jobs</p>
 
       <div className="mt-4 flex items-center gap-3">
         <select
@@ -45,86 +64,107 @@ export default function OffersPage() {
             <div key={i} className="h-16 animate-pulse rounded-lg bg-slate-200" />
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : grouped.length === 0 ? (
         <div className="mt-16 text-center text-slate-500">No offers found.</div>
       ) : (
-        <div className="mt-6 space-y-3">
-          {filtered.map((offer) => {
-            const candidateName = offer.candidate && typeof offer.candidate === "object"
-              ? `${(offer.candidate as any).firstName} ${(offer.candidate as any).lastName}`
-              : "Unknown";
-            const jobTitle = offer.job && typeof offer.job === "object"
-              ? (offer.job as any).title : "";
-            const salaryPeriodLabel = offer.salaryType === "per-month" ? "mo" : "yr";
+        <div className="mt-6 space-y-4">
+          {grouped.map(([jobTitle, jobOffers]) => {
+            const isExpanded = expandedJobs.has(jobTitle);
+            const signedCount = jobOffers.filter((o) => o.isSigned).length;
+            const draftCount = jobOffers.filter((o) => o.status === "draft").length;
 
             return (
-              <div key={offer.id} className="rounded-lg border border-slate-200 bg-white p-4 transition hover:shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <FileText size={15} className="text-slate-400" />
-                      <span className="text-sm font-semibold text-slate-900">{candidateName}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        offer.status === "draft" ? "bg-amber-50 text-amber-700" :
-                        offer.status === "sent" ? "bg-sky-50 text-sky-700" :
-                        offer.status === "accepted" ? "bg-emerald-50 text-emerald-700" :
-                        "bg-rose-50 text-rose-700"
-                      }`}>{offer.status}</span>
-                      {offer.isSigned && (
-                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                          Signed
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                      <span>{offer.designation}</span>
-                      {jobTitle && <><span>&middot;</span><span>{jobTitle}</span></>}
-                      <span>&middot;</span>
-                      <span>₹{Number(offer.offeredCTC).toLocaleString()}/{salaryPeriodLabel}</span>
-                      {offer.joiningDate && <><span>&middot;</span><span>Joins {new Date(offer.joiningDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span></>}
-                    </div>
+              <div key={jobTitle} className="rounded-lg border border-slate-200 bg-white">
+                <button
+                  onClick={() => toggleJob(jobTitle)}
+                  className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-slate-50 transition rounded-lg"
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    {isExpanded ? <ChevronDown size={16} className="shrink-0 text-slate-400" /> : <ChevronRight size={16} className="shrink-0 text-slate-400" />}
+                    <span className="text-sm font-semibold text-slate-900">{jobTitle}</span>
+                    <span className="text-xs text-slate-400">({jobOffers.length} offers)</span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {offer.status === "draft" && (
-                      <button
-                        onClick={() => void updateOffer(offer.id, { status: "sent" })}
-                        disabled={!offer.isSigned}
-                        className="rounded-lg bg-slate-950 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
-                        title={!offer.isSigned ? "Sign the offer before sending" : ""}
-                      >
-                        {!offer.isSigned ? "Sign Required" : "Mark Sent"}
-                      </button>
+                    {draftCount > 0 && (
+                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">{draftCount} pending</span>
                     )}
-                    {offer.status === "sent" && (
-                      <>
-                        <button
-                          onClick={() => void updateOffer(offer.id, { status: "accepted" })}
-                          className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700"
-                        >
-                          Accept
-                        </button>
-                        <button
-                          onClick={() => void updateOffer(offer.id, { status: "rejected" })}
-                          className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50"
-                        >
-                          Reject
-                        </button>
-                      </>
+                    {signedCount > 0 && (
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{signedCount} signed</span>
                     )}
-                    <button
-                      onClick={() => router.push(`/recruitment/offers/${offer.id}/letter`)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                    >
-                      <ExternalLink size={12} /> Letter
-                    </button>
-                    <button
-                      onClick={() => router.push(`/recruitment/offers/${offer.id}`)}
-                      className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                    >
-                      Details
-                    </button>
                   </div>
-                </div>
+                </button>
+
+                {isExpanded && (
+                  <div className="border-t border-slate-100">
+                    {jobOffers.length === 0 ? (
+                      <p className="px-4 py-6 text-center text-sm text-slate-400">No offers for this job.</p>
+                    ) : (
+                      jobOffers.map((offer) => {
+                        const candidateName = offer.candidate && typeof offer.candidate === "object"
+                          ? `${(offer.candidate as any).firstName} ${(offer.candidate as any).lastName}`
+                          : "Unknown";
+                        const salaryPeriodLabel = offer.salaryType === "per-month" ? "mo" : "yr";
+
+                        return (
+                          <div key={offer.id} className="flex items-center justify-between border-t border-slate-50 px-4 py-3 first:border-t-0 hover:bg-slate-50 transition">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <FileText size={15} className="shrink-0 text-slate-400" />
+                                <span className="text-sm font-semibold text-slate-900">{candidateName}</span>
+                                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                                  offer.isSigned ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                                }`}>
+                                  {offer.isSigned ? "Signed" : "Unsigned"}
+                                </span>
+                                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                                  offer.status === "draft" ? "bg-slate-100 text-slate-600" :
+                                  offer.status === "sent" ? "bg-sky-50 text-sky-700" :
+                                  offer.status === "accepted" ? "bg-emerald-50 text-emerald-700" :
+                                  "bg-rose-50 text-rose-700"
+                                }`}>{offer.status}</span>
+                              </div>
+                              <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                                <span>{offer.designation}</span>
+                                <span>&middot;</span>
+                                <span>₹{Number(offer.offeredCTC).toLocaleString()}/{salaryPeriodLabel}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0 ml-3">
+                              {offer.status === "draft" && !offer.isSigned && (
+                                <button
+                                  onClick={async () => { await signOffer(offer.id); }}
+                                  className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700"
+                                >
+                                  <PenSquare size={12} /> Sign
+                                </button>
+                              )}
+                              {offer.status === "draft" && offer.isSigned && (
+                                <button
+                                  onClick={async () => { await updateOffer(offer.id, { status: "sent" }); }}
+                                  className="inline-flex items-center gap-1 rounded-lg bg-slate-950 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800"
+                                >
+                                  <Send size={12} /> Send
+                                </button>
+                              )}
+                              <button
+                                onClick={() => router.push(`/recruitment/offers/${offer.id}/letter`)}
+                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                              >
+                                <ExternalLink size={12} /> Letter
+                              </button>
+                              <button
+                                onClick={() => router.push(`/recruitment/offers/${offer.id}`)}
+                                className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                              >
+                                Details
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
