@@ -2,14 +2,18 @@
 
 import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ExternalLink, FileText } from "lucide-react";
+import { ArrowLeft, ExternalLink, FileText, PenSquare } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
+import { useSession } from "next-auth/react";
 
 export default function OfferDetailPage() {
   const params = useParams()!;
   const id = params.id as string;
   const router = useRouter();
-  const { offers, fetchOffers, updateOffer } = useRecruitmentStore();
+  const { data: session } = useSession();
+  const role = session?.user?.role ?? "";
+  const isHr = role === "admin" || role === "human-resource";
+  const { offers, fetchOffers, updateOffer, signOffer } = useRecruitmentStore();
 
   useEffect(() => { void fetchOffers(); }, [fetchOffers]);
 
@@ -107,6 +111,34 @@ export default function OfferDetailPage() {
           >
             <FileText size={16} /> View Offer Letter
           </a>
+        </div>
+
+        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-900">Digital Signature</h3>
+            <span className={`rounded-full px-3 py-1 text-xs font-medium ${
+              offer.isSigned ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+            }`}>
+              {offer.isSigned ? "Signed" : "Not Signed"}
+            </span>
+          </div>
+          {offer.isSigned ? (
+            <div className="mt-3 space-y-1 text-sm text-slate-600">
+              <p><span className="font-medium text-slate-700">Signed by:</span> {(offer.signedBy as any)?.name || "N/A"}</p>
+              <p><span className="font-medium text-slate-700">Role:</span> {(offer.signedBy as any)?.role || "N/A"}</p>
+              <p><span className="font-medium text-slate-700">Signed at:</span> {offer.signedAt ? new Date(offer.signedAt).toLocaleString("en-IN") : "N/A"}</p>
+              <p className="mt-2 text-xs italic text-slate-400">Electronically signed through FlowZen HRMS.</p>
+            </div>
+          ) : isHr ? (
+            <div className="mt-3">
+              <button
+                onClick={async () => { await signOffer(offer.id); }}
+                className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"
+              >
+                <PenSquare size={16} /> Sign Offer
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

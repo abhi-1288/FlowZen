@@ -1,102 +1,157 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { UserPlus } from "lucide-react";
+import { Briefcase, ChevronRight, UserPlus } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
+import { STAGE_LABELS, type Stage } from "@/lib/recruitment-types";
 
 export default function ReferralsPage() {
-  const { referrals, loading, fetchReferrals, createReferral, setModal } = useRecruitmentStore(
-    useShallow((s) => ({ referrals: s.referrals, loading: s.loading, fetchReferrals: s.fetchReferrals, createReferral: s.createReferral, setModal: s.setModal }))
+  const { jobs, referrals, loading, fetchJobs, fetchReferrals } = useRecruitmentStore(
+    useShallow((s) => ({ jobs: s.jobs, referrals: s.referrals, loading: s.loading, fetchJobs: s.fetchJobs, fetchReferrals: s.fetchReferrals }))
   );
-  const [candidateId, setCandidateId] = useState("");
-  const [bonusEligible, setBonusEligible] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
-  useEffect(() => { if (referrals.length === 0) void fetchReferrals(); }, [referrals.length, fetchReferrals]);
+  useEffect(() => { if (jobs.length === 0) void fetchJobs(); }, [jobs.length, fetchJobs]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!candidateId.trim()) return;
-    await createReferral({ candidateId: candidateId.trim(), referralBonusEligible: bonusEligible });
-    setCandidateId("");
-    setBonusEligible(false);
-  }
+  useEffect(() => {
+    if (selectedJobId) {
+      void fetchReferrals({ jobId: selectedJobId });
+    } else {
+      void fetchReferrals();
+    }
+  }, [selectedJobId, fetchReferrals]);
+
+  const visibleJobs = jobs.filter((j) => j.status === "open" || j.status === "closed");
+
+  const selectedJob = selectedJobId ? jobs.find((j) => j.id === selectedJobId) : null;
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-semibold text-slate-900">Referrals</h1>
-      <p className="mt-1 text-sm text-slate-500">{referrals.length} total</p>
-
-      <form onSubmit={handleSubmit} className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4">
-        <label className="block flex-1 min-w-[200px]">
-          <span className="mb-1 block text-sm font-medium text-slate-700">Candidate ID</span>
-          <input
-            value={candidateId}
-            onChange={(e) => setCandidateId(e.target.value)}
-            placeholder="Enter candidate ObjectId"
-            required
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-          />
-        </label>
-        <label className="flex items-center gap-2 text-sm text-slate-700">
-          <input
-            type="checkbox"
-            checked={bonusEligible}
-            onChange={(e) => setBonusEligible(e.target.checked)}
-            className="rounded border-slate-300"
-          />
-          Referral bonus eligible
-        </label>
-        <button
-          type="submit"
-          className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
-        >
-          <UserPlus size={16} /> Submit Referral
-        </button>
-      </form>
-
-      {loading ? (
-        <div className="mt-6 space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-16 animate-pulse rounded-lg bg-slate-200" />
-          ))}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">Referrals</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {selectedJob
+              ? `${referrals.length} referral(s) for ${selectedJob.title}`
+              : `${referrals.length} total`}
+          </p>
         </div>
-      ) : referrals.length === 0 ? (
-        <div className="mt-16 text-center text-slate-500">No referrals yet.</div>
-      ) : (
-        <div className="mt-6 space-y-3">
-          {referrals.map((referral) => {
-            const employeeName = referral.employee && typeof referral.employee === "object"
-              ? (referral.employee as any).name : "Unknown";
-            const candidateName = referral.candidate && typeof referral.candidate === "object"
-              ? `${(referral.candidate as any).firstName} ${(referral.candidate as any).lastName}`
-              : "Unknown";
+        {selectedJobId && (
+          <button
+            onClick={() => setSelectedJobId(null)}
+            className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+          >
+            View All
+          </button>
+        )}
+      </div>
 
-            return (
-              <div key={referral.id} className="rounded-lg border border-slate-200 bg-white p-4">
-                <div className="flex items-center justify-between">
+      {!selectedJobId ? (
+        <>
+          {loading && jobs.length === 0 ? (
+            <div className="mt-6 space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-20 animate-pulse rounded-lg bg-slate-200" />
+              ))}
+            </div>
+          ) : visibleJobs.length === 0 ? (
+            <div className="mt-16 text-center text-slate-500">
+              <Briefcase className="mx-auto h-10 w-10 text-slate-300" />
+              <p className="mt-2">No open or closed jobs found.</p>
+            </div>
+          ) : (
+            <div className="mt-6 space-y-3">
+              {visibleJobs.map((job) => (
+                <button
+                  key={job.id}
+                  onClick={() => setSelectedJobId(job.id)}
+                  className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:shadow-sm"
+                >
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-slate-900">{candidateName}</span>
+                      <span className="text-sm font-semibold text-slate-900">{job.title}</span>
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        referral.status === "pending" ? "bg-amber-50 text-amber-700" :
-                        referral.status === "reviewed" ? "bg-sky-50 text-sky-700" :
-                        referral.status === "hired" ? "bg-emerald-50 text-emerald-700" :
-                        "bg-rose-50 text-rose-700"
-                      }`}>{referral.status}</span>
+                        job.status === "open" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
+                      }`}>{job.status}</span>
                     </div>
-                    <p className="text-xs text-slate-500">Referred by {employeeName}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">{job.department} &middot; {job.location || "Remote"}</p>
                   </div>
-                  {referral.referralBonusEligible && (
-                    <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                      Bonus Eligible
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                  <ChevronRight size={18} className="text-slate-400" />
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          {loading ? (
+            <div className="mt-6 space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-16 animate-pulse rounded-lg bg-slate-200" />
+              ))}
+            </div>
+          ) : referrals.length === 0 ? (
+            <div className="mt-16 text-center text-slate-500">
+              <UserPlus className="mx-auto h-10 w-10 text-slate-300" />
+              <p className="mt-2">No referrals for this job yet.</p>
+            </div>
+          ) : (
+            <div className="mt-6 overflow-hidden rounded-xl border border-slate-200">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50">
+                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Candidate Name</th>
+                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Referred By</th>
+                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Current Stage</th>
+                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Referral Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {referrals.map((referral) => {
+                    const candidateName = referral.candidate && typeof referral.candidate === "object"
+                      ? `${(referral.candidate as any).firstName} ${(referral.candidate as any).lastName}`
+                      : "Unknown";
+                    const referredBy = referral.employee && typeof referral.employee === "object"
+                      ? (referral.employee as any).name
+                      : "Unknown";
+                    const stage = referral.candidate && typeof referral.candidate === "object"
+                      ? (referral.candidate as any).stage
+                      : "";
+                    const stageLabel = stage ? STAGE_LABELS[stage as Stage] || stage : "-";
+
+                    return (
+                      <tr key={referral.id} className="bg-white hover:bg-slate-50">
+                        <td className="px-4 py-3 font-medium text-slate-900">{candidateName}</td>
+                        <td className="px-4 py-3 text-slate-600">{referredBy}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            stage === "joined" ? "bg-emerald-50 text-emerald-700" :
+                            stage === "rejected" ? "bg-rose-50 text-rose-700" :
+                            stage === "offer" ? "bg-indigo-50 text-indigo-700" :
+                            "bg-slate-100 text-slate-600"
+                          }`}>
+                            {stageLabel}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            referral.status === "pending" ? "bg-amber-50 text-amber-700" :
+                            referral.status === "reviewed" ? "bg-sky-50 text-sky-700" :
+                            referral.status === "hired" ? "bg-emerald-50 text-emerald-700" :
+                            "bg-rose-50 text-rose-700"
+                          }`}>
+                            {referral.status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

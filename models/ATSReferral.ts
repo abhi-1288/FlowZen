@@ -4,6 +4,8 @@ const ATSReferralSchema = new Schema(
   {
     employee: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     candidate: { type: Schema.Types.ObjectId, ref: "ATSCandidate", required: true, index: true },
+    job: { type: Schema.Types.ObjectId, ref: "ATSJob", default: null, index: true },
+    referralId: { type: String, default: "", trim: true },
     status: {
       type: String,
       enum: ["pending", "reviewed", "hired", "rejected"],

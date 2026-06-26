@@ -23,7 +23,8 @@ export async function GET(_request: Request, { params }: Params) {
 
   const offer = await ATSOffer.findOne({ _id: id, company: user.company })
     .populate("candidate", "firstName lastName email phone")
-    .populate("job", "title department");
+    .populate("job", "title department")
+    .populate("signedBy", "name role");
 
   if (!offer) return jsonError("Offer not found.", 404);
 

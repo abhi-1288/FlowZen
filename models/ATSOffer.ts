@@ -26,6 +26,9 @@ const ATSOfferSchema = new Schema(
     },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     company: { type: Schema.Types.ObjectId, ref: "Company", required: true, index: true },
+    signedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    signedAt: { type: Date, default: null },
+    isSigned: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

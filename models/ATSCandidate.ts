@@ -52,6 +52,34 @@ const ATSCandidateSchema = new Schema(
 ATSCandidateSchema.index({ company: 1, stage: 1 });
 ATSCandidateSchema.index({ company: 1, job: 1 });
 
+const REFERRAL_STAGE_MAP: Record<string, string> = {
+  applied: "pending",
+  screening: "reviewed",
+  "technical-interview": "reviewed",
+  "manager-round": "reviewed",
+  "hr-round": "reviewed",
+  offer: "reviewed",
+  joined: "hired",
+  rejected: "rejected",
+};
+
+ATSCandidateSchema.post("save", async function () {
+  if (this.isModified("stage")) {
+    const newStatus = REFERRAL_STAGE_MAP[this.stage];
+    if (newStatus) {
+      try {
+        const { ATSReferral } = await import("@/models/ATSReferral");
+        await ATSReferral.findOneAndUpdate(
+          { candidate: this._id },
+          { $set: { status: newStatus } }
+        );
+      } catch {
+        // referral sync is best-effort
+      }
+    }
+  }
+});
+
 export type ATSCandidateDocument = InferSchemaType<typeof ATSCandidateSchema>;
 if (process.env.NODE_ENV === "development") {
   delete (models as any).ATSCandidate;

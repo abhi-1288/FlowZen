@@ -41,6 +41,8 @@ export default function JobDetailPage() {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [portfolioUrl, setPortfolioUrl] = useState("");
   const [linkedInUrl, setLinkedInUrl] = useState("");
+  const [knowEmployee, setKnowEmployee] = useState(false);
+  const [referralId, setReferralId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -70,6 +72,7 @@ export default function JobDetailPage() {
     formData.set("notes", notes);
     formData.set("portfolioUrl", portfolioUrl);
     formData.set("linkedInUrl", linkedInUrl);
+    formData.set("referralId", referralId);
     if (resumeFile) formData.set("resume", resumeFile);
 
     const res = await fetch(`/api/public/jobs/${job.id}/apply`, {
@@ -239,6 +242,43 @@ export default function JobDetailPage() {
               <span className="mb-1 block text-sm font-medium text-slate-700">Cover Letter / Notes</span>
               <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
             </label>
+            <div className="rounded-lg border border-slate-200 p-4">
+              <p className="mb-2 text-sm font-medium text-slate-700">Do you know anyone working at this company?</p>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <input
+                    type="radio"
+                    name="knowEmployee"
+                    checked={knowEmployee === true}
+                    onChange={() => setKnowEmployee(true)}
+                    className="text-indigo-600"
+                  />
+                  Yes
+                </label>
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <input
+                    type="radio"
+                    name="knowEmployee"
+                    checked={knowEmployee === false}
+                    onChange={() => setKnowEmployee(false)}
+                    className="text-indigo-600"
+                  />
+                  No
+                </label>
+              </div>
+              {knowEmployee && (
+                <label className="mt-3 block">
+                  <span className="mb-1 block text-sm font-medium text-slate-700">Employee Referral ID</span>
+                  <input
+                    value={referralId}
+                    onChange={(e) => setReferralId(e.target.value)}
+                    placeholder="HELLO-COMPANY-41279814"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <p className="mt-1 text-xs text-slate-400">Enter the referral ID provided by the employee.</p>
+                </label>
+              )}
+            </div>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700">Resume / CV *</span>
               <div className="flex flex-col gap-1">

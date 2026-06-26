@@ -24,7 +24,8 @@ export async function GET(request: Request) {
   const offers = await ATSOffer.find(filter)
     .sort({ createdAt: -1 })
     .populate("candidate", "firstName lastName")
-    .populate("job", "title");
+    .populate("job", "title")
+    .populate("signedBy", "name role");
 
   return NextResponse.json({ offers: serializeDocs(offers) });
 }

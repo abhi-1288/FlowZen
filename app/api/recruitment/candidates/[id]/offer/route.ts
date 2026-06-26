@@ -27,7 +27,8 @@ export async function GET(_request: Request, { params }: Params) {
     .sort({ createdAt: -1 })
     .populate("candidate", "firstName lastName email phone")
     .populate("job", "title department location")
-    .populate("company", "name icon");
+    .populate("company", "name icon")
+    .populate("signedBy", "name role");
 
   return NextResponse.json({ offer: offer ? serializeDoc(offer) : null });
 }

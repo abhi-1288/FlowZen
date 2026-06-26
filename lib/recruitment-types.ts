@@ -157,6 +157,9 @@ export type ATSOffer = {
   officeLocation: string;
   perks: string;
   status: OfferStatus;
+  signedBy: { id: string; name: string; role: string } | string | null;
+  signedAt: string | null;
+  isSigned: boolean;
   createdBy: string;
   company: string;
   createdAt: string;
@@ -178,8 +181,9 @@ export type ATSTimelineEntry = {
 export type ATSReferral = {
   id: string;
   employee: { id: string; name: string } | string;
-  candidate: { id: string; firstName: string; lastName: string } | string;
+  candidate: { id: string; firstName: string; lastName: string; stage?: Stage; job?: { id: string; title: string } | string } | string;
   status: ReferralStatus;
+  referralId: string;
   referralBonusEligible: boolean;
   company: string;
   createdAt: string;

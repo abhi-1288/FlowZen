@@ -73,8 +73,9 @@ type RecruitmentStore = {
 
   fetchTimeline: (candidateId: string) => Promise<void>;
 
-  fetchReferrals: () => Promise<void>;
+  fetchReferrals: (params?: Record<string, string>) => Promise<void>;
   createReferral: (data: { candidateId: string; referralBonusEligible: boolean }) => Promise<void>;
+  signOffer: (id: string) => Promise<void>;
 
   uploadResume: (candidateId: string, file: File) => Promise<void>;
 };
@@ -383,10 +384,11 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
     }
   },
 
-  fetchReferrals: async () => {
+  fetchReferrals: async (params) => {
     set({ loading: true, error: null });
     try {
-      const { referrals } = await apiFetch<{ referrals: ATSReferral[] }>("/api/recruitment/referrals");
+      const query = params ? "?" + new URLSearchParams(params).toString() : "";
+      const { referrals } = await apiFetch<{ referrals: ATSReferral[] }>(`/api/recruitment/referrals${query}`);
       set({ referrals });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "Failed to load referrals." });
@@ -403,6 +405,21 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
         body: JSON.stringify(data),
       });
       set((state) => ({ referrals: [...state.referrals, referral] }));
+    } finally {
+      set({ saving: false });
+    }
+  },
+
+  signOffer: async (id) => {
+    set({ saving: true, error: null });
+    try {
+      const { offer } = await apiFetch<{ offer: ATSOffer }>(`/api/recruitment/offers/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: "sign" }),
+      });
+      set((state) => ({
+        offers: state.offers.map((o) => (o.id === id ? offer : o)),
+      }));
     } finally {
       set({ saving: false });
     }

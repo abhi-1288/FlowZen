@@ -3,9 +3,11 @@ import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { ATSJob } from "@/models/ATSJob";
 import { ATSCandidate } from "@/models/ATSCandidate";
+import { ATSReferral } from "@/models/ATSReferral";
 import { ATSTimeline } from "@/models/ATSTimeline";
 import { User } from "@/models/User";
 import { Notification } from "@/models/Notification";
+import { Company } from "@/models/Company";
 import { saveDocument } from "@/lib/storage";
 import { jsonError } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
@@ -36,6 +38,7 @@ export async function POST(
   const portfolioUrl = String(form.get("portfolioUrl") ?? "").trim();
   const linkedInUrl = String(form.get("linkedInUrl") ?? "").trim();
   const resumeFile = form.get("resume") as File | null;
+  const referralId = String(form.get("referralId") ?? "").trim();
 
   if (!firstName) return jsonError("First name is required.");
   if (!email) return jsonError("Email is required.");
@@ -50,6 +53,31 @@ export async function POST(
     resumeUrl = result.url;
   }
 
+  let referralEmployee: any = null;
+  if (referralId) {
+    const lastDash = referralId.lastIndexOf("-");
+    if (lastDash === -1 || lastDash === 0 || lastDash === referralId.length - 1) {
+      return jsonError("Invalid referral ID format. Expected format: COMPANY-EMPLOYEEID");
+    }
+    const companyNamePart = referralId.slice(0, lastDash);
+    const employeeIdPart = referralId.slice(lastDash + 1);
+    if (!companyNamePart || !employeeIdPart) {
+      return jsonError("Invalid referral ID format. Expected format: COMPANY-EMPLOYEEID");
+    }
+    const companyDoc = await Company.findOne({ _id: job.company });
+    if (!companyDoc) return jsonError("Company not found.", 404);
+    if (companyDoc.name.toUpperCase() !== companyNamePart.toUpperCase()) {
+      return jsonError("Referral company does not match this job's company.");
+    }
+    referralEmployee = await User.findOne({
+      companyIdentityCode: employeeIdPart,
+      company: job.company,
+    });
+    if (!referralEmployee) {
+      return jsonError("Referral employee not found. Please check the referral ID.");
+    }
+  }
+
   const candidate = await ATSCandidate.create({
     firstName,
     lastName,
@@ -61,18 +89,42 @@ export async function POST(
     resumeUrl,
     portfolioUrl,
     linkedInUrl,
-    source: "Company Website",
+    source: referralEmployee ? "Referral" : "Company Website",
     stage: "applied",
     notes,
     job: job._id,
     company: job.company,
   });
 
+  if (referralEmployee) {
+    await ATSReferral.create({
+      employee: referralEmployee._id,
+      candidate: candidate._id,
+      job: job._id,
+      referralId,
+      status: "pending",
+      referralBonusEligible: false,
+      company: job.company,
+    });
+    const candidateName = `${firstName} ${lastName}`.trim();
+    await Notification.create({
+      user: referralEmployee._id,
+      company: job.company,
+      type: "info",
+      title: "New Referral Application",
+      message: `${candidateName} applied using your referral for ${job.title}.`,
+      link: `/recruitment/candidates/${candidate._id}`,
+    });
+    emitToUser(String(referralEmployee._id), "notification:new", {
+      message: `${candidateName} applied using your referral for ${job.title}.`,
+    });
+  }
+
   await ATSTimeline.create({
     candidate: candidate._id,
     job: job._id,
     action: "applied",
-    metadata: { source: "Company Website", resumeUrl },
+    metadata: { source: referralEmployee ? "Referral" : "Company Website", resumeUrl },
     company: job.company,
   });
 

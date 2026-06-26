@@ -70,6 +70,11 @@ export default function OffersPage() {
                         offer.status === "accepted" ? "bg-emerald-50 text-emerald-700" :
                         "bg-rose-50 text-rose-700"
                       }`}>{offer.status}</span>
+                      {offer.isSigned && (
+                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                          Signed
+                        </span>
+                      )}
                     </div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                       <span>{offer.designation}</span>
@@ -83,9 +88,11 @@ export default function OffersPage() {
                     {offer.status === "draft" && (
                       <button
                         onClick={() => void updateOffer(offer.id, { status: "sent" })}
-                        className="rounded-lg bg-slate-950 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800"
+                        disabled={!offer.isSigned}
+                        className="rounded-lg bg-slate-950 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={!offer.isSigned ? "Sign the offer before sending" : ""}
                       >
-                        Mark Sent
+                        {!offer.isSigned ? "Sign Required" : "Mark Sent"}
                       </button>
                     )}
                     {offer.status === "sent" && (

@@ -27,7 +27,8 @@ export async function GET(_request: Request, { params }: Params) {
   const offer = await ATSOffer.findOne({ _id: id, company: user.company })
     .populate("candidate", "firstName lastName email phone")
     .populate("job", "title department location")
-    .populate("company", "name icon");
+    .populate("company", "name icon")
+    .populate("signedBy", "name role");
 
   if (!offer) return jsonError("Offer not found.", 404);
 
@@ -41,7 +42,37 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!isObjectId(id)) return jsonError("Invalid offer id.");
 
   const body = await request.json();
+
+  await connectDb();
+  const user = await User.findById(userId);
+  if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  if (!user.company) return jsonError("No company found.", 400);
+
+  const existingOffer = await ATSOffer.findOne({ _id: id, company: user.company });
+  if (!existingOffer) return jsonError("Offer not found.", 404);
+
+  if (body.action === "sign") {
+    if (existingOffer.isSigned) return jsonError("Offer is already signed.", 400);
+    const updates: Record<string, unknown> = {
+      signedBy: userId,
+      signedAt: new Date(),
+      isSigned: true,
+    };
+    const offer = await ATSOffer.findOneAndUpdate(
+      { _id: id, company: user.company },
+      { $set: updates },
+      { new: true }
+    )
+      .populate("candidate", "firstName lastName email phone")
+      .populate("job", "title")
+      .populate("signedBy", "name role");
+
+    return NextResponse.json({ offer: serializeDoc(offer!) });
+  }
+
   const updates: Record<string, unknown> = {};
+  const contentFields = ["offeredCTC", "pfAmount", "esicAmount", "joiningDate", "designation", "department", "officeLocation", "perks"];
+  const hasContentChanges = contentFields.some((f) => body[f] !== undefined);
   if (body.offeredCTC !== undefined) updates.offeredCTC = Number(body.offeredCTC);
   if (body.pfAmount !== undefined) updates.pfAmount = Number(body.pfAmount);
   if (body.esicAmount !== undefined) updates.esicAmount = Number(body.esicAmount);
@@ -52,10 +83,11 @@ export async function PATCH(request: Request, { params }: Params) {
   if (body.perks !== undefined) updates.perks = String(body.perks).trim();
   if (body.status !== undefined) updates.status = body.status;
 
-  await connectDb();
-  const user = await User.findById(userId);
-  if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
-  if (!user.company) return jsonError("No company found.", 400);
+  if (existingOffer.isSigned && hasContentChanges) {
+    updates.signedBy = null;
+    updates.signedAt = null;
+    updates.isSigned = false;
+  }
 
   const offer = await ATSOffer.findOneAndUpdate(
     { _id: id, company: user.company },
@@ -63,7 +95,8 @@ export async function PATCH(request: Request, { params }: Params) {
     { new: true }
   )
     .populate("candidate", "firstName lastName email phone")
-    .populate("job", "title");
+    .populate("job", "title")
+    .populate("signedBy", "name role");
 
   if (!offer) return jsonError("Offer not found.", 404);
 

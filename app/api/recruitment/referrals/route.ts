@@ -7,7 +7,7 @@ import { User } from "@/models/User";
 import { isObjectId, jsonError, requireUserId, serializeDocs } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
 
-export async function GET(_request: Request) {
+export async function GET(request: Request) {
   const userId = await requireUserId();
   if (!userId) return jsonError("Unauthorized", 401);
 
@@ -16,13 +16,17 @@ export async function GET(_request: Request) {
   if (!user) return jsonError("Forbidden", 403);
   if (!user.company) return jsonError("No company found.", 400);
 
+  const { searchParams } = new URL(request.url);
+  const jobId = searchParams.get("jobId");
+
   const filter: Record<string, unknown> = { company: user.company };
   if (user.role === "employee") filter.employee = userId;
+  if (jobId) filter.job = jobId;
 
   const referrals = await ATSReferral.find(filter)
     .sort({ createdAt: -1 })
     .populate("employee", "name email")
-    .populate("candidate", "firstName lastName email");
+    .populate("candidate", "firstName lastName email stage");
 
   return NextResponse.json({ referrals: serializeDocs(referrals) });
 }

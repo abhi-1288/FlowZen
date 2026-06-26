@@ -27,7 +27,8 @@ export async function GET(request: Request) {
     .sort({ createdAt: -1 })
     .populate("candidate", "firstName lastName email phone")
     .populate("job", "title department")
-    .populate("company", "name icon");
+    .populate("company", "name icon")
+    .populate("signedBy", "name role");
 
   if (!offer) return jsonError("No offer found for this candidate.", 404);
 
