@@ -1,7 +1,7 @@
 import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 
-function companyCodePrefix(name: string) {
+export function companyCodePrefix(name: string) {
   const cleaned = String(name ?? "COMPANY")
     .trim()
     .toUpperCase()

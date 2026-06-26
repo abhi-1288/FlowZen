@@ -43,6 +43,9 @@ export default function JobDetailPage() {
   const [linkedInUrl, setLinkedInUrl] = useState("");
   const [knowEmployee, setKnowEmployee] = useState(false);
   const [referralId, setReferralId] = useState("");
+  const [referralStatus, setReferralStatus] = useState<"idle" | "verifying" | "verified" | "error">("idle");
+  const [referralName, setReferralName] = useState("");
+  const [referralCompanyName, setReferralCompanyName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -54,6 +57,30 @@ export default function JobDetailPage() {
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    if (!knowEmployee || !referralId.trim() || !job) {
+      setReferralStatus("idle");
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setReferralStatus("verifying");
+      try {
+        const res = await fetch(`/api/public/jobs/${job.id}/verify-referral?referralId=${encodeURIComponent(referralId)}`);
+        if (!res.ok) {
+          setReferralStatus("error");
+          return;
+        }
+        const data = await res.json();
+        setReferralName(data.name);
+        setReferralCompanyName(data.company);
+        setReferralStatus("verified");
+      } catch {
+        setReferralStatus("error");
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [referralId, knowEmployee, job]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -269,13 +296,31 @@ export default function JobDetailPage() {
               {knowEmployee && (
                 <label className="mt-3 block">
                   <span className="mb-1 block text-sm font-medium text-slate-700">Employee Referral ID</span>
-                  <input
-                    value={referralId}
-                    onChange={(e) => setReferralId(e.target.value)}
-                    placeholder="HELLO-COMPANY-41279814"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <p className="mt-1 text-xs text-slate-400">Enter the referral ID provided by the employee.</p>
+                  <div className="relative">
+                    <input
+                      value={referralId}
+                      onChange={(e) => setReferralId(e.target.value)}
+                      placeholder="HELLO-COMPANY-41279814"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 pr-9 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    {referralStatus === "verifying" && (
+                      <Loader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-slate-400" />
+                    )}
+                    {referralStatus === "verified" && (
+                      <CheckCircle size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500" />
+                    )}
+                  </div>
+                  {referralStatus === "verified" && (
+                    <p className="mt-1 text-xs text-emerald-600">
+                      Verified: {referralName} ({referralCompanyName})
+                    </p>
+                  )}
+                  {referralStatus === "error" && (
+                    <p className="mt-1 text-xs text-rose-500">Referral employee not found. Please check the referral ID.</p>
+                  )}
+                  {referralStatus === "idle" && (
+                    <p className="mt-1 text-xs text-slate-400">Enter the referral ID provided by the employee.</p>
+                  )}
                 </label>
               )}
             </div>

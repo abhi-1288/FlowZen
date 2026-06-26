@@ -10,6 +10,7 @@ import { Notification } from "@/models/Notification";
 import { Company } from "@/models/Company";
 import { saveDocument } from "@/lib/storage";
 import { jsonError } from "@/lib/api";
+import { companyCodePrefix } from "@/lib/company-identity";
 import { emitToUser } from "@/lib/socket-emit";
 import { createMagicLinkToken } from "@/lib/codes";
 import { sendMail } from "@/lib/mailer";
@@ -55,22 +56,15 @@ export async function POST(
 
   let referralEmployee: any = null;
   if (referralId) {
-    const lastDash = referralId.lastIndexOf("-");
-    if (lastDash === -1 || lastDash === 0 || lastDash === referralId.length - 1) {
-      return jsonError("Invalid referral ID format. Expected format: COMPANY-EMPLOYEEID");
-    }
-    const companyNamePart = referralId.slice(0, lastDash);
-    const employeeIdPart = referralId.slice(lastDash + 1);
-    if (!companyNamePart || !employeeIdPart) {
-      return jsonError("Invalid referral ID format. Expected format: COMPANY-EMPLOYEEID");
-    }
     const companyDoc = await Company.findOne({ _id: job.company });
     if (!companyDoc) return jsonError("Company not found.", 404);
-    if (companyDoc.name.toUpperCase() !== companyNamePart.toUpperCase()) {
+    const expectedPrefix = companyCodePrefix(companyDoc.name);
+    const actualPrefix = referralId.includes("-") ? referralId.slice(0, referralId.lastIndexOf("-")) : "";
+    if (!actualPrefix || expectedPrefix !== actualPrefix) {
       return jsonError("Referral company does not match this job's company.");
     }
     referralEmployee = await User.findOne({
-      companyIdentityCode: employeeIdPart,
+      companyIdentityCode: referralId,
       company: job.company,
     });
     if (!referralEmployee) {
