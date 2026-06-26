@@ -164,13 +164,12 @@ export function renderRecruitmentOfferLetterHtml(input: RecruitmentOfferLetterIn
     .perks { margin-top: 16px; border: 1px solid #fde68a; border-radius: 8px; background: #fffbeb; padding: 16px; color: #78350f; }
     .perks h4 { margin: 0 0 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0; color: #92400e; }
     .perks p { margin: 0; color: #78350f; }
-    .signatures { margin-top: 48px; }
+    .signatures { margin-top: 48px; display: flex; flex-direction: column; align-items: center; }
     .signatures-label { margin-bottom: 32px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0; color: #64748b; }
-    .signature-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 48px; row-gap: 40px; }
-    .signature-block { display: flex; flex-direction: column; align-items: center; }
-    .signature-role { margin: 0 0 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0; color: #94a3b8; }
-    .signature-merged { margin: 0 0 8px; font-size: 14px; font-weight: 600; color: #0f172a; text-align: center; }
-    .signature-line { width: 192px; height: 40px; border-bottom: 1px solid #94a3b8; margin-bottom: 4px; }
+    .signature-signed { display: flex; flex-direction: column; align-items: center; }
+    .signature-box { border: 1px solid #94a3b8; border-radius: 8px; padding: 8px 24px; text-align: center; }
+    .signature-box-text { margin: 0; font-size: 14px; font-weight: 600; color: #0f172a; }
+    .signature-rule { width: 192px; border-top: 1px solid #94a3b8; margin: 16px 0 8px; }
     .signature-company { margin: 0; font-size: 14px; font-weight: 600; color: #0f172a; }
     .footer { margin-top: 48px; border-top: 1px solid #e2e8f0; padding-top: 16px; text-align: center; font-size: 12px; color: #94a3b8; }
     @media print {
@@ -188,11 +187,11 @@ export function renderRecruitmentOfferLetterHtml(input: RecruitmentOfferLetterIn
       .section-title { margin: 16px 0 8px; }
       .compensation th, .compensation td { padding: 4px 8px; }
       .perks { margin-top: 8px; padding: 8px; }
-      .perks h4, .signatures-label, .signature-role, .signature-merged { font-size: 10px; }
+      .perks h4, .signatures-label, .signature-box-text { font-size: 10px; }
       .signatures { margin-top: 24px; }
       .signatures-label { margin-bottom: 16px; }
-      .signature-grid { column-gap: 24px; row-gap: 12px; }
-      .signature-line { width: 144px; height: 24px; }
+      .signature-box { padding: 4px 16px; }
+      .signature-rule { width: 144px; margin: 12px 0 4px; }
       .signature-company { font-size: 11px; }
       .footer { margin-top: 24px; padding-top: 8px; font-size: 9px; }
     }
@@ -247,21 +246,23 @@ export function renderRecruitmentOfferLetterHtml(input: RecruitmentOfferLetterIn
 
     <section class="signatures">
       <p class="signatures-label">Authorized Signatories</p>
-      <div class="signature-grid">
-        ${isSigned ? `
-        <div class="signature-block" style="grid-column:1/-1;">
-          <p class="signature-merged">${escapeHtml(signedByName)} / ${escapeHtml(signedByRole)} / ${escapeHtml(signedAt)}</p>
-          <div class="signature-line"></div>
-          <p class="signature-company">${escapeHtml(companyName)} Authority</p>
+      ${isSigned ? `
+      <div class="signature-signed">
+        <div class="signature-box">
+          <p class="signature-box-text">${escapeHtml(signedByName)} / ${escapeHtml(signedByRole)} / ${escapeHtml(signedAt)}</p>
         </div>
-        ` : `
-        <div class="signature-block">
-          <p class="signature-role">Authorized Signatory</p>
-          <div class="signature-line"></div>
-          <p class="signature-company">${escapeHtml(companyName)}</p>
-        </div>
-        `}
+        <div class="signature-rule"></div>
+        <p class="signature-company">${escapeHtml(companyName)} Authority</p>
       </div>
+      ` : `
+      <div class="signature-signed">
+        <div class="signature-box">
+          <p class="signature-box-text">Authorized Signatory</p>
+        </div>
+        <div class="signature-rule"></div>
+        <p class="signature-company">${escapeHtml(companyName)}</p>
+      </div>
+      `}
     </section>
 
     <footer class="footer">

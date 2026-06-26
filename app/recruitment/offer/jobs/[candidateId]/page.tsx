@@ -1,38 +1,69 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ExternalLink, FileText, PenSquare } from "lucide-react";
+import { ArrowLeft, FileText, ExternalLink, PenSquare, Send, CheckCircle } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useSession } from "next-auth/react";
+import type { ATSOffer } from "@/lib/recruitment-types";
 
-export default function OfferDetailPage() {
+export default function CandidateOfferPage() {
   const params = useParams()!;
-  const id = params.id as string;
   const router = useRouter();
+  const candidateId = params.candidateId as string;
   const { data: session } = useSession();
   const role = session?.user?.role ?? "";
   const isHr = role === "admin" || role === "human-resource";
   const { offers, fetchOffers, updateOffer, signOffer } = useRecruitmentStore();
 
-  useEffect(() => { void fetchOffers(); }, [fetchOffers]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const offer = offers.find((o) => o.id === id);
+  useEffect(() => {
+    (async () => {
+      await fetchOffers();
+      setLoading(false);
+    })();
+  }, [fetchOffers]);
 
-  if (!offer) {
+  const offer = offers.find((o) => {
+    const cId = typeof o.candidate === "object" ? o.candidate.id : o.candidate;
+    return cId === candidateId;
+  });
+
+  if (loading) {
     return (
       <div className="p-6">
-        <button onClick={() => router.back()} className="mb-4 text-sm text-slate-500 hover:text-slate-900">&larr; Back</button>
-        <p className="text-slate-500">Offer not found.</p>
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-indigo-600" />
       </div>
     );
   }
 
-  const candidateName = offer.candidate && typeof offer.candidate === "object"
+  if (!offer) {
+    return (
+      <div className="p-6 max-w-xl">
+        <button onClick={() => router.back()} className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900">
+          <ArrowLeft size={16} /> Back
+        </button>
+        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">
+          <FileText size={40} className="mx-auto text-slate-300" />
+          <h2 className="mt-3 text-lg font-semibold text-slate-900">No Offer Found</h2>
+          <p className="mt-1 text-sm text-slate-500">This candidate doesn't have an offer yet.</p>
+          <button
+            onClick={() => router.push("/recruitment/offers")}
+            className="mt-4 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+          >
+            Go to Offers
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const candidateName = typeof offer.candidate === "object"
     ? `${(offer.candidate as any).firstName} ${(offer.candidate as any).lastName}`
     : "Unknown";
-  const jobTitle = offer.job && typeof offer.job === "object"
-    ? (offer.job as any).title : "";
+  const jobTitle = typeof offer.job === "object" ? (offer.job as any).title : "";
   const salaryPeriodLabel = offer.salaryType === "per-month" ? "month" : "year";
 
   return (
@@ -57,8 +88,8 @@ export default function OfferDetailPage() {
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-            <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Designation</p>
-            <p className="mt-1 text-sm font-medium text-slate-900">{offer.designation}</p>
+            <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Offered CTC</p>
+            <p className="mt-1 text-sm font-medium text-slate-900">₹{Number(offer.offeredCTC).toLocaleString()}/{salaryPeriodLabel}</p>
           </div>
           <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
             <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Department</p>
@@ -68,6 +99,12 @@ export default function OfferDetailPage() {
             <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
               <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Joining Date</p>
               <p className="mt-1 text-sm font-medium text-slate-900">{new Date(offer.joiningDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</p>
+            </div>
+          )}
+          {offer.officeLocation && (
+            <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Office Location</p>
+              <p className="mt-1 text-sm font-medium text-slate-900">{offer.officeLocation}</p>
             </div>
           )}
         </div>
@@ -94,23 +131,22 @@ export default function OfferDetailPage() {
               <span className="text-sm font-semibold text-emerald-600">₹{Number(offer.offeredCTC - (offer.pfAmount || 0) - (offer.esicAmount || 0)).toLocaleString()}</span>
             </div>
           </div>
-          {offer.pfAmount || offer.esicAmount ? (
-            <div className="border-t border-slate-200 bg-slate-50 px-5 py-3">
-              <p className="text-xs text-slate-500">Food &amp; travel accommodation deductions are applied as per company policy. See the full offer letter for the complete breakdown.</p>
-            </div>
-          ) : null}
-          <div className="border-t border-slate-200 px-5 py-3">
-            <p className="text-xs text-slate-400 italic">Note: A detailed offer letter will be provided after joining the company.</p>
-          </div>
         </div>
 
         <div className="mt-6 flex gap-3">
           <a
             href={`/recruitment/offers/${offer.id}/letter`}
+            target="_blank"
             className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
           >
             <FileText size={16} /> View Offer Letter
           </a>
+          <button
+            onClick={() => router.push("/recruitment/offers")}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+          >
+            <ExternalLink size={16} /> All Offers (Jobs)
+          </button>
         </div>
 
         <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -131,6 +167,16 @@ export default function OfferDetailPage() {
               </div>
               <div className="mt-3 w-48 border-t border-slate-400" />
               <p className="mt-1 text-sm font-medium text-slate-700">Authority</p>
+              {offer.status === "draft" && (
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={async () => { await updateOffer(offer.id, { status: "sent" }); }}
+                    className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+                  >
+                    <Send size={16} /> Send Offer
+                  </button>
+                </div>
+              )}
             </div>
           ) : isHr ? (
             <div className="mt-3">
@@ -142,6 +188,15 @@ export default function OfferDetailPage() {
               </button>
             </div>
           ) : null}
+        </div>
+
+        <div className="mt-6 text-center">
+          <button
+            onClick={() => router.push("/recruitment/offers")}
+            className="text-sm text-indigo-600 hover:text-indigo-700"
+          >
+            View all offers grouped by jobs &rarr;
+          </button>
         </div>
       </div>
     </div>

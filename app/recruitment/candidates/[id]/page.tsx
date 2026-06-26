@@ -30,7 +30,6 @@ import {
   STAGES,
   type ATSCandidate,
   type ATSJob,
-  type ATSOffer,
 } from "@/lib/recruitment-types";
 import { cn, apiFetch } from "@/lib/client-utils";
 import { useSession } from "next-auth/react";
@@ -82,7 +81,6 @@ export default function CandidateProfilePage() {
   const [showAssignForm, setShowAssignForm] = useState(false);
   const [stageFeedback, setStageFeedback] = useState("suitable");
   const [submitting, setSubmitting] = useState(false);
-  const [candidateOffer, setCandidateOffer] = useState<ATSOffer | null>(null);
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [convertPassword, setConvertPassword] = useState("");
   const [convertConfirmPassword, setConvertConfirmPassword] = useState("");
@@ -99,12 +97,6 @@ export default function CandidateProfilePage() {
     void fetchCandidate(id);
     void fetchTimeline(id);
   }, [id, fetchCandidate, fetchTimeline]);
-
-  useEffect(() => {
-    apiFetch<{ offer: ATSOffer | null }>(`/api/recruitment/candidates/${id}/offer`)
-      .then((res) => { if (mountedRef.current) setCandidateOffer(res.offer); })
-      .catch(() => { if (mountedRef.current) setCandidateOffer(null); });
-  }, [id]);
 
   const [candidateInterviews, setCandidateInterviews] = useState<any[]>([]);
   const [ivRefreshKey, setIvRefreshKey] = useState(0);
@@ -603,15 +595,6 @@ export default function CandidateProfilePage() {
               >
                 <FileText size={14} /> Generate Offer
               </button>
-              {candidateOffer && (
-                <a
-                  href={`/recruitment/candidates/${id}/offer`}
-                  target="_blank"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
-                >
-                  <FileText size={14} /> View Offer Letter
-                </a>
-              )}
               <button
                 onClick={() => setShowAssignForm(!showAssignForm)}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
@@ -1474,6 +1457,7 @@ function OfferModal({
   candidateId: string;
   jobId: string | null;
 }) {
+  const router = useRouter();
   const { modal, setModal, createOffer, saving, activeJob, fetchJob } =
     useRecruitmentStore();
   const [loadingJob, setLoadingJob] = useState(false);
@@ -1536,6 +1520,7 @@ function OfferModal({
       status: "draft",
     });
     setModal(null);
+    router.push(`/recruitment/offer/jobs/${candidateId}`);
   }
 
   return (

@@ -249,36 +249,25 @@ export default function OfferLetterPage() {
           <p className="mb-8 text-xs font-semibold uppercase tracking-wider text-slate-500 print:mb-4 print:text-[10px]">
             Authorized Signatories
           </p>
-          <div className="grid grid-cols-2 gap-x-12 gap-y-10 print:gap-x-6 print:gap-y-3">
+          <div className="flex flex-col items-center">
             {offer.isSigned ? (
               <>
-                <div className="flex flex-col items-center">
-                  <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-slate-400 print:text-[9px]">HR Name</p>
-                  <div className="mb-1 h-10 w-48 border-b border-slate-400 print:h-6 print:w-36" />
-                  <p className="text-sm font-medium text-slate-900 print:text-[11px]">{offer.signedBy?.name || "N/A"}</p>
+                <div className="rounded-lg border border-slate-300 px-6 py-2 text-center">
+                  <p className="text-sm font-semibold text-slate-900 print:text-[11px]">
+                    {offer.signedBy?.name || "N/A"} / {offer.signedBy?.role || "N/A"} / {offer.signedAt ? new Date(offer.signedAt).toLocaleString("en-IN") : "N/A"}
+                  </p>
                 </div>
-                <div className="flex flex-col items-center">
-                  <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-slate-400 print:text-[9px]">HR Role</p>
-                  <div className="mb-1 h-10 w-48 border-b border-slate-400 print:h-6 print:w-36" />
-                  <p className="text-sm font-medium text-slate-900 print:text-[11px]">{offer.signedBy?.role || "N/A"}</p>
-                </div>
-                <div className="flex flex-col items-center">
-                  <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-slate-400 print:text-[9px]">Signed Date &amp; Time</p>
-                  <div className="mb-1 h-10 w-48 border-b border-slate-400 print:h-6 print:w-36" />
-                  <p className="text-sm font-medium text-slate-900 print:text-[11px]">{offer.signedAt ? new Date(offer.signedAt).toLocaleString("en-IN") : "N/A"}</p>
-                </div>
-                <div className="col-span-2 text-center pt-2">
-                  <p className="text-xs italic text-slate-500 print:text-[10px]">Electronically signed through FlowZen HRMS.</p>
-                </div>
+                <div className="mt-4 w-48 border-t border-slate-400 print:mt-2 print:w-36" />
+                <p className="mt-2 text-sm font-medium text-slate-900 print:text-[11px]">{companyName} Authority</p>
               </>
             ) : (
-              <div className="flex flex-col items-center">
-                <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-slate-400 print:text-[9px]">
-                  Authorized Signatory
-                </p>
-                <div className="mb-1 h-10 w-48 border-b border-slate-400 print:h-6 print:w-36" />
-                <p className="text-sm font-medium text-slate-900 print:text-[11px]">{companyName}</p>
-              </div>
+              <>
+                <div className="rounded-lg border border-slate-300 px-6 py-2">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 print:text-[9px]">Authorized Signatory</p>
+                </div>
+                <div className="mt-4 w-48 border-t border-slate-400 print:mt-2 print:w-36" />
+                <p className="mt-2 text-sm font-medium text-slate-900 print:text-[11px]">{companyName}</p>
+              </>
             )}
           </div>
         </div>
