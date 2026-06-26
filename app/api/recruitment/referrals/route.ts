@@ -18,17 +18,26 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const jobId = searchParams.get("jobId");
+  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
+  const rawLimit = parseInt(searchParams.get("limit") ?? "10", 10);
+  const limit = rawLimit === 0 ? 0 : Math.min(100, Math.max(1, rawLimit));
+  const skip = limit === 0 ? 0 : (page - 1) * limit;
 
   const filter: Record<string, unknown> = { company: user.company };
   if (user.role === "employee") filter.employee = userId;
   if (jobId) filter.job = jobId;
 
-  const referrals = await ATSReferral.find(filter)
-    .sort({ createdAt: -1 })
-    .populate("employee", "name email")
-    .populate("candidate", "firstName lastName email stage");
+  const [totalCount, referrals] = await Promise.all([
+    ATSReferral.countDocuments(filter),
+    ATSReferral.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit || undefined)
+      .populate("employee", "name email")
+      .populate("candidate", "firstName lastName email stage"),
+  ]);
 
-  return NextResponse.json({ referrals: serializeDocs(referrals) });
+  return NextResponse.json({ referrals: serializeDocs(referrals), totalCount, page, limit });
 }
 
 export async function POST(request: Request) {

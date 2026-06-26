@@ -1,24 +1,47 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ChevronRight, ChevronDown, Briefcase } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, Briefcase, ChevronLeft, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
 import { STAGE_LABELS, type Stage } from "@/lib/recruitment-types";
 
+const LIMIT = 10;
+
 export default function CandidatesPage() {
   const router = useRouter();
-  const { candidates, jobs, loading, fetchCandidates, fetchJobs } = useRecruitmentStore(
-    useShallow((s) => ({ candidates: s.candidates, jobs: s.jobs, loading: s.loading, fetchCandidates: s.fetchCandidates, fetchJobs: s.fetchJobs }))
+  const { candidates, jobs, loading, totalCandidates, fetchCandidates, fetchJobs } = useRecruitmentStore(
+    useShallow((s) => ({ candidates: s.candidates, jobs: s.jobs, loading: s.loading, totalCandidates: s.totalCandidates, fetchCandidates: s.fetchCandidates, fetchJobs: s.fetchJobs }))
   );
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("");
+  const [page, setPage] = useState(1);
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
   const [expandedCandidate, setExpandedCandidate] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const totalPages = Math.ceil(totalCandidates / LIMIT) || 1;
 
-  useEffect(() => { if (candidates.length === 0) void fetchCandidates(); }, [candidates.length, fetchCandidates]);
-  useEffect(() => { if (jobs.length === 0) void fetchJobs(); }, [jobs.length, fetchJobs]);
+  const load = useCallback((pg: number, stage: string, q: string) => {
+    const params: Record<string, string> = { page: String(pg), limit: String(LIMIT) };
+    if (stage) params.stage = stage;
+    if (q) params.search = q;
+    void fetchCandidates(params);
+  }, [fetchCandidates]);
+
+  useEffect(() => {
+    if (jobs.length === 0) void fetchJobs();
+  }, [jobs.length, fetchJobs]);
+
+  useEffect(() => {
+    load(page, stageFilter, search);
+  }, [page, stageFilter, search, load]);
+
+  const debouncedSearch = (value: string) => {
+    setSearch(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setPage(1), 300);
+  };
 
   const grouped = useMemo(() => {
     const map = new Map<string, typeof candidates>();
@@ -41,23 +64,17 @@ export default function CandidatesPage() {
     });
   };
 
-  const filteredCandidates = useMemo(() => {
-    return candidates.filter((c) => {
-      if (stageFilter && c.stage !== stageFilter) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        if (!c.firstName.toLowerCase().includes(q) && !c.lastName.toLowerCase().includes(q) && !c.email.toLowerCase().includes(q)) return false;
-      }
-      return true;
-    });
-  }, [candidates, stageFilter, search]);
-
   const stages = ["applied", "screening", "technical-interview", "manager-round", "hr-round", "offer", "joined", "rejected"];
+
+  const handleStageChange = (value: string) => {
+    setStageFilter(value);
+    setPage(1);
+  };
 
   return (
     <div className="p-6">
       <h1 className="text-2xl font-semibold text-slate-900">Candidates</h1>
-      <p className="mt-1 text-sm text-slate-500">{candidates.length} total</p>
+      <p className="mt-1 text-sm text-slate-500">{totalCandidates} total</p>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <div className="relative flex-1 max-w-xs">
@@ -66,13 +83,13 @@ export default function CandidatesPage() {
             className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-slate-950"
             placeholder="Search candidates..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => debouncedSearch(e.target.value)}
           />
         </div>
         <select
           className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none"
           value={stageFilter}
-          onChange={(e) => setStageFilter(e.target.value)}
+          onChange={(e) => handleStageChange(e.target.value)}
         >
           <option value="">All Stages</option>
           {stages.map((s) => <option key={s} value={s}>{STAGE_LABELS[s as Stage]}</option>)}
@@ -182,6 +199,42 @@ export default function CandidatesPage() {
               </div>
             );
           })}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <button
+                onClick={() => setPage(1)}
+                disabled={page === 1}
+                className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronsLeft size={16} />
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span className="px-3 text-sm text-slate-600">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronRight size={16} />
+              </button>
+              <button
+                onClick={() => setPage(totalPages)}
+                disabled={page === totalPages}
+                className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronsRight size={16} />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

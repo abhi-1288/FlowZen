@@ -22,18 +22,34 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
   const department = searchParams.get("department");
+  const search = searchParams.get("search");
+  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
+  const rawLimit = parseInt(searchParams.get("limit") ?? "10", 10);
+  const limit = rawLimit === 0 ? 0 : Math.min(100, Math.max(1, rawLimit));
+  const skip = limit === 0 ? 0 : (page - 1) * limit;
 
   const filter: Record<string, unknown> = { company: user.company };
   if (status) filter.status = status;
   if (department) filter.department = department;
+  if (search) {
+    filter.$or = [
+      { title: { $regex: search, $options: "i" } },
+      { department: { $regex: search, $options: "i" } },
+    ];
+  }
 
-  const jobs = await ATSJob.find(filter).populate("company", "name").sort({ createdAt: -1 });
+  const [totalCount, jobs] = await Promise.all([
+    ATSJob.countDocuments(filter),
+    ATSJob.find(filter).populate("company", "name").sort({ createdAt: -1 }).skip(skip).limit(limit || undefined),
+  ]);
 
   const jobIds = jobs.map((j: any) => j._id);
-  const counts = await ATSCandidate.aggregate([
-    { $match: { job: { $in: jobIds }, company: user.company } },
-    { $group: { _id: "$job", count: { $sum: 1 } } },
-  ]);
+  const counts = jobIds.length > 0
+    ? await ATSCandidate.aggregate([
+        { $match: { job: { $in: jobIds }, company: user.company } },
+        { $group: { _id: "$job", count: { $sum: 1 } } },
+      ])
+    : [];
   const countMap: Record<string, number> = {};
   for (const c of counts) countMap[String(c._id)] = c.count;
   const jobsWithCount = jobs.map((job: any) => ({
@@ -41,7 +57,7 @@ export async function GET(request: Request) {
     applicantsCount: countMap[String(job._id)] ?? 0,
   }));
 
-  return NextResponse.json({ jobs: jobsWithCount });
+  return NextResponse.json({ jobs: jobsWithCount, totalCount, page, limit });
 }
 
 export async function POST(request: Request) {

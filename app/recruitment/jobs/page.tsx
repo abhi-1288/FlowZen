@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Plus, Search, Eye, Pencil, Archive, Globe, Share2, Check, Trash2 } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Archive, Globe, Share2, Check, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
 import type { EmploymentType, JobStatus, SalaryType } from "@/lib/recruitment-types";
@@ -13,27 +13,44 @@ export default function JobsPage() {
   const { data: session } = useSession();
   const role = session?.user?.role ?? "";
   const isAdmin = role === "admin";
-  const { jobs, loading, fetchJobs, updateJob, deleteJob, setModal } = useRecruitmentStore(
-    useShallow((s) => ({ jobs: s.jobs, loading: s.loading, fetchJobs: s.fetchJobs, updateJob: s.updateJob, deleteJob: s.deleteJob, setModal: s.setModal }))
+  const { jobs, loading, totalJobs, fetchJobs, updateJob, deleteJob, setModal } = useRecruitmentStore(
+    useShallow((s) => ({ jobs: s.jobs, loading: s.loading, totalJobs: s.totalJobs, fetchJobs: s.fetchJobs, updateJob: s.updateJob, deleteJob: s.deleteJob, setModal: s.setModal }))
   );
   const [statusFilter, setStatusFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
   const [copiedJobId, setCopiedJobId] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const totalPages = Math.ceil(totalJobs / 10) || 1;
 
-  useEffect(() => { if (jobs.length === 0) void fetchJobs(); }, [jobs.length, fetchJobs]);
+  const load = useCallback((pg: number, status: string, q: string) => {
+    const params: Record<string, string> = { page: String(pg), limit: "10" };
+    if (status) params.status = status;
+    if (q) params.search = q;
+    void fetchJobs(params);
+  }, [fetchJobs]);
 
-  const filtered = useMemo(() => jobs.filter((j) => {
-    if (statusFilter && j.status !== statusFilter) return false;
-    if (searchQuery && !j.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return true;
-  }), [jobs, statusFilter, searchQuery]);
+  useEffect(() => {
+    load(page, statusFilter, searchQuery);
+  }, [page, statusFilter, searchQuery, load]);
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setPage(1), 300);
+  };
+
+  const handleStatusChange = (value: string) => {
+    setStatusFilter(value);
+    setPage(1);
+  };
 
   return (
     <div className="p-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Job Openings</h1>
-          <p className="mt-1 text-sm text-slate-500">{jobs.length} total jobs</p>
+          <p className="mt-1 text-sm text-slate-500">{totalJobs} total jobs</p>
         </div>
         <button
           onClick={() => setModal({ type: "create-job" })}
@@ -51,13 +68,13 @@ export default function JobsPage() {
             className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-slate-950"
             placeholder="Search jobs..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
         </div>
         <select
           className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none"
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => handleStatusChange(e.target.value)}
         >
           <option value="">All Status</option>
           <option value="draft">Draft</option>
@@ -66,19 +83,19 @@ export default function JobsPage() {
         </select>
       </div>
 
-      {loading ? (
+      {loading && jobs.length === 0 ? (
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="h-40 animate-pulse rounded-xl bg-slate-200" />
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : jobs.length === 0 ? (
         <div className="mt-16 text-center">
           <p className="text-slate-500">No jobs found.</p>
         </div>
       ) : (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((job) => (
+          {jobs.map((job) => (
             <div key={job.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
               <div className="flex items-start justify-between">
                 <div className="min-w-0 flex-1">
@@ -169,6 +186,24 @@ export default function JobsPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-center gap-2">
+          <button onClick={() => setPage(1)} disabled={page === 1} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed">
+            <ChevronsLeft size={16} />
+          </button>
+          <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed">
+            <ChevronLeft size={16} />
+          </button>
+          <span className="px-3 text-sm text-slate-600">Page {page} of {totalPages}</span>
+          <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed">
+            <ChevronRight size={16} />
+          </button>
+          <button onClick={() => setPage(totalPages)} disabled={page === totalPages} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed">
+            <ChevronsRight size={16} />
+          </button>
         </div>
       )}
 

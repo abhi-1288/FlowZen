@@ -24,6 +24,10 @@ export async function GET(request: Request) {
   const stage = searchParams.get("stage");
   const jobId = searchParams.get("jobId");
   const search = searchParams.get("search");
+  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
+  const rawLimit = parseInt(searchParams.get("limit") ?? "10", 10);
+  const limit = rawLimit === 0 ? 0 : Math.min(100, Math.max(1, rawLimit));
+  const skip = limit === 0 ? 0 : (page - 1) * limit;
 
   const filter: Record<string, unknown> = { company: user.company };
   if (stage) filter.stage = stage;
@@ -39,19 +43,26 @@ export async function GET(request: Request) {
     filter["assignedTeam.user"] = userId;
   }
 
-  const candidates = await ATSCandidate.find(filter)
-    .sort({ createdAt: -1 })
-    .populate("assignedRecruiter", "name email")
-    .populate("assignedTeam.user", "name email")
-    .populate("job", "title");
+  const [totalCount, candidates] = await Promise.all([
+    ATSCandidate.countDocuments(filter),
+    ATSCandidate.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit || undefined)
+      .populate("assignedRecruiter", "name email")
+      .populate("assignedTeam.user", "name email")
+      .populate("job", "title"),
+  ]);
 
   const candidateIds = candidates.map((c: any) => c._id);
-  const upcomingInterviews = await import("@/models/ATSInterview").then(({ ATSInterview }) =>
-    ATSInterview.find({ candidate: { $in: candidateIds }, status: "scheduled", company: user.company })
-      .select("candidate roundType scheduledAt")
-      .sort({ scheduledAt: 1 })
-      .lean()
-  );
+  const upcomingInterviews = candidateIds.length > 0
+    ? await import("@/models/ATSInterview").then(({ ATSInterview }) =>
+        ATSInterview.find({ candidate: { $in: candidateIds }, status: "scheduled", company: user.company })
+          .select("candidate roundType scheduledAt")
+          .sort({ scheduledAt: 1 })
+          .lean()
+      )
+    : [];
   const interviewMap: Record<string, any[]> = {};
   for (const iv of upcomingInterviews) {
     const cid = String((iv as any).candidate);
@@ -64,7 +75,7 @@ export async function GET(request: Request) {
     upcomingInterviews: interviewMap[c.id] || [],
   }));
 
-  return NextResponse.json({ candidates: serialized });
+  return NextResponse.json({ candidates: serialized, totalCount, page, limit });
 }
 
 export async function POST(request: Request) {

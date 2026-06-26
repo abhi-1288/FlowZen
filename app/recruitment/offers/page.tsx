@@ -1,35 +1,47 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, ExternalLink, ChevronRight, ChevronDown, PenSquare, Send } from "lucide-react";
+import { FileText, ExternalLink, ChevronRight, ChevronDown, PenSquare, Send, ChevronLeft, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
 
+const LIMIT = 10;
+
 export default function OffersPage() {
   const router = useRouter();
-  const { offers, loading, fetchOffers, updateOffer, signOffer } = useRecruitmentStore(
-    useShallow((s) => ({ offers: s.offers, loading: s.loading, fetchOffers: s.fetchOffers, updateOffer: s.updateOffer, signOffer: s.signOffer }))
+  const { offers, loading, totalOffers, fetchOffers, updateOffer, signOffer } = useRecruitmentStore(
+    useShallow((s) => ({ offers: s.offers, loading: s.loading, totalOffers: s.totalOffers, fetchOffers: s.fetchOffers, updateOffer: s.updateOffer, signOffer: s.signOffer }))
   );
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const totalPages = Math.ceil(totalOffers / LIMIT) || 1;
 
-  useEffect(() => { if (offers.length === 0) void fetchOffers(); }, [offers.length, fetchOffers]);
+  const load = useCallback((pg: number, status: string) => {
+    const params: Record<string, string> = { page: String(pg), limit: String(LIMIT) };
+    if (status) params.status = status;
+    void fetchOffers(params);
+  }, [fetchOffers]);
 
-  const filtered = useMemo(() => statusFilter
-    ? offers.filter((o) => o.status === statusFilter)
-    : offers,
-  [offers, statusFilter]);
+  useEffect(() => {
+    load(page, statusFilter);
+  }, [page, statusFilter, load]);
+
+  const handleStatusChange = (value: string) => {
+    setStatusFilter(value);
+    setPage(1);
+  };
 
   const grouped = useMemo(() => {
     const map = new Map<string, typeof offers>();
-    for (const offer of filtered) {
+    for (const offer of offers) {
       const jobTitle = offer.job && typeof offer.job === "object" ? (offer.job as any).title : "Unknown Job";
       if (!map.has(jobTitle)) map.set(jobTitle, []);
       map.get(jobTitle)!.push(offer);
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [filtered]);
+  }, [offers]);
 
   const toggleJob = (title: string) => {
     setExpandedJobs((prev) => {
@@ -42,13 +54,13 @@ export default function OffersPage() {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-semibold text-slate-900">Offers</h1>
-      <p className="mt-1 text-sm text-slate-500">{offers.length} offers across {grouped.length} jobs</p>
+      <p className="mt-1 text-sm text-slate-500">{totalOffers} offers across {grouped.length} jobs</p>
 
       <div className="mt-4 flex items-center gap-3">
         <select
           className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none"
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => handleStatusChange(e.target.value)}
         >
           <option value="">All Status</option>
           <option value="draft">Draft</option>
@@ -58,7 +70,7 @@ export default function OffersPage() {
         </select>
       </div>
 
-      {loading ? (
+      {loading && offers.length === 0 ? (
         <div className="mt-6 space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-16 animate-pulse rounded-lg bg-slate-200" />
@@ -168,6 +180,24 @@ export default function OffersPage() {
               </div>
             );
           })}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <button onClick={() => setPage(1)} disabled={page === 1} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed">
+                <ChevronsLeft size={16} />
+              </button>
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed">
+                <ChevronLeft size={16} />
+              </button>
+              <span className="px-3 text-sm text-slate-600">Page {page} of {totalPages}</span>
+              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed">
+                <ChevronRight size={16} />
+              </button>
+              <button onClick={() => setPage(totalPages)} disabled={page === totalPages} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed">
+                <ChevronsRight size={16} />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -1,31 +1,42 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Calendar, ChevronDown, ChevronUp } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Calendar, ChevronDown, ChevronUp, ChevronLeft, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
-import { cn } from "@/lib/client-utils";
+
+const LIMIT = 10;
 
 export default function InterviewsPage() {
-  const { interviews, loading, fetchInterviews, updateInterview, setModal } = useRecruitmentStore(
-    useShallow((s) => ({ interviews: s.interviews, loading: s.loading, fetchInterviews: s.fetchInterviews, updateInterview: s.updateInterview, setModal: s.setModal }))
+  const { interviews, loading, totalInterviews, fetchInterviews, setModal } = useRecruitmentStore(
+    useShallow((s) => ({ interviews: s.interviews, loading: s.loading, totalInterviews: s.totalInterviews, fetchInterviews: s.fetchInterviews, setModal: s.setModal }))
   );
   const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const totalPages = Math.ceil(totalInterviews / LIMIT) || 1;
 
-  useEffect(() => { if (interviews.length === 0) void fetchInterviews(); }, [interviews.length, fetchInterviews]);
+  const load = useCallback((pg: number, status: string) => {
+    const params: Record<string, string> = { page: String(pg), limit: String(LIMIT) };
+    if (status) params.status = status;
+    void fetchInterviews(params);
+  }, [fetchInterviews]);
 
-  const filtered = useMemo(() => statusFilter
-    ? interviews.filter((i) => i.status === statusFilter)
-    : interviews,
-  [interviews, statusFilter]);
+  useEffect(() => {
+    load(page, statusFilter);
+  }, [page, statusFilter, load]);
+
+  const handleStatusChange = (value: string) => {
+    setStatusFilter(value);
+    setPage(1);
+  };
 
   return (
     <div className="p-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Interviews</h1>
-          <p className="mt-1 text-sm text-slate-500">{interviews.length} total</p>
+          <p className="mt-1 text-sm text-slate-500">{totalInterviews} total</p>
         </div>
       </div>
 
@@ -33,7 +44,7 @@ export default function InterviewsPage() {
         <select
           className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none"
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => handleStatusChange(e.target.value)}
         >
           <option value="">All Status</option>
           <option value="scheduled">Scheduled</option>
@@ -43,17 +54,17 @@ export default function InterviewsPage() {
         </select>
       </div>
 
-      {loading ? (
+      {loading && interviews.length === 0 ? (
         <div className="mt-6 space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-20 animate-pulse rounded-lg bg-slate-200" />
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : interviews.length === 0 ? (
         <div className="mt-16 text-center text-slate-500">No interviews found.</div>
       ) : (
         <div className="mt-6 space-y-3">
-          {filtered.map((interview) => {
+          {interviews.map((interview) => {
             const candidateName = interview.candidate && typeof interview.candidate === "object"
               ? `${(interview.candidate as any).firstName} ${(interview.candidate as any).lastName}`
               : "Unknown";
@@ -127,6 +138,24 @@ export default function InterviewsPage() {
               </div>
             );
           })}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <button onClick={() => setPage(1)} disabled={page === 1} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed">
+                <ChevronsLeft size={16} />
+              </button>
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed">
+                <ChevronLeft size={16} />
+              </button>
+              <span className="px-3 text-sm text-slate-600">Page {page} of {totalPages}</span>
+              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed">
+                <ChevronLeft size={16} className="rotate-180" />
+              </button>
+              <button onClick={() => setPage(totalPages)} disabled={page === totalPages} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed">
+                <ChevronsRight size={16} />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -42,6 +42,11 @@ type RecruitmentStore = {
   saving: boolean;
   error: string | null;
   modal: ModalState;
+  totalJobs: number;
+  totalCandidates: number;
+  totalOffers: number;
+  totalReferrals: number;
+  totalInterviews: number;
 
   setModal: (modal: ModalState) => void;
   setError: (error: string | null) => void;
@@ -94,6 +99,11 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
   saving: false,
   error: null,
   modal: null,
+  totalJobs: 0,
+  totalCandidates: 0,
+  totalOffers: 0,
+  totalReferrals: 0,
+  totalInterviews: 0,
 
   setModal: (modal) => set({ modal }),
   setError: (error) => set({ error }),
@@ -111,8 +121,8 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const query = params ? "?" + new URLSearchParams(params).toString() : "";
-      const { jobs } = await apiFetch<{ jobs: ATSJob[] }>(`/api/recruitment/jobs${query}`);
-      set({ jobs });
+      const { jobs, totalCount } = await apiFetch<{ jobs: ATSJob[]; totalCount: number }>(`/api/recruitment/jobs${query}`);
+      set({ jobs, totalJobs: totalCount });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "Failed to load jobs." });
     } finally {
@@ -174,8 +184,8 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const query = params ? "?" + new URLSearchParams(params).toString() : "";
-      const { candidates } = await apiFetch<{ candidates: ATSCandidate[] }>(`/api/recruitment/candidates${query}`);
-      set({ candidates });
+      const { candidates, totalCount } = await apiFetch<{ candidates: ATSCandidate[]; totalCount: number }>(`/api/recruitment/candidates${query}`);
+      set({ candidates, totalCandidates: totalCount });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "Failed to load candidates." });
     } finally {
@@ -268,8 +278,8 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
 
   silentRefreshCandidates: async () => {
     try {
-      const { candidates } = await apiFetch<{ candidates: ATSCandidate[] }>("/api/recruitment/candidates");
-      set({ candidates });
+      const { candidates, totalCount } = await apiFetch<{ candidates: ATSCandidate[]; totalCount: number }>("/api/recruitment/candidates?limit=0");
+      set({ candidates, totalCandidates: totalCount });
     } catch {}
   },
 
@@ -277,8 +287,8 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const query = params ? "?" + new URLSearchParams(params).toString() : "";
-      const { interviews } = await apiFetch<{ interviews: ATSInterview[] }>(`/api/recruitment/interviews${query}`);
-      set({ interviews });
+      const { interviews, totalCount } = await apiFetch<{ interviews: ATSInterview[]; totalCount: number }>(`/api/recruitment/interviews${query}`);
+      set({ interviews, totalInterviews: totalCount });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "Failed to load interviews." });
     } finally {
@@ -333,8 +343,8 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const query = params ? "?" + new URLSearchParams(params).toString() : "";
-      const { offers } = await apiFetch<{ offers: ATSOffer[] }>(`/api/recruitment/offers${query}`);
-      set({ offers });
+      const { offers, totalCount } = await apiFetch<{ offers: ATSOffer[]; totalCount: number }>(`/api/recruitment/offers${query}`);
+      set({ offers, totalOffers: totalCount });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "Failed to load offers." });
     } finally {
@@ -388,8 +398,8 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const query = params ? "?" + new URLSearchParams(params).toString() : "";
-      const { referrals } = await apiFetch<{ referrals: ATSReferral[] }>(`/api/recruitment/referrals${query}`);
-      set({ referrals });
+      const { referrals, totalCount } = await apiFetch<{ referrals: ATSReferral[]; totalCount: number }>(`/api/recruitment/referrals${query}`);
+      set({ referrals, totalReferrals: totalCount });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "Failed to load referrals." });
     } finally {

@@ -17,15 +17,24 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
+  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
+  const rawLimit = parseInt(searchParams.get("limit") ?? "10", 10);
+  const limit = rawLimit === 0 ? 0 : Math.min(100, Math.max(1, rawLimit));
+  const skip = limit === 0 ? 0 : (page - 1) * limit;
 
   const filter: Record<string, unknown> = { company: user.company };
   if (status) filter.status = status;
 
-  const offers = await ATSOffer.find(filter)
-    .sort({ createdAt: -1 })
-    .populate("candidate", "firstName lastName")
-    .populate("job", "title")
-    .populate("signedBy", "name role");
+  const [totalCount, offers] = await Promise.all([
+    ATSOffer.countDocuments(filter),
+    ATSOffer.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit || undefined)
+      .populate("candidate", "firstName lastName")
+      .populate("job", "title")
+      .populate("signedBy", "name role"),
+  ]);
 
-  return NextResponse.json({ offers: serializeDocs(offers) });
+  return NextResponse.json({ offers: serializeDocs(offers), totalCount, page, limit });
 }

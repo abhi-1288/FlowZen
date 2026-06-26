@@ -12,8 +12,8 @@ export default function FullKanbanPage() {
   );
 
   useEffect(() => {
-    if (candidates.length === 0) void fetchCandidates();
-    if (jobs.length === 0) void fetchJobs();
+    if (candidates.length === 0) void fetchCandidates({ limit: "0" });
+    if (jobs.length === 0) void fetchJobs({ limit: "0" });
   }, [candidates.length, jobs.length, fetchCandidates, fetchJobs]);
 
   const grouped = useMemo(() => {

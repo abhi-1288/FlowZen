@@ -20,6 +20,10 @@ export async function GET(request: Request) {
   const status = searchParams.get("status");
   const fromDate = searchParams.get("from");
   const toDate = searchParams.get("to");
+  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
+  const rawLimit = parseInt(searchParams.get("limit") ?? "10", 10);
+  const limit = rawLimit === 0 ? 0 : Math.min(100, Math.max(1, rawLimit));
+  const skip = limit === 0 ? 0 : (page - 1) * limit;
 
   const filter: Record<string, unknown> = { company: user.company };
   if (interviewer && isObjectId(interviewer)) filter.interviewer = interviewer;
@@ -30,11 +34,16 @@ export async function GET(request: Request) {
     if (toDate) (filter.scheduledAt as Record<string, unknown>).$lte = new Date(toDate);
   }
 
-  const interviews = await ATSInterview.find(filter)
-    .sort({ scheduledAt: -1 })
-    .populate("interviewer", "name email")
-    .populate("candidate", "firstName lastName")
-    .populate("job", "title");
+  const [totalCount, interviews] = await Promise.all([
+    ATSInterview.countDocuments(filter),
+    ATSInterview.find(filter)
+      .sort({ scheduledAt: -1 })
+      .skip(skip)
+      .limit(limit || undefined)
+      .populate("interviewer", "name email")
+      .populate("candidate", "firstName lastName")
+      .populate("job", "title"),
+  ]);
 
-  return NextResponse.json({ interviews: serializeDocs(interviews) });
+  return NextResponse.json({ interviews: serializeDocs(interviews), totalCount, page, limit });
 }
