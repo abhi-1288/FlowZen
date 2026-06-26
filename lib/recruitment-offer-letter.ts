@@ -167,10 +167,12 @@ export function renderRecruitmentOfferLetterHtml(input: RecruitmentOfferLetterIn
     .signatures { margin-top: 48px; display: flex; flex-direction: column; align-items: center; }
     .signatures-label { margin-bottom: 32px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0; color: #64748b; }
     .signature-signed { display: flex; flex-direction: column; align-items: center; }
-    .signature-box { border: 1px solid #94a3b8; border-radius: 8px; padding: 8px 24px; text-align: center; }
-    .signature-box-text { margin: 0; font-size: 14px; font-weight: 600; color: #0f172a; }
+    .signature-box { border: 1px solid #94a3b8; border-radius: 8px; padding: 10px 20px; text-align: left; min-width: 240px; }
+    .signature-box-text { margin: 0; font-size: 14px; font-weight: 600; color: #0f172a; line-height: 1.6; }
+    .signature-sep { border-top: 1px solid #cbd5e1; margin: 4px 0; width: 50%; }
     .signature-rule { width: 192px; border-top: 1px solid #94a3b8; margin: 16px 0 8px; }
     .signature-company { margin: 0; font-size: 14px; font-weight: 600; color: #0f172a; }
+    .signature-mono { margin: 4px 0 0; font-family: "Courier New", monospace; font-size: 11px; color: #94a3b8; letter-spacing: 1px; text-transform: uppercase; }
     .footer { margin-top: 48px; border-top: 1px solid #e2e8f0; padding-top: 16px; text-align: center; font-size: 12px; color: #94a3b8; }
     @media print {
       body { background: #fff; }
@@ -190,9 +192,10 @@ export function renderRecruitmentOfferLetterHtml(input: RecruitmentOfferLetterIn
       .perks h4, .signatures-label, .signature-box-text { font-size: 10px; }
       .signatures { margin-top: 24px; }
       .signatures-label { margin-bottom: 16px; }
-      .signature-box { padding: 4px 16px; }
+      .signature-box { padding: 6px 14px; min-width: 180px; }
       .signature-rule { width: 144px; margin: 12px 0 4px; }
       .signature-company { font-size: 11px; }
+      .signature-mono { font-size: 9px; }
       .footer { margin-top: 24px; padding-top: 8px; font-size: 9px; }
     }
   </style>
@@ -249,10 +252,15 @@ export function renderRecruitmentOfferLetterHtml(input: RecruitmentOfferLetterIn
       ${isSigned ? `
       <div class="signature-signed">
         <div class="signature-box">
-          <p class="signature-box-text">${escapeHtml(signedByName)} / ${escapeHtml(signedByRole)} / ${escapeHtml(signedAt)}</p>
+          <p class="signature-box-text">${escapeHtml(signedByName)}</p>
+          <div class="signature-sep"></div>
+          <p class="signature-box-text">${escapeHtml(signedByRole)}</p>
+          <div class="signature-sep"></div>
+          <p class="signature-box-text">${escapeHtml(signedAt)}</p>
         </div>
         <div class="signature-rule"></div>
         <p class="signature-company">${escapeHtml(companyName)} Authority</p>
+        <p class="signature-mono">flowzen-hrms</p>
       </div>
       ` : `
       <div class="signature-signed">
@@ -261,6 +269,7 @@ export function renderRecruitmentOfferLetterHtml(input: RecruitmentOfferLetterIn
         </div>
         <div class="signature-rule"></div>
         <p class="signature-company">${escapeHtml(companyName)}</p>
+        <p class="signature-mono">flowzen-hrms</p>
       </div>
       `}
     </section>

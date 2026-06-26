@@ -124,13 +124,16 @@ export default function OfferDetailPage() {
           </div>
           {offer.isSigned ? (
             <div className="mt-3 flex flex-col items-center">
-              <div className="rounded-lg border border-slate-300 px-4 py-1.5 text-center">
-                <p className="text-sm font-semibold text-slate-900">
-                  {(offer.signedBy as any)?.name || "N/A"} / {(offer.signedBy as any)?.role || "N/A"} / {offer.signedAt ? new Date(offer.signedAt).toLocaleString("en-IN") : "N/A"}
-                </p>
+              <div className="rounded-lg border border-slate-300 px-4 py-2 text-left min-w-[200px]">
+                <p className="text-sm font-semibold text-slate-900">{(offer.signedBy as any)?.name || "N/A"}</p>
+                <div className="border-t border-slate-300 my-1 w-1/2" />
+                <p className="text-sm font-semibold text-slate-900">{(offer.signedBy as any)?.role || "N/A"}</p>
+                <div className="border-t border-slate-300 my-1 w-1/2" />
+                <p className="text-sm font-semibold text-slate-900">{offer.signedAt ? new Date(offer.signedAt).toLocaleString("en-IN") : "N/A"}</p>
               </div>
               <div className="mt-3 w-48 border-t border-slate-400" />
               <p className="mt-1 text-sm font-medium text-slate-700">Authority</p>
+              <p className="mt-0.5 font-mono text-[10px] tracking-widest text-slate-400 uppercase">flowzen-hrms</p>
             </div>
           ) : isHr ? (
             <div className="mt-3">

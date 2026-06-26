@@ -252,21 +252,25 @@ export default function OfferLetterPage() {
           <div className="flex flex-col items-center">
             {offer.isSigned ? (
               <>
-                <div className="rounded-lg border border-slate-300 px-6 py-2 text-center">
-                  <p className="text-sm font-semibold text-slate-900 print:text-[11px]">
-                    {offer.signedBy?.name || "N/A"} / {offer.signedBy?.role || "N/A"} / {offer.signedAt ? new Date(offer.signedAt).toLocaleString("en-IN") : "N/A"}
-                  </p>
+                <div className="rounded-lg border border-slate-300 px-5 py-2 text-left min-w-[200px] print:min-w-[160px]">
+                  <p className="text-sm font-semibold text-slate-900 print:text-[11px]">{offer.signedBy?.name || "N/A"}</p>
+                  <div className="border-t border-slate-300 my-1 w-1/2 print:my-0.5" />
+                  <p className="text-sm font-semibold text-slate-900 print:text-[11px]">{offer.signedBy?.role || "N/A"}</p>
+                  <div className="border-t border-slate-300 my-1 w-1/2 print:my-0.5" />
+                  <p className="text-sm font-semibold text-slate-900 print:text-[11px]">{offer.signedAt ? new Date(offer.signedAt).toLocaleString("en-IN") : "N/A"}</p>
                 </div>
                 <div className="mt-4 w-48 border-t border-slate-400 print:mt-2 print:w-36" />
                 <p className="mt-2 text-sm font-medium text-slate-900 print:text-[11px]">{companyName} Authority</p>
+                <p className="mt-0.5 font-mono text-[10px] tracking-widest text-slate-400 uppercase print:text-[8px]">flowzen-hrms</p>
               </>
             ) : (
               <>
-                <div className="rounded-lg border border-slate-300 px-6 py-2">
+                <div className="rounded-lg border border-slate-300 px-5 py-2 text-left min-w-[200px] print:min-w-[160px]">
                   <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 print:text-[9px]">Authorized Signatory</p>
                 </div>
                 <div className="mt-4 w-48 border-t border-slate-400 print:mt-2 print:w-36" />
                 <p className="mt-2 text-sm font-medium text-slate-900 print:text-[11px]">{companyName}</p>
+                <p className="mt-0.5 font-mono text-[10px] tracking-widest text-slate-400 uppercase print:text-[8px]">flowzen-hrms</p>
               </>
             )}
           </div>

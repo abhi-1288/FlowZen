@@ -2,19 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, ExternalLink, ChevronRight, ChevronDown, PenSquare, Send } from "lucide-react";
+import { FileText, ExternalLink, ChevronDown, PenSquare, Send, Briefcase } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
 
 export default function OffersPage() {
   const router = useRouter();
-  const { offers, loading, fetchOffers, updateOffer, signOffer } = useRecruitmentStore(
-    useShallow((s) => ({ offers: s.offers, loading: s.loading, fetchOffers: s.fetchOffers, updateOffer: s.updateOffer, signOffer: s.signOffer }))
+  const { offers, jobs, loading, fetchOffers, fetchJobs, updateOffer, signOffer } = useRecruitmentStore(
+    useShallow((s) => ({ offers: s.offers, jobs: s.jobs, loading: s.loading, fetchOffers: s.fetchOffers, fetchJobs: s.fetchJobs, updateOffer: s.updateOffer, signOffer: s.signOffer }))
   );
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState("");
 
   useEffect(() => { if (offers.length === 0) void fetchOffers(); }, [offers.length, fetchOffers]);
+  useEffect(() => { if (jobs.length === 0) void fetchJobs(); }, [jobs.length, fetchJobs]);
 
   const filtered = useMemo(() => statusFilter
     ? offers.filter((o) => o.status === statusFilter)
@@ -22,14 +23,17 @@ export default function OffersPage() {
   [offers, statusFilter]);
 
   const grouped = useMemo(() => {
-    const map = new Map<string, typeof offers>();
+    const map = new Map<string, { jobTitle: string; jobStatus: string | null; offers: typeof offers }>();
     for (const offer of filtered) {
+      const jobId = typeof offer.job === "object" ? (offer.job as any).id : null;
       const jobTitle = offer.job && typeof offer.job === "object" ? (offer.job as any).title : "Unknown Job";
-      if (!map.has(jobTitle)) map.set(jobTitle, []);
-      map.get(jobTitle)!.push(offer);
+      const job = jobId ? jobs.find((j) => j.id === jobId) : null;
+      const key = jobTitle;
+      if (!map.has(key)) map.set(key, { jobTitle, jobStatus: job?.status || null, offers: [] });
+      map.get(key)!.offers.push(offer);
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [filtered]);
+  }, [filtered, jobs]);
 
   const toggleJob = (title: string) => {
     setExpandedJobs((prev) => {
@@ -42,7 +46,7 @@ export default function OffersPage() {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-semibold text-slate-900">Offers</h1>
-      <p className="mt-1 text-sm text-slate-500">{offers.length} offers across {grouped.length} jobs</p>
+      <p className="mt-1 text-sm text-slate-500">{offers.length} total</p>
 
       <div className="mt-4 flex items-center gap-3">
         <select
@@ -67,22 +71,31 @@ export default function OffersPage() {
       ) : grouped.length === 0 ? (
         <div className="mt-16 text-center text-slate-500">No offers found.</div>
       ) : (
-        <div className="mt-6 space-y-4">
-          {grouped.map(([jobTitle, jobOffers]) => {
+        <div className="mt-6 space-y-3">
+          {grouped.map(([jobTitle, group]) => {
             const isExpanded = expandedJobs.has(jobTitle);
-            const signedCount = jobOffers.filter((o) => o.isSigned).length;
-            const draftCount = jobOffers.filter((o) => o.status === "draft").length;
+            const signedCount = group.offers.filter((o) => o.isSigned).length;
+            const draftCount = group.offers.filter((o) => o.status === "draft").length;
 
             return (
-              <div key={jobTitle} className="rounded-lg border border-slate-200 bg-white">
+              <div key={jobTitle} className="rounded-lg border border-slate-200 bg-white overflow-hidden">
                 <button
                   onClick={() => toggleJob(jobTitle)}
-                  className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-slate-50 transition rounded-lg"
+                  className="flex w-full items-center justify-between px-4 py-3 hover:bg-slate-50 transition"
                 >
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    {isExpanded ? <ChevronDown size={16} className="shrink-0 text-slate-400" /> : <ChevronRight size={16} className="shrink-0 text-slate-400" />}
-                    <span className="text-sm font-semibold text-slate-900">{jobTitle}</span>
-                    <span className="text-xs text-slate-400">({jobOffers.length} offers)</span>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Briefcase size={16} className="shrink-0 text-slate-400" />
+                    <span className="text-sm font-semibold text-slate-900 truncate">{jobTitle}</span>
+                    {group.jobStatus && (
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                        group.jobStatus === "open" ? "bg-emerald-50 text-emerald-700" :
+                        group.jobStatus === "closed" ? "bg-rose-50 text-rose-700" :
+                        "bg-slate-100 text-slate-500"
+                      }`}>
+                        {group.jobStatus.charAt(0).toUpperCase() + group.jobStatus.slice(1)}
+                      </span>
+                    )}
+                    <span className="shrink-0 text-xs text-slate-400">({group.offers.length} offers)</span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {draftCount > 0 && (
@@ -91,15 +104,16 @@ export default function OffersPage() {
                     {signedCount > 0 && (
                       <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{signedCount} signed</span>
                     )}
+                    <ChevronDown size={16} className={`shrink-0 text-slate-400 transition-transform ${isExpanded ? "" : "-rotate-90"}`} />
                   </div>
                 </button>
 
                 {isExpanded && (
                   <div className="border-t border-slate-100">
-                    {jobOffers.length === 0 ? (
+                    {group.offers.length === 0 ? (
                       <p className="px-4 py-6 text-center text-sm text-slate-400">No offers for this job.</p>
                     ) : (
-                      jobOffers.map((offer) => {
+                      group.offers.map((offer) => {
                         const candidateName = offer.candidate && typeof offer.candidate === "object"
                           ? `${(offer.candidate as any).firstName} ${(offer.candidate as any).lastName}`
                           : "Unknown";
