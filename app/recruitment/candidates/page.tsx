@@ -15,6 +15,7 @@ export default function CandidatesPage() {
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("");
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
+  const [expandedCandidate, setExpandedCandidate] = useState<string | null>(null);
 
   useEffect(() => { if (candidates.length === 0) void fetchCandidates(); }, [candidates.length, fetchCandidates]);
   useEffect(() => { if (jobs.length === 0) void fetchJobs(); }, [jobs.length, fetchJobs]);
@@ -22,9 +23,10 @@ export default function CandidatesPage() {
   const grouped = useMemo(() => {
     const map = new Map<string, typeof candidates>();
     for (const c of candidates) {
+      const cJobTitle = typeof c.job === "object" ? c.job.title : "";
       const cJobId = typeof c.job === "object" ? c.job.id : c.job;
       const job = jobs.find((j) => j.id === cJobId);
-      const key = job?.title || "Unknown Job";
+      const key = job?.title || cJobTitle || "Unknown Job";
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(c);
     }
@@ -117,40 +119,60 @@ export default function CandidatesPage() {
                     {jobCandidates.length === 0 ? (
                       <p className="px-4 py-6 text-center text-sm text-slate-400">No candidates for this job.</p>
                     ) : (
-                      jobCandidates.map((candidate) => {
+                        jobCandidates.map((candidate) => {
                         const candidateJobTitle = typeof candidate.job === "object" ? candidate.job.title : "";
+                        const isCandidateExpanded = expandedCandidate === candidate.id;
                         return (
-                          <div key={candidate.id} className="flex items-center justify-between border-t border-slate-50 px-4 py-3 first:border-t-0 hover:bg-slate-50 transition">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-semibold text-slate-900">{candidate.firstName} {candidate.lastName}</span>
-                                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                                  candidate.stage === "joined" ? "bg-emerald-50 text-emerald-700" :
-                                  candidate.stage === "rejected" ? "bg-rose-50 text-rose-700" :
-                                  "bg-slate-100 text-slate-600"
-                                }`}>{STAGE_LABELS[candidate.stage]}</span>
-                                {(candidate as any).upcomingInterviews?.length > 0 && (
-                                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">Interview Scheduled</span>
-                                )}
-                                {candidate.rating > 0 && (
-                                  <span className="text-xs text-amber-500">{'★'.repeat(candidate.rating)}</span>
-                                )}
+                          <div key={candidate.id} className="border-t border-slate-50 first:border-t-0">
+                            <div
+                              className="flex cursor-pointer items-center justify-between px-4 py-3 hover:bg-slate-50 transition"
+                              onClick={() => setExpandedCandidate(isCandidateExpanded ? null : candidate.id)}
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-semibold text-slate-900">{candidate.firstName} {candidate.lastName}</span>
+                                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                                    candidate.stage === "joined" ? "bg-emerald-50 text-emerald-700" :
+                                    candidate.stage === "rejected" ? "bg-rose-50 text-rose-700" :
+                                    "bg-slate-100 text-slate-600"
+                                  }`}>{STAGE_LABELS[candidate.stage]}</span>
+                                  {(candidate as any).upcomingInterviews?.length > 0 && (
+                                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">Interview Scheduled</span>
+                                  )}
+                                  {candidate.rating > 0 && (
+                                    <span className="text-xs text-amber-500">{'★'.repeat(candidate.rating)}</span>
+                                  )}
+                                </div>
+                                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                                  <span>{candidate.email}</span>
+                                  {candidateJobTitle && <><span>&middot;</span><span>{candidateJobTitle}</span></>}
+                                  {candidate.currentCompany && <><span>&middot;</span><span>{candidate.currentCompany}</span></>}
+                                  {candidate.experienceYears > 0 && <><span>&middot;</span><span>{candidate.experienceYears}y exp</span></>}
+                                </div>
                               </div>
-                              <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                                <span>{candidate.email}</span>
-                                {candidateJobTitle && <><span>&middot;</span><span>{candidateJobTitle}</span></>}
-                                {candidate.currentCompany && <><span>&middot;</span><span>{candidate.currentCompany}</span></>}
-                                {candidate.experienceYears > 0 && <><span>&middot;</span><span>{candidate.experienceYears}y exp</span></>}
+                              <div className="flex items-center gap-2 shrink-0 ml-3">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); router.push(`/recruitment/candidates/${candidate.id}`); }}
+                                  className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                                >
+                                  Profile
+                                </button>
+                                {isCandidateExpanded ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
                               </div>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0 ml-3">
-                              <button
-                                onClick={() => router.push(`/recruitment/candidates/${candidate.id}`)}
-                                className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                              >
-                                Profile
-                              </button>
-                            </div>
+                            {isCandidateExpanded && (
+                              <div className="border-t border-slate-100 px-4 py-3">
+                                <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                                  {candidate.phone && <div><span className="text-xs text-slate-400">Phone</span><p className="text-slate-700">{candidate.phone}</p></div>}
+                                  <div><span className="text-xs text-slate-400">Experience</span><p className="text-slate-700">{candidate.experienceYears}y</p></div>
+                                  {candidate.currentCTC > 0 && <div><span className="text-xs text-slate-400">Current CTC</span><p className="text-slate-700">₹{candidate.currentCTC.toLocaleString()}</p></div>}
+                                  {candidate.expectedCTC > 0 && <div><span className="text-xs text-slate-400">Expected CTC</span><p className="text-slate-700">₹{candidate.expectedCTC.toLocaleString()}</p></div>}
+                                  <div><span className="text-xs text-slate-400">Notice Period</span><p className="text-slate-700">{candidate.noticePeriod}d</p></div>
+                                  <div><span className="text-xs text-slate-400">Source</span><p className="text-slate-700">{candidate.source}</p></div>
+                                  {candidate.createdAt && <div><span className="text-xs text-slate-400">Applied</span><p className="text-slate-700">{new Date(candidate.createdAt).toLocaleDateString("en-IN")}</p></div>}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })
