@@ -667,7 +667,7 @@ export function MembersTab({
     return () => window.removeEventListener("keydown", onKey);
   }, [modalRole]);
 
-  const canEditOthersRole = actorRole === "human-resource";
+  const canEditOthersRole = actorRole === "human-resource" || actorRole === "admin";
 
   const modalMembers = modalRole
     ? members.filter((m) => {
