@@ -185,7 +185,7 @@ export function ProfileHub() {
     profile?.company && profile?.companyStatus === "approved",
   );
   const canViewMembersTab = hasCompany && ["human-resource", "admin", "finance"].includes(String(role));
-  const canViewFinanceTab = hasCompany && ["finance", "admin"].includes(String(role));
+  const canViewFinanceTab = hasCompany;
   const canViewCompanyTabs = hasCompany;
   const mobileTabs: Tab[] = [
     "dashboard",
@@ -929,7 +929,7 @@ export function ProfileHub() {
                 />
               ) : null}
 
-              {tab === "finance" && canViewFinanceTab ? (
+              {tab === "finance" ? (
                 <FinanceTab actorRole={String(role)} profileId={String(profile?.id ?? session?.user?.id ?? "")} showToast={showToast} />
               ) : null}
 

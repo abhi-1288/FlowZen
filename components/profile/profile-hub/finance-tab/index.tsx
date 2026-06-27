@@ -237,6 +237,44 @@ export function FinanceTab({
   const isFinanceOrAdmin = actorRole === "finance" || actorRole === "admin";
   const adminOptions = data.members.filter((m) => String(m.role) === "admin");
 
+  if (!isFinanceOrAdmin) {
+    return (
+      <div className="space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="border-l-4 border-amber-500 pl-4">
+            <h3 className="text-base font-semibold text-slate-900">Finance</h3>
+            <p className="mt-0.5 text-sm text-slate-500">Monthly payroll, salary slips, and expense requests.</p>
+          </div>
+          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
+        </div>
+
+        <div>
+          <h4 className="mb-3 text-sm font-semibold text-slate-800">Monthly Payroll</h4>
+          <SalarySlipSection mySlips={mySlips} slipsLoading={slipsLoading} month={month} />
+        </div>
+
+        <div>
+          <h4 className="mb-3 text-sm font-semibold text-slate-800">Request Expense</h4>
+          <div className="space-y-4">
+            <ExpenseFormSection expenseForm={expenseForm} actorRole={actorRole} financeMembers={data.financeMembers} onSubmit={submitExpense} onFormChange={setExpenseForm} />
+            <ExpenseListSection expenses={data.expenses} actorRole={actorRole} profileId={profileId} adminOptions={adminOptions} forwardAdminByExpense={forwardAdminByExpense} onForwardAdmin={(id, adminId) => setForwardAdminByExpense({ ...forwardAdminByExpense, [id]: adminId })} onReject={(id, type) => setRejectTarget({ id, type })} onStatusUpdate={updateStatus} />
+          </div>
+        </div>
+
+        <div>
+          <h4 className="mb-3 text-sm font-semibold text-slate-800">Reports</h4>
+          <div className="space-y-5">
+            <ReportsSection reports={reports} />
+            <PoliciesSection policyData={policyData} foodOptedIn={foodOptedIn} travelOptedIn={travelOptedIn} onToggleOptInOut={toggleOptInOut} />
+            <LeaveImpactSection leaveImpacts={leaveImpacts} month={month} />
+          </div>
+        </div>
+
+        <RejectModal rejectTarget={rejectTarget} rejectReason={rejectReason} onReasonChange={setRejectReason} onCancel={() => { setRejectTarget(null); setRejectReason(""); }} onConfirm={rejectItem} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
