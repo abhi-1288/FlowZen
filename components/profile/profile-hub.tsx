@@ -33,7 +33,9 @@ import { AttendanceTab } from "./profile-hub/attendance-tab";
 import { DashboardTab } from "./profile-hub/dashboard-tab";
 import { ApprovalsTab, MembersTab, MessagesTab, NotificationsTab } from "./profile-hub/admin-tabs";
 import { FinanceTab } from "./profile-hub/finance-tab";
-import { OnboardingTab, ProfileTab, TimelineTab } from "./profile-hub/profile-tabs";
+import { ProfileTab } from "./profile-hub/profile-tabs";
+import { TimelineTab } from "./profile-hub/timeline-tab";
+import { OnboardingTab } from "./profile-hub/onboarding-tab";
 import { DocumentsTab } from "./profile-hub/documents-tab";
 import { CareersTab } from "./profile-hub/careers-tab";
 import { AnyRecord, AvatarBadge, formatRoleWithCustom } from "./profile-hub/shared";
@@ -598,7 +600,7 @@ export function ProfileHub() {
             onClick={() => setTab("timeline")}
           />
           <NavButton
-            active={tab === "onboarding"}
+            active={tab === "onboarding"} 
             icon={<ShieldCheck size={16} />}
             label="Onboarding"
             onClick={() => setTab("onboarding")}
@@ -624,14 +626,12 @@ export function ProfileHub() {
             />
           ) : null}
           {canViewCompanyTabs && ["admin", "human-resource", "project-manager", "qa-tester", "finance"].includes(String(role)) ? (
-            <Link
-              href="/recruitment/candidates"
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400 transition-all hover:bg-white/10 hover:text-white"
-            >
-              <Briefcase size={16} />
-              Recruitment
-              {recruitmentCount > 0 ? <span className="ml-auto rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold text-white">{recruitmentCount}</span> : null}
-            </Link>
+            <NavButton
+              active={pathname?.startsWith("/recruitment") ?? false}
+              icon={<Briefcase size={16} />}
+              label={`Recruitment${recruitmentCount ? ` (${recruitmentCount})` : ""}`}
+              onClick={() => router.push("/recruitment/candidates")}
+            />
           ) : null}
           {canViewCompanyTabs ? (
             <NavButton

@@ -28,7 +28,7 @@ export async function PATCH(request: Request, { params }: Params) {
 
   try {
     await connectDb();
-  } catch (error) {
+  } catch {
     return jsonError("Database unavailable", 500);
   }
 

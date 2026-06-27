@@ -218,7 +218,15 @@ export async function PATCH(request: Request, { params }: Params) {
     if (joinRequest.kind === "company") {
       requester.companyStatus = status;
       if (status === "approved") {
-        const salaryAmount = Math.max(0, Number(body.salaryAmount ?? 0));
+        let salaryAmount = Math.max(0, Number(body.salaryAmount ?? 0));
+        if (salaryAmount === 0) {
+          const meta = (joinRequest.metadata ?? {}) as Record<string, unknown>;
+          const offeredCTC = Number(meta.offeredCTC ?? 0);
+          if (offeredCTC > 0) {
+            const salaryType = String(meta.salaryType ?? "per-annum");
+            salaryAmount = salaryType === "per-annum" ? Math.round(offeredCTC / 12) : offeredCTC;
+          }
+        }
         await cleanupQuitterBoardAssignments(requester._id);
         requester.company = joinRequest.company;
         requester.companyJoined = new Date();
@@ -233,7 +241,6 @@ export async function PATCH(request: Request, { params }: Params) {
           });
         }
         await ensureCompanyIdentityCode(requester, joinRequest.company);
-        const approver = await User.findById(joinRequest.approver).select("role");
         const meta = (joinRequest.metadata ?? {}) as { enrollingHrId?: unknown };
         let historyInviterId = joinRequest.approver;
         if (meta.enrollingHrId) {

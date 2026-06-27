@@ -43,7 +43,7 @@ export async function GET(_request: Request, { params }: Params) {
   if (!caller) return jsonError("User not found.", 404);
 
   const isOwner = String(board.owner) === userId;
-  const callerMember = (board.members as any[]).find((member) => String(member.user) === userId);
+  const _callerMember = (board.members as any[]).find((member) => String(member.user) === userId);
 
   if (isOwner && caller.role === "admin" && caller.company) {
     const [managers, testers, finance, hr] = await Promise.all([
@@ -138,7 +138,6 @@ export async function PATCH(request: Request, { params }: Params) {
     const team = await Team.findOne({ _id: teamId, manager: userId }).populate("employees");
     if (!team) return jsonError("Team not found or you are not its manager.", 404);
 
-    const at = new Date();
     const newlyAssigned: string[] = [];
     for (const emp of team.employees as any[]) {
       if (emp.teamStatus !== "approved") continue;

@@ -4,7 +4,7 @@ import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 
-export async function POST(request: Request) {
+export async function POST() {
   try {
     const userId = await requireUserId();
     if (!userId) return jsonError("Unauthorized", 401);

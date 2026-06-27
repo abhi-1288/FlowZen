@@ -3,16 +3,32 @@
 import { useEffect, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { usePathname, useRouter } from "next/navigation";
-import Link from "next/link";
 import Image from "next/image";
 import {
   LayoutDashboard, Briefcase, Users, Columns3, Calendar, FileText, UserPlus, LogOut
 } from "lucide-react";
-import { cn, apiFetch } from "@/lib/client-utils";
+import { apiFetch } from "@/lib/client-utils";
 import { useNotificationToast } from "@/lib/toast-context";
+import { NavButton } from "@/components/profile/profile-hub/chrome";
 
 type NotificationPreview = {
   readAt?: string | null;
+};
+
+type SidebarCounts = {
+  jobsOpen: number;
+  jobsClosed: number;
+  candidatesOpen: number;
+  candidatesClosed: number;
+  interviewsOpen: number;
+  interviewsClosed: number;
+  offersOpen: number;
+  offersClosed: number;
+  referralsOpen: number;
+  referralsClosed: number;
+  pendingTasks: number;
+  myRequestCount: number;
+  otherRequestCount: number;
 };
 
 const navItems = [
@@ -30,8 +46,9 @@ export function RecruitmentSidebar() {
   const router = useRouter();
   const { data: session } = useSession();
   const role = session?.user?.role;
-  const isHr = role === "admin" || role === "human-resource";
+  const isFullAccess = role === "admin" || role === "human-resource";
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [counts, setCounts] = useState<SidebarCounts | null>(null);
   const { showNotificationToast } = useNotificationToast();
   const sseRef = useRef<EventSource | null>(null);
 
@@ -42,6 +59,21 @@ export function RecruitmentSidebar() {
     }
     void fetchNotificationCount();
   }, []);
+
+  useEffect(() => {
+    async function fetchCounts() {
+      const result = await apiFetch<SidebarCounts>("/api/recruitment/sidebar-counts").catch(() => null);
+      if (result) setCounts(result);
+    }
+    void fetchCounts();
+  }, []);
+
+  useEffect(() => {
+    for (const item of navItems) {
+      router.prefetch(item.href);
+    }
+    router.prefetch("/profile");
+  }, [router]);
 
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -75,54 +107,69 @@ export function RecruitmentSidebar() {
   }, [session?.user?.id, showNotificationToast]);
 
   return (
-    <aside className="sticky top-0 hidden h-screen w-60 shrink-0 self-start overflow-y-auto border-r border-slate-200 bg-white md:flex md:flex-col">
-      <div className="border-b border-slate-200 p-4">
+    <aside className="sticky top-0 hidden h-screen w-60 shrink-0 self-start overflow-y-auto border-r border-slate-800/60 bg-slate-950/95 text-white backdrop-blur-xl md:flex md:flex-col">
+      <div className="border-b border-slate-800/60 p-4">
         <div className="flex items-center gap-2">
           <div className="relative h-8 w-8 overflow-hidden rounded-lg shadow-sm shadow-indigo-500/20">
             <Image src="/Logos/logo.jpg" alt="FlowZen Logo" fill className="object-cover" />
           </div>
           <div>
             <h1 className="text-sm font-bold tracking-tight">Recruitment</h1>
-            <p className="text-xs text-slate-500 capitalize">{session?.user?.name}: {session?.user?.role}</p>
-            <p className="text-xs text-slate-500 capitalize">Company: {session?.user?.company || "—"}</p>
+            <p className="text-xs text-slate-400 capitalize">{session?.user?.company || "—"}</p>
+            <p className="text-xs text-slate-500 capitalize">{session?.user?.name} &middot; {session?.user?.role}</p>
           </div>
         </div>
       </div>
 
       <nav className="flex-1 space-y-1 p-3">
-        {navItems.filter((item) => isHr || item.href === "/recruitment/candidates").map((item) => {
+        {navItems.filter((item) =>
+          isFullAccess ||
+          item.href === "/recruitment/dashboard" ||
+          item.href === "/recruitment/jobs" ||
+          item.href === "/recruitment/candidates" ||
+          item.href === "/recruitment/interviews"
+        ).map((item) => {
           const isActive = !!(pathname && (pathname === item.href || pathname.startsWith(item.href + "/")));
+          const chip = item.href !== "/recruitment/dashboard" && item.href !== "/recruitment/board" && counts
+            ? {
+                open: counts[`${item.href.replace("/recruitment/", "")}Open` as keyof SidebarCounts] as number,
+                closed: counts[`${item.href.replace("/recruitment/", "")}Closed` as keyof SidebarCounts] as number,
+              }
+            : null;
+          const chips = (() => {
+            const items: React.ReactNode[] = [];
+            if (chip) {
+              items.push(<span key="o" className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-400" title={`${chip.open} open`}>{chip.open}</span>);
+              items.push(<span key="c" className="rounded bg-rose-500/20 px-1.5 py-0.5 text-[11px] font-semibold text-rose-400" title={`${chip.closed} closed`}>{chip.closed}</span>);
+            }
+
+            return items.length > 0 ? <span className="flex items-center gap-1.5">{items}</span> : undefined;
+          })();
           return (
-            <Link
+            <NavButton
               key={item.href}
-              href={item.href}
-              onMouseEnter={() => router.prefetch(item.href)}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition",
-                isActive
-                  ? "bg-slate-950 text-white"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
-              )}
-            >
-              <item.icon size={18} />
-              {item.label}
-            </Link>
+              active={isActive}
+              icon={<item.icon size={16} />}
+              label={item.label}
+              onClick={() => router.push(item.href)}
+              after={chips}
+            />
           );
         })}
       </nav>
 
-      <div className="border-t border-slate-200 p-3">
-        <Link
-          href="/profile"
-          className="mb-1 block rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-950"
-        >
-          Profile Center{unreadNotifications ? ` (${unreadNotifications})` : ""}
-        </Link>
+      <div className="border-t border-slate-800/60 p-3">
+        <NavButton
+          active={pathname?.startsWith("/profile") ?? false}
+          label={`Profile Center${unreadNotifications ? ` (${unreadNotifications})` : ""}`}
+          onClick={() => router.push("/profile")}
+        />
         <button
+          suppressHydrationWarning
           onClick={() => signOut({ callbackUrl: "/login" })}
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50"
+          className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-rose-400 transition-all hover:bg-white/10 hover:text-rose-300"
         >
-          <LogOut size={14} />
+          <LogOut size={16} />
           Sign out
         </button>
       </div>

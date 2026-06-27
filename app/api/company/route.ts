@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { databaseUnavailable, jsonError, requireUserId, serializeDoc } from "@/lib/api";
-import { createJoinCode, createRoleJoinCode } from "@/lib/codes";
+import { createJoinCode } from "@/lib/codes";
 import { generateCompanyIdentityCode } from "@/lib/company-identity";
 import { Company } from "@/models/Company";
 import { User } from "@/models/User";

@@ -23,13 +23,22 @@ export async function GET(request: Request) {
   const status = searchParams.get("status");
   const department = searchParams.get("department");
   const search = searchParams.get("search");
+  const workflow = searchParams.get("workflow");
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
   const rawLimit = parseInt(searchParams.get("limit") ?? "10", 10);
   const limit = rawLimit === 0 ? 0 : Math.min(100, Math.max(1, rawLimit));
   const skip = limit === 0 ? 0 : (page - 1) * limit;
 
   const filter: Record<string, unknown> = { company: user.company };
-  if (status) filter.status = status;
+
+  if (workflow === "true") {
+    filter["workflow.status"] = { $nin: ["published"] };
+  } else if (status) {
+    filter.status = status;
+  } else {
+    filter.status = { $in: ["open", "closed", "draft"] };
+  }
+
   if (department) filter.department = department;
   if (search) {
     filter.$or = [
@@ -40,7 +49,14 @@ export async function GET(request: Request) {
 
   const [totalCount, jobs] = await Promise.all([
     ATSJob.countDocuments(filter),
-    ATSJob.find(filter).populate("company", "name").sort({ createdAt: -1 }).skip(skip).limit(limit || undefined),
+    ATSJob.find(filter)
+      .populate("company", "name")
+      .populate("workflow.requestedBy", "name email")
+      .populate("workflow.assignedHR", "name email")
+      .populate("workflow.salaryApprovedBy", "name email")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit || undefined),
   ]);
 
   const jobIds = jobs.map((j: any) => j._id);
@@ -52,10 +68,20 @@ export async function GET(request: Request) {
     : [];
   const countMap: Record<string, number> = {};
   for (const c of counts) countMap[String(c._id)] = c.count;
-  const jobsWithCount = jobs.map((job: any) => ({
-    ...serializeDoc(job),
-    applicantsCount: countMap[String(job._id)] ?? 0,
-  }));
+  const jobsWithCount = jobs.map((job: any) => {
+    const doc = serializeDoc(job);
+    const wf = (job as any).workflow;
+    return {
+      ...doc,
+      applicantsCount: countMap[String(job._id)] ?? 0,
+      workflow: wf ? {
+        ...(wf.toObject?.() ?? wf),
+        requestedBy: wf.requestedBy ? { id: String(wf.requestedBy._id), name: wf.requestedBy.name } : null,
+        assignedHR: wf.assignedHR ? { id: String(wf.assignedHR._id), name: wf.assignedHR.name } : null,
+        salaryApprovedBy: wf.salaryApprovedBy ? { id: String(wf.salaryApprovedBy._id), name: wf.salaryApprovedBy.name } : null,
+      } : { status: "published", requestedBy: null, assignedHR: null, salaryApprovedBy: null, publishedBy: null, rejectionReason: "", rejectedBy: null, requestedAt: null, assignedAt: null, forwardedAt: null, salaryApprovedAt: null, readyAt: null, publishedAt: null },
+    };
+  });
 
   return NextResponse.json({ jobs: jobsWithCount, totalCount, page, limit });
 }

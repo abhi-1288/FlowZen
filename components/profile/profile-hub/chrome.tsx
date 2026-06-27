@@ -3,15 +3,11 @@ import type { ReactNode } from "react";
 export function ProfileSkeleton() {
   return (
     <div className="animate-pulse space-y-6">
-      {/* Cover banner skeleton */}
       <div className="h-48 rounded-2xl bg-gradient-to-r from-slate-200 to-slate-300" />
-
-      {/* Cards */}
       <div className="grid gap-5 xl:grid-cols-2">
         {[1, 2].map((item) => (
           <div key={item} className="rounded-2xl bg-white p-6 shadow-sm">
             <div className="h-6 w-44 rounded bg-slate-200" />
-
             <div className="mt-6 space-y-4">
               {[1, 2, 3, 4].map((line) => (
                 <div key={line} className="h-4 rounded bg-slate-100" />
@@ -29,14 +25,17 @@ export function NavButton({
   label,
   icon,
   onClick,
+  after,
 }: {
   active: boolean;
-  label: string;
+  label: string | ReactNode;
   icon?: ReactNode;
   onClick: () => void;
+  after?: ReactNode;
 }) {
   return (
     <button
+      suppressHydrationWarning
       className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-all duration-200 ${
         active
           ? "bg-white/15 text-white shadow-sm"
@@ -53,10 +52,16 @@ export function NavButton({
           {icon}
         </span>
       ) : null}
-      <span>{label}</span>
-      {active ? (
-        <span className="ml-auto h-1.5 w-1.5 rounded-full bg-indigo-400" />
+      <span className="truncate">{label}</span>
+      {after || active ? (
+        <span className="ml-auto flex items-center gap-1.5">
+          {after}
+          {active ? <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" /> : null}
+        </span>
       ) : null}
     </button>
   );
 }
+
+
+

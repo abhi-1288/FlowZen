@@ -19,7 +19,7 @@ import { ProjectBudget } from "@/models/ProjectBudget";
 import { Holiday } from "@/models/Holiday";
 import { Notification } from "@/models/Notification";
 
-export async function POST(request: Request) {
+export async function POST() {
   try {
     const userId = await requireUserId();
     if (!userId) return jsonError("Unauthorized", 401);

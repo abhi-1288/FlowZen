@@ -15,8 +15,8 @@ export default function JobDetailPage() {
   const { data: session } = useSession();
   const role = session?.user?.role ?? "";
   const isAdmin = role === "admin";
-  const { activeJob, candidates, loading, fetchJob, fetchCandidates, setModal, deleteJob, updateJob } = useRecruitmentStore(
-    useShallow((s) => ({ activeJob: s.activeJob, candidates: s.candidates, loading: s.loading, fetchJob: s.fetchJob, fetchCandidates: s.fetchCandidates, setModal: s.setModal, deleteJob: s.deleteJob, updateJob: s.updateJob }))
+  const { activeJob, candidates, loading, fetchJob, fetchCandidates, setModal, updateJob } = useRecruitmentStore(
+    useShallow((s) => ({ activeJob: s.activeJob, candidates: s.candidates, loading: s.loading, fetchJob: s.fetchJob, fetchCandidates: s.fetchCandidates, setModal: s.setModal, updateJob: s.updateJob }))
   );
   const [candidateFilter, setCandidateFilter] = useState("");
   const [copied, setCopied] = useState(false);
@@ -246,7 +246,7 @@ function DeleteJobModal({ id }: { id: string }) {
 }
 
 function CandidateModal({ jobId }: { jobId: string }) {
-  const { modal, setModal, createCandidate, jobs } = useRecruitmentStore();
+  const { modal, setModal, createCandidate } = useRecruitmentStore();
   if (modal?.type !== "create-candidate") return null;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {

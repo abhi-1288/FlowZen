@@ -3,6 +3,7 @@ import { connectDb } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { ATSCandidate } from "@/models/ATSCandidate";
 import { ATSJob } from "@/models/ATSJob";
+import { ATSOffer } from "@/models/ATSOffer";
 import { ATSTimeline } from "@/models/ATSTimeline";
 import { ATSAuditLog } from "@/models/ATSAuditLog";
 import { User } from "@/models/User";
@@ -104,6 +105,11 @@ export async function POST(request: Request, { params }: Params) {
     status: "present",
   });
 
+  const acceptedOffer = await ATSOffer.findOne({
+    candidate: candidate._id,
+    status: "accepted",
+  }).select("offeredCTC salaryType");
+
   await JoinRequest.create({
     requester: employee._id,
     approver: userId,
@@ -114,6 +120,8 @@ export async function POST(request: Request, { params }: Params) {
       convertedFromCandidate: id,
       designation: job?.title || "",
       department: job?.department || "",
+      offeredCTC: acceptedOffer?.offeredCTC || 0,
+      salaryType: acceptedOffer?.salaryType || "per-annum",
     },
   });
 

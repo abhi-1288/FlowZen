@@ -180,7 +180,6 @@ export async function POST(req: Request) {
               wfh.currentStep = "hr";
               await wfh.save();
               const hr = await User.findById(hrId).select("name");
-              const hrName = String(hr?.name ?? "HR");
               await Notification.create({ user: hrId, title: "WFH Request", body: `${body} (No manager assigned)`, link: "/profile?tab=attendance" });
               emitToUser(hrId, "notification:new", {});
             } else {
@@ -225,7 +224,6 @@ export async function POST(req: Request) {
           const hrId = await findApprovedHrUserId(companyId as any);
           if (hrId) {
             const hr = await User.findById(hrId).select("name");
-            const hrName = String(hr?.name ?? "HR");
             await Notification.create({ user: hrId, title: "WFH Request", body, link: "/profile?tab=attendance" });
             emitToUser(hrId, "notification:new", {});
           } else {

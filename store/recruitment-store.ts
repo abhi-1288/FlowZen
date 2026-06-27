@@ -11,6 +11,7 @@ import type {
   ATSReferral,
   DashboardData,
   Stage,
+  WorkflowStatus,
 } from "@/lib/recruitment-types";
 
 type ModalState =
@@ -47,6 +48,11 @@ type RecruitmentStore = {
   totalOffers: number;
   totalReferrals: number;
   totalInterviews: number;
+  myTasks: ATSJob[];
+  inProgressJobs: ATSJob[];
+  myRequests: ATSJob[];
+  allRequests: ATSJob[];
+  userRole: string;
 
   setModal: (modal: ModalState) => void;
   setError: (error: string | null) => void;
@@ -57,6 +63,11 @@ type RecruitmentStore = {
   createJob: (data: Partial<ATSJob>) => Promise<ATSJob>;
   updateJob: (id: string, data: Partial<ATSJob>) => Promise<void>;
   deleteJob: (id: string) => Promise<void>;
+  requestJob: (data: { title: string; assignedHR: string; openings?: number }) => Promise<void>;
+  fetchMyTasks: () => Promise<void>;
+  fetchInProgressJobs: () => Promise<void>;
+  fetchMyRequests: () => Promise<void>;
+  fetchAllRequests: () => Promise<void>;
 
   fetchCandidates: (params?: Record<string, string>) => Promise<void>;
   fetchCandidate: (id: string) => Promise<void>;
@@ -104,6 +115,11 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
   totalOffers: 0,
   totalReferrals: 0,
   totalInterviews: 0,
+  myTasks: [],
+  inProgressJobs: [],
+  myRequests: [],
+  allRequests: [],
+  userRole: "",
 
   setModal: (modal) => set({ modal }),
   setError: (error) => set({ error }),
@@ -178,6 +194,57 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
       jobs: state.jobs.filter((j) => j.id !== id),
       activeJob: state.activeJob?.id === id ? null : state.activeJob,
     }));
+  },
+
+  requestJob: async (data) => {
+    set({ saving: true, error: null });
+    try {
+      await apiFetch("/api/recruitment/jobs/request", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : "Failed to create job request." });
+      throw error;
+    } finally {
+      set({ saving: false });
+    }
+  },
+
+  fetchMyTasks: async () => {
+    try {
+      const { tasks } = await apiFetch<{ tasks: ATSJob[] }>("/api/recruitment/jobs/my-tasks");
+      set({ myTasks: tasks });
+    } catch {
+      set({ myTasks: [] });
+    }
+  },
+
+  fetchInProgressJobs: async () => {
+    try {
+      const { jobs } = await apiFetch<{ jobs: ATSJob[] }>("/api/recruitment/jobs?workflow=true&limit=50");
+      set({ inProgressJobs: jobs });
+    } catch {
+      set({ inProgressJobs: [] });
+    }
+  },
+
+  fetchMyRequests: async () => {
+    try {
+      const { requests } = await apiFetch<{ requests: ATSJob[] }>("/api/recruitment/jobs/my-requests");
+      set({ myRequests: requests });
+    } catch {
+      set({ myRequests: [] });
+    }
+  },
+
+  fetchAllRequests: async () => {
+    try {
+      const { requests } = await apiFetch<{ requests: ATSJob[] }>("/api/recruitment/jobs/all-requests");
+      set({ allRequests: requests });
+    } catch {
+      set({ allRequests: [] });
+    }
   },
 
   fetchCandidates: async (params) => {

@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { databaseUnavailable, isObjectId, jsonError, requireUserId } from "@/lib/api";
 import { Company } from "@/models/Company";
+import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
+import { emitNotification } from "@/lib/realtime";
 
 const VALID_ROLES = ["employee", "project-manager", "qa-tester", "human-resource", "finance", "admin", "others"];
 const ROLE_LABELS = [
@@ -56,6 +58,10 @@ export async function PATCH(request: Request) {
     return jsonError("Only approved HR or admins can update members.", 403);
   }
 
+  if (String(actor._id) === String(member._id)) {
+    return jsonError("You cannot change your own role.", 403);
+  }
+
   const newRole = String((body as any).role ?? "").trim();
   const customRole = String((body as any).customRole ?? "").trim();
 
@@ -83,6 +89,16 @@ export async function PATCH(request: Request) {
     member.role = newRole;
     member.customRole = "";
     await member.save();
+
+    await Notification.create({
+      user: member._id,
+      company: member.company,
+      type: "info",
+      title: "Role Updated",
+      message: `Your role has been changed from ${oldRole} to ${newRole} by ${actor.name ?? "HR/Admin"}.`,
+    });
+    emitNotification(String(member._id));
+
     return NextResponse.json({ ok: true, role: member.role });
   }
 

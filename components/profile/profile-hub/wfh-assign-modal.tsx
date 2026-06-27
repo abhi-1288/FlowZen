@@ -34,7 +34,7 @@ export function WfhAssignModal({
         }
       );
       const mapped = Array.isArray(res.wfhDates)
-        ? res.wfhDates.map((item: any) => {
+        ? res.wfhDates.map((item) => {
           if (item && typeof item === "object") {
             return {
               date: String(item.date),
@@ -133,3 +133,4 @@ export function WfhAssignModal({
     </div>
   );
 }
+

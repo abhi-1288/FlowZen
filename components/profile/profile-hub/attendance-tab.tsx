@@ -1,287 +1,25 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Calendar, Camera, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, Info, LogOut, Pen, Plus, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Calendar, Check, ChevronLeft, ChevronRight, Pen, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { apiFetch } from "@/lib/client-utils";
 import { ActionButton, AnyRecord } from "./shared";
-
-export function CalendarTab() {
-  const [viewDate, setViewDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [history, setHistory] = useState<AnyRecord[]>([]);
-  const [requests, setRequests] = useState<AnyRecord[]>([]);
-  const [leavePolicy, setLeavePolicy] = useState<AnyRecord | null>(null);
-  const [holidays, setHolidays] = useState<AnyRecord[]>([]);
-  const [minWorkHours, setMinWorkHours] = useState(8);
-
-  const month = viewDate.getMonth();
-  const year = viewDate.getFullYear();
-
-  const monthNames = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-  ];
-
-  const prevMonth = () => {
-    setViewDate(new Date(year, month - 1, 1));
-  };
-
-  const nextMonth = () => {
-    setViewDate(new Date(year, month + 1, 1));
-  };
-
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDay = new Date(year, month, 1).getDay();
-
-  const days: any[] = [];
-  for (let i = 0; i < firstDay; i++) {
-    days.push(null);
-  }
-  for (let i = 1; i <= daysInMonth; i++) {
-    days.push(i);
-  }
-  const numWeeks = Math.ceil(days.length / 7);
-
-  const normalizeDate = (date: Date) => {
-    const normalized = new Date(date);
-    normalized.setHours(0, 0, 0, 0);
-    return normalized;
-  };
-
-  const getDateForDay = (day: number | null) => {
-    if (!day) return null;
-    return normalizeDate(new Date(year, month, day));
-  };
-
-  const getAttendanceStatus = (day: number | null): 'present' | 'half-day' | 'absent' | null => {
-    if (!day) return null;
-    const date = getDateForDay(day);
-    if (!date) return null;
-    const entry = history.find(
-      (e) =>
-        normalizeDate(new Date(String(e.date))).getTime() === date.getTime(),
-    );
-    if (!entry) return null;
-    if (!entry.checkIn || !entry.checkOut) return 'present';
-    const diff = new Date(String(entry.checkOut)).getTime() - new Date(String(entry.checkIn)).getTime();
-    const hrs = diff / 3600000;
-    const threshold = minWorkHours / 2;
-    if (hrs < threshold) return 'absent';
-    if (hrs < minWorkHours) return 'half-day';
-    return 'present';
-  };
-
-  const isCheckedIn = (day: number | null) => {
-    const status = getAttendanceStatus(day);
-    return status === 'present' || status === 'half-day';
-  };
-
-  const isOnLeave = (day: number | null) => {
-    if (!day) return false;
-    const date = new Date(year, month, day);
-    return requests.some((req) => {
-      if (req.status !== "approved") return false;
-      const start = new Date(String(req.startDate));
-      const end = new Date(String(req.endDate));
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-      return date >= start && date <= end;
-    });
-  };
-
-  const isHoliday = (day: number | null) => {
-    if (!day) return false;
-    const date = new Date(year, month, day);
-    return holidays.some((holiday) => {
-      const start = new Date(String(holiday.startDate));
-      const end = new Date(String(holiday.endDate));
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-      return date >= start && date <= end;
-    });
-  };
-
-  const isPastDay = (day: number | null) => {
-    if (!day) return false;
-    const date = getDateForDay(day);
-    if (!date) return false;
-    const today = normalizeDate(new Date());
-    return date.getTime() < today.getTime();
-  };
-
-  const loadData = async () => {
-    const [historyRes, requestsRes, holidaysRes] = await Promise.all([
-      apiFetch<{ history: AnyRecord[]; minWorkHours?: number }>("/api/attendance/checkin").catch(
-        () => ({ history: [] as AnyRecord[], minWorkHours: undefined }),
-      ),
-      apiFetch<{ requests: AnyRecord[]; leavePolicy?: AnyRecord }>("/api/attendance/leave").catch(
-        () => ({ requests: [] as AnyRecord[], leavePolicy: null }),
-      ),
-      apiFetch<{ holidays: AnyRecord[] }>("/api/attendance/holidays").catch(
-        () => ({ holidays: [] as AnyRecord[] }),
-      ),
-    ]);
-
-    setHistory(historyRes.history ?? []);
-    setMinWorkHours(historyRes.minWorkHours ?? 8);
-    setRequests(requestsRes.requests ?? []);
-    setHolidays(holidaysRes.holidays ?? []);
-  };
-
-  useEffect(() => {
-    void loadData();
-  }, []);
-
-  const isToday = (day: number | null) => {
-    if (!day) return false;
-    const today = new Date();
-    return (
-      day === today.getDate() &&
-      month === today.getMonth() &&
-      year === today.getFullYear()
-    );
-  };
-
-  const weekDays = ["SUN.", "Mon.", "Tue.", "Wed.", "Thr.", "Fri.", "Sat."];
-
-  return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
-      <div className="mb-8 flex items-center justify-center gap-4">
-        <ActionButton onClick={prevMonth} variant="secondary" className="h-10 w-12" aria-label="Previous month">
-          <ChevronLeft size={20} />
-        </ActionButton>
-
-        <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 shadow-sm">
-          <div className="border-r border-slate-200 bg-slate-50 px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-600">
-            {monthNames[month]}
-          </div>
-          <div className="bg-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-900">
-            {year}
-          </div>
-        </div>
-
-        <ActionButton onClick={nextMonth} variant="secondary" className="h-10 w-12" aria-label="Next month">
-          <ChevronRight size={20} />
-        </ActionButton>
-      </div>
-
-      <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4">
-        <div className="grid grid-cols-7 gap-3">
-          {weekDays.map((wd, i) => (
-            <div
-              key={wd}
-              className={`flex flex-col gap-3 rounded-2xl p-2 pb-6 transition-all ${i === 0
-                ? "bg-rose-50/50 text-rose-600 border border-rose-100/50"
-                : "bg-emerald-50/50 text-emerald-600 border border-emerald-100/50"
-                }`}
-            >
-              <span className="text-center text-[10px] font-black uppercase tracking-tighter sm:text-xs">
-                {wd}
-              </span>
-              <div className="space-y-2">
-                {/* Find days that belong to this column */}
-                {Array.from({ length: numWeeks }).map((_, rowIndex) => {
-                  const dayIndex = rowIndex * 7 + i;
-                  const day = days[dayIndex];
-                  if (day === undefined) return null;
-
-                  const today = isToday(day);
-                  const status = day ? getAttendanceStatus(day) : null;
-                  const checkedIn = status === 'present' || status === 'half-day';
-                  const leave = isOnLeave(day);
-                  const holiday = isHoliday(day);
-                  const past = isPastDay(day);
-                  const attAbsent = status === 'absent';
-                  const halfDay = status === 'half-day';
-                  return (
-                    <div
-                      key={rowIndex}
-                      onClick={() => {
-                        const date = getDateForDay(day);
-                        if (date) {
-                          setSelectedDate(date);
-                        }
-                      }}
-                      role={day ? "button" : undefined}
-                      tabIndex={day ? 0 : undefined}
-                      title={
-                        day
-                          ? `View details for ${monthNames[month]} ${day}, ${year}`
-                          : undefined
-                      }
-                      className={`relative cursor-pointer grid h-10 w-full place-items-center rounded-xl text-xs font-bold sm:h-14 sm:text-sm transition-all ${day
-                        ? holiday
-                          ? "bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 shadow-sm hover:border-fuchsia-300 hover:bg-fuchsia-50"
-                          : halfDay
-                            ? "bg-amber-100 text-amber-700 border border-amber-200 shadow-sm hover:border-amber-300 hover:bg-amber-50"
-                            : attAbsent
-                              ? "bg-rose-50 text-rose-600 border border-rose-200 shadow-sm hover:border-rose-300 hover:bg-rose-100"
-                              : today
-                                ? checkedIn
-                                  ? "bg-sky-100 text-sky-700 border border-sky-200 shadow-inner"
-                                  : "bg-white text-rose-600 border border-rose-200 shadow-sm hover:border-rose-300 hover:bg-rose-50"
-                                : checkedIn
-                                  ? "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm hover:border-emerald-300 hover:bg-emerald-50"
-                                  : leave
-                                    ? "bg-emerald-100 text-rose-600 border border-emerald-200 shadow-sm hover:border-emerald-300 hover:bg-emerald-50"
-                                    : past
-                                      ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm"
-                                      : "bg-white shadow-sm border border-slate-100 text-slate-700 hover:border-slate-200 hover:bg-slate-50"
-                        : "opacity-0"
-                        }`}
-                    >
-                      {day}
-                      {day &&
-                        (holiday ||
-                          checkedIn ||
-                          leave ||
-                          attAbsent ||
-                          halfDay ||
-                          (today && !checkedIn && !attAbsent)) && (
-                          <span className="absolute right-1 top-1 rounded-full bg-white/90 p-0.5">
-                            {holiday ? (
-                              <Calendar className="h-3.5 w-3.5 text-fuchsia-600" />
-                            ) : attAbsent ? (
-                              <X className="h-3.5 w-3.5 text-rose-600" />
-                            ) : checkedIn || leave ? (
-                              <Check className="h-3.5 w-3.5 text-emerald-600" />
-                            ) : (
-                              <X className="h-3.5 w-3.5 text-rose-600" />
-                            )}
-                          </span>
-                        )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {selectedDate && (
-        <DayDetailsModal
-          date={selectedDate}
-          onClose={() => setSelectedDate(null)}
-          history={history}
-          requests={requests}
-          holidays={holidays}
-          minWorkHours={minWorkHours}
-        />
-      )}
-    </section>
-  );
-}
-
+import { LeaveModal, RequestsListModal } from "./attendance/modals/leave-modals";
+import { HolidayModal, EditHolidayModal, AdminLeaveHistoryModal } from "./attendance/modals/holiday-modals";
+import { WfhRequestModal, WfhRequestsListModal } from "./attendance/modals/wfh-modals";
+import { CheckOutRequestModal, CheckOutRequestsListModal } from "./attendance/modals/checkout-modals";
+import { DayDetailsModal } from "./attendance/modals/day-details-modal";
+import { AskModal, RequestsModal } from "./attendance/inline-modals";
+import {
+  getAttendanceStatus as getAttendanceStatusFn,
+  getDateForDay as getDateForDayFn, getWfhDetail as getWfhDetailFn,
+  isAttendanceEnabled as checkAttendanceEnabled,
+  canExportAttendance as checkCanExport,
+  isCompanyWfh as isCompanyWfhFn,
+  isHoliday as isHolidayFn, isOnLeave as isOnLeaveFn, isOnWfh as isOnWfhFn,
+  isOwnRequest as isOwnRequestFn,
+  isPastDay as isPastDayFn, isPendingLeave as isPendingLeaveFn,
+  isToday as isTodayFn, normalizeDate as normalizeDateFn,
+} from "./attendance/utils";
 export function AttendanceTab({
   profile,
   showToast,
@@ -292,7 +30,6 @@ export function AttendanceTab({
   const { data: session } = useSession();
   const [viewDate, setViewDate] = useState(new Date());
   const [isCheckingIn, setIsCheckingIn] = useState(false);
-  const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showHolidayModal, setShowHolidayModal] = useState(false);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
@@ -335,31 +72,22 @@ export function AttendanceTab({
   const [wfhRejectingId, setWfhRejectingId] = useState<string | null>(null);
   const [wfhRejectionReason, setWfhRejectionReason] = useState("");
   const [minWorkHours, setMinWorkHours] = useState(8);
-
-  const normalizeDate = (date: Date) => {
-    const normalized = new Date(date);
-    normalized.setHours(0, 0, 0, 0);
-    return normalized;
-  };
-
+  const normalizeDate = (date: Date) => normalizeDateFn(date);
   const attendanceStartDate = useMemo(() => {
     const parseDate = (value: unknown) => {
       if (!value) return null;
       const date = new Date(String(value));
       return Number.isNaN(date.getTime()) ? null : normalizeDate(date);
     };
-
     const companyJoined = parseDate(profile?.companyJoined);
     const teamJoined = parseDate(profile?.teamJoined);
     const createdAt = parseDate(profile?.createdAt);
-
     return (
       companyJoined || teamJoined || createdAt || normalizeDate(new Date(0))
     );
   }, [profile]);
-
   const loadData = async () => {
-    const [hRes, cRes, rRes, holRes, wfhRes, wfhReqRes, coRes] = await Promise.all([
+    const [hRes,, rRes, holRes, wfhRes, wfhReqRes, coRes] = await Promise.all([
       apiFetch<{ history: AnyRecord[]; today?: string }>(
         "/api/attendance/checkin",
       ).catch(() => ({ history: [] as AnyRecord[], today: undefined })),
@@ -393,7 +121,6 @@ export function AttendanceTab({
     setWfhDays(wfhRes.wfhDays ?? 0);
     setWfhPeriod(wfhRes.wfhPeriod ?? "monthly");
     setRemainingWfhDays(Math.max(0, Number((wfhReqRes as any)?.wfhPolicy?.remainingWfhDays ?? 0)));
-
     if (hRes.today) {
       const today = new Date(hRes.today);
       if (!Number.isNaN(today.getTime())) {
@@ -401,13 +128,8 @@ export function AttendanceTab({
       }
     }
   };
-
-  const isAttendanceEnabled = Boolean(
-    (profile?.companyStatus === "approved" && profile?.company) ||
-    (profile?.teamStatus === "approved" && profile?.team),
-  );
-  const canExportAttendance = ["finance"].includes(String(profile?.role ?? ""));
-
+  const isAttendanceEnabled = checkAttendanceEnabled(profile);
+  const canExportAttendance = checkCanExport(profile);
   const exportAttendance = () => {
     if (!exportFrom || !exportTo) {
       showToast("Select a start and end date.", "error");
@@ -415,18 +137,15 @@ export function AttendanceTab({
     }
     window.location.href = `/api/attendance/export?from=${encodeURIComponent(exportFrom)}&to=${encodeURIComponent(exportTo)}`;
   };
-
   useEffect(() => {
     if (!isAttendanceEnabled) return;
     loadData();
   }, [isAttendanceEnabled]);
-
   useEffect(() => {
     if (serverToday) {
       setViewDate(serverToday);
     }
   }, [serverToday]);
-
   const handleCheckIn = async () => {
     if (todayLeave) {
       showToast(
@@ -435,7 +154,6 @@ export function AttendanceTab({
       );
       return;
     }
-
     setIsCheckingIn(true);
     try {
       await apiFetch("/api/attendance/checkin", { method: "POST" });
@@ -450,7 +168,6 @@ export function AttendanceTab({
       setIsCheckingIn(false);
     }
   };
-
   const handleCheckOut = async () => {
     setIsCheckingIn(true);
     try {
@@ -463,7 +180,6 @@ export function AttendanceTab({
       setIsCheckingIn(false);
     }
   };
-
   const handleApprove = async (id: string, assignedAdmin?: string) => {
     try {
       await apiFetch(`/api/attendance/leave/${id}`, {
@@ -479,7 +195,6 @@ export function AttendanceTab({
       );
     }
   };
-
   const handleReject = async () => {
     if (!rejectingId) return;
     try {
@@ -498,7 +213,6 @@ export function AttendanceTab({
       );
     }
   };
-
   const handleWfhApprove = async (id: string) => {
     try {
       await apiFetch(`/api/attendance/wfh/${id}`, {
@@ -514,7 +228,6 @@ export function AttendanceTab({
       );
     }
   };
-
   const handleWfhReject = async () => {
     if (!wfhRejectingId) return;
     try {
@@ -533,7 +246,6 @@ export function AttendanceTab({
       );
     }
   };
-
   const handleRevoke = async (id: string) => {
     try {
       await apiFetch(`/api/attendance/leave/${id}`, {
@@ -549,7 +261,6 @@ export function AttendanceTab({
       );
     }
   };
-
   const handleWfhRevoke = async (id: string) => {
     try {
       await apiFetch(`/api/attendance/wfh/${id}`, {
@@ -565,7 +276,6 @@ export function AttendanceTab({
       );
     }
   };
-
   const handleEditHoliday = async (
     holiday: AnyRecord,
     updates: {
@@ -589,7 +299,6 @@ export function AttendanceTab({
       );
     }
   };
-
   const handleDeleteHoliday = async (holiday: AnyRecord) => {
     try {
       await apiFetch("/api/attendance/holidays", {
@@ -605,15 +314,12 @@ export function AttendanceTab({
       );
     }
   };
-
   const requestHolidayDelete = (holiday: AnyRecord) => {
     setHolidayToDelete(holiday);
     setShowDeleteHolidayConfirm(true);
   };
-
   const month = viewDate.getMonth();
   const year = viewDate.getFullYear();
-
   const monthNames = [
     "January",
     "February",
@@ -628,18 +334,14 @@ export function AttendanceTab({
     "November",
     "December",
   ];
-
   const prevMonth = () => {
     setViewDate(new Date(year, month - 1, 1));
   };
-
   const nextMonth = () => {
     setViewDate(new Date(year, month + 1, 1));
   };
-
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDay = new Date(year, month, 1).getDay();
-
   const days: any[] = [];
   for (let i = 0; i < firstDay; i++) {
     days.push(null);
@@ -648,166 +350,42 @@ export function AttendanceTab({
     days.push(i);
   }
   const numWeeks = Math.ceil(days.length / 7);
-
   const serverTodayDate = useMemo(() => {
     return normalizeDate(serverToday ?? new Date());
   }, [serverToday]);
-
   const todayDate = serverTodayDate;
-
-  const getDateForDay = (day: number | null) => {
-    if (!day) return null;
-    return normalizeDate(new Date(year, month, day));
-  };
-
+  const getDateForDay = (day: number | null) => getDateForDayFn(day, year, month);
   const isBeforeAttendanceStart = (day: number | null) => {
-    const date = getDateForDay(day);
+    const date = getDateForDayFn(day, year, month);
     if (!date) return false;
     return date.getTime() < attendanceStartDate.getTime();
   };
-
-  const isToday = (day: number | null) => {
-    if (!day) return false;
-    return (
-      day === todayDate.getDate() &&
-      month === todayDate.getMonth() &&
-      year === todayDate.getFullYear()
-    );
-  };
-
-  const getAttendanceStatus = (day: number | null): 'present' | 'half-day' | 'absent' | null => {
-    if (!day) return null;
-    const date = getDateForDay(day);
-    if (!date) return null;
-    const entry = history.find((e: any) => {
-      const entryDate = normalizeDate(new Date(e.date));
-      return entryDate.getTime() === date.getTime();
-    });
-    if (!entry) return null;
-    if (!entry.checkIn || !entry.checkOut) return 'present';
-    const diff = new Date(String(entry.checkOut)).getTime() - new Date(String(entry.checkIn)).getTime();
-    const hrs = diff / 3600000;
-    const threshold = minWorkHours / 2;
-    if (hrs < threshold) return 'absent';
-    if (hrs < minWorkHours) return 'half-day';
-    return 'present';
-  };
-
-  const isCheckedIn = (day: number | null) => {
-    const status = getAttendanceStatus(day);
-    return status === 'present' || status === 'half-day';
-  };
-
-  const isPastDay = (day: number | null) => {
-    const date = getDateForDay(day);
-    if (!date) return false;
-    return date.getTime() < todayDate.getTime();
-  };
-
+  const isToday = (day: number | null) => isTodayFn(day, month, year, todayDate);
+  const getAttendanceStatus = (day: number | null) => getAttendanceStatusFn(day, history, minWorkHours, year, month);
+  const isPastDay = (day: number | null) => isPastDayFn(day, todayDate, year, month);
   const isWeekend = (day: number | null) => {
-    const date = getDateForDay(day);
+    const date = getDateForDayFn(day, year, month);
     if (!date) return false;
-    
     const manualWeekendsThisMonth = companyWeekendDates.filter((item) => {
-      const weekendDate = normalizeDate(new Date(item.date));
+      const weekendDate = normalizeDateFn(new Date(item.date));
       return weekendDate.getFullYear() === year && weekendDate.getMonth() === month;
     });
-
     if (manualWeekendsThisMonth.length === 0) {
       return date.getDay() === 0;
     }
-
     return manualWeekendsThisMonth.some((item) => {
-      const weekendDate = normalizeDate(new Date(item.date));
+      const weekendDate = normalizeDateFn(new Date(item.date));
       return weekendDate.getTime() === date.getTime();
     });
   };
-
   const currentUserId = session?.user?.id;
-
-  const isOwnRequest = (req: any) =>
-    String(req.requester?._id || req.requester) === currentUserId;
-
-  const isOnLeave = (day: number | null) => {
-    if (!day) return false;
-    const date = new Date(year, month, day);
-    return requests.some((req: any) => {
-      if (req.status !== "approved" || !isOwnRequest(req)) return false;
-      const start = new Date(req.startDate);
-      const end = new Date(req.endDate);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-      return date >= start && date <= end;
-    });
-  };
-
-  const isOnWfh = (day: number | null) => {
-    if (!day) return false;
-    const date = new Date(year, month, day);
-    return wfhRequests.some((req: any) => {
-      if (req.status !== "approved" || !isOwnRequest(req)) return false;
-      const start = new Date(req.startDate);
-      const end = new Date(req.endDate);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-      return date >= start && date <= end;
-    });
-  };
-
-  const isPendingLeave = (day: number | null) => {
-    if (!day) return false;
-    const date = new Date(year, month, day);
-    return requests.some((req: any) => {
-      if (!["pending", "hr-approved", "manager-approved"].includes(String(req.status)) || !isOwnRequest(req)) return false;
-      const start = new Date(req.startDate);
-      const end = new Date(req.endDate);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-      return date >= start && date <= end;
-    });
-  };
-
-  const isHoliday = (day: number | null) => {
-    if (!day) return false;
-    const date = new Date(year, month, day);
-    return holidays.some((holiday: any) => {
-      const start = new Date(holiday.startDate);
-      const end = new Date(holiday.endDate);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-      return date >= start && date <= end;
-    });
-  };
-
-  const getWfhDetail = (day: number | null) => {
-    if (!day) return null;
-    const date = new Date(year, month, day);
-    date.setHours(0, 0, 0, 0);
-    return wfhRequests.find((req: any) => {
-      if (req.status !== "approved") return false;
-      const start = new Date(req.startDate);
-      const end = new Date(req.endDate);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-      return date >= start && date <= end;
-    }) || null;
-  };
-
-  const getCompanyWfhDetail = (day: number | null) => {
-    if (!day) return null;
-    const date = new Date(year, month, day);
-    date.setHours(0, 0, 0, 0);
-    return companyWfhDates.find((d) => {
-      const dDate = new Date(d.date);
-      dDate.setHours(0, 0, 0, 0);
-      return dDate.getTime() === date.getTime();
-    }) || null;
-  };
-
-  const isCompanyWfh = (day: number | null) => {
-    return !!getCompanyWfhDetail(day);
-  };
-
+  const isOwnRequest = (req: any) => isOwnRequestFn(req, currentUserId);
+  const isOnLeave = (day: number | null) => isOnLeaveFn(day, requests, currentUserId, year, month);
+  const isOnWfh = (day: number | null) => isOnWfhFn(day, wfhRequests, currentUserId, year, month);
+  const isPendingLeave = (day: number | null) => isPendingLeaveFn(day, requests, currentUserId, year, month);
+  const isHoliday = (day: number | null) => isHolidayFn(day, holidays, year, month);
+  const getWfhDetail = (day: number | null) => getWfhDetailFn(day, wfhRequests, year, month);
+  const isCompanyWfh = (day: number | null) => isCompanyWfhFn(day, companyWfhDates, year, month);
   const todayLeave = requests.some((req: any) => {
     if (req.status !== "approved" || !isOwnRequest(req)) return false;
     const start = new Date(req.startDate);
@@ -816,7 +394,6 @@ export function AttendanceTab({
     end.setHours(23, 59, 59, 999);
     return todayDate >= start && todayDate <= end;
   });
-
   const todayAttendance = history.find((entry: any) => {
     const entryDate = normalizeDate(new Date(entry.date));
     return entryDate.getTime() === todayDate.getTime();
@@ -825,7 +402,6 @@ export function AttendanceTab({
   const paidLeaveDays = Math.max(0, Number(leavePolicy?.paidLeaveDays ?? 0));
   const paidLeavePeriod = String(leavePolicy?.paidLeavePeriod ?? "monthly");
   const canAskPaidLeave = String(profile?.role ?? "") !== "admin" && remainingPaidLeaveDays > 0;
-
   const isTodayWfh = useMemo(() => {
     const todayTime = todayDate.getTime();
     return wfhRequests.some((req: any) => {
@@ -837,23 +413,7 @@ export function AttendanceTab({
       return todayTime >= start.getTime() && todayTime <= end.getTime();
     });
   }, [wfhRequests, todayDate]);
-
-  const currentHoliday = (day: number | null) => {
-    if (!day) return null;
-    const date = new Date(year, month, day);
-    return (
-      holidays.find((holiday: any) => {
-        const start = new Date(holiday.startDate);
-        const end = new Date(holiday.endDate);
-        start.setHours(0, 0, 0, 0);
-        end.setHours(23, 59, 59, 999);
-        return date >= start && date <= end;
-      }) || null
-    );
-  };
-
   const weekDays = ["SUN.", "Mon.", "Tue.", "Wed.", "Thr.", "Fri.", "Sat."];
-
   if (!isAttendanceEnabled) {
     return (
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
@@ -869,83 +429,6 @@ export function AttendanceTab({
     </section>
   );
 }
-
-function CheckOutRequestsListModal({
-  requests,
-  onClose,
-}: {
-  requests: AnyRecord[];
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200">
-        <div className="flex items-center justify-between border-b border-slate-100 p-6">
-          <div>
-            <h3 className="text-xl font-bold text-slate-900">Check-Out Requests</h3>
-            <p className="text-sm text-slate-500">Your check-out requests and their status.</p>
-          </div>
-          <ActionButton variant="ghost" className="p-2" onClick={onClose} aria-label="Close">
-            <Trash2 size={20} />
-          </ActionButton>
-        </div>
-
-        <div className="max-h-[60vh] overflow-y-auto p-6">
-          {requests.length === 0 ? (
-            <div className="py-12 text-center">
-              <p className="text-sm text-slate-400">No check-out requests found.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {requests.map((req: any) => {
-                const att = req.attendance as any;
-                return (
-                  <div key={req._id} className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900">
-                            {new Date(req.date).toLocaleDateString()}
-                          </span>
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                              req.status === "approved"
-                                ? "bg-emerald-100 text-emerald-700"
-                                : req.status === "rejected"
-                                  ? "bg-rose-100 text-rose-700"
-                                  : "bg-amber-100 text-amber-700"
-                            }`}
-                          >
-                            {req.status}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-sm text-slate-600">
-                          Check-in at {att?.checkIn ? new Date(att.checkIn).toLocaleTimeString() : "--"}
-                          {req.requestedCheckOut ? ` → Check-out at ${new Date(req.requestedCheckOut).toLocaleTimeString()}` : ""}
-                        </p>
-                        {req.reason ? (
-                          <p className="mt-1 text-sm text-slate-500">
-                            <span className="font-medium">Reason:</span> {req.reason}
-                          </p>
-                        ) : null}
-                        {req.rejectionReason ? (
-                          <p className="mt-1 text-sm text-rose-600">
-                            <span className="font-medium">Rejected:</span> {req.rejectionReason}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
   return (
     <>
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
@@ -1022,7 +505,6 @@ function CheckOutRequestsListModal({
                 Manage Holidays
               </ActionButton>
             )}
-
             {(wfhCheckInMode === "all-day" || isTodayWfh) && (
               todayAttendance && !todayAttendance.checkOut ? (
                 <ActionButton
@@ -1067,7 +549,6 @@ function CheckOutRequestsListModal({
           </span>
           .
         </div>
-
         <div className="mb-6 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
           WFH policy:{" "}
           <span className="font-semibold text-slate-950">
@@ -1079,124 +560,31 @@ function CheckOutRequestsListModal({
           </span>
           .
         </div>
-
-        {showAskModal && (
-          <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-slate-900">Ask</h3>
-                <ActionButton variant="ghost" className="p-1" onClick={() => setShowAskModal(false)} aria-label="Close">
-                  <X size={20} />
-                </ActionButton>
-              </div>
-              <div className="flex flex-col gap-2">
-                <div className="flex gap-3">
-                  {profile?.role !== "admin" && (
-                    <ActionButton
-                      variant="secondary"
-                      className="flex-1"
-                      onClick={() => {
-                        if (!canAskPaidLeave) {
-                          showToast("Paid leave quota is used up. Missed dates will count as absent.", "error");
-                          return;
-                        }
-                        setShowAskModal(false);
-                        setShowLeaveModal(true);
-                      }}
-                      disabled={!canAskPaidLeave}
-                      title={!canAskPaidLeave ? "Paid leave quota used up." : "Request paid leave."}
-                    >
-                      Leave
-                    </ActionButton>
-                  )}
-                  <ActionButton
-                    variant="secondary"
-                    className="flex-1"
-                    onClick={() => {
-                      if (remainingWfhDays <= 0) {
-                        showToast("WFH quota used up.", "error");
-                        return;
-                      }
-                      setShowAskModal(false);
-                      setShowWfhFormModal(true);
-                    }}
-                    disabled={remainingWfhDays <= 0}
-                    title={remainingWfhDays <= 0 ? "WFH quota used up." : "Request WFH."}
-                  >
-                    WFH
-                  </ActionButton>
-                </div>
-                <ActionButton
-                  variant="secondary"
-                  className="w-full"
-                  onClick={() => {
-                    setShowAskModal(false);
-                    setShowCheckOutRequestModal(true);
-                  }}
-                >
-                  Check-out
-                </ActionButton>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showViewModal && (
-          <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-slate-900">Requests</h3>
-                <ActionButton variant="ghost" className="p-1" onClick={() => setShowViewModal(false)} aria-label="Close">
-                  <X size={20} />
-                </ActionButton>
-              </div>
-              {(() => {
-                const pendingLeave = requests.filter((r) =>
-                  ["pending", "hr-approved", "manager-approved"].includes(String(r.status)),
-                ).length;
-                const pendingWfh = wfhRequests.filter((r) =>
-                  ["pending", "manager-approved", "hr-approved"].includes(String(r.status)),
-                ).length;
-                const checkOutCount = checkOutRequests.filter((r: any) => r.status === "pending").length;
-                return (
-                  <div className="flex flex-col gap-3">
-                    <ActionButton
-                      variant="secondary"
-                      className="w-full"
-                      onClick={() => {
-                        setShowViewModal(false);
-                        setShowRequestsModal(true);
-                      }}
-                    >
-                      {`Leave${pendingLeave ? ` (${pendingLeave})` : ""}`}
-                    </ActionButton>
-                    <ActionButton
-                      variant="secondary"
-                      className="w-full"
-                      onClick={() => {
-                        setShowViewModal(false);
-                        setShowWfhRequestsModal(true);
-                      }}
-                    >
-                      {`WFH${pendingWfh ? ` (${pendingWfh})` : ""}`}
-                    </ActionButton>
-                    <ActionButton
-                      variant="secondary"
-                      className="w-full"
-                      onClick={() => {
-                        setShowViewModal(false);
-                        setShowCheckOutRequestsModal(true);
-                      }}
-                    >
-                      {`Check-out${checkOutCount ? ` (${checkOutCount})` : ""}`}
-                    </ActionButton>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        )}
-
+        <AskModal
+          isOpen={showAskModal}
+          onClose={() => setShowAskModal(false)}
+          showToast={showToast}
+          canAskPaidLeave={canAskPaidLeave}
+          remainingWfhDays={remainingWfhDays}
+          profile={profile}
+          onLeave={() => { setShowAskModal(false); setShowLeaveModal(true); }}
+          onWfh={() => { setShowAskModal(false); setShowWfhFormModal(true); }}
+          onCheckout={() => { setShowAskModal(false); setShowCheckOutRequestModal(true); }}
+        />
+        <RequestsModal
+          isOpen={showViewModal}
+          onClose={() => setShowViewModal(false)}
+          pendingLeave={requests.filter((r) =>
+            ["pending", "hr-approved", "manager-approved"].includes(String(r.status)),
+          ).length}
+          pendingWfh={wfhRequests.filter((r) =>
+            ["pending", "manager-approved", "hr-approved"].includes(String(r.status)),
+          ).length}
+          checkOutCount={checkOutRequests.filter((r: any) => r.status === "pending").length}
+          onLeaveClick={() => { setShowViewModal(false); setShowRequestsModal(true); }}
+          onWfhClick={() => { setShowViewModal(false); setShowWfhRequestsModal(true); }}
+          onCheckoutClick={() => { setShowViewModal(false); setShowCheckOutRequestsModal(true); }}
+        />
         {showLeaveModal && (
           <LeaveModal
             onClose={() => setShowLeaveModal(false)}
@@ -1249,7 +637,6 @@ function CheckOutRequestsListModal({
             showToast={showToast}
           />
         )}
-
         {showDeleteHolidayConfirm && holidayToDelete && (
           <div className="fixed inset-0 z-[90] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
             <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
@@ -1284,7 +671,6 @@ function CheckOutRequestsListModal({
             </div>
           </div>
         )}
-
         {showRequestsModal && (
           <RequestsListModal
             requests={requests}
@@ -1301,7 +687,6 @@ function CheckOutRequestsListModal({
             }}
           />
         )}
-
         {rejectingId && (
           <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/40 p-4 backdrop-blur-md">
             <div className="w-full max-w-md animate-in zoom-in-95 fade-in duration-200 rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
@@ -1311,7 +696,6 @@ function CheckOutRequestsListModal({
               <p className="mt-1 text-sm text-slate-500">
                 Please provide a reason for rejection.
               </p>
-
               <div className="mt-6 space-y-4">
                 <textarea
                   required
@@ -1321,7 +705,6 @@ function CheckOutRequestsListModal({
                   onChange={(e) => setRejectionReason(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 p-4 text-sm focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all resize-none"
                 />
-
                 <div className="flex gap-3 pt-2">
                   <ActionButton
                     variant="secondary"
@@ -1345,7 +728,6 @@ function CheckOutRequestsListModal({
             </div>
           </div>
         )}
-
         {showCheckOutRequestModal && (
           <CheckOutRequestModal
             history={history}
@@ -1354,14 +736,12 @@ function CheckOutRequestsListModal({
             showToast={showToast}
           />
         )}
-
         {showCheckOutRequestsModal && (
           <CheckOutRequestsListModal
             requests={checkOutRequests}
             onClose={() => setShowCheckOutRequestsModal(false)}
           />
         )}
-
         {showWfhFormModal && (
           <WfhRequestModal
             onClose={() => setShowWfhFormModal(false)}
@@ -1369,7 +749,6 @@ function CheckOutRequestsListModal({
             showToast={showToast}
           />
         )}
-
         {showWfhRequestsModal && (
           <WfhRequestsListModal
             requests={wfhRequests}
@@ -1381,7 +760,6 @@ function CheckOutRequestsListModal({
             userRole={String(profile?.role ?? "")}
           />
         )}
-
         {wfhRejectingId && (
           <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/40 p-4 backdrop-blur-md">
             <div className="w-full max-w-md animate-in zoom-in-95 fade-in duration-200 rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
@@ -1423,13 +801,11 @@ function CheckOutRequestsListModal({
             </div>
           </div>
         )}
-
         <div className="mb-8 flex flex-col items-center justify-center gap-4">
           <div className="flex items-center gap-4">
             <ActionButton onClick={prevMonth} variant="secondary" className="h-10 w-12" aria-label="Previous month">
               <ChevronLeft size={20} />
             </ActionButton>
-
             <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 shadow-sm">
               <div className="border-r border-slate-200 bg-slate-50 px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-600">
                 {monthNames[month]}
@@ -1438,13 +814,11 @@ function CheckOutRequestsListModal({
                 {year}
               </div>
             </div>
-
             <ActionButton onClick={nextMonth} variant="secondary" className="h-10 w-12" aria-label="Next month">
               <ChevronRight size={20} />
             </ActionButton>
           </div>
         </div>
-
         <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4">
           <div className="grid grid-cols-7 gap-3">
             {weekDays.map((wd, i) => (
@@ -1463,7 +837,6 @@ function CheckOutRequestsListModal({
                     const dayIndex = rowIndex * 7 + i;
                     const day = days[dayIndex];
                     if (day === undefined) return null;
-
                     const today = isToday(day);
                     const attStatus = getAttendanceStatus(day);
                     const checkedIn = attStatus === 'present' || attStatus === 'half-day';
@@ -1474,7 +847,6 @@ function CheckOutRequestsListModal({
                     const companyWfh = isCompanyWfh(day);
                     const pendingLeave = isPendingLeave(day);
                     const holiday = isHoliday(day);
-                    const holidayDetails = currentHoliday(day);
                     const past = isPastDay(day);
                     const weekend = isWeekend(day);
                     const beforeStart = isBeforeAttendanceStart(day);
@@ -1577,7 +949,6 @@ function CheckOutRequestsListModal({
             ))}
           </div>
         </div>
-
         <div className="mt-6 flex flex-wrap justify-center gap-6 text-xs font-semibold text-slate-600 bg-slate-50 py-3 px-6 rounded-full w-fit mx-auto border border-slate-200">
           <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-emerald-100 border border-emerald-300"></span> Present</div>
           <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-amber-100 border border-amber-300"></span> Half-Day</div>
@@ -1587,7 +958,6 @@ function CheckOutRequestsListModal({
           <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-fuchsia-100 border border-fuchsia-300"></span> Holiday</div>
         </div>
       </section>
-
       {selectedDate && (
         <DayDetailsModal
           date={selectedDate}
@@ -1601,1789 +971,5 @@ function CheckOutRequestsListModal({
         />
       )}
     </>
-  );
-}
-
-function LeaveModal({
-  onClose,
-  onRefresh,
-  showToast,
-  leavePolicy,
-}: {
-  onClose: () => void;
-  onRefresh: () => void;
-  showToast: (text: string, type?: "success" | "error") => void;
-  leavePolicy?: AnyRecord | null;
-}) {
-  const [formData, setFormData] = useState({
-    startDate: "",
-    endDate: "",
-    reason: "",
-    attachmentUrl: "",
-  });
-  const [loading, setLoading] = useState(false);
-  const [hrUsers, setHrUsers] = useState<{ _id: string; name: string }[]>([]);
-  const [selectedHr, setSelectedHr] = useState("");
-
-  useEffect(() => {
-    apiFetch<{ users: { _id: string; name: string }[] }>("/api/users?role=human-resource")
-      .then((res) => setHrUsers(res.users ?? []))
-      .catch(() => {});
-  }, []);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData((prev) => ({
-          ...prev,
-          attachmentUrl: reader.result as string,
-        }));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await apiFetch("/api/attendance/leave", {
-        method: "POST",
-        body: JSON.stringify({ ...formData, ...(selectedHr ? { hrApprover: selectedHr } : {}) }),
-      });
-      onRefresh();
-      showToast("Leave request submitted!");
-      onClose();
-    } catch (err) {
-      showToast(
-        err instanceof Error ? err.message : "Failed to submit leave",
-        "error",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
-        <h3 className="text-xl font-bold text-slate-900">Ask Leave</h3>
-        <p className="mt-1 text-sm text-slate-500">
-          Submit a paid leave request for HR and admin approval.
-        </p>
-        <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-          Remaining paid leave:{" "}
-          <span className="font-semibold text-slate-900">
-            {Math.max(0, Number(leavePolicy?.remainingPaidLeaveDays ?? 0))} day{Number(leavePolicy?.remainingPaidLeaveDays ?? 0) === 1 ? "" : "s"}
-          </span>{" "}
-          this {String(leavePolicy?.paidLeavePeriod ?? "monthly")} period.
-        </p>
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold uppercase text-slate-500">
-                Start Date
-              </label>
-              <input
-                required
-                type="date"
-                value={formData.startDate}
-                onChange={(e) =>
-                  setFormData({ ...formData, startDate: e.target.value })
-                }
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold uppercase text-slate-500">
-                End Date
-              </label>
-              <input
-                required
-                type="date"
-                value={formData.endDate}
-                onChange={(e) =>
-                  setFormData({ ...formData, endDate: e.target.value })
-                }
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
-              />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-bold uppercase text-slate-500">
-              Reason
-            </label>
-            <textarea
-              required
-              rows={3}
-              placeholder="Why are you taking leave?"
-              value={formData.reason}
-              onChange={(e) =>
-                setFormData({ ...formData, reason: e.target.value })
-              }
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
-            />
-          </div>
-          {hrUsers.length > 0 && (
-            <div className="space-y-1">
-              <label className="text-xs font-bold uppercase text-slate-500">
-                Assign HR
-              </label>
-              <select
-                value={selectedHr}
-                onChange={(e) => setSelectedHr(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
-              >
-                <option value="">Auto-assign any HR</option>
-                {hrUsers.map((hr) => (
-                  <option key={hr._id} value={hr._id}>{hr.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
-          <div className="space-y-1">
-            <label className="text-xs font-bold uppercase text-slate-500">
-              Attachment (Optional)
-            </label>
-            <div className="flex items-center gap-3">
-              <label className="flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500 hover:bg-slate-100 transition-colors">
-                <Camera size={18} />
-                <span>
-                  {formData.attachmentUrl
-                    ? "Image selected"
-                    : "Upload medical/reason document"}
-                </span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-              </label>
-              {formData.attachmentUrl && (
-                <div className="relative h-12 w-12 overflow-hidden rounded-lg border border-slate-200">
-                  <img
-                    src={formData.attachmentUrl}
-                    alt="preview"
-                    className="h-full w-full object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormData((prev) => ({ ...prev, attachmentUrl: "" }))
-                    }
-                    className="absolute inset-0 grid place-items-center bg-black/40 text-white opacity-0 hover:opacity-100 transition-opacity"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-            >
-              Cancel
-            </button>
-            <button
-              disabled={loading}
-              type="submit"
-              className="rounded-lg bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-            >
-              {loading ? "Submitting..." : "Submit"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function HolidayModal({
-  onClose,
-  onRefresh,
-  showToast,
-}: {
-  onClose: () => void;
-  onRefresh: () => void;
-  showToast: (text: string, type?: "success" | "error") => void;
-}) {
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    startDate: "",
-    endDate: "",
-  });
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await apiFetch("/api/attendance/holidays", {
-        method: "POST",
-        body: JSON.stringify(formData),
-      });
-      onRefresh();
-      showToast("Holiday added successfully!");
-      onClose();
-    } catch (err) {
-      showToast(
-        err instanceof Error ? err.message : "Failed to add holiday",
-        "error",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
-        <h3 className="text-xl font-bold text-slate-900">Add Holiday</h3>
-        <p className="mt-1 text-sm text-slate-500">
-          Create a future holiday for the organization.
-        </p>
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div className="space-y-1">
-            <label className="text-xs font-bold uppercase text-slate-500">
-              Holiday Title
-            </label>
-            <input
-              required
-              type="text"
-              value={formData.title}
-              onChange={(e) =>
-                setFormData({ ...formData, title: e.target.value })
-              }
-              placeholder="Holiday name"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-bold uppercase text-slate-500">
-              Description
-            </label>
-            <textarea
-              rows={3}
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              placeholder="Optional holiday note"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold uppercase text-slate-500">
-                Start Date
-              </label>
-              <input
-                required
-                type="date"
-                value={formData.startDate}
-                onChange={(e) =>
-                  setFormData({ ...formData, startDate: e.target.value })
-                }
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold uppercase text-slate-500">
-                End Date
-              </label>
-              <input
-                required
-                type="date"
-                value={formData.endDate}
-                onChange={(e) =>
-                  setFormData({ ...formData, endDate: e.target.value })
-                }
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-            >
-              Cancel
-            </button>
-            <button
-              disabled={loading}
-              type="submit"
-              className="rounded-lg bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-            >
-              {loading ? "Saving..." : "Save Holiday"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function EditHolidayModal({
-  holiday,
-  onClose,
-  onSave,
-  onDelete,
-  showToast,
-}: {
-  holiday: AnyRecord;
-  onClose: () => void;
-  onSave: (updates: {
-    title: string;
-    description: string;
-    startDate: string;
-    endDate: string;
-  }) => Promise<void>;
-  onDelete: () => Promise<void>;
-  showToast: (text: string, type?: "success" | "error") => void;
-}) {
-  const [formData, setFormData] = useState({
-    title: String(holiday.title ?? ""),
-    description: String(holiday.description ?? ""),
-    startDate: holiday.startDate
-      ? new Date(String(holiday.startDate)).toISOString().slice(0, 10)
-      : "",
-    endDate: holiday.endDate
-      ? new Date(String(holiday.endDate)).toISOString().slice(0, 10)
-      : "",
-  });
-  const [loading, setLoading] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await onSave(formData);
-      onClose();
-    } catch (err) {
-      showToast(
-        err instanceof Error ? err.message : "Failed to update holiday",
-        "error",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    setLoading(true);
-    try {
-      await onDelete();
-      onClose();
-    } catch (err) {
-      showToast(
-        err instanceof Error ? err.message : "Failed to delete holiday",
-        "error",
-      );
-    } finally {
-      setLoading(false);
-      setShowDeleteConfirm(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200 relative">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-xl font-bold text-slate-900">Edit Holiday</h3>
-            <p className="mt-1 text-sm text-slate-500">
-              Update holiday details or remove it entirely.
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-700"
-          >
-            Close
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div className="space-y-1">
-            <label className="text-xs font-bold uppercase text-slate-500">
-              Holiday Title
-            </label>
-            <input
-              required
-              type="text"
-              value={formData.title}
-              onChange={(e) =>
-                setFormData({ ...formData, title: e.target.value })
-              }
-              placeholder="Holiday name"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-bold uppercase text-slate-500">
-              Description
-            </label>
-            <textarea
-              rows={3}
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              placeholder="Optional holiday note"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold uppercase text-slate-500">
-                Start Date
-              </label>
-              <input
-                required
-                type="date"
-                value={formData.startDate}
-                onChange={(e) =>
-                  setFormData({ ...formData, startDate: e.target.value })
-                }
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold uppercase text-slate-500">
-                End Date
-              </label>
-              <input
-                required
-                type="date"
-                value={formData.endDate}
-                onChange={(e) =>
-                  setFormData({ ...formData, endDate: e.target.value })
-                }
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-between gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => setShowDeleteConfirm(true)}
-              className="rounded-lg border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50 transition disabled:opacity-50"
-            >
-              Delete
-            </button>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-              >
-                Cancel
-              </button>
-              <button
-                disabled={loading}
-                type="submit"
-                className="rounded-lg bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-              >
-                {loading ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-[90] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
-            <h3 className="text-xl font-bold text-slate-900">Confirm Delete</h3>
-            <p className="mt-2 text-sm text-slate-500">
-              Delete holiday "{String(holiday.title ?? "")}"? This action cannot
-              be undone.
-            </p>
-            <div className="mt-6 flex gap-3">
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={loading}
-                className="flex-1 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function AdminLeaveHistoryModal({
-  requests,
-  holidays,
-  onClose,
-  onEditHoliday,
-  onDeleteHoliday,
-  onAddHoliday,
-}: {
-  requests: AnyRecord[];
-  holidays: AnyRecord[];
-  onClose: () => void;
-  onEditHoliday: (holiday: AnyRecord) => void;
-  onDeleteHoliday: (holiday: AnyRecord) => void;
-  onAddHoliday: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/40 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-5xl rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200 overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-100 p-6">
-          <div>
-            <h3 className="text-xl font-bold text-slate-900">
-              Manage Holidays
-            </h3>
-            <p className="text-sm text-slate-500">
-              Create, update, or remove company holidays from one place.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={onAddHoliday}
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition"
-            >
-              Add Holiday
-            </button>
-            <button
-              onClick={onClose}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-
-        <div className="max-h-[70vh] overflow-y-auto p-6">
-          <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-slate-50">
-            <table className="min-w-full text-sm border-collapse">
-              <thead>
-                <tr className="bg-slate-100">
-                  <th className="px-3 py-2 border text-left">Title</th>
-                  <th className="px-3 py-2 border text-left">From</th>
-                  <th className="px-3 py-2 border text-left">To</th>
-                  <th className="px-3 py-2 border text-left">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {holidays.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={4}
-                      className="px-3 py-8 text-center text-sm text-slate-500"
-                    >
-                      No holidays available.
-                    </td>
-                  </tr>
-                ) : (
-                  holidays.map((h: any) => (
-                    <tr
-                      key={h._id}
-                      className="border-b bg-white hover:bg-slate-50 transition"
-                    >
-                      <td className="px-3 py-3 border">{h.title}</td>
-                      <td className="px-3 py-3 border">
-                        {h.startDate
-                          ? new Date(h.startDate).toLocaleDateString()
-                          : "-"}
-                      </td>
-                      <td className="px-3 py-3 border">
-                        {h.endDate
-                          ? new Date(h.endDate).toLocaleDateString()
-                          : "-"}
-                      </td>
-                      <td className="px-3 py-3 border">
-                        <div className="flex gap-3">
-                          <button
-                            type="button"
-                            onClick={() => onEditHoliday(h)}
-                            className="rounded-lg px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onDeleteHoliday(h)}
-                            className="rounded-lg px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function RequestsListModal({
-  requests,
-  onClose,
-  onApprove,
-  onReject,
-  onRevoke,
-  currentUserId,
-  onViewDay,
-  userRole,
-}: {
-  requests: AnyRecord[];
-  onClose: () => void;
-  onApprove: (id: string, assignedAdmin?: string) => void;
-  onReject: (id: string) => void;
-  onRevoke?: (id: string) => void;
-  currentUserId?: string;
-  onViewDay?: (dateStr: string) => void;
-  userRole?: string;
-}) {
-  const [selectedLeave, setSelectedLeave] = useState<AnyRecord | null>(null);
-
-  if (selectedLeave) {
-    return (
-      <LeaveDetailsModal
-        leave={selectedLeave}
-        onClose={() => setSelectedLeave(null)}
-        onApprove={(assignedAdmin) => {
-          onApprove(String(selectedLeave._id), assignedAdmin);
-          setSelectedLeave(null);
-        }}
-        onReject={() => {
-          onReject(String(selectedLeave._id));
-          setSelectedLeave(null);
-        }}
-        onRevoke={() => {
-          onRevoke?.(String(selectedLeave._id));
-          setSelectedLeave(null);
-        }}
-        currentUserId={currentUserId}
-        onViewDay={onViewDay}
-        userRole={userRole}
-      />
-    );
-  }
-
-  return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200">
-        <div className="flex items-center justify-between border-b border-slate-100 p-6">
-          <div>
-            <h3 className="text-xl font-bold text-slate-900">Leave Requests</h3>
-            <p className="text-sm text-slate-500">
-              Manage pending leave approvals and view status.
-            </p>
-          </div>
-          <ActionButton
-            variant="ghost"
-            className="p-2"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <Trash2 size={20} />
-          </ActionButton>
-        </div>
-
-        <div className="max-h-[60vh] overflow-y-auto p-6">
-          {requests.length === 0 ? (
-            <div className="py-12 text-center">
-              <p className="text-sm text-slate-400">No leave requests found.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {requests.map((req: any) => {
-                const isRequester =
-                  req.requester?._id === currentUserId ||
-                  req.requester === currentUserId;
-                const step = String(req.currentStep ?? "hr");
-                const canApprove =
-                  !isRequester &&
-                  ["pending", "hr-approved"].includes(String(req.status)) &&
-                  (
-                    (step === "admin" && String(userRole ?? "") === "admin") ||
-                    (step === "hr" && ["human-resource", "admin"].includes(String(userRole ?? "")))
-                  );
-
-                return (
-                  <div
-                    key={req._id}
-                    onClick={() => setSelectedLeave(req)}
-                    className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 cursor-pointer hover:border-slate-200 hover:bg-slate-100/50 transition-all active:scale-[0.98]"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900">
-                            {req.requester?.name || "User"}
-                          </span>
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${req.status === "approved"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : req.status === "rejected"
-                                ? "bg-rose-100 text-rose-700"
-                                : "bg-amber-100 text-amber-700"
-                              }`}
-                          >
-                            {req.status}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-sm text-slate-600">
-                          {req.reason}
-                        </p>
-                        <div className="mt-2 flex items-center gap-4 text-xs text-slate-500">
-                          <span className="flex items-center gap-1">
-                            <Clock size={12} />{" "}
-                            {new Date(req.startDate).toLocaleDateString()} -{" "}
-                            {new Date(req.endDate).toLocaleDateString()}
-                          </span>
-                          <span className="font-bold">{req.duration} days</span>
-                        </div>
-                      </div>
-
-                      {/* Approval actions moved to the detailed modal. */}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        <div className="border-t border-slate-100 p-4 flex justify-end">
-          <ActionButton
-            variant="secondary"
-            onClick={onClose}
-          >
-            Close
-          </ActionButton>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function LeaveDetailsModal({
-  leave,
-  onClose,
-  onApprove,
-  onReject,
-  onRevoke,
-  currentUserId,
-  onViewDay,
-  userRole,
-}: {
-  leave: AnyRecord;
-  onClose: () => void;
-  onApprove: (assignedAdmin?: string) => void;
-  onReject: () => void;
-  onRevoke?: () => void;
-  currentUserId?: string;
-  onViewDay?: (dateStr: string) => void;
-  userRole?: string;
-}) {
-  const isRequester =
-    (leave.requester as any)?._id === currentUserId ||
-    leave.requester === currentUserId;
-  const step = String(leave.currentStep ?? "hr");
-
-  const canApprove =
-    !isRequester &&
-    ["pending", "hr-approved"].includes(String(leave.status)) &&
-    (
-      (step === "admin" && String(userRole ?? "") === "admin") ||
-      (step === "hr" && ["human-resource", "admin"].includes(String(userRole ?? "")))
-    );
-
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const canRevoke =
-    isRequester &&
-    leave.status !== "pending" &&
-    leave.status !== "rejected" &&
-    new Date(String(leave.startDate)) > now;
-
-  const [adminUsers, setAdminUsers] = useState<{ _id: string; name: string }[]>([]);
-  const [selectedAdmin, setSelectedAdmin] = useState("");
-
-  useEffect(() => {
-    if (canApprove && step === "hr") {
-      apiFetch<{ users: { _id: string; name: string }[] }>("/api/users?role=admin")
-        .then((res) => setAdminUsers(res.users ?? []))
-        .catch(() => {});
-    }
-  }, [canApprove, step]);
-
-  return (
-    <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-md">
-      <div className="w-full max-w-lg animate-in zoom-in-95 fade-in duration-300 rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200 overflow-hidden">
-        <div className="relative h-32 bg-slate-900">
-          <div className="absolute -bottom-8 left-6">
-            <div className="h-16 w-16 rounded-2xl bg-emerald-600 shadow-xl shadow-emerald-600/20 grid place-items-center text-white">
-              <Clock size={32} />
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 h-8 w-8 grid place-items-center rounded-full bg-white/10 text-white hover:bg-white/20 transition"
-          >
-            <LogOut className="rotate-180" size={16} />
-          </button>
-        </div>
-
-        <div className="p-8 pt-12">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-2xl font-bold text-slate-900">
-                {String((leave.requester as any)?.name || "User")}
-              </h3>
-              <p className="text-sm font-medium text-slate-500 capitalize">
-                {String(leave.status)} Request
-              </p>
-            </div>
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${leave.status === "approved"
-                ? "bg-emerald-100 text-emerald-700"
-                : leave.status === "rejected"
-                  ? "bg-rose-100 text-rose-700"
-                  : "bg-amber-100 text-amber-700"
-                }`}
-            >
-              {String(leave.status)}
-            </span>
-          </div>
-
-          <div className="mt-8 grid grid-cols-2 gap-6 rounded-2xl bg-slate-50 p-5">
-            <div className="space-y-1">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                Duration
-              </p>
-              <p className="text-sm font-bold text-slate-900">
-                {Number(leave.duration)} Days
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                Date Range
-              </p>
-              <p className="text-sm font-bold text-slate-900">
-                {new Date(String(leave.startDate)).toLocaleDateString()} -{" "}
-                {new Date(String(leave.endDate)).toLocaleDateString()}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-8 space-y-6">
-            <div className="space-y-2">
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                Reason for Leave
-              </p>
-              <p className="text-sm leading-relaxed text-slate-700">
-                {String(leave.reason)}
-              </p>
-            </div>
-
-            {!!leave.attachmentUrl && (
-              <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Attachments
-                </p>
-                <div className="group relative aspect-video w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-                  <img
-                    src={String(leave.attachmentUrl)}
-                    alt="attachment"
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
-                  <a
-                    href={String(leave.attachmentUrl)}
-                    download="attachment"
-                    className="absolute inset-0 grid place-items-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <div className="rounded-full bg-white px-4 py-2 text-xs font-bold text-slate-900 shadow-xl">
-                      View Original
-                    </div>
-                  </a>
-                </div>
-              </div>
-            )}
-
-            {leave.status === "rejected" && !!leave.rejectionReason && (
-              <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-5">
-                <p className="text-xs font-bold uppercase tracking-wide text-rose-500">
-                  Rejection Reason
-                </p>
-                <p className="mt-2 text-sm leading-relaxed text-rose-700 font-medium">
-                  {String(leave.rejectionReason)}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {canApprove && (
-            <div className="mt-10 space-y-4">
-              {step === "hr" && adminUsers.length > 0 && (
-                <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase text-slate-500">
-                    Assign Admin (for final approval)
-                  </label>
-                  <select
-                    value={selectedAdmin}
-                    onChange={(e) => setSelectedAdmin(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
-                  >
-                    <option value="">Auto-assign any admin</option>
-                    {adminUsers.map((au) => (
-                      <option key={au._id} value={au._id}>{au.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <div className="flex gap-4">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onReject();
-                  }}
-                  className="flex-1 rounded-2xl border border-rose-200 py-4 text-sm font-bold text-rose-600 hover:bg-rose-50 transition shadow-sm"
-                >
-                  Reject
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onApprove(selectedAdmin || undefined);
-                  }}
-                  className="flex-1 rounded-2xl bg-emerald-600 py-4 text-sm font-bold text-white hover:bg-emerald-700 transition shadow-xl shadow-emerald-600/20"
-                >
-                  Approve
-                </button>
-              </div>
-            </div>
-          )}
-
-          {canRevoke && onRevoke && (
-            <div className="mt-6">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRevoke();
-                }}
-                className="w-full rounded-2xl border border-rose-200 py-4 text-sm font-bold text-rose-600 hover:bg-rose-50 transition shadow-sm"
-              >
-                Revoke Request
-              </button>
-            </div>
-          )}
-
-          <div className="mt-6">
-            <button
-              onClick={onClose}
-              className="w-full rounded-2xl border border-slate-200 py-4 text-sm font-bold text-slate-600 hover:bg-slate-50 transition"
-            >
-              Back to List
-            </button>
-          </div>
-          {onViewDay && (
-            <div className="mt-4">
-              <button
-                onClick={() => {
-                  // close this modal and open day details for the start date
-                  onClose();
-                  try {
-                    onViewDay(String(leave.startDate));
-                  } catch (e) {
-                    /* ignore */
-                  }
-                }}
-                className="w-full mt-2 rounded-2xl bg-slate-100 py-3 text-sm font-bold text-slate-700 hover:bg-slate-200 transition"
-              >
-                View Day Details
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DayDetailsModal({
-  date,
-  onClose,
-  history,
-  requests,
-  holidays,
-  wfhRequests = [],
-  companyWfhDates = [],
-  minWorkHours = 8,
-}: {
-  date: Date;
-  onClose: () => void;
-  history: AnyRecord[];
-  requests: AnyRecord[];
-  holidays: AnyRecord[];
-  wfhRequests?: AnyRecord[];
-  companyWfhDates?: { date: string; reason: string }[];
-  minWorkHours?: number;
-}) {
-  const attendance = history.find((h: any) => {
-    const d = new Date(h.date);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime() === date.getTime();
-  });
-
-  const leave = requests.find((r: any) => {
-    const start = new Date(String(r.startDate));
-    const end = new Date(String(r.endDate));
-    start.setHours(0, 0, 0, 0);
-    end.setHours(23, 59, 59, 999);
-    return date >= start && date <= end;
-  });
-
-  const holiday = holidays.find((h: any) => {
-    const start = new Date(String(h.startDate));
-    const end = new Date(String(h.endDate));
-    start.setHours(0, 0, 0, 0);
-    end.setHours(23, 59, 59, 999);
-    return date >= start && date <= end;
-  });
-
-  const approvedWfh = wfhRequests.find((r: any) => {
-    if (r.status !== "approved") return false;
-    const start = new Date(String(r.startDate));
-    const end = new Date(String(r.endDate));
-    start.setHours(0, 0, 0, 0);
-    end.setHours(23, 59, 59, 999);
-    return date >= start && date <= end;
-  });
-
-  const companyWfh = companyWfhDates.find((d) => {
-    const dDate = new Date(d.date);
-    dDate.setHours(0, 0, 0, 0);
-    return dDate.getTime() === date.getTime();
-  });
-
-  return (
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-md">
-      <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold">{date.toLocaleDateString()}</h3>
-          <button onClick={onClose} className="text-sm text-slate-500 hover:text-slate-800 font-medium">
-            Close
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          {approvedWfh && (
-            <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-bold text-blue-800 flex items-center gap-1.5">
-                  <Pen className="h-4 w-4 text-blue-600" /> Work From Home (Approved)
-                </p>
-                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700">
-                  Approved
-                </span>
-              </div>
-              <p className="mt-1 text-sm text-slate-700">
-                {String((approvedWfh as any).reason ?? "")}
-              </p>
-              <p className="mt-2 text-xs text-slate-500">
-                Duration: {String((approvedWfh as any).duration ?? "")} day(s)
-              </p>
-            </div>
-          )}
-
-          {!approvedWfh && companyWfh && (
-            <div className="rounded-xl border border-teal-100 bg-teal-50/50 p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-bold text-teal-800 flex items-center gap-1.5">
-                  <Pen className="h-4 w-4 text-teal-600" /> Company WFH Day
-                </p>
-                <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs font-bold text-teal-700">
-                  Company
-                </span>
-              </div>
-              {companyWfh.reason && (
-                <p className="mt-1 text-sm text-slate-700">{companyWfh.reason}</p>
-              )}
-            </div>
-          )}
-
-          {attendance ? (
-            <div className="rounded-xl border border-slate-100 p-4">
-              <div className="flex justify-between">
-                <p className="text-sm font-bold text-slate-900">Check-in</p>
-                <p className="text-sm text-slate-600">
-                  {new Date(String(attendance.checkIn)).toLocaleTimeString()}
-                </p>
-              </div>
-              <br />
-              <hr />
-              <br />
-              <div className="flex justify-between">
-                <p className="text-sm font-bold text-slate-900">Check-out</p>
-                <p className="text-sm text-slate-600">
-                  {attendance.checkOut ? new Date(String(attendance.checkOut)).toLocaleTimeString() : "--"}
-                </p>
-              </div>
-              {Boolean(attendance.checkOut) && (() => {
-                const diff = new Date(String(attendance.checkOut)).getTime() - new Date(String(attendance.checkIn)).getTime();
-                const mins = Math.round(diff / 60000);
-                const display = mins < 60 ? `${mins} min` : `${(mins / 60).toFixed(1).replace(/\.0$/, '')} hrs`;
-                const hrs = diff / 3600000;
-                const threshold = minWorkHours / 2;
-                const statusInfo = hrs < threshold
-                  ? { label: 'Absent', className: 'text-rose-600 bg-rose-50 border border-rose-200' }
-                  : hrs < minWorkHours
-                    ? { label: 'Half-Day', className: 'text-amber-600 bg-amber-50 border border-amber-200' }
-                    : { label: 'Present', className: 'text-emerald-600 bg-emerald-50 border border-emerald-200' };
-                return (
-                  <>
-                    <br />
-                    <hr />
-                    <br />
-                    <div className="flex justify-between">
-                      <p className="text-sm font-bold text-slate-900">Hours</p>
-                      <p className="text-sm font-semibold text-emerald-600">{display}</p>
-                    </div>
-                    <br />
-                    <hr />
-                    <br />
-                    <div className="flex justify-between items-center">
-                      <p className="text-sm font-bold text-slate-900">Status</p>
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${statusInfo.className}`}>{statusInfo.label}</span>
-                    </div>
-                  </>
-                );
-              })()}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-slate-100 p-4">
-              <p className="text-sm font-bold text-slate-900">No attendance recorded</p>
-            </div>
-          )}
-
-          {leave && (
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-bold text-emerald-800">Leave</p>
-                {Boolean((leave as any).halfDay) && (
-                  <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-700">
-                    Half-day
-                  </span>
-                )}
-              </div>
-              <p className="mt-1 text-sm text-slate-700">
-                {String((leave as any).reason ?? "")}
-              </p>
-              <p className="mt-2 text-xs text-slate-500">
-                Duration: {String((leave as any).duration ?? "")} day(s) •
-                Status: {String((leave as any).status ?? "")}
-              </p>
-            </div>
-          )}
-          {holiday && (
-            <div className="rounded-xl border border-fuchsia-100 bg-fuchsia-50/50 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-bold text-fuchsia-800">Holiday</p>
-                  <p className="mt-1 text-base font-semibold text-slate-900">
-                    {String((holiday as any).title ?? "Company holiday")}
-                  </p>
-                </div>
-                <span className="rounded-full bg-fuchsia-100 px-2 py-1 text-xs font-bold text-fuchsia-700">
-                  Holiday
-                </span>
-              </div>
-              {((holiday as any).description ?? "") && (
-                <p className="mt-3 text-sm text-slate-700">
-                  {String((holiday as any).description)}
-                </p>
-              )}
-              <p className="mt-2 text-xs text-slate-500">
-                Duration: {String((holiday as any).duration ?? "")} day(s)
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function WfhRequestModal({
-  onClose,
-  onRefresh,
-  showToast,
-}: {
-  onClose: () => void;
-  onRefresh: () => void;
-  showToast: (text: string, type?: "success" | "error") => void;
-}) {
-  const [formData, setFormData] = useState({
-    startDate: "",
-    endDate: "",
-    reason: "",
-  });
-  const [loading, setLoading] = useState(false);
-  const [hrUsers, setHrUsers] = useState<{ _id: string; name: string }[]>([]);
-  const [selectedHr, setSelectedHr] = useState("");
-
-  useEffect(() => {
-    apiFetch<{ users: { _id: string; name: string }[] }>("/api/users?role=human-resource")
-      .then((res) => setHrUsers(res.users ?? []))
-      .catch(() => {});
-  }, []);
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await apiFetch("/api/attendance/wfh", {
-        method: "POST",
-        body: JSON.stringify({ ...formData, ...(selectedHr ? { hrApprover: selectedHr } : {}) }),
-      });
-      onRefresh();
-      showToast("WFH request submitted!");
-      onClose();
-    } catch (err) {
-      showToast(
-        err instanceof Error ? err.message : "Failed to submit WFH request",
-        "error",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
-        <h3 className="text-xl font-bold text-slate-900">Request WFH</h3>
-        <p className="mt-1 text-sm text-slate-500">
-          Submit a Work From Home request for approval.
-        </p>
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold uppercase text-slate-500">Start Date</label>
-              <input
-                required
-                type="date"
-                value={formData.startDate}
-                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold uppercase text-slate-500">End Date</label>
-              <input
-                required
-                type="date"
-                value={formData.endDate}
-                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
-              />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-bold uppercase text-slate-500">Reason</label>
-            <textarea
-              required
-              rows={3}
-              placeholder="Why are you requesting WFH?"
-              value={formData.reason}
-              onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
-            />
-          </div>
-          {hrUsers.length > 0 && (
-            <div className="space-y-1">
-              <label className="text-xs font-bold uppercase text-slate-500">
-                Assign HR
-              </label>
-              <select
-                value={selectedHr}
-                onChange={(e) => setSelectedHr(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
-              >
-                <option value="">Auto-assign any HR</option>
-                {hrUsers.map((hr) => (
-                  <option key={hr._id} value={hr._id}>{hr.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-            >
-              Cancel
-            </button>
-            <button
-              disabled={loading}
-              type="submit"
-              className="rounded-lg bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-            >
-              {loading ? "Submitting..." : "Submit"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function WfhRequestsListModal({
-  requests,
-  onClose,
-  onApprove,
-  onReject,
-  onRevoke,
-  currentUserId,
-  userRole,
-}: {
-  requests: AnyRecord[];
-  onClose: () => void;
-  onApprove: (id: string) => void;
-  onReject: (id: string) => void;
-  onRevoke?: (id: string) => void;
-  currentUserId?: string;
-  userRole?: string;
-}) {
-  const [selectedWfh, setSelectedWfh] = useState<AnyRecord | null>(null);
-
-  if (selectedWfh) {
-    return (
-      <WfhDetailsModal
-        wfh={selectedWfh}
-        onClose={() => setSelectedWfh(null)}
-        onApprove={() => {
-          onApprove(String(selectedWfh._id));
-          setSelectedWfh(null);
-        }}
-        onReject={() => {
-          onReject(String(selectedWfh._id));
-          setSelectedWfh(null);
-        }}
-        onRevoke={() => {
-          onRevoke?.(String(selectedWfh._id));
-          setSelectedWfh(null);
-        }}
-        currentUserId={currentUserId}
-        userRole={userRole}
-      />
-    );
-  }
-
-  const isManagerRole = userRole === "project-manager" || userRole === "qa-tester" || userRole === "admin";
-  const isHrRole = userRole === "human-resource" || userRole === "admin";
-  const isAdmin = userRole === "admin";
-
-  const canApproveWfh = (req: AnyRecord) => {
-    const reqRequester = req.requester as { _id?: string } | undefined;
-    if (String(reqRequester?._id || req.requester) === currentUserId) return false;
-    if (req.status === "rejected" || req.status === "approved") return false;
-    const step = String(req.currentStep ?? "manager");
-    if (step === "manager" && isManagerRole) return true;
-    if (step === "hr" && isHrRole) return true;
-    if (step === "admin" && isAdmin) return true;
-    return false;
-  };
-
-  return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200">
-        <div className="flex items-center justify-between border-b border-slate-100 p-6">
-          <div>
-            <h3 className="text-xl font-bold text-slate-900">WFH Requests</h3>
-            <p className="text-sm text-slate-500">
-              Manage WFH request approvals and view status.
-            </p>
-          </div>
-          <button onClick={onClose} className="rounded-lg p-2 hover:bg-slate-50 text-slate-400">
-            <Trash2 size={20} />
-          </button>
-        </div>
-
-        <div className="max-h-[60vh] overflow-y-auto p-6">
-          {requests.length === 0 ? (
-            <div className="py-12 text-center">
-              <p className="text-sm text-slate-400">No WFH requests found.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {requests.map((req: any) => {
-                const canApprove = canApproveWfh(req);
-
-                return (
-                  <div
-                    key={req._id}
-                    onClick={() => setSelectedWfh(req)}
-                    className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 cursor-pointer hover:border-slate-200 hover:bg-slate-100/50 transition-all active:scale-[0.98]"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900">
-                            {req.requester?.name || "User"}
-                          </span>
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${req.status === "approved"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : req.status === "rejected"
-                                ? "bg-rose-100 text-rose-700"
-                                : "bg-amber-100 text-amber-700"
-                              }`}
-                          >
-                            {req.status}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-sm text-slate-600">{req.reason}</p>
-                        <div className="mt-2 flex items-center gap-4 text-xs text-slate-500">
-                          <span className="flex items-center gap-1">
-                            <Clock size={12} />{" "}
-                            {new Date(String(req.startDate)).toLocaleDateString()} -{" "}
-                            {new Date(String(req.endDate)).toLocaleDateString()}
-                          </span>
-                          <span className="font-bold">{Number(req.duration)} day{Number(req.duration) === 1 ? "" : "s"}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        <div className="border-t border-slate-100 p-4 flex justify-end">
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function WfhDetailsModal({
-  wfh,
-  onClose,
-  onApprove,
-  onReject,
-  onRevoke,
-  currentUserId,
-  userRole,
-}: {
-  wfh: AnyRecord;
-  onClose: () => void;
-  onApprove: () => void;
-  onReject: () => void;
-  onRevoke?: () => void;
-  currentUserId?: string;
-  userRole?: string;
-}) {
-  const isRequester =
-    String((wfh.requester as any)?._id || wfh.requester) === currentUserId;
-  const step = String(wfh.currentStep ?? "manager");
-  const isManagerRole = userRole === "project-manager" || userRole === "qa-tester" || userRole === "admin";
-  const isHrRole = userRole === "human-resource" || userRole === "admin";
-  const isAdmin = userRole === "admin";
-
-  const canApprove =
-    !isRequester &&
-    wfh.status !== "rejected" &&
-    wfh.status !== "approved" &&
-    (
-      (step === "manager" && isManagerRole) ||
-      (step === "hr" && isHrRole) ||
-      (step === "admin" && isAdmin)
-    );
-
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const canRevoke =
-    isRequester &&
-    wfh.status !== "pending" &&
-    wfh.status !== "rejected" &&
-    new Date(String(wfh.startDate)) > now;
-
-  return (
-    <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-md">
-      <div className="w-full max-w-lg animate-in zoom-in-95 fade-in duration-300 rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200 overflow-hidden">
-        <div className="relative h-32 bg-slate-900">
-          <div className="absolute -bottom-8 left-6">
-            <div className="h-16 w-16 rounded-2xl bg-emerald-600 shadow-xl shadow-emerald-600/20 grid place-items-center text-white">
-              <Clock size={32} />
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 h-8 w-8 grid place-items-center rounded-full bg-white/10 text-white hover:bg-white/20 transition"
-          >
-            <LogOut className="rotate-180" size={16} />
-          </button>
-        </div>
-
-        <div className="p-8 pt-12">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-2xl font-bold text-slate-900">
-                {String((wfh.requester as any)?.name || "User")}
-              </h3>
-              <p className="text-sm font-medium text-slate-500 capitalize">
-                {String(wfh.status)} WFH Request
-              </p>
-            </div>
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${wfh.status === "approved"
-                ? "bg-emerald-100 text-emerald-700"
-                : wfh.status === "rejected"
-                  ? "bg-rose-100 text-rose-700"
-                  : "bg-amber-100 text-amber-700"
-                }`}
-            >
-              {String(wfh.status)}
-            </span>
-          </div>
-
-          <div className="mt-6 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="rounded-xl bg-slate-50 p-4">
-                <p className="text-xs font-bold uppercase text-slate-500">Start Date</p>
-                <p className="mt-1 text-sm font-semibold text-slate-900">
-                  {new Date(String(wfh.startDate)).toLocaleDateString()}
-                </p>
-              </div>
-              <div className="rounded-xl bg-slate-50 p-4">
-                <p className="text-xs font-bold uppercase text-slate-500">End Date</p>
-                <p className="mt-1 text-sm font-semibold text-slate-900">
-                  {new Date(String(wfh.endDate)).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-slate-50 p-4">
-              <p className="text-xs font-bold uppercase text-slate-500">Duration</p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">
-                {Number(wfh.duration)} day{Number(wfh.duration) === 1 ? "" : "s"}
-              </p>
-            </div>
-
-            <div className="rounded-xl bg-slate-50 p-4">
-              <p className="text-xs font-bold uppercase text-slate-500">Reason</p>
-              <p className="mt-1 text-sm text-slate-700 leading-relaxed">{String(wfh.reason)}</p>
-            </div>
-
-            {String(wfh.rejectionReason || "") && (
-              <div className="rounded-xl bg-rose-50 p-4 border border-rose-100">
-                <p className="text-xs font-bold uppercase text-rose-600">Rejection Reason</p>
-                <p className="mt-1 text-sm text-rose-700">{String(wfh.rejectionReason)}</p>
-              </div>
-            )}
-          </div>
-
-          {canApprove && (
-            <div className="mt-8 flex gap-3">
-              <button
-                onClick={onReject}
-                className="flex-1 rounded-xl border border-rose-200 py-3 text-sm font-semibold text-rose-600 hover:bg-rose-50 transition"
-              >
-                Reject
-              </button>
-              <button
-                onClick={onApprove}
-                className="flex-1 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/20"
-              >
-                Approve
-              </button>
-            </div>
-          )}
-
-          {canRevoke && onRevoke && (
-            <div className="mt-6">
-              <button
-                onClick={onRevoke}
-                className="w-full rounded-xl border border-rose-200 py-3 text-sm font-semibold text-rose-600 hover:bg-rose-50 transition"
-              >
-                Revoke Request
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CheckOutRequestModal({
-  history,
-  onClose,
-  onRefresh,
-  showToast,
-}: {
-  history: AnyRecord[];
-  onClose: () => void;
-  onRefresh: () => void;
-  showToast: (text: string, type?: "success" | "error") => void;
-}) {
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const recordsWithoutCheckOut = history.filter(
-    (h: any) => {
-      if (h.checkOut || !h.checkIn) return false;
-      const d = new Date(h.date);
-      d.setHours(0, 0, 0, 0);
-      return d.getTime() !== todayStart.getTime();
-    },
-  );
-
-  const [selectedId, setSelectedId] = useState("");
-  const [reason, setReason] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [financeUsers, setFinanceUsers] = useState<{ _id: string; name: string }[]>([]);
-  const [selectedFinance, setSelectedFinance] = useState("");
-
-  useEffect(() => {
-    apiFetch<{ users: { _id: string; name: string }[] }>("/api/users?role=finance")
-      .then((res) => setFinanceUsers(res.users ?? []))
-      .catch(() => {});
-  }, []);
-
-  const handleSubmit = async () => {
-    if (!selectedId) {
-      showToast("Please select a date.", "error");
-      return;
-    }
-    if (!reason.trim()) {
-      showToast("Please provide a reason.", "error");
-      return;
-    }
-    setLoading(true);
-    try {
-      await apiFetch("/api/attendance/checkout-request", {
-        method: "POST",
-        body: JSON.stringify({ attendanceId: selectedId, reason: reason.trim(), ...(selectedFinance ? { assignedTo: selectedFinance } : {}) }),
-      });
-      showToast("Check-out request sent to finance.");
-      onRefresh();
-      onClose();
-    } catch (err) {
-      showToast(
-        err instanceof Error ? err.message : "Failed to submit request",
-        "error",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-slate-900">Request Check-Out</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:text-slate-600 transition">
-            <X size={20} />
-          </button>
-        </div>
-        <p className="text-sm text-slate-500 mb-4">
-          Select a day you forgot to check out. Finance will mark check-out at 8 hours from check-in.
-        </p>
-        {recordsWithoutCheckOut.length === 0 ? (
-          <p className="text-sm text-slate-500 py-4 text-center">No pending check-outs found.</p>
-        ) : (
-          <select
-            value={selectedId}
-            onChange={(e) => setSelectedId(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm mb-4"
-          >
-            <option value="">Select a date...</option>
-            {recordsWithoutCheckOut.map((h: any) => (
-              <option key={String(h._id)} value={String(h._id)}>
-                {new Date(h.date).toLocaleDateString()} — Checked in at{" "}
-                {new Date(h.checkIn).toLocaleTimeString()}
-              </option>
-            ))}
-          </select>
-        )}
-        {recordsWithoutCheckOut.length > 0 && (
-          <textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="Reason for requesting check-out..."
-            className="mb-4 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-            rows={3}
-          />
-        )}
-        {financeUsers.length > 0 && (
-          <div className="space-y-1 mb-4">
-            <label className="text-xs font-bold uppercase text-slate-500">
-              Assign Finance User
-            </label>
-            <select
-              value={selectedFinance}
-              onChange={(e) => setSelectedFinance(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
-            >
-              <option value="">Auto-assign any finance</option>
-              {financeUsers.map((fu) => (
-                <option key={fu._id} value={fu._id}>{fu.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
-        <div className="flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={loading || !selectedId}
-            className="rounded-lg bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-          >
-            {loading ? "Sending..." : "Request"}
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }

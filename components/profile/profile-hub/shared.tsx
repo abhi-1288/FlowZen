@@ -44,7 +44,7 @@ export function SectionHeader({
   description,
   accent = "slate",
 }: {
-  title: string;
+  title: ReactNode;
   description?: string;
   accent?: string;
 }) {

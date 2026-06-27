@@ -28,7 +28,6 @@ export function BoardCanvas({ boardId }: { boardId: string }) {
   const router = useRouter();
   const { data: session } = useSession();
   const activeBoard = useBoardStore((state) => state.activeBoard);
-  const boards = useBoardStore((state) => state.boards);
   const columns = useBoardStore((state) => state.columns);
   const tasks = useBoardStore((state) => state.tasks);
   const loading = useBoardStore((state) => state.loading);

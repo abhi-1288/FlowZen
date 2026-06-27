@@ -47,6 +47,23 @@ export type InterviewStatus = "scheduled" | "completed" | "cancelled" | "resched
 export type Recommendation = "strong-hire" | "hire" | "hold" | "reject";
 export type OfferStatus = "draft" | "sent" | "accepted" | "rejected";
 export type ReferralStatus = "pending" | "reviewed" | "hired" | "rejected";
+export type WorkflowStatus = "requested" | "assigned" | "drafting" | "salary-pending" | "salary-approved" | "draft-ready" | "published" | "rejected";
+
+export type Workflow = {
+  status: WorkflowStatus;
+  requestedBy: { id: string; name: string } | string | null;
+  assignedHR: { id: string; name: string } | string | null;
+  salaryApprovedBy: { id: string; name: string } | string | null;
+  publishedBy: { id: string; name: string } | string | null;
+  rejectionReason: string;
+  rejectedBy: { id: string; name: string } | string | null;
+  requestedAt: string | null;
+  assignedAt: string | null;
+  forwardedAt: string | null;
+  salaryApprovedAt: string | null;
+  readyAt: string | null;
+  publishedAt: string | null;
+};
 export type TimelineAction =
   | "applied"
   | "resume-uploaded"
@@ -75,6 +92,7 @@ export type ATSJob = {
   description: string;
   requiredSkills: string[];
   status: JobStatus;
+  workflow: Workflow;
   createdBy: string;
   company: string;
   createdAt: string;
@@ -198,4 +216,26 @@ export type DashboardData = {
   offersAccepted: number;
   hiringFunnel: { stage: Stage; count: number }[];
   sourcePerformance: { source: Source; count: number }[];
+  userName: string;
+  totalJobs: number;
+  draftJobs: number;
+  closedJobs: number;
+  candidatesThisMonth: number;
+  interviewsThisMonth: number;
+  offersThisMonth: number;
+  candidatesPerOpening: number;
+  upcomingInterviews: {
+    id: string;
+    candidate: { firstName: string; lastName: string };
+    job: { title: string };
+    scheduledAt: string;
+    roundType: string;
+  }[];
+  recentActivity: {
+    id: string;
+    action: string;
+    candidate: { firstName: string; lastName: string };
+    createdAt: string;
+  }[];
+  monthlyTrends: { month: number; year: number; count: number }[];
 };
