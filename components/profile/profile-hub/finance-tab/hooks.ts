@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client-utils";
 import type { AnyRecord } from "../shared";
-import type { FinanceData, ReportsData, LeaveImpact, PolicyData, PolicyApiResponse } from "./types";
+import type { FinanceData, ReportsData, LeaveImpact, PolicyData, PolicyApiResponse, SalaryCycleData } from "./types";
 
 export function useFinanceData(month: string, showToast: (text: string, type?: "success" | "error") => void) {
   const [data, setData] = useState<FinanceData | null>(null);
@@ -90,4 +90,24 @@ export function useMySalarySlips(month: string) {
   }, [month]);
 
   return { mySlips, slipsLoading };
+}
+
+export function useSalaryCycle(data: FinanceData | null) {
+  const [salaryCycle, setSalaryCycle] = useState<SalaryCycleData | null>(null);
+
+  const refreshSalaryCycle = useCallback(async () => {
+    try {
+      const result = await apiFetch<SalaryCycleData>("/api/finance/salary-cycle");
+      setSalaryCycle(result);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!data) return;
+    refreshSalaryCycle();
+  }, [data, refreshSalaryCycle]);
+
+  return { salaryCycle, setSalaryCycle, refreshSalaryCycle };
 }

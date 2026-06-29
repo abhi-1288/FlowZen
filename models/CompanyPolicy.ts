@@ -8,6 +8,16 @@ const policySchema = new mongoose.Schema({
   travelOptedOutMembers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   pfPercentage: { type: Number, default: 12 },
   esicPercentage: { type: Number, default: 0.75 },
+  salaryCycleDay: { type: Number, default: 29, min: 1, max: 31 },
+  pendingSalaryCycleDay: { type: Number, default: null, min: 1, max: 31 },
+  salaryCycleStartDay: { type: Number, default: null, min: 1, max: 31 },
+  salaryCycleEndDay: { type: Number, default: null, min: 1, max: 31 },
+  pendingSalaryCycleStartDay: { type: Number, default: null, min: 1, max: 31 },
+  pendingSalaryCycleEndDay: { type: Number, default: null, min: 1, max: 31 },
+  salaryCycleChangeStatus: { type: String, enum: ["pending", "approved", "rejected"], default: null },
+  salaryCycleChangeRequestedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+  salaryCycleChangeApprover: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+  salaryCycleChangeRequestedAt: { type: Date, default: null },
 }, { timestamps: true });
 
 if (process.env.NODE_ENV === "development") {

@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { jsonError, requireUserId } from "@/lib/api";
 import { emitNotification } from "@/lib/realtime";
-import { FinanceSalary, ExpenseRequest, Notification, ProjectBudget, ExpenseBill, User } from "@/models";
-import { actorWithCompany, canManageFinance } from "./helpers";
+import { CompanyPolicy, FinanceSalary, ExpenseRequest, Notification, ProjectBudget, ExpenseBill, User } from "@/models";
+import { actorWithCompany, autoGenerateSalariesForMonth, canManageFinance } from "./helpers";
 
 export async function handleStatusUpdates(request: Request) {
   const userId = await requireUserId();
@@ -439,6 +439,79 @@ export async function handleStatusUpdates(request: Request) {
     }
 
     return jsonError("Invalid bill status.");
+  }
+
+  if (type === "salary-cycle") {
+    if (String(actor.role) !== "admin")
+      return jsonError("Only admin can approve salary cycle changes.", 403);
+
+    const policy = await CompanyPolicy.findOne({ company: actor.company });
+    if (!policy) return jsonError("No policy found.", 404);
+    if (policy.salaryCycleChangeStatus !== "pending")
+      return jsonError("No pending salary cycle change.", 400);
+    if (policy.salaryCycleChangeApprover && String(policy.salaryCycleChangeApprover) !== userId)
+      return jsonError("This change is assigned to another admin.", 403);
+
+    if (status === "approved") {
+      policy.salaryCycleDay = policy.pendingSalaryCycleDay ?? policy.salaryCycleDay;
+      policy.salaryCycleStartDay = policy.pendingSalaryCycleStartDay ?? policy.salaryCycleStartDay;
+      policy.salaryCycleEndDay = policy.pendingSalaryCycleEndDay ?? policy.salaryCycleEndDay;
+      policy.pendingSalaryCycleDay = null;
+      policy.pendingSalaryCycleStartDay = null;
+      policy.pendingSalaryCycleEndDay = null;
+      policy.salaryCycleChangeStatus = "approved";
+      policy.salaryCycleChangeRequestedAt = null;
+      await policy.save();
+
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      await autoGenerateSalariesForMonth({
+        actorCompany: actor.company,
+        userId,
+        actorName: actor.name ?? "Admin",
+        month: currentMonth,
+        policy: policy || {},
+      });
+
+      if (policy.salaryCycleChangeRequestedBy) {
+        const msg = policy.salaryCycleStartDay && policy.salaryCycleEndDay 
+          ? `Your proposal to change the salary cycle to ${policy.salaryCycleStartDay} - ${policy.salaryCycleEndDay} has been approved.`
+          : `Your proposal to change the salary cycle day to ${policy.salaryCycleDay} has been approved.`;
+        
+        await Notification.create({
+          user: policy.salaryCycleChangeRequestedBy,
+          company: actor.company,
+          type: "info",
+          title: "Salary cycle change approved",
+          message: msg,
+        });
+        emitNotification(String(policy.salaryCycleChangeRequestedBy));
+      }
+      return NextResponse.json({ ok: true, salaryCycleDay: policy.salaryCycleDay });
+    }
+
+    if (status === "rejected") {
+      policy.pendingSalaryCycleDay = null;
+      policy.pendingSalaryCycleStartDay = null;
+      policy.pendingSalaryCycleEndDay = null;
+      policy.salaryCycleChangeStatus = "rejected";
+      policy.salaryCycleChangeApprover = null;
+      policy.salaryCycleChangeRequestedAt = null;
+      await policy.save();
+
+      if (policy.salaryCycleChangeRequestedBy) {
+        await Notification.create({
+          user: policy.salaryCycleChangeRequestedBy,
+          company: actor.company,
+          type: "info",
+          title: "Salary cycle change rejected",
+          message: `Your proposal to change the salary cycle day has been rejected.`,
+        });
+        emitNotification(String(policy.salaryCycleChangeRequestedBy));
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    return jsonError("Invalid salary-cycle status.");
   }
 
   return jsonError("Unknown finance update.");

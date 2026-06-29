@@ -97,3 +97,16 @@ export type RejectTarget = {
 export type SalaryModalTab = "unpaid" | "paid";
 
 export type FinanceSubTab = "my" | "ops" | "reports";
+
+export type SalaryCycleData = {
+  salaryCycleDay: number;
+  pendingSalaryCycleDay: number | null;
+  salaryCycleStartDay: number | null;
+  salaryCycleEndDay: number | null;
+  pendingSalaryCycleStartDay: number | null;
+  pendingSalaryCycleEndDay: number | null;
+  salaryCycleChangeStatus: string | null;
+  salaryCycleChangeRequestedBy: { _id: string; name: string; email: string } | null;
+  salaryCycleChangeApprover: { _id: string; name: string; email: string } | null;
+  salaryCycleChangeRequestedAt: string | null;
+};

@@ -50,10 +50,13 @@ export function FinanceSubTabs({
 }) {
   const myRequestsCount = data.expenses.filter((e) => {
     const status = String(e.status ?? "");
-    return status === "pending" || status === "forwarded";
+    return status === "pending" || status === "forwarded" || status === "approved";
   }).length;
 
-  const pendingSalariesCount = data.salaries.filter((s) => String(s.status ?? "") === "pending").length;
+  const pendingSalariesCount = data.salaries.filter((s) => {
+    const status = String(s.status ?? "");
+    return status === "pending" || status === "approved";
+  }).length;
   const pendingBudgetsCount = data.budgets.filter((b) => String(b.status ?? "") === "pending").length;
   const acceptedExpensesCount = data.expenses.filter((e) => String(e.status ?? "") === "accepted").length;
   const opsCount = pendingSalariesCount + pendingBudgetsCount + acceptedExpensesCount;

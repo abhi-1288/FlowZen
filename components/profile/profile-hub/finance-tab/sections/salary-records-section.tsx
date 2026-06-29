@@ -8,11 +8,13 @@ export function SalaryRecordsSection({
   actorRole,
   onDelete,
   onStatusUpdate,
+  onViewDetail,
 }: {
   salaries: AnyRecord[];
   actorRole: string;
   onDelete: (id: string, employeeName: string) => void;
   onStatusUpdate: (type: "salary" | "expense" | "budget" | "bill", id: string, status: string, extra?: Record<string, string>) => void;
+  onViewDetail?: (id: string, employeeName: string) => void;
 }) {
   const pendingCount = salaries.filter((s) => String(s.status ?? "") === "pending").length;
 
@@ -54,6 +56,9 @@ export function SalaryRecordsSection({
               ) : null}
               {String(salary.status) === "paid" ? (
                 <a href={`/salary-slip/${String(salary.id)}`} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800">View Slip</a>
+              ) : null}
+              {actorRole === "admin" && onViewDetail ? (
+                <ActionButton variant="secondary" className="px-3" onClick={() => onViewDetail(String(salary.id), displayNested(salary.employee, "name", "Employee"))}>Details</ActionButton>
               ) : null}
             </div>
           </div>

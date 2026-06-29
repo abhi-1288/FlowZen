@@ -295,7 +295,7 @@ export function ProfileHub() {
         if (financeCounts) {
           nextFinanceCount = String(actualRole) === "admin"
             ? financeCounts.pendingSalaryApproval + financeCounts.pendingExpenseApproval + financeCounts.forwardedExpenseApproval + financeCounts.pendingBills + financeCounts.pendingBudgets
-            : financeCounts.pendingSalaryPayment + financeCounts.pendingExpenseApproval + financeCounts.pendingExpenseAcceptance + financeCounts.pendingBudgets;
+            : financeCounts.pendingSalaryApproval + financeCounts.pendingSalaryPayment + financeCounts.pendingExpenseApproval + financeCounts.pendingExpenseAcceptance + financeCounts.pendingBudgets;
           setFinanceCount(nextFinanceCount);
         }
         if (String(actualRole) === "finance" && checkOutResult) {

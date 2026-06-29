@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/client-utils";
 import { AnyRecord } from "../shared";
 import type { SalaryBreakdown, BudgetForm, ExpenseForm, InvoiceForm, RejectTarget, SalaryModalTab } from "./types";
-import { useFinanceData, useInvoices, useReports, useLeaveImpacts, usePolicyData, useMySalarySlips } from "./hooks";
+import { useFinanceData, useInvoices, useReports, useLeaveImpacts, usePolicyData, useMySalarySlips, useSalaryCycle } from "./hooks";
 import { toggleRoleInSet } from "./helpers";
 import { DashboardCards } from "./sections/dashboard-cards";
 import { SalaryReminder } from "./sections/salary-reminder";
@@ -21,12 +21,14 @@ import { ReportsSection } from "./sections/reports-section";
 import { PoliciesSection } from "./sections/policies-section";
 import { LeaveImpactSection } from "./sections/leave-impact-section";
 import { SalarySlipSection } from "./sections/salary-slip-section";
+import { SalaryCycleSection } from "./sections/salary-cycle-section";
 import { RejectModal } from "./modals/reject-modal";
 import { DeleteSalaryModal } from "./modals/delete-salary-modal";
 import { ExpiredBudgetsModal } from "./modals/expired-budgets-modal";
 import { BudgetModal } from "./modals/budget-modal";
 import { InvoiceModal } from "./modals/invoice-modal";
 import { SalaryOverviewModal } from "./modals/salary-overview-modal";
+import { SalaryDetailModal } from "./modals/salary-detail-modal";
 
 export function FinanceTab({
   actorRole,
@@ -60,6 +62,8 @@ export function FinanceTab({
   const [rejectReason, setRejectReason] = useState("");
   const [deleteSalaryId, setDeleteSalaryId] = useState<string | null>(null);
   const [deleteSalaryEmployee, setDeleteSalaryEmployee] = useState("");
+  const [salaryDetailId, setSalaryDetailId] = useState<string | null>(null);
+  const [salaryDetailEmployee, setSalaryDetailEmployee] = useState("");
   const { invoices, setInvoices } = useInvoices(data);
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [invoiceForm, setInvoiceForm] = useState<InvoiceForm>({ boardId: "", clientName: "", clientEmail: "", amount: "", description: "" });
@@ -70,6 +74,7 @@ export function FinanceTab({
   const [expandedRoles, setExpandedRoles] = useState<Set<string>>(new Set());
   const { mySlips, slipsLoading } = useMySalarySlips(month);
   const { policyData } = usePolicyData(data);
+  const { salaryCycle, setSalaryCycle, refreshSalaryCycle } = useSalaryCycle(data);
   const [financeSubTab, setFinanceSubTab] = useState<"my" | "ops" | "reports">("my");
   const [foodOptedIn, setFoodOptedIn] = useState(true);
   const [travelOptedIn, setTravelOptedIn] = useState(true);
@@ -316,7 +321,8 @@ export function FinanceTab({
           <InvoicesSection invoices={invoices} isFinanceOrAdmin={isFinanceOrAdmin} onCreateInvoice={() => setShowInvoiceForm(true)} onMarkInvoice={markInvoice} />
           <BudgetAllocateSection onAllocate={() => openBudgetModal()} />
           <BudgetListSection budgets={data.budgets} actorRole={actorRole} profileId={profileId} onEdit={openBudgetModal} onApprove={(id) => updateStatus("budget", id, "approved")} onReject={(id, type) => setRejectTarget({ id, type })} onViewExpired={() => setShowExpiredBudgets(true)} />
-          <SalaryRecordsSection salaries={data.salaries} actorRole={actorRole} onDelete={(id, name) => { setDeleteSalaryId(id); setDeleteSalaryEmployee(name); }} onStatusUpdate={updateStatus} />
+          <SalaryRecordsSection salaries={data.salaries} actorRole={actorRole} onDelete={(id, name) => { setDeleteSalaryId(id); setDeleteSalaryEmployee(name); }} onStatusUpdate={updateStatus} onViewDetail={(id, name) => { setSalaryDetailId(id); setSalaryDetailEmployee(name); }} />
+          <SalaryCycleSection salaryCycle={salaryCycle} actorRole={actorRole} profileId={profileId} adminOptions={adminOptions} onRefresh={refreshSalaryCycle} />
         </div>
       ) : null}
 
@@ -335,6 +341,7 @@ export function FinanceTab({
       <BudgetModal show={showBudgetModal} editingBudgetId={editingBudgetId} budgetForm={budgetForm} boards={data.boards} financeMembers={data.financeMembers} actorRole={actorRole} onFormChange={setBudgetForm} onSubmit={submitBudget} onCancel={() => { setShowBudgetModal(false); setEditingBudgetId(null); }} />
       <InvoiceModal show={showInvoiceForm} invoiceForm={invoiceForm} onFormChange={setInvoiceForm} onSubmit={createInvoice} onCancel={() => { setShowInvoiceForm(false); setInvoiceForm({ boardId: "", clientName: "", clientEmail: "", amount: "", description: "" }); }} />
       <SalaryOverviewModal show={showSalaryModal} salaryModalTab={salaryModalTab} expandedRoles={expandedRoles} salaries={data.salaries} members={data.members} memberRoleMap={memberRoleMap} onTabChange={setSalaryModalTab} onToggleRole={(role) => setExpandedRoles(toggleRoleInSet(expandedRoles, role))} onClose={() => { setShowSalaryModal(false); setExpandedRoles(new Set()); }} />
+      <SalaryDetailModal salaryId={salaryDetailId} onClose={() => { setSalaryDetailId(null); setSalaryDetailEmployee(""); }} />
     </div>
   );
 }

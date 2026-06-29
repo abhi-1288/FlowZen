@@ -9,9 +9,9 @@ import { Notification } from "@/models/Notification";
 import { ProjectBudget } from "@/models/ProjectBudget";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
-import { JoinRequest } from "@/models/JoinRequest";
-import { monthKey, actorWithCompany, canManageFinance, computeSalaryBreakdown } from "./helpers";
+import { monthKey, actorWithCompany, autoGenerateSalariesForMonth, canManageFinance, computeSalaryBreakdown } from "./helpers";
 import { handleStatusUpdates } from "./status-updates";
+import { CompanyPolicy } from "@/models/CompanyPolicy";
 
 export async function GET(request: Request) {
   const userId = await requireUserId();
@@ -85,105 +85,31 @@ export async function GET(request: Request) {
 
   const month = monthKey(url.searchParams.get("month"));
 
+  const policy = await CompanyPolicy.findOne({ company: actor.company }).select("salaryCycleDay salaryCycleStartDay salaryCycleEndDay");
+  const salaryCycleDay = policy?.salaryCycleDay ?? 29;
+
   const now = new Date();
   const dayOfMonth = now.getDate();
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const isMonthEnd = dayOfMonth >= Math.min(28, lastDay) && dayOfMonth <= lastDay;
+  
+  let cycleTriggerDay = Math.min(salaryCycleDay, lastDay);
+  if (policy?.salaryCycleEndDay) {
+    cycleTriggerDay = Math.min(policy.salaryCycleEndDay, lastDay);
+  }
+  
+  const isCycleDay = dayOfMonth >= Math.min(cycleTriggerDay - 2, lastDay) && dayOfMonth <= lastDay;
 
   let monthEndGenerated = false;
+  const currentMonth = new Date().toISOString().slice(0, 7);
 
-  if (canManage && isMonthEnd) {
-    const existingSalaries = await FinanceSalary.countDocuments({
-      company: actor.company,
+  if (canManage && isCycleDay && month === currentMonth) {
+    monthEndGenerated = await autoGenerateSalariesForMonth({
+      actorCompany: actor.company,
+      userId,
+      actorName: actor.name ?? "Finance",
       month,
+      policy: policy || {},
     });
-    if (existingSalaries === 0) {
-      const approvedMembers = await User.find({
-        company: actor.company,
-        companyStatus: "approved",
-      }).select("_id name");
-      const periodStart = `${month}-01`;
-      const periodEnd = `${month}-${String(lastDay).padStart(2, "0")}`;
-      const generatedSalaries: any[] = [];
-      for (const member of approvedMembers) {
-        const computed = await computeSalaryBreakdown({
-          actorCompany: actor.company,
-          employeeId: String(member._id),
-          periodStart,
-          periodEnd,
-          allowances: 0,
-          manualDeductions: 0,
-        });
-        if ("error" in computed) continue;
-        const { breakdown } = computed;
-        const salary = await FinanceSalary.findOneAndUpdate(
-          { company: actor.company, employee: member._id, month },
-          {
-            $set: {
-              baseSalary: breakdown.grossSalary,
-              allowances: 0,
-              deductions: breakdown.totalDeductions,
-              netSalary: breakdown.finalSalary,
-            },
-            $setOnInsert: { status: "pending" },
-          },
-          { new: true, upsert: true },
-        );
-        generatedSalaries.push({ ...salary.toObject?.() ?? salary, employee: member });
-      }
-      if (generatedSalaries.length > 0) {
-        monthEndGenerated = true;
-        const admins = await User.find({
-          company: actor.company,
-          role: "admin",
-          companyStatus: "approved",
-        }).select("_id");
-        const approvalCounts = await Promise.all(
-          admins.map(async (a) => {
-            const count = await JoinRequest.countDocuments({
-              approver: a._id,
-              company: actor.company,
-              kind: "salary",
-              status: "pending",
-            });
-            return { id: String(a._id), count };
-          }),
-        );
-        approvalCounts.sort((a, b) => a.count - b.count);
-        const targetAdminId = approvalCounts[0]?.id;
-        if (targetAdminId) {
-          const targetAdmin = admins.find((a) => String(a._id) === targetAdminId);
-          if (targetAdmin) {
-            for (const _salary of generatedSalaries) {
-              const assignedAdmin = await User.findById(targetAdminId).select("_id");
-              if (assignedAdmin) {
-                await JoinRequest.findOneAndUpdate(
-                  { company: actor.company, kind: "salary", status: "pending", approver: targetAdminId },
-                  { $set: { approver: targetAdminId } },
-                  { upsert: false },
-                );
-              }
-            }
-            await Notification.create({
-              user: targetAdminId,
-              company: actor.company,
-              type: "approval",
-              title: "Monthly salaries pending approval",
-              message: `${generatedSalaries.length} salary record(s) were auto-generated for ${month}. Admin approval required.`,
-            });
-            emitNotification(targetAdminId);
-          }
-        }
-        await Notification.create({
-          user: userId,
-          company: actor.company,
-          type: "info",
-          title: "Salaries auto-generated",
-          message: `${generatedSalaries.length} salary record(s) were auto-generated for ${month}.`,
-        });
-        emitNotification(userId);
-      }
-    }
   }
 
   const [salaries, expenses, budgets, boards, members, financeMembers, bills] =

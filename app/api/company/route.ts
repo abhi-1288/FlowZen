@@ -34,7 +34,8 @@ export async function POST(request: Request) {
     name,
     owner: userId,
     joinCode,
-    members: [userId]
+    members: [userId],
+    startDate: new Date(),
   });
 
   user.company = company._id;

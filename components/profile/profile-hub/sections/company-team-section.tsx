@@ -29,6 +29,7 @@ export function CompanyTeamSection({
         <Row label="Team" value={team?.name ? String(team.name) : undefined} />
         <Row label="Company status" value={profile?.companyStatus ? String(profile.companyStatus) : undefined} />
         <Row label="Team status" value={profile?.teamStatus ? String(profile.teamStatus) : undefined} />
+        <Row label="Company Start Date" value={company?.startDate || company?.createdAt ? new Date((company.startDate || company.createdAt) as string | Date).toLocaleDateString() : undefined} />
         <Row label="Company Joined" value={profile?.company && profile?.companyJoined ? new Date(profile.companyJoined as string | Date).toLocaleDateString() : undefined} />
         <Row label="Team Joined" value={profile?.team && profile?.teamJoined ? new Date(profile.teamJoined as string | Date).toLocaleDateString() : undefined} />
         {inApprovedCompany && !["human-resource", "admin"].includes(role) ? (
