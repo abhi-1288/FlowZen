@@ -92,12 +92,14 @@ export async function GET(request: Request) {
   const dayOfMonth = now.getDate();
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   
-  let cycleTriggerDay = Math.min(salaryCycleDay, lastDay);
-  if (policy?.salaryCycleEndDay) {
-    cycleTriggerDay = Math.min(policy.salaryCycleEndDay, lastDay);
-  }
+  const cycleTriggerDay = Math.min(
+    policy?.salaryCycleStartDay && policy?.salaryCycleEndDay
+      ? policy.salaryCycleEndDay + 1  // e.g., period 29th→28th, trigger on 29th
+      : salaryCycleDay,
+    lastDay,
+  );
   
-  const isCycleDay = dayOfMonth >= Math.min(cycleTriggerDay - 2, lastDay) && dayOfMonth <= lastDay;
+  const isCycleDay = dayOfMonth >= Math.max(1, cycleTriggerDay) && dayOfMonth <= lastDay;
 
   let monthEndGenerated = false;
   const currentMonth = new Date().toISOString().slice(0, 7);
@@ -199,7 +201,7 @@ export async function GET(request: Request) {
     0,
   );
   const pendingSalaries = salaries.filter(
-    (salary: any) => salary.status !== "paid",
+    (salary: any) => salary.status === "pending",
   ).length;
   const paidSalaries = salaries.filter(
     (salary: any) => salary.status === "paid",
