@@ -26,6 +26,7 @@ export type PolicyData = {
   travelAccommodationAmount: number;
   foodOptedOutMembers: { _id: string; name: string; email: string; role: string }[];
   travelOptedOutMembers: { _id: string; name: string; email: string; role: string }[];
+  advanceSalaryEnabled: boolean;
 };
 
 export type PolicyApiResponse = PolicyData & { nowOptedOut: boolean };
@@ -91,7 +92,7 @@ export type FinanceData = {
 
 export type RejectTarget = {
   id: string;
-  type: "expense" | "budget";
+  type: "expense" | "budget" | "salary";
 };
 
 export type SalaryModalTab = "unpaid" | "paid";

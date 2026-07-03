@@ -48,6 +48,12 @@ export function ProfileTab({
   const [policyInfo, setPolicyInfo] = useState<{
     foodAmount: number; travelAccommodationAmount: number;
     foodOptedOutMembers?: AnyRecord[]; travelOptedOutMembers?: AnyRecord[];
+    advanceSalaryEnabled?: boolean;
+  } | null>(null);
+  const [salaryCycle, setSalaryCycle] = useState<{
+    salaryCycleDay: number;
+    salaryCycleStartDay: number | null;
+    salaryCycleEndDay: number | null;
   } | null>(null);
   const [companyActionModal, setCompanyActionModal] = useState(false);
   const [companyActionType, setCompanyActionType] = useState<"hold" | "takedown" | null>(null);
@@ -202,8 +208,10 @@ export function ProfileTab({
 
   useEffect(() => {
     if (!inApprovedCompany) return;
-    apiFetch<{ foodAmount: number; travelAccommodationAmount: number; foodOptedOutMembers: AnyRecord[]; travelOptedOutMembers: AnyRecord[] }>("/api/finance/policy")
+    apiFetch<{ foodAmount: number; travelAccommodationAmount: number; foodOptedOutMembers: AnyRecord[]; travelOptedOutMembers: AnyRecord[]; advanceSalaryEnabled: boolean }>("/api/finance/policy")
       .then(setPolicyInfo).catch(() => {});
+    apiFetch<{ salaryCycleDay: number; salaryCycleStartDay: number | null; salaryCycleEndDay: number | null }>("/api/finance/salary-cycle")
+      .then(setSalaryCycle).catch(() => {});
   }, [inApprovedCompany]);
 
   const wfhAdminState: WfhAdminState = {
@@ -255,7 +263,7 @@ export function ProfileTab({
         <CompanyTeamSection profile={profile} company={company} team={team} inApprovedCompany={inApprovedCompany}
           role={role} identityRequesting={identityRequesting} insights={insights} onRequestIdentity={requestIdentityCode} />
 
-        <PolicyQuotasSection company={company} policyInfo={policyInfo} profile={profile} session={session} />
+        <PolicyQuotasSection company={company} policyInfo={policyInfo} salaryCycle={salaryCycle} profile={profile} session={session} />
 
         <CompensationSection inApprovedCompany={inApprovedCompany} effectiveBaseSalary={effectiveBaseSalary}
           insights={insights} role={role} salaryRequesting={salaryRequesting} onRequestSalary={requestSalary} />

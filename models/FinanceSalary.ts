@@ -11,7 +11,13 @@ const FinanceSalarySchema = new Schema(
     netSalary: { type: Number, default: 0 },
     status: { type: String, enum: ["pending", "approved", "paid", "rejected"], default: "pending", index: true },
     approvedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    approvedAt: { type: Date, default: null },
+    rejectedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    rejectedAt: { type: Date, default: null },
+    rejectionReason: { type: String, default: "" },
     paidAt: { type: Date, default: null },
+    createdBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    updatedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
   },
   { timestamps: true },
 );

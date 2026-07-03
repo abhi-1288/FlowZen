@@ -99,6 +99,12 @@ export async function GET() {
     status: "pending",
   }).select("_id");
   insights.pendingSalaryRequest = !!pendingSalaryRequest;
+  const pendingAdvanceSalaryRequest = await JoinRequest.findOne({
+    requester: userId,
+    kind: "salary-advance",
+    status: "pending",
+  }).select("_id");
+  insights.pendingAdvanceSalaryRequest = !!pendingAdvanceSalaryRequest;
   const inApprovedCompany = Boolean(user.company && user.companyStatus === "approved");
   const userCompanyId =
     typeof user.company === "object" && user.company

@@ -18,6 +18,7 @@ const policySchema = new mongoose.Schema({
   salaryCycleChangeRequestedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   salaryCycleChangeApprover: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   salaryCycleChangeRequestedAt: { type: Date, default: null },
+  advanceSalaryEnabled: { type: Boolean, default: false },
 }, { timestamps: true });
 
 if (process.env.NODE_ENV === "development") {

@@ -70,6 +70,7 @@ export function usePolicyData(data: FinanceData | null) {
         travelAccommodationAmount: res.travelAccommodationAmount,
         foodOptedOutMembers: res.foodOptedOutMembers ?? [],
         travelOptedOutMembers: res.travelOptedOutMembers ?? [],
+        advanceSalaryEnabled: res.advanceSalaryEnabled ?? false,
       }))
       .catch(() => { });
   }, [data]);

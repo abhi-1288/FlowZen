@@ -36,17 +36,34 @@ export async function handleStatusUpdates(request: Request) {
         return jsonError("Only admin can reject salary payouts.", 403);
       if (existing.status !== "pending")
         return jsonError("Only pending salary payouts can be rejected.", 400);
+      const rejectionReason = String(body.rejectionReason ?? "").trim();
+      if (!rejectionReason)
+        return jsonError("A rejection reason is required.", 400);
+    }
+
+    const updateFields: Record<string, any> = {
+      status,
+      updatedBy: userId,
+    };
+    if (status === "approved") {
+      updateFields.approvedBy = userId;
+      updateFields.approvedAt = new Date();
+      updateFields.paidAt = null;
+    }
+    if (status === "paid") {
+      updateFields.paidAt = new Date();
+    }
+    if (status === "rejected") {
+      updateFields.rejectedBy = userId;
+      updateFields.rejectedAt = new Date();
+      updateFields.rejectionReason = String(body.rejectionReason ?? "").trim();
+      updateFields.approvedBy = null;
+      updateFields.paidAt = null;
     }
 
     const salary = await FinanceSalary.findOneAndUpdate(
       { _id: id, company: actor.company },
-      {
-        $set: {
-          status,
-          approvedBy: userId,
-          paidAt: status === "paid" ? new Date() : null,
-        },
-      },
+      { $set: updateFields },
       { new: true },
     );
 
@@ -83,6 +100,7 @@ export async function handleStatusUpdates(request: Request) {
     }
 
     if (status === "rejected") {
+      const rejectionReason = String(body.rejectionReason ?? "").trim();
       const financeUsers = await User.find({
         company: actor.company,
         role: "finance",
@@ -94,13 +112,85 @@ export async function handleStatusUpdates(request: Request) {
           company: actor.company,
           type: "info",
           title: "Salary payout rejected",
-          message: `Salary for ${salary?.month ?? ""} has been rejected by admin.`,
+          message: `Salary for ${salary?.month ?? ""} has been rejected by admin. Reason: ${rejectionReason}`,
         })),
       );
       financeUsers.forEach((u) => emitNotification(String(u._id)));
     }
 
     return NextResponse.json({ salary });
+  }
+
+  if (type === "salary-bulk") {
+    if (!["approved", "rejected"].includes(status))
+      return jsonError("Invalid bulk status.");
+    if (status === "rejected" && String(actor.role) !== "admin")
+      return jsonError("Only admin can reject salary payouts.", 403);
+
+    const ids = body.ids;
+    if (!Array.isArray(ids) || ids.length === 0)
+      return jsonError("No salary IDs provided.", 400);
+
+    const filter: Record<string, any> = {
+      _id: { $in: ids },
+      company: actor.company,
+      status: "pending",
+    };
+
+    const updateFields: Record<string, any> = {
+      status,
+      updatedBy: userId,
+    };
+    if (status === "approved") {
+      updateFields.approvedBy = userId;
+      updateFields.approvedAt = new Date();
+    }
+    if (status === "rejected") {
+      updateFields.rejectedBy = userId;
+      updateFields.rejectedAt = new Date();
+      updateFields.rejectionReason = String(body.rejectionReason ?? "Bulk rejected by admin").trim();
+    }
+
+    const result = await FinanceSalary.updateMany(filter, { $set: updateFields });
+
+    const modifiedCount = result.modifiedCount;
+
+    if (modifiedCount > 0) {
+      const financeUsers = await User.find({
+        company: actor.company,
+        role: "finance",
+        companyStatus: "approved",
+      }).select("_id");
+
+      if (status === "approved") {
+        await Notification.insertMany(
+          financeUsers.map((u) => ({
+            user: u._id,
+            company: actor.company,
+            type: "info",
+            title: "Salaries approved",
+            message: `${modifiedCount} salary record(s) have been approved.`,
+          })),
+        );
+      }
+
+      if (status === "rejected") {
+        const rejectionReason = updateFields.rejectionReason;
+        await Notification.insertMany(
+          financeUsers.map((u) => ({
+            user: u._id,
+            company: actor.company,
+            type: "info",
+            title: "Salaries rejected",
+            message: `${modifiedCount} salary record(s) have been rejected by admin. Reason: ${rejectionReason}`,
+          })),
+        );
+      }
+
+      financeUsers.forEach((u) => emitNotification(String(u._id)));
+    }
+
+    return NextResponse.json({ modified: modifiedCount });
   }
 
   if (type === "expense") {

@@ -390,7 +390,7 @@ export async function autoGenerateSalariesForMonth(params: {
           deductions: breakdown.totalDeductions,
           netSalary: breakdown.finalSalary,
         },
-        $setOnInsert: { status: "pending" },
+        $setOnInsert: { status: "pending", createdBy: userId },
       },
       { new: true, upsert: true },
     );

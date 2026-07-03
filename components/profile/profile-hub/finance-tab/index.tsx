@@ -16,6 +16,7 @@ import { ExpenseAllocatorSection } from "./sections/expense-allocator-section";
 import { InvoicesSection } from "./sections/invoices-section";
 import { BudgetAllocateSection } from "./sections/budget-allocate-section";
 import { BudgetListSection } from "./sections/budget-list-section";
+import { AdvanceRequestSection } from "./sections/advance-request-section";
 import { SalaryRecordsSection } from "./sections/salary-records-section";
 import { ReportsSection } from "./sections/reports-section";
 import { PoliciesSection } from "./sections/policies-section";
@@ -73,7 +74,7 @@ export function FinanceTab({
   const [salaryModalTab, setSalaryModalTab] = useState<SalaryModalTab>("unpaid");
   const [expandedRoles, setExpandedRoles] = useState<Set<string>>(new Set());
   const { mySlips, slipsLoading } = useMySalarySlips(month);
-  const { policyData } = usePolicyData(data);
+  const { policyData, setPolicyData } = usePolicyData(data);
   const { salaryCycle, setSalaryCycle, refreshSalaryCycle } = useSalaryCycle(data);
   const [financeSubTab, setFinanceSubTab] = useState<"my" | "ops" | "reports">("my");
   const [foodOptedIn, setFoodOptedIn] = useState(true);
@@ -91,6 +92,19 @@ export function FinanceTab({
       if (type === "food") setFoodOptedIn(optedIn);
       else setTravelOptedIn(optedIn);
       showToast(`Successfully ${optedIn ? "opted in" : "opted out"} of ${type} policy.`, "success");
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Failed to update policy.", "error");
+    }
+  }
+
+  async function toggleAdvanceSalary(enabled: boolean) {
+    try {
+      const res = await apiFetch<{ advanceSalaryEnabled: boolean }>("/api/finance/policy", {
+        method: "POST",
+        body: JSON.stringify({ advanceSalaryEnabled: enabled }),
+      });
+      setPolicyData((prev) => prev ? { ...prev, advanceSalaryEnabled: res.advanceSalaryEnabled } : prev);
+      showToast(`Advance salary ${enabled ? "enabled" : "disabled"}.`, "success");
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : "Failed to update policy.", "error");
     }
@@ -185,6 +199,19 @@ export function FinanceTab({
     await load();
   }
 
+  async function bulkStatusUpdate(ids: string[], status: "approved" | "rejected") {
+    try {
+      const res = await apiFetch<{ modified: number }>("/api/finance", {
+        method: "PATCH",
+        body: JSON.stringify({ type: "salary-bulk", ids, status }),
+      });
+      showToast(`${res.modified} salary record(s) ${status}.`, "success");
+      await load();
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Bulk operation failed.", "error");
+    }
+  }
+
   async function deleteSalary() {
     if (!deleteSalaryId) return;
     try {
@@ -241,6 +268,14 @@ export function FinanceTab({
 
   const isFinanceOrAdmin = actorRole === "finance" || actorRole === "admin";
   const adminOptions = data.members.filter((m) => String(m.role) === "admin");
+  const approvers = [
+    ...(data.financeMembers ?? []),
+    ...(data.members ?? []),
+  ].filter((m, i, arr) => {
+    const role = String(m.role);
+    return (role === "admin" || role === "human-resource" || role === "finance") &&
+      arr.findIndex((x) => String(x.id) === String(m.id)) === i;
+  }).map((m) => ({ id: String(m.id), name: String(m.name ?? m.email ?? "Unknown") }));
 
   if (!isFinanceOrAdmin) {
     return (
@@ -266,11 +301,17 @@ export function FinanceTab({
           </div>
         </div>
 
+        {policyData?.advanceSalaryEnabled ? (
+        <div>
+          <AdvanceRequestSection approvers={approvers} showToast={showToast} />
+        </div>
+        ) : null}
+
         <div>
           <h4 className="mb-3 text-sm font-semibold text-slate-800">Reports</h4>
           <div className="space-y-5">
             <ReportsSection reports={reports} />
-            <PoliciesSection policyData={policyData} foodOptedIn={foodOptedIn} travelOptedIn={travelOptedIn} onToggleOptInOut={toggleOptInOut} />
+            <PoliciesSection policyData={policyData} foodOptedIn={foodOptedIn} travelOptedIn={travelOptedIn} actorRole={actorRole} salaryCycle={salaryCycle} onToggleOptInOut={toggleOptInOut} onToggleAdvanceSalary={toggleAdvanceSalary} />
             <LeaveImpactSection leaveImpacts={leaveImpacts} month={month} />
           </div>
         </div>
@@ -307,6 +348,9 @@ export function FinanceTab({
 
       {financeSubTab === "my" ? (
         <div className="space-y-5">
+          {policyData?.advanceSalaryEnabled ? (
+            <AdvanceRequestSection approvers={approvers} showToast={showToast} />
+          ) : null}
           <ExpenseFormSection expenseForm={expenseForm} actorRole={actorRole} financeMembers={data.financeMembers} onSubmit={submitExpense} onFormChange={setExpenseForm} />
           <ExpenseListSection expenses={data.expenses} actorRole={actorRole} profileId={profileId} adminOptions={adminOptions} forwardAdminByExpense={forwardAdminByExpense} onForwardAdmin={(id, adminId) => setForwardAdminByExpense({ ...forwardAdminByExpense, [id]: adminId })} onReject={(id, type) => setRejectTarget({ id, type })} onStatusUpdate={updateStatus} />
         </div>
@@ -321,7 +365,7 @@ export function FinanceTab({
           <InvoicesSection invoices={invoices} isFinanceOrAdmin={isFinanceOrAdmin} onCreateInvoice={() => setShowInvoiceForm(true)} onMarkInvoice={markInvoice} />
           <BudgetAllocateSection onAllocate={() => openBudgetModal()} />
           <BudgetListSection budgets={data.budgets} actorRole={actorRole} profileId={profileId} onEdit={openBudgetModal} onApprove={(id) => updateStatus("budget", id, "approved")} onReject={(id, type) => setRejectTarget({ id, type })} onViewExpired={() => setShowExpiredBudgets(true)} />
-          <SalaryRecordsSection salaries={data.salaries} actorRole={actorRole} onDelete={(id, name) => { setDeleteSalaryId(id); setDeleteSalaryEmployee(name); }} onStatusUpdate={updateStatus} onViewDetail={(id, name) => { setSalaryDetailId(id); setSalaryDetailEmployee(name); }} />
+          <SalaryRecordsSection salaries={data.salaries} actorRole={actorRole} month={month} onDelete={(id, name) => { setDeleteSalaryId(id); setDeleteSalaryEmployee(name); }} onStatusUpdate={updateStatus} onReject={(id, type) => setRejectTarget({ id, type })} onBulkStatusUpdate={bulkStatusUpdate} onViewDetail={(id, name) => { setSalaryDetailId(id); setSalaryDetailEmployee(name); }} />
           <SalaryCycleSection salaryCycle={salaryCycle} actorRole={actorRole} profileId={profileId} adminOptions={adminOptions} onRefresh={refreshSalaryCycle} />
         </div>
       ) : null}
@@ -329,7 +373,7 @@ export function FinanceTab({
       {financeSubTab === "reports" ? (
         <div className="space-y-5">
           <ReportsSection reports={reports} />
-          <PoliciesSection policyData={policyData} foodOptedIn={foodOptedIn} travelOptedIn={travelOptedIn} onToggleOptInOut={toggleOptInOut} />
+          <PoliciesSection policyData={policyData} foodOptedIn={foodOptedIn} travelOptedIn={travelOptedIn} actorRole={actorRole} salaryCycle={salaryCycle} onToggleOptInOut={toggleOptInOut} onToggleAdvanceSalary={toggleAdvanceSalary} />
           <LeaveImpactSection leaveImpacts={leaveImpacts} month={month} />
           <SalarySlipSection mySlips={mySlips} slipsLoading={slipsLoading} month={month} />
         </div>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { databaseUnavailable, isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
 import { Company } from "@/models/Company";
+import { FinanceSalary } from "@/models/FinanceSalary";
 import { JoinRequest } from "@/models/JoinRequest";
 import { Notification } from "@/models/Notification";
 import { Team } from "@/models/Team";
@@ -367,6 +368,31 @@ export async function PATCH(request: Request, { params }: Params) {
       }
     }
 
+    if (joinRequest.kind === "salary-advance") {
+      if (status === "approved") {
+        const metadata = joinRequest.metadata || {};
+        const advanceAmount = Number(metadata.advanceAmount ?? 0);
+        const currentMonth = new Date().toISOString().slice(0, 7);
+
+        await FinanceSalary.findOneAndUpdate(
+          { company: joinRequest.company, employee: requester._id, month: currentMonth },
+          {
+            $set: {
+              baseSalary: 0,
+              allowances: 0,
+              deductions: 0,
+              netSalary: advanceAmount,
+            },
+            $setOnInsert: {
+              status: "pending",
+              createdBy: joinRequest.approver,
+            },
+          },
+          { new: true, upsert: true },
+        );
+      }
+    }
+
     if (joinRequest.kind === "team") {
       requester.teamStatus = status;
       if (status === "approved") {
@@ -666,6 +692,13 @@ export async function PATCH(request: Request, { params }: Params) {
         status === "approved"
           ? `The salary update request for ${joinRequest.metadata?.targetUserName || "a member"} was approved by the admin.`
           : `The salary update request for ${joinRequest.metadata?.targetUserName || "a member"} was rejected.`;
+    } else if (joinRequest.kind === "salary-advance") {
+      const advanceAmount = Number((joinRequest.metadata as any)?.advanceAmount ?? 0);
+      title = status === "approved" ? "Salary advance approved" : "Salary advance rejected";
+      message =
+        status === "approved"
+          ? `Your salary advance of ₹${advanceAmount.toLocaleString("en-IN")} has been approved. Finance will process it shortly.`
+          : "Your salary advance request was rejected.";
     } else if (joinRequest.kind === "role-transfer") {
       title = status === "approved" ? "Role transfer approved" : "Role transfer rejected";
       message =

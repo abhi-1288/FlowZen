@@ -25,6 +25,7 @@ export async function GET() {
       travelAccommodationAmount: 0,
       foodOptedOutMembers: [],
       travelOptedOutMembers: [],
+      advanceSalaryEnabled: false,
     });
   }
 
@@ -33,6 +34,7 @@ export async function GET() {
     travelAccommodationAmount: policy.travelAccommodationAmount ?? 0,
     foodOptedOutMembers: policy.foodOptedOutMembers ?? [],
     travelOptedOutMembers: policy.travelOptedOutMembers ?? [],
+    advanceSalaryEnabled: policy.advanceSalaryEnabled ?? false,
   });
 }
 
@@ -51,9 +53,14 @@ export async function POST(request: Request) {
   const foodAmount = Math.max(0, Number(body.foodAmount ?? 0));
   const travelAccommodationAmount = Math.max(0, Number(body.travelAccommodationAmount ?? 0));
 
+  const update: Record<string, any> = { foodAmount, travelAccommodationAmount };
+  if (typeof body.advanceSalaryEnabled === "boolean") {
+    update.advanceSalaryEnabled = body.advanceSalaryEnabled;
+  }
+
   const policy = await CompanyPolicy.findOneAndUpdate(
     { company: actor.company },
-    { $set: { foodAmount, travelAccommodationAmount } },
+    { $set: update },
     { new: true, upsert: true },
   );
 
@@ -82,6 +89,7 @@ export async function POST(request: Request) {
     travelAccommodationAmount: policy.travelAccommodationAmount ?? 0,
     foodOptedOutMembers: policy.foodOptedOutMembers ?? [],
     travelOptedOutMembers: policy.travelOptedOutMembers ?? [],
+    advanceSalaryEnabled: policy.advanceSalaryEnabled ?? false,
   });
 }
 
@@ -155,6 +163,7 @@ export async function PATCH(request: Request) {
     travelAccommodationAmount: policy.travelAccommodationAmount ?? 0,
     foodOptedOutMembers: policy.foodOptedOutMembers ?? [],
     travelOptedOutMembers: policy.travelOptedOutMembers ?? [],
+    advanceSalaryEnabled: policy.advanceSalaryEnabled ?? false,
     nowOptedOut: !isOptedOut,
   });
 }

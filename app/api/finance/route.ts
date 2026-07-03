@@ -428,7 +428,7 @@ export async function POST(request: Request) {
           deductions: breakdown.totalDeductions,
           netSalary: breakdown.finalSalary,
         },
-        $setOnInsert: { status: "pending" },
+        $setOnInsert: { status: "pending", createdBy: userId },
       },
       { new: true, upsert: true },
     );
