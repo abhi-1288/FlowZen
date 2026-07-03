@@ -20,11 +20,15 @@ export function usePolicySettings(
       ? "yearly"
       : "monthly",
   );
+  const [carryForwardLeaveDays, setCarryForwardLeaveDays] = useState<boolean>(
+    company?.carryForwardLeaveDays === true,
+  );
   const [minWorkHours, setMinWorkHours] = useState<number>(
     Math.max(1, Math.min(24, Number(company?.minWorkHours ?? 8))),
   );
   const [savingNoticePeriod, setSavingNoticePeriod] = useState(false);
   const [savingPaidLeave, setSavingPaidLeave] = useState(false);
+  const [savingCarryForwardLeave, setSavingCarryForwardLeave] = useState(false);
   const [savingDayHour, setSavingDayHour] = useState(false);
 
   async function saveNoticePeriodOnly() {
@@ -84,16 +88,38 @@ export function usePolicySettings(
     }
   }
 
+  async function saveCarryForwardLeaveOnly() {
+    try {
+      setSavingCarryForwardLeave(true);
+      await apiFetch("/api/hr/policy", {
+        method: "PATCH",
+        body: JSON.stringify({ carryForwardLeaveDays }),
+      });
+      showToast("Leave carry-forward policy updated.", "success");
+      await refresh(true);
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Unable to update carry-forward policy.",
+        "error",
+      );
+    } finally {
+      setSavingCarryForwardLeave(false);
+    }
+  }
+
   return {
     noticePeriodDays, setNoticePeriodDays,
     paidLeaveDays, setPaidLeaveDays,
     paidLeavePeriod, setPaidLeavePeriod,
+    carryForwardLeaveDays, setCarryForwardLeaveDays,
     minWorkHours, setMinWorkHours,
     savingNoticePeriod,
     savingPaidLeave,
+    savingCarryForwardLeave,
     savingDayHour,
     saveNoticePeriodOnly,
     savePaidLeaveOnly,
+    saveCarryForwardLeaveOnly,
     saveDayHourOnly,
   };
 }

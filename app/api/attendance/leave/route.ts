@@ -67,7 +67,7 @@ export async function POST(req: Request) {
     if (!user.company) return jsonError("You must belong to a company to request leave.", 400);
     if (String(user.role) === "admin") return jsonError("Admins cannot request paid leave.", 403);
 
-    const company = await Company.findById(user.company).select("paidLeaveDays paidLeavePeriod");
+    const company = await Company.findById(user.company).select("paidLeaveDays paidLeavePeriod carryForwardLeaveDays");
     if (!company) return jsonError("Company not found.", 404);
     const paidLeaveDays = Math.max(0, Number(company.paidLeaveDays ?? 0));
     const paidLeavePeriod = String(company.paidLeavePeriod ?? "monthly");
@@ -103,7 +103,25 @@ export async function POST(req: Request) {
       (sum, leave) => sum + overlapDuration(leave, quota.start, quota.end),
       0,
     );
-    const remainingLeaveDays = Math.max(0, paidLeaveDays - usedLeaveDays);
+    let carryForward = 0;
+    if (company.carryForwardLeaveDays) {
+      const prevQuota = leaveWindow(new Date(quota.start.getTime() - 1), paidLeavePeriod);
+      const prevLeaves = await LeaveRequest.find({
+        requester: userId,
+        company: user.company,
+        isPaidLeave: { $ne: false },
+        status: { $in: ["pending", "hr-approved", "manager-approved", "approved"] },
+        startDate: { $lte: prevQuota.end },
+        endDate: { $gte: prevQuota.start },
+      }).select("startDate endDate duration halfDay");
+      const usedPrev = prevLeaves.reduce(
+        (sum, leave) => sum + overlapDuration(leave, prevQuota.start, prevQuota.end),
+        0,
+      );
+      carryForward = Math.max(0, paidLeaveDays - usedPrev);
+    }
+    const totalAvailable = paidLeaveDays + carryForward;
+    const remainingLeaveDays = Math.max(0, totalAvailable - usedLeaveDays);
     if (requestedDuration > remainingLeaveDays) {
       return jsonError(
         `Paid leave quota exceeded. Remaining ${paidLeavePeriod} paid leave: ${remainingLeaveDays} day${remainingLeaveDays === 1 ? "" : "s"}.`,
@@ -192,7 +210,7 @@ export async function GET() {
   const user = await User.findById(userId);
   if (!user) return jsonError("User not found.", 404);
   const company = user.company
-    ? await Company.findById(user.company).select("paidLeaveDays paidLeavePeriod")
+    ? await Company.findById(user.company).select("paidLeaveDays paidLeavePeriod carryForwardLeaveDays")
     : null;
   const paidLeaveDays = Math.max(0, Number(company?.paidLeaveDays ?? 0));
   const paidLeavePeriod = String(company?.paidLeavePeriod ?? "monthly");
@@ -211,6 +229,25 @@ export async function GET() {
     (sum, leave) => sum + overlapDuration(leave, quota.start, quota.end),
     0,
   );
+  let carryForwardLeaveDays = 0;
+  if (company?.carryForwardLeaveDays) {
+    const prevQuota = leaveWindow(new Date(quota.start.getTime() - 1), paidLeavePeriod);
+    const prevLeaves = user.company
+      ? await LeaveRequest.find({
+        requester: userId,
+        company: user.company,
+        isPaidLeave: { $ne: false },
+        status: { $in: ["pending", "hr-approved", "manager-approved", "approved"] },
+        startDate: { $lte: prevQuota.end },
+        endDate: { $gte: prevQuota.start },
+      }).select("startDate endDate duration halfDay")
+      : [];
+    const usedPrev = prevLeaves.reduce(
+      (sum, leave) => sum + overlapDuration(leave, prevQuota.start, prevQuota.end),
+      0,
+    );
+    carryForwardLeaveDays = Math.max(0, paidLeaveDays - usedPrev);
+  }
 
   // Base query: all leave requests for the same company
   let query: any = { company: user.company };
@@ -254,13 +291,16 @@ export async function GET() {
     requests = await LeaveRequest.find(query).populate("requester", "name email role").sort({ createdAt: -1 });
   }
 
+  const totalAvailable = paidLeaveDays + carryForwardLeaveDays;
+
   return NextResponse.json({
     requests,
     leavePolicy: {
       paidLeaveDays,
       paidLeavePeriod,
       usedPaidLeaveDays,
-      remainingPaidLeaveDays: Math.max(0, paidLeaveDays - usedPaidLeaveDays),
+      carryForwardLeaveDays,
+      remainingPaidLeaveDays: Math.max(0, totalAvailable - usedPaidLeaveDays),
     },
   });
 }

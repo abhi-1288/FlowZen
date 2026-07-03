@@ -49,6 +49,7 @@ export function ProfileTab({
     foodAmount: number; travelAccommodationAmount: number;
     foodOptedOutMembers?: AnyRecord[]; travelOptedOutMembers?: AnyRecord[];
     advanceSalaryEnabled?: boolean;
+    pfPercentage?: number; esicPercentage?: number; tdsPercentage?: number;
   } | null>(null);
   const [salaryCycle, setSalaryCycle] = useState<{
     salaryCycleDay: number;
@@ -208,7 +209,7 @@ export function ProfileTab({
 
   useEffect(() => {
     if (!inApprovedCompany) return;
-    apiFetch<{ foodAmount: number; travelAccommodationAmount: number; foodOptedOutMembers: AnyRecord[]; travelOptedOutMembers: AnyRecord[]; advanceSalaryEnabled: boolean }>("/api/finance/policy")
+    apiFetch<{ foodAmount: number; travelAccommodationAmount: number; foodOptedOutMembers: AnyRecord[]; travelOptedOutMembers: AnyRecord[]; advanceSalaryEnabled: boolean; pfPercentage: number; esicPercentage: number; tdsPercentage: number }>("/api/finance/policy")
       .then(setPolicyInfo).catch(() => {});
     apiFetch<{ salaryCycleDay: number; salaryCycleStartDay: number | null; salaryCycleEndDay: number | null }>("/api/finance/salary-cycle")
       .then(setSalaryCycle).catch(() => {});
@@ -280,12 +281,20 @@ export function ProfileTab({
             onPaidLeavePeriodChange={policy.setPaidLeavePeriod}
             savingPaidLeave={policy.savingPaidLeave}
             onSavePaidLeave={policy.savePaidLeaveOnly}
+            carryForwardLeaveDays={policy.carryForwardLeaveDays}
+            onCarryForwardLeaveChange={policy.setCarryForwardLeaveDays}
+            savingCarryForwardLeave={policy.savingCarryForwardLeave}
+            onSaveCarryForwardLeave={policy.saveCarryForwardLeaveOnly}
             wfhDays={wfh.wfhDays}
             onWfhDaysChange={wfh.setWfhDays}
             wfhPeriod={wfh.wfhPeriod}
             onWfhPeriodChange={wfh.setWfhPeriod}
             wfhLoading={wfh.wfhLoading}
             onSaveWfhQuota={wfh.saveWfhQuota}
+            carryForwardWfhDays={wfh.carryForwardWfhDays}
+            onCarryForwardWfhChange={wfh.setCarryForwardWfhDays}
+            savingCarryForwardWfh={wfh.wfhLoading}
+            onSaveCarryForwardWfh={wfh.saveCarryForwardWfhOnly}
             minWorkHours={policy.minWorkHours}
             onMinWorkHoursChange={policy.setMinWorkHours}
             savingDayHour={policy.savingDayHour}

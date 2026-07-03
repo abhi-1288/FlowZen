@@ -293,6 +293,7 @@ export async function computeSalaryBreakdown(params: {
   let travelDeduction = 0;
   let pfDeduction = 0;
   let esicDeduction = 0;
+  let tdsDeduction = 0;
   let finalSalary = Math.max(0, grossSalary + allowances - manualDeductions);
   if (policy) {
     const isFoodOptedOut = policy.foodOptedOutMembers?.some(
@@ -313,15 +314,24 @@ export async function computeSalaryBreakdown(params: {
     const esicPct = Number((policy as any).esicPercentage ?? 0.75);
     const empPfAmount = Number((employee as any).pfDeductionAmount ?? 0);
     const empEsicAmount = Number((employee as any).esicDeductionAmount ?? 0);
-    if ((employee as any).pfNumber) {
+    if (!(employee as any).pfExempted) {
       pfDeduction = empPfAmount > 0 ? roundCurrency(empPfAmount) : roundCurrency(grossSalary * pfPct / 100);
     }
-    if ((employee as any).esicNumber) {
+    if (!(employee as any).esicExempted) {
       esicDeduction = empEsicAmount > 0 ? roundCurrency(empEsicAmount) : roundCurrency(grossSalary * esicPct / 100);
     }
-    finalSalary = Math.max(0, finalSalary - pfDeduction - esicDeduction);
+    const tdsPct = Number((policy as any).tdsPercentage ?? 0);
+    const empTdsAmount = Number((employee as any).tdsDeductionAmount ?? 0);
+    if (!(employee as any).tdsExempted) {
+      if (empTdsAmount > 0) {
+        tdsDeduction = roundCurrency(empTdsAmount);
+      } else if (tdsPct > 0) {
+        tdsDeduction = roundCurrency(grossSalary * tdsPct / 100);
+      }
+    }
+    finalSalary = Math.max(0, finalSalary - pfDeduction - esicDeduction - tdsDeduction);
   }
-  const totalDeductions = leaveDeduction + manualDeductions + pfDeduction + esicDeduction;
+  const totalDeductions = leaveDeduction + manualDeductions + pfDeduction + esicDeduction + tdsDeduction;
 
   return {
     breakdown: {
@@ -335,6 +345,7 @@ export async function computeSalaryBreakdown(params: {
       leaveDeduction,
       pfDeduction,
       esicDeduction,
+      tdsDeduction,
       allowances,
       manualDeductions,
       totalDeductions,
@@ -388,6 +399,9 @@ export async function autoGenerateSalariesForMonth(params: {
           baseSalary: breakdown.grossSalary,
           allowances: 0,
           deductions: breakdown.totalDeductions,
+          pfDeduction: breakdown.pfDeduction,
+          esicDeduction: breakdown.esicDeduction,
+          tdsDeduction: breakdown.tdsDeduction,
           netSalary: breakdown.finalSalary,
         },
         $setOnInsert: { status: "pending", createdBy: userId },

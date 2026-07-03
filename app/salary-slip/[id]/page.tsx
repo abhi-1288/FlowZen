@@ -40,6 +40,13 @@ type SlipData = {
     travelDeduction: number;
     pfDeduction: number;
     esicDeduction: number;
+    tdsDeduction: number;
+    pfPct: number;
+    esicPct: number;
+    tdsPct: number;
+    pfExempted: boolean;
+    esicExempted: boolean;
+    tdsExempted: boolean;
     finalSalary: number;
     periodStart: string;
     periodEnd: string;
@@ -89,6 +96,10 @@ export default function SalarySlipPage() {
   }
 
   const { slip, employee, company, breakdown } = data;
+  function dedLabel(name: string, pct: number, exempted: boolean) {
+    if (exempted) return `${name} (Exempt)`;
+    return `${name} (${pct}%)`;
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 py-8 print:bg-white print:py-0">
@@ -196,21 +207,27 @@ export default function SalarySlipPage() {
                   <span className="text-slate-500">Travel Deduction</span>
                   <span className="font-medium text-slate-900">{formatINR(breakdown.travelDeduction)}</span>
                 </div>
-                {employee.pfNumber ? (
+                {!breakdown.pfExempted ? (
                   <div className="flex justify-between">
-                    <span className="text-slate-500">PF {employee.pfNumber}</span>
+                    <span className="text-slate-500">PF ({breakdown.pfPct}%)</span>
                     <span className="font-medium text-slate-900">{formatINR(breakdown.pfDeduction)}</span>
                   </div>
                 ) : null}
-                {employee.esicNumber ? (
+                {!breakdown.esicExempted ? (
                   <div className="flex justify-between">
-                    <span className="text-slate-500">ESIC {employee.esicNumber}</span>
+                    <span className="text-slate-500">ESIC ({breakdown.esicPct}%)</span>
                     <span className="font-medium text-slate-900">{formatINR(breakdown.esicDeduction)}</span>
+                  </div>
+                ) : null}
+                {!breakdown.tdsExempted ? (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">TDS ({breakdown.tdsPct}%)</span>
+                    <span className="font-medium text-slate-900">{formatINR(breakdown.tdsDeduction)}</span>
                   </div>
                 ) : null}
                 <div className="border-t border-slate-100 pt-1.5 flex justify-between font-semibold">
                   <span className="text-slate-700">Total Deductions</span>
-                  <span className="text-slate-900">{formatINR(breakdown.leaveDeduction + breakdown.foodDeduction + breakdown.travelDeduction + breakdown.pfDeduction + breakdown.esicDeduction)}</span>
+                  <span className="text-slate-900">{formatINR(breakdown.leaveDeduction + breakdown.foodDeduction + breakdown.travelDeduction + breakdown.pfDeduction + breakdown.esicDeduction + breakdown.tdsDeduction)}</span>
                 </div>
               </div>
             </div>

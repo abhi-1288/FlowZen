@@ -17,6 +17,7 @@ export async function PATCH(request: Request) {
   const hasNoticePeriod = Object.prototype.hasOwnProperty.call(body, "noticePeriodDays");
   const hasPaidLeaveDays = Object.prototype.hasOwnProperty.call(body, "paidLeaveDays");
   const hasPaidLeavePeriod = Object.prototype.hasOwnProperty.call(body, "paidLeavePeriod");
+  const hasCarryForwardLeave = Object.prototype.hasOwnProperty.call(body, "carryForwardLeaveDays");
   const hasMinWorkHours = Object.prototype.hasOwnProperty.call(body, "minWorkHours");
   const noticePeriodDays = Number((body as any).noticePeriodDays);
   const paidLeaveDays = Number((body as any).paidLeaveDays);
@@ -32,6 +33,7 @@ export async function PATCH(request: Request) {
   if (hasPaidLeavePeriod && !ALLOWED_PAID_LEAVE_PERIODS.has(paidLeavePeriod)) {
     return jsonError("Invalid paid leave period.", 400);
   }
+  const carryForwardLeaveDays = body.carryForwardLeaveDays === true;
   if (hasMinWorkHours && (!Number.isFinite(minWorkHours) || minWorkHours < 1 || minWorkHours > 24)) {
     return jsonError("Invalid minimum work hours.", 400);
   }
@@ -56,6 +58,7 @@ export async function PATCH(request: Request) {
   if (hasNoticePeriod) company.noticePeriodDays = noticePeriodDays;
   if (hasPaidLeaveDays) company.paidLeaveDays = Math.floor(paidLeaveDays);
   if (hasPaidLeavePeriod) company.paidLeavePeriod = paidLeavePeriod;
+  if (hasCarryForwardLeave) company.carryForwardLeaveDays = carryForwardLeaveDays;
   if (hasMinWorkHours) company.minWorkHours = Math.floor(minWorkHours);
   await company.save();
 

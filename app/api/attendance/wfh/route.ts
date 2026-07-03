@@ -70,7 +70,7 @@ export async function POST(req: Request) {
     if (!user.company) return jsonError("You must belong to a company to request WFH.", 400);
 
     // WFH quota check (mirrors paid leave pattern)
-    const company = await Company.findById(user.company).select("wfhDays wfhPeriod wfhDates");
+    const company = await Company.findById(user.company).select("wfhDays wfhPeriod wfhDates carryForwardWfhDays");
     if (!company) return jsonError("Company not found.", 404);
     const wfhDays = Math.max(0, Number(company.wfhDays ?? 0));
     const wfhPeriod = String(company.wfhPeriod ?? "monthly");
@@ -97,8 +97,29 @@ export async function POST(req: Request) {
       return d >= quota.start && d <= quota.end;
     }).length;
 
+    let carryForward = 0;
+    if (company.carryForwardWfhDays) {
+      const prevQuota = wfhWindow(new Date(quota.start.getTime() - 1), wfhPeriod);
+      const prevWfh = await WfhRequest.find({
+        requester: userId,
+        company: user.company,
+        status: { $in: ["pending", "manager-approved", "hr-approved", "approved"] },
+        startDate: { $lte: prevQuota.end },
+        endDate: { $gte: prevQuota.start },
+      }).select("startDate endDate duration");
+      const usedPrev = prevWfh.reduce(
+        (sum, w) => sum + overlapDuration(w, prevQuota.start, prevQuota.end),
+        0,
+      );
+      const prevCompanyWfh = (company.wfhDates ?? []).filter((entry: any) => {
+        const d = new Date(entry.date);
+        return d >= prevQuota.start && d <= prevQuota.end;
+      }).length;
+      carryForward = Math.max(0, wfhDays - (usedPrev + prevCompanyWfh));
+    }
+    const totalAvailable = wfhDays + carryForward;
     const totalUsedWfhDays = usedWfhDays + companyWfhDaysInPeriod;
-    const remainingWfhDays = Math.max(0, wfhDays - totalUsedWfhDays);
+    const remainingWfhDays = Math.max(0, totalAvailable - totalUsedWfhDays);
     if (diffDays > remainingWfhDays) {
       return jsonError(
         `WFH quota exceeded. Remaining ${wfhPeriod} WFH: ${remainingWfhDays} day${remainingWfhDays === 1 ? "" : "s"}.`,
@@ -287,8 +308,8 @@ export async function GET() {
   }
 
   // Compute remaining WFH quota for the requester
-  const company = await Company.findById(user.company).select("wfhDays wfhPeriod wfhDates");
-  let wfhPolicy: Record<string, any> = { wfhDays: 0, wfhPeriod: "monthly", usedWfhDays: 0, remainingWfhDays: 0 };
+  const company = await Company.findById(user.company).select("wfhDays wfhPeriod wfhDates carryForwardWfhDays");
+  let wfhPolicy: Record<string, any> = { wfhDays: 0, wfhPeriod: "monthly", usedWfhDays: 0, remainingWfhDays: 0, carryForwardWfhDays: 0 };
   if (company) {
     const wfhDays = Math.max(0, Number(company.wfhDays ?? 0));
     const wfhPeriod = String(company.wfhPeriod ?? "monthly");
@@ -325,8 +346,29 @@ export async function GET() {
       const d = new Date(entry.date);
       return d >= quota.start && d <= quota.end;
     }).length;
+    let carryForward = 0;
+    if (company.carryForwardWfhDays) {
+      const prevQuota = wfhWindow(new Date(quota.start.getTime() - 1), wfhPeriod);
+      const prevWfh = await WfhRequest.find({
+        requester: userId,
+        company: user.company,
+        status: { $in: ["pending", "manager-approved", "hr-approved", "approved"] },
+        startDate: { $lte: prevQuota.end },
+        endDate: { $gte: prevQuota.start },
+      }).select("startDate endDate duration");
+      const usedPrev = prevWfh.reduce(
+        (sum, w) => sum + overlapDuration(w, prevQuota.start, prevQuota.end),
+        0,
+      );
+      const prevCompanyWfh = (company.wfhDates ?? []).filter((entry: any) => {
+        const d = new Date(entry.date);
+        return d >= prevQuota.start && d <= prevQuota.end;
+      }).length;
+      carryForward = Math.max(0, wfhDays - (usedPrev + prevCompanyWfh));
+    }
+    const totalAvailable = wfhDays + carryForward;
     const totalUsed = usedWfhDays + companyWfhDaysInPeriod;
-    wfhPolicy = { wfhDays, wfhPeriod, usedWfhDays: totalUsed, remainingWfhDays: Math.max(0, wfhDays - totalUsed) };
+    wfhPolicy = { wfhDays, wfhPeriod, usedWfhDays: totalUsed, carryForwardWfhDays: carryForward, remainingWfhDays: Math.max(0, totalAvailable - totalUsed) };
   }
 
   return NextResponse.json({ requests, wfhPolicy });

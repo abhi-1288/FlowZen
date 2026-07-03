@@ -107,6 +107,10 @@ const UserSchema = new Schema(
     pfDeductionAmount: { type: Number, default: 0 },
     esicNumber: { type: String, default: "" },
     esicDeductionAmount: { type: Number, default: 0 },
+    tdsDeductionAmount: { type: Number, default: 0 },
+    pfExempted: { type: Boolean, default: false },
+    esicExempted: { type: Boolean, default: false },
+    tdsExempted: { type: Boolean, default: false },
     salaryHistory: [
       {
         amount: { type: Number, required: true },

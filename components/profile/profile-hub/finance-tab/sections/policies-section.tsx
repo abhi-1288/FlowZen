@@ -14,18 +14,35 @@ export function PoliciesSection({
   travelOptedIn,
   actorRole,
   salaryCycle,
+  hasFinanceMember,
+  pfPctInput,
+  esicPctInput,
+  tdsPctInput,
   onToggleOptInOut,
   onToggleAdvanceSalary,
+  onPfPctChange,
+  onEsicPctChange,
+  onTdsPctChange,
+  onSavePercentages,
 }: {
   policyData: PolicyData | null;
   foodOptedIn: boolean;
   travelOptedIn: boolean;
   actorRole?: string;
   salaryCycle?: SalaryCycleData | null;
+  hasFinanceMember?: boolean;
+  pfPctInput?: string;
+  esicPctInput?: string;
+  tdsPctInput?: string;
   onToggleOptInOut: (type: "food" | "travel", optedIn: boolean) => void;
   onToggleAdvanceSalary?: (enabled: boolean) => void;
+  onPfPctChange?: (value: string) => void;
+  onEsicPctChange?: (value: string) => void;
+  onTdsPctChange?: (value: string) => void;
+  onSavePercentages?: () => void;
 }) {
   const canConfigure = actorRole === "finance" || actorRole === "admin";
+  const canConfigurePercentages = actorRole === "finance" || (actorRole === "admin" && !hasFinanceMember);
   const showDeductions = policyData && (policyData.foodAmount > 0 || policyData.travelAccommodationAmount > 0);
   if (!policyData && !salaryCycle) return null;
 
@@ -83,6 +100,35 @@ export function PoliciesSection({
               </div>
             ) : null}
           </>
+        ) : null}
+        {canConfigurePercentages ? (
+          <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3 space-y-2">
+            <p className="font-medium text-slate-900">Deduction Percentages</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">PF (%)</label>
+                <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" type="number" min="0" max="100" step="0.01" value={pfPctInput} onChange={(e) => onPfPctChange?.(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">ESIC (%)</label>
+                <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" type="number" min="0" max="100" step="0.01" value={esicPctInput} onChange={(e) => onEsicPctChange?.(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">TDS (%)</label>
+                <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" type="number" min="0" max="100" step="0.01" value={tdsPctInput} onChange={(e) => onTdsPctChange?.(e.target.value)} />
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <button className="rounded-lg bg-slate-950 text-white px-4 py-1.5 text-xs font-medium" onClick={onSavePercentages}>Save Percentages</button>
+            </div>
+          </div>
+        ) : policyData ? (
+          <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+            <div>
+              <p className="font-medium text-slate-900">Deduction Percentages</p>
+              <p className="text-xs text-slate-500">PF: {policyData.pfPercentage}% &middot; ESIC: {policyData.esicPercentage}% &middot; TDS: {policyData.tdsPercentage}%</p>
+            </div>
+          </div>
         ) : null}
         {policyData ? (
           <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">

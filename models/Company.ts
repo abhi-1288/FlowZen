@@ -31,6 +31,8 @@ const CompanySchema = new Schema(
         reason: { type: String }
       }
     ],
+    carryForwardLeaveDays: { type: Boolean, default: false },
+    carryForwardWfhDays: { type: Boolean, default: false },
     wfhCheckInMode: { type: String, enum: ["all-day", "wfh-only"], default: "all-day" },
     minWorkHours: { type: Number, default: 8 },
     icon: { type: String, default: "" },

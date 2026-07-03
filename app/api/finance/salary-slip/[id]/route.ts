@@ -64,7 +64,7 @@ export async function GET(request: Request, { params }: Params) {
     }
 
     const [employee, companyDoc, policy] = await Promise.all([
-      User.findById(salary.employee).select("name email role companyIdentityCode baseSalary companyJoined createdAt pfNumber pfDeductionAmount esicNumber esicDeductionAmount"),
+      User.findById(salary.employee).select("name email role companyIdentityCode baseSalary companyJoined createdAt pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted"),
       Company.findById(salary.company).select("name icon"),
       CompanyPolicy.findOne({ company: salary.company }),
     ]);
@@ -193,26 +193,39 @@ export async function GET(request: Request, { params }: Params) {
     const leaveDeduction = roundCurrency(dailySalary * totalUnpaidDays);
     const grossSalary = roundCurrency(dailySalary * payableDays);
 
-    let foodDeduction = 0;
-    let travelDeduction = 0;
-    let pfDeduction = 0;
-    let esicDeduction = 0;
-    if (policy) {
-      const isFoodOptedOut = policy.foodOptedOutMembers?.some((id: any) => String(id) === String(employee._id));
-      const isTravelOptedOut = policy.travelOptedOutMembers?.some((id: any) => String(id) === String(employee._id));
-      if (!isFoodOptedOut) foodDeduction = Math.max(0, Number(policy.foodAmount ?? 0));
-      if (!isTravelOptedOut) travelDeduction = Math.max(0, Number(policy.travelAccommodationAmount ?? 0));
-      const pfPercentage = Number((policy as any).pfPercentage ?? 12);
-      const esicPercentage = Number((policy as any).esicPercentage ?? 0.75);
-      const empPfAmount = Number((employee as any).pfDeductionAmount ?? 0);
-      const empEsicAmount = Number((employee as any).esicDeductionAmount ?? 0);
-      if ((employee as any).pfNumber) {
-        pfDeduction = empPfAmount > 0 ? roundCurrency(empPfAmount) : roundCurrency(grossSalary * pfPercentage / 100);
+      let foodDeduction = 0;
+      let travelDeduction = 0;
+      let pfDeduction = 0;
+      let esicDeduction = 0;
+      let tdsDeduction = 0;
+      let pfPercentage = 0;
+      let esicPercentage = 0;
+      let tdsPercentage = 0;
+      if (policy) {
+        const isFoodOptedOut = policy.foodOptedOutMembers?.some((id: any) => String(id) === String(employee._id));
+        const isTravelOptedOut = policy.travelOptedOutMembers?.some((id: any) => String(id) === String(employee._id));
+        if (!isFoodOptedOut) foodDeduction = Math.max(0, Number(policy.foodAmount ?? 0));
+        if (!isTravelOptedOut) travelDeduction = Math.max(0, Number(policy.travelAccommodationAmount ?? 0));
+        pfPercentage = Number((policy as any).pfPercentage ?? 12);
+        esicPercentage = Number((policy as any).esicPercentage ?? 0.75);
+        tdsPercentage = Number((policy as any).tdsPercentage ?? 0);
+        const empPfAmount = Number((employee as any).pfDeductionAmount ?? 0);
+        const empEsicAmount = Number((employee as any).esicDeductionAmount ?? 0);
+        const empTdsAmount = Number((employee as any).tdsDeductionAmount ?? 0);
+        if (!(employee as any).pfExempted) {
+          pfDeduction = empPfAmount > 0 ? roundCurrency(empPfAmount) : roundCurrency(grossSalary * pfPercentage / 100);
+        }
+        if (!(employee as any).esicExempted) {
+          esicDeduction = empEsicAmount > 0 ? roundCurrency(empEsicAmount) : roundCurrency(grossSalary * esicPercentage / 100);
+        }
+        if (!(employee as any).tdsExempted) {
+          if (empTdsAmount > 0) {
+            tdsDeduction = roundCurrency(empTdsAmount);
+          } else if (tdsPercentage > 0) {
+            tdsDeduction = roundCurrency(grossSalary * tdsPercentage / 100);
+          }
+        }
       }
-      if ((employee as any).esicNumber) {
-        esicDeduction = empEsicAmount > 0 ? roundCurrency(empEsicAmount) : roundCurrency(grossSalary * esicPercentage / 100);
-      }
-    }
     const finalSalary = Math.max(0, Number(salary.netSalary ?? 0));
     const periodAdjusted = !!(companyJoined && companyJoined > startOfDay(periodStart) && companyJoined <= startOfDay(periodEnd));
 
@@ -252,6 +265,13 @@ export async function GET(request: Request, { params }: Params) {
         travelDeduction,
         pfDeduction,
         esicDeduction,
+        tdsDeduction,
+        pfPct: pfPercentage,
+        esicPct: esicPercentage,
+        tdsPct: tdsPercentage,
+        pfExempted: Boolean((employee as any).pfExempted),
+        esicExempted: Boolean((employee as any).esicExempted),
+        tdsExempted: Boolean((employee as any).tdsExempted),
         finalSalary,
         periodStart: toDateKey(effectiveStart),
         periodEnd: toDateKey(effectiveEnd),

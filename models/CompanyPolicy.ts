@@ -8,6 +8,7 @@ const policySchema = new mongoose.Schema({
   travelOptedOutMembers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   pfPercentage: { type: Number, default: 12 },
   esicPercentage: { type: Number, default: 0.75 },
+  tdsPercentage: { type: Number, default: 0 },
   salaryCycleDay: { type: Number, default: 29, min: 1, max: 31 },
   pendingSalaryCycleDay: { type: Number, default: null, min: 1, max: 31 },
   salaryCycleStartDay: { type: Number, default: null, min: 1, max: 31 },

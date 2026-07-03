@@ -26,6 +26,9 @@ export async function GET() {
       foodOptedOutMembers: [],
       travelOptedOutMembers: [],
       advanceSalaryEnabled: false,
+      pfPercentage: 12,
+      esicPercentage: 0.75,
+      tdsPercentage: 0,
     });
   }
 
@@ -35,6 +38,9 @@ export async function GET() {
     foodOptedOutMembers: policy.foodOptedOutMembers ?? [],
     travelOptedOutMembers: policy.travelOptedOutMembers ?? [],
     advanceSalaryEnabled: policy.advanceSalaryEnabled ?? false,
+    pfPercentage: policy.pfPercentage ?? 12,
+    esicPercentage: policy.esicPercentage ?? 0.75,
+    tdsPercentage: policy.tdsPercentage ?? 0,
   });
 }
 
@@ -50,6 +56,18 @@ export async function POST(request: Request) {
     return jsonError("Only finance or admin can configure policies.", 403);
 
   const body = await request.json();
+
+  const hasPctFields = "pfPercentage" in body || "esicPercentage" in body || "tdsPercentage" in body;
+  if (hasPctFields && String(actor.role) !== "finance") {
+    const financeCount = await User.countDocuments({
+      company: actor.company,
+      role: "finance",
+      companyStatus: "approved",
+    });
+    if (financeCount > 0) {
+      return jsonError("Only finance can configure deduction percentages when a finance member exists.", 403);
+    }
+  }
   const foodAmount = Math.max(0, Number(body.foodAmount ?? 0));
   const travelAccommodationAmount = Math.max(0, Number(body.travelAccommodationAmount ?? 0));
 
@@ -57,6 +75,9 @@ export async function POST(request: Request) {
   if (typeof body.advanceSalaryEnabled === "boolean") {
     update.advanceSalaryEnabled = body.advanceSalaryEnabled;
   }
+  if (typeof body.pfPercentage === "number") update.pfPercentage = Math.max(0, body.pfPercentage);
+  if (typeof body.esicPercentage === "number") update.esicPercentage = Math.max(0, body.esicPercentage);
+  if (typeof body.tdsPercentage === "number") update.tdsPercentage = Math.max(0, body.tdsPercentage);
 
   const policy = await CompanyPolicy.findOneAndUpdate(
     { company: actor.company },
@@ -90,6 +111,9 @@ export async function POST(request: Request) {
     foodOptedOutMembers: policy.foodOptedOutMembers ?? [],
     travelOptedOutMembers: policy.travelOptedOutMembers ?? [],
     advanceSalaryEnabled: policy.advanceSalaryEnabled ?? false,
+    pfPercentage: policy.pfPercentage ?? 12,
+    esicPercentage: policy.esicPercentage ?? 0.75,
+    tdsPercentage: policy.tdsPercentage ?? 0,
   });
 }
 
@@ -164,6 +188,9 @@ export async function PATCH(request: Request) {
     foodOptedOutMembers: policy.foodOptedOutMembers ?? [],
     travelOptedOutMembers: policy.travelOptedOutMembers ?? [],
     advanceSalaryEnabled: policy.advanceSalaryEnabled ?? false,
+    pfPercentage: policy.pfPercentage ?? 12,
+    esicPercentage: policy.esicPercentage ?? 0.75,
+    tdsPercentage: policy.tdsPercentage ?? 0,
     nowOptedOut: !isOptedOut,
   });
 }

@@ -32,6 +32,7 @@ export async function GET() {
     wfhDays: company.wfhDays ?? 0,
     wfhPeriod: company.wfhPeriod ?? "monthly",
     wfhCheckInMode: company.wfhCheckInMode || "all-day",
+    carryForwardWfhDays: company.carryForwardWfhDays ?? false,
     wfhDates: company.wfhDates || [],
     weekendDates: company.weekendDates || [],
   });
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
     return jsonError("Only company owner or HR can manage WFH settings", 403);
   }
 
-  const { wfhDays, wfhPeriod, mode, startDate, endDate, reason } = await request.json();
+  const { wfhDays, wfhPeriod, mode, startDate, endDate, reason, carryForwardWfhDays } = await request.json();
 
   let quotaUpdated = false;
 
@@ -69,6 +70,10 @@ export async function POST(request: Request) {
   if (wfhPeriod && ["monthly", "yearly"].includes(wfhPeriod)) {
     company.wfhPeriod = wfhPeriod;
     quotaUpdated = true;
+  }
+
+  if (typeof carryForwardWfhDays === "boolean") {
+    company.carryForwardWfhDays = carryForwardWfhDays;
   }
 
   if (mode && ["all-day", "wfh-only"].includes(mode)) {
@@ -143,6 +148,7 @@ export async function POST(request: Request) {
     wfhDays: company.wfhDays,
     wfhPeriod: company.wfhPeriod,
     wfhCheckInMode: company.wfhCheckInMode,
+    carryForwardWfhDays: company.carryForwardWfhDays ?? false,
     wfhDates: company.wfhDates || [],
     weekendDates: company.weekendDates || [],
   });

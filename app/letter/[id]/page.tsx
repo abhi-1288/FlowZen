@@ -38,6 +38,9 @@ type LetterData = {
     pfDeductionAmount?: number;
     esicNumber?: string;
     esicDeductionAmount?: number;
+    pfExempted?: boolean;
+    esicExempted?: boolean;
+    tdsExempted?: boolean;
   };
   approver?: { _id: string; name: string; role: string };
   company: { _id: string; name: string; icon?: string };
@@ -54,6 +57,9 @@ type PolicyInfo = {
   travelAccommodationAmount: number;
   foodOptedOutMembers?: { _id?: string }[];
   travelOptedOutMembers?: { _id?: string }[];
+  pfPercentage?: number;
+  esicPercentage?: number;
+  tdsPercentage?: number;
 };
 
 type SignatoryInfo = {
@@ -244,7 +250,22 @@ function SalaryCertificateContent({
 
   const foodDeduction = policy && !isOptedOut(policy.foodOptedOutMembers, requesterId) ? policy.foodAmount : 0;
   const travelDeduction = policy && !isOptedOut(policy.travelOptedOutMembers, requesterId) ? policy.travelAccommodationAmount : 0;
-  const totalDeductions = foodDeduction + travelDeduction;
+
+  const pfPct = policy?.pfPercentage ?? 12;
+  const esicPct = policy?.esicPercentage ?? 0.75;
+  const tdsPct = policy?.tdsPercentage ?? 0;
+  const empPfAmount = Number(data.requester?.pfDeductionAmount ?? 0);
+  const empEsicAmount = Number(data.requester?.esicDeductionAmount ?? 0);
+  const pfDeduction = !data.requester?.pfExempted
+    ? (empPfAmount > 0 ? empPfAmount : Math.round(monthlyBase * pfPct / 100))
+    : 0;
+  const esicDeduction = !data.requester?.esicExempted
+    ? (empEsicAmount > 0 ? empEsicAmount : Math.round(monthlyBase * esicPct / 100))
+    : 0;
+  const tdsDeduction = !data.requester?.tdsExempted && tdsPct > 0
+    ? Math.round(monthlyBase * tdsPct / 100)
+    : 0;
+  const totalDeductions = foodDeduction + travelDeduction + pfDeduction + esicDeduction + tdsDeduction;
   const monthlyNet = Math.max(0, monthlyBase - totalDeductions);
   const annualNet = monthlyNet * 12;
 
@@ -313,6 +334,30 @@ function SalaryCertificateContent({
                 <td className="px-4 py-2.5 text-slate-600 print:px-2 print:py-1">- Travel Accommodation</td>
                 <td className="px-4 py-2.5 text-right text-slate-600 print:px-2 print:py-1">{formatCurrency(travelDeduction)}</td>
                 <td className="px-4 py-2.5 text-right text-slate-600 print:px-2 print:py-1">{formatCurrency(travelDeduction * 12)}</td>
+              </tr>
+            ) : null}
+
+            {!data.requester?.pfExempted ? (
+              <tr className="bg-white">
+                <td className="px-4 py-2.5 text-slate-600 print:px-2 print:py-1">- PF Deduction ({pfPct}%)</td>
+                <td className="px-4 py-2.5 text-right text-slate-600 print:px-2 print:py-1">{formatCurrency(pfDeduction)}</td>
+                <td className="px-4 py-2.5 text-right text-slate-600 print:px-2 print:py-1">{formatCurrency(pfDeduction * 12)}</td>
+              </tr>
+            ) : null}
+
+            {!data.requester?.esicExempted ? (
+              <tr className="bg-white">
+                <td className="px-4 py-2.5 text-slate-600 print:px-2 print:py-1">- ESIC Deduction ({esicPct}%)</td>
+                <td className="px-4 py-2.5 text-right text-slate-600 print:px-2 print:py-1">{formatCurrency(esicDeduction)}</td>
+                <td className="px-4 py-2.5 text-right text-slate-600 print:px-2 print:py-1">{formatCurrency(esicDeduction * 12)}</td>
+              </tr>
+            ) : null}
+
+            {!data.requester?.tdsExempted && tdsPct > 0 ? (
+              <tr className="bg-white">
+                <td className="px-4 py-2.5 text-slate-600 print:px-2 print:py-1">- TDS Deduction ({tdsPct}%)</td>
+                <td className="px-4 py-2.5 text-right text-slate-600 print:px-2 print:py-1">{formatCurrency(tdsDeduction)}</td>
+                <td className="px-4 py-2.5 text-right text-slate-600 print:px-2 print:py-1">{formatCurrency(tdsDeduction * 12)}</td>
               </tr>
             ) : null}
 

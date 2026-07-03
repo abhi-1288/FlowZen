@@ -374,6 +374,10 @@ export async function POST(request: Request) {
         pfDeductionAmount: Number((computed.employee as any).pfDeductionAmount ?? 0),
         esicNumber: String((computed.employee as any).esicNumber ?? ""),
         esicDeductionAmount: Number((computed.employee as any).esicDeductionAmount ?? 0),
+        tdsDeductionAmount: Number((computed.employee as any).tdsDeductionAmount ?? 0),
+        pfExempted: Boolean((computed.employee as any).pfExempted),
+        esicExempted: Boolean((computed.employee as any).esicExempted),
+        tdsExempted: Boolean((computed.employee as any).tdsExempted),
       },
     });
   }
@@ -391,12 +395,20 @@ export async function POST(request: Request) {
     const pfDeductionAmount = Math.max(0, Number(body.pfDeductionAmount ?? 0));
     const esicNumber = String(body.esicNumber ?? "").trim();
     const esicDeductionAmount = Math.max(0, Number(body.esicDeductionAmount ?? 0));
-    if (pfNumber || esicNumber || pfDeductionAmount > 0 || esicDeductionAmount > 0) {
-      const updateData: Record<string, string | number> = {};
+    const tdsDeductionAmount = Math.max(0, Number(body.tdsDeductionAmount ?? 0));
+    const pfExempted = body.pfExempted === true;
+    const esicExempted = body.esicExempted === true;
+    const tdsExempted = body.tdsExempted === true;
+    if (pfNumber || esicNumber || pfDeductionAmount > 0 || esicDeductionAmount > 0 || tdsDeductionAmount > 0 || pfExempted || esicExempted || tdsExempted) {
+      const updateData: Record<string, string | number | boolean> = {};
       if (pfNumber) updateData.pfNumber = pfNumber;
       if (esicNumber) updateData.esicNumber = esicNumber;
       if (pfDeductionAmount > 0) updateData.pfDeductionAmount = pfDeductionAmount;
       if (esicDeductionAmount > 0) updateData.esicDeductionAmount = esicDeductionAmount;
+      if (tdsDeductionAmount > 0) updateData.tdsDeductionAmount = tdsDeductionAmount;
+      if (pfExempted) updateData.pfExempted = true;
+      if (esicExempted) updateData.esicExempted = true;
+      if (tdsExempted) updateData.tdsExempted = true;
       await User.updateOne({ _id: employeeId }, { $set: updateData });
     }
 
@@ -426,6 +438,9 @@ export async function POST(request: Request) {
           baseSalary: breakdown.grossSalary,
           allowances,
           deductions: breakdown.totalDeductions,
+          pfDeduction: breakdown.pfDeduction,
+          esicDeduction: breakdown.esicDeduction,
+          tdsDeduction: breakdown.tdsDeduction,
           netSalary: breakdown.finalSalary,
         },
         $setOnInsert: { status: "pending", createdBy: userId },

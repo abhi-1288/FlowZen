@@ -71,6 +71,9 @@ export function usePolicyData(data: FinanceData | null) {
         foodOptedOutMembers: res.foodOptedOutMembers ?? [],
         travelOptedOutMembers: res.travelOptedOutMembers ?? [],
         advanceSalaryEnabled: res.advanceSalaryEnabled ?? false,
+        pfPercentage: res.pfPercentage ?? 12,
+        esicPercentage: res.esicPercentage ?? 0.75,
+        tdsPercentage: res.tdsPercentage ?? 0,
       }))
       .catch(() => { });
   }, [data]);

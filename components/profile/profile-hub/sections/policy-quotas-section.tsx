@@ -16,7 +16,7 @@ export function PolicyQuotasSection({
   session,
 }: {
   company: AnyRecord | null;
-  policyInfo: { foodAmount: number; travelAccommodationAmount: number; foodOptedOutMembers?: AnyRecord[]; travelOptedOutMembers?: AnyRecord[]; advanceSalaryEnabled?: boolean } | null;
+  policyInfo: { foodAmount: number; travelAccommodationAmount: number; foodOptedOutMembers?: AnyRecord[]; travelOptedOutMembers?: AnyRecord[]; advanceSalaryEnabled?: boolean; pfPercentage?: number; esicPercentage?: number; tdsPercentage?: number } | null;
   salaryCycle: { salaryCycleDay: number; salaryCycleStartDay: number | null; salaryCycleEndDay: number | null } | null;
   profile: AnyRecord | null;
   session: { user?: { id?: string } } | null;
@@ -40,6 +40,14 @@ export function PolicyQuotasSection({
           value={policyInfo ? (policyInfo.advanceSalaryEnabled ? "Enabled" : "Disabled") : undefined}
         />
         <Row
+          label="Leave Carry-Forward"
+          value={company?.carryForwardLeaveDays ? "Enabled" : "Disabled"}
+        />
+        <Row
+          label="WFH Carry-Forward"
+          value={company?.carryForwardWfhDays ? "Enabled" : "Disabled"}
+        />
+        <Row
           label="Food Accomodation"
           value={policyInfo ? policyInfo.foodOptedOutMembers?.some((m) => String(m._id || m.id || m) === String(profile?.id ?? profile?._id ?? session?.user?.id)) ? "₹0/mo" : `₹${policyInfo.foodAmount.toLocaleString("en-IN")}/mo` : undefined}
         />
@@ -51,6 +59,13 @@ export function PolicyQuotasSection({
         <Row label="Paid Leave" value={company ? `${Math.max(0, Number(company.paidLeaveDays ?? 0))} day${Number(company.paidLeaveDays ?? 0) === 1 ? "" : "s"} ${String(company.paidLeavePeriod ?? "monthly")}` : undefined} />
         <Row label="WFH" value={company ? `${Math.max(0, Number(company.wfhDays ?? 0))} day${Number(company.wfhDays ?? 0) === 1 ? "" : "s"} ${String(company.wfhPeriod ?? "monthly")}` : undefined} />
         <Row label="Work-Hours Policy" value={company ? `${Math.max(1, Number(company.minWorkHours ?? 8))} hrs / day` : "No minimum work hours"} />
+        {policyInfo ? (
+          <>
+            <Row label="PF Deduction" value={`${policyInfo.pfPercentage ?? 12}%`} />
+            <Row label="ESIC Deduction" value={`${policyInfo.esicPercentage ?? 0.75}%`} />
+            <Row label="TDS Deduction" value={`${policyInfo.tdsPercentage ?? 0}%`} />
+          </>
+        ) : null}
       </dl>
     </section>
   );

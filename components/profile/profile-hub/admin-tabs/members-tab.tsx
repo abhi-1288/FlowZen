@@ -9,6 +9,7 @@ import { SalaryModal } from "./modals/salary-modal";
 import { RoleModal } from "./modals/role-modal";
 import { CustomRoleModal } from "./modals/custom-role-modal";
 import { PfEsicModal, type PfEsicFormData } from "./modals/pf-esic-modal";
+import { TdsModal, type TdsFormData } from "./modals/tds-modal";
 import { DocumentsModal } from "./modals/documents-modal";
 import { MemberListModal } from "./modals/member-list-modal";
 
@@ -27,6 +28,7 @@ export function MembersTab({
   const selfId = session?.user?.id ?? "";
   const hr = (insights?.hr as AnyRecord | undefined) ?? null;
   const members = Array.isArray(hr?.members) ? (hr.members as AnyRecord[]) : [];
+  const companyTdsPct = Number(hr?.companyTdsPct ?? 0);
   const roleCounts = (hr?.roleCounts as AnyRecord | undefined) ?? {};
   const [modalRole, setModalRole] = useState<(typeof HR_MEMBER_ROLE_KEYS)[number] | null>(null);
   const [meetingDuration, setMeetingDuration] = useState<MeetingDuration>(30);
@@ -49,8 +51,11 @@ export function MembersTab({
   const [modalSearchQuery, setModalSearchQuery] = useState("");
   const [modalSearchInput, setModalSearchInput] = useState("");
   const [pfEsicModalMember, setPfEsicModalMember] = useState<AnyRecord | null>(null);
-  const [pfEsicInput, setPfEsicInput] = useState<PfEsicFormData>({ pfNumber: "", pfDeductionAmount: "", esicNumber: "", esicDeductionAmount: "" });
+  const [pfEsicInput, setPfEsicInput] = useState<PfEsicFormData>({ pfNumber: "", pfDeductionAmount: "", esicNumber: "", esicDeductionAmount: "", pfExempted: false, esicExempted: false });
   const [savingPfEsic, setSavingPfEsic] = useState(false);
+  const [tdsModalMember, setTdsModalMember] = useState<AnyRecord | null>(null);
+  const [tdsInput, setTdsInput] = useState<TdsFormData>({ tdsDeductionAmount: "", tdsExempted: false });
+  const [savingTds, setSavingTds] = useState(false);
   const [docModalMember, setDocModalMember] = useState<AnyRecord | null>(null);
   const [docModalData, setDocModalData] = useState<{
     member: { name: string; email: string; role: string };
@@ -82,8 +87,18 @@ export function MembersTab({
       pfDeductionAmount: String(Number(member.pfDeductionAmount ?? 0) > 0 ? Number(member.pfDeductionAmount) : ""),
       esicNumber: String(member.esicNumber ?? ""),
       esicDeductionAmount: String(Number(member.esicDeductionAmount ?? 0) > 0 ? Number(member.esicDeductionAmount) : ""),
+      pfExempted: Boolean(member.pfExempted ?? false),
+      esicExempted: Boolean(member.esicExempted ?? false),
     });
     setPfEsicModalMember(member);
+  }
+
+  function openTdsModal(member: AnyRecord) {
+    setTdsInput({
+      tdsDeductionAmount: String(Number(member.tdsDeductionAmount ?? 0) > 0 ? Number(member.tdsDeductionAmount) : ""),
+      tdsExempted: Boolean(member.tdsExempted ?? false),
+    });
+    setTdsModalMember(member);
   }
 
   async function openDocModal(member: AnyRecord) {
@@ -184,6 +199,8 @@ export function MembersTab({
           pfDeductionAmount: pfEsicInput.pfDeductionAmount ? Number(pfEsicInput.pfDeductionAmount) : 0,
           esicNumber: pfEsicInput.esicNumber,
           esicDeductionAmount: pfEsicInput.esicDeductionAmount ? Number(pfEsicInput.esicDeductionAmount) : 0,
+          pfExempted: pfEsicInput.pfExempted,
+          esicExempted: pfEsicInput.esicExempted,
         }),
       });
       showToast("PF & ESIC details saved.");
@@ -193,6 +210,29 @@ export function MembersTab({
       showToast(err instanceof Error ? err.message : "Unable to save PF/ESIC details.", "error");
     } finally {
       setSavingPfEsic(false);
+    }
+  }
+
+  async function saveTdsModal() {
+    const member = tdsModalMember;
+    const memberId = String(member?.id ?? "");
+    if (!memberId) return;
+    try {
+      setSavingTds(true);
+      await apiFetch(`/api/hr/member-tds/${memberId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          tdsDeductionAmount: tdsInput.tdsDeductionAmount ? Number(tdsInput.tdsDeductionAmount) : 0,
+          tdsExempted: tdsInput.tdsExempted,
+        }),
+      });
+      showToast("TDS details saved.");
+      setTdsModalMember(null);
+      await refresh(true);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to save TDS details.", "error");
+    } finally {
+      setSavingTds(false);
     }
   }
 
@@ -325,6 +365,7 @@ export function MembersTab({
         onRequestFire={requestFire}
         onOpenSalaryModal={openSalaryModal}
         onOpenPfEsicModal={openPfEsicModal}
+        onOpenTdsModal={openTdsModal}
         onOpenDocModal={openDocModal}
         onOpenRoleModal={openRoleModal}
         onOpenCustomRoleModal={openCustomRoleModal}
@@ -381,6 +422,16 @@ export function MembersTab({
         onDataChange={setPfEsicInput}
         onCancel={() => setPfEsicModalMember(null)}
         onSave={savePfEsicModal}
+      />
+
+      <TdsModal
+        member={tdsModalMember}
+        data={tdsInput}
+        saving={savingTds}
+        companyTdsPct={companyTdsPct}
+        onDataChange={setTdsInput}
+        onCancel={() => setTdsModalMember(null)}
+        onSave={saveTdsModal}
       />
 
       <DocumentsModal

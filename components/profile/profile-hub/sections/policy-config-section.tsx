@@ -9,12 +9,20 @@ export function PolicyConfigSection({
   onPaidLeavePeriodChange,
   savingPaidLeave,
   onSavePaidLeave,
+  carryForwardLeaveDays,
+  onCarryForwardLeaveChange,
+  savingCarryForwardLeave,
+  onSaveCarryForwardLeave,
   wfhDays,
   onWfhDaysChange,
   wfhPeriod,
   onWfhPeriodChange,
   wfhLoading,
   onSaveWfhQuota,
+  carryForwardWfhDays,
+  onCarryForwardWfhChange,
+  savingCarryForwardWfh,
+  onSaveCarryForwardWfh,
   minWorkHours,
   onMinWorkHoursChange,
   savingDayHour,
@@ -30,12 +38,20 @@ export function PolicyConfigSection({
   onPaidLeavePeriodChange: (value: "monthly" | "yearly") => void;
   savingPaidLeave: boolean;
   onSavePaidLeave: () => Promise<void>;
+  carryForwardLeaveDays: boolean;
+  onCarryForwardLeaveChange: (value: boolean) => void;
+  savingCarryForwardLeave: boolean;
+  onSaveCarryForwardLeave: () => Promise<void>;
   wfhDays: number;
   onWfhDaysChange: (value: number) => void;
   wfhPeriod: "monthly" | "yearly";
   onWfhPeriodChange: (value: "monthly" | "yearly") => void;
   wfhLoading: boolean;
   onSaveWfhQuota: () => Promise<void>;
+  carryForwardWfhDays: boolean;
+  onCarryForwardWfhChange: (value: boolean) => void;
+  savingCarryForwardWfh: boolean;
+  onSaveCarryForwardWfh: () => Promise<void>;
   minWorkHours: number;
   onMinWorkHoursChange: (value: number) => void;
   savingDayHour: boolean;
@@ -104,6 +120,29 @@ export function PolicyConfigSection({
         >
           {savingPaidLeave ? "Saving..." : "Save paid leave"}
         </button>
+        <div className="mt-3 flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2">
+          <span className="text-sm text-slate-700">Carry forward unused leave to next period</span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className={`rounded-lg px-3 py-1 text-xs font-medium ${carryForwardLeaveDays ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`}
+              onClick={() => onCarryForwardLeaveChange(true)}
+            >On</button>
+            <button
+              type="button"
+              className={`rounded-lg px-3 py-1 text-xs font-medium ${!carryForwardLeaveDays ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`}
+              onClick={() => onCarryForwardLeaveChange(false)}
+            >Off</button>
+          </div>
+        </div>
+        <button
+          className="mt-2 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={savingCarryForwardLeave}
+          type="button"
+          onClick={onSaveCarryForwardLeave}
+        >
+          {savingCarryForwardLeave ? "Saving..." : "Save carry-forward"}
+        </button>
       </div>
 
       <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -120,6 +159,29 @@ export function PolicyConfigSection({
             {wfhLoading ? "Saving..." : "Save"}
           </button>
         </div>
+        <div className="mt-3 flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2">
+          <span className="text-sm text-slate-700">Carry forward unused WFH to next period</span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className={`rounded-lg px-3 py-1 text-xs font-medium ${carryForwardWfhDays ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`}
+              onClick={() => onCarryForwardWfhChange(true)}
+            >On</button>
+            <button
+              type="button"
+              className={`rounded-lg px-3 py-1 text-xs font-medium ${!carryForwardWfhDays ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`}
+              onClick={() => onCarryForwardWfhChange(false)}
+            >Off</button>
+          </div>
+        </div>
+        <button
+          className="mt-2 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={savingCarryForwardWfh}
+          type="button"
+          onClick={onSaveCarryForwardWfh}
+        >
+          {savingCarryForwardWfh ? "Saving..." : "Save carry-forward"}
+        </button>
       </div>
 
       <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">

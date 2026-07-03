@@ -10,6 +10,9 @@ export function useWfh(
   const [wfhDays, setWfhDays] = useState(0);
   const [wfhPeriod, setWfhPeriod] = useState<"monthly" | "yearly">("monthly");
   const [wfhMode, setWfhMode] = useState<"all-day" | "wfh-only">("all-day");
+  const [carryForwardWfhDays, setCarryForwardWfhDays] = useState<boolean>(
+    company?.carryForwardWfhDays === true,
+  );
   const [wfhLoading, setWfhLoading] = useState(false);
   const [wfhDates, setWfhDates] = useState<{ date: string; reason: string }[]>([]);
   const [weekendDates, setWeekendDates] = useState<{ date: string; reason?: string }[]>([]);
@@ -27,12 +30,13 @@ export function useWfh(
     if (!company) return;
     try {
       setWfhLoading(true);
-      const res = await apiFetch<{ wfhDays: number; wfhPeriod: string; wfhCheckInMode: string; wfhDates: { date: string; reason: string }[]; weekendDates?: { date: string; reason?: string }[] }>(
+      const res = await apiFetch<{ wfhDays: number; wfhPeriod: string; wfhCheckInMode: string; carryForwardWfhDays: boolean; wfhDates: { date: string; reason: string }[]; weekendDates?: { date: string; reason?: string }[] }>(
         "/api/company/wfh",
       );
       setWfhDays(res.wfhDays ?? 0);
       setWfhPeriod(res.wfhPeriod === "yearly" ? "yearly" : "monthly");
       setWfhMode(res.wfhCheckInMode === "wfh-only" ? "wfh-only" : "all-day");
+      setCarryForwardWfhDays(res.carryForwardWfhDays ?? false);
       setWfhDates(res.wfhDates || []);
       setWeekendDates(res.weekendDates || []);
     } catch {
@@ -63,6 +67,24 @@ export function useWfh(
       setWfhLoading(false);
     }
   }, [wfhDays, wfhPeriod, showToast]);
+
+  const saveCarryForwardWfhOnly = useCallback(async () => {
+    try {
+      setWfhLoading(true);
+      await apiFetch("/api/company/wfh", {
+        method: "POST",
+        body: JSON.stringify({ carryForwardWfhDays }),
+      });
+      showToast("WFH carry-forward policy updated.", "success");
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Failed to update WFH carry-forward",
+        "error",
+      );
+    } finally {
+      setWfhLoading(false);
+    }
+  }, [carryForwardWfhDays, showToast]);
 
   const updateWfhMode = useCallback(async (mode: "all-day" | "wfh-only") => {
     try {
@@ -169,6 +191,7 @@ export function useWfh(
     wfhDays, setWfhDays,
     wfhPeriod, setWfhPeriod,
     wfhMode, setWfhMode,
+    carryForwardWfhDays, setCarryForwardWfhDays,
     wfhLoading,
     wfhDates, setWfhDates,
     weekendDates, setWeekendDates,
@@ -183,6 +206,7 @@ export function useWfh(
     confirmDateDay, setConfirmDateDay,
     loadWfh,
     saveWfhQuota,
+    saveCarryForwardWfhOnly,
     updateWfhMode,
     visibleWeekendDates,
     assignWeekends,

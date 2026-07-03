@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/client-utils";
 import { AnyRecord } from "../shared";
-import type { SalaryBreakdown, BudgetForm, ExpenseForm, InvoiceForm, RejectTarget, SalaryModalTab } from "./types";
+import type { SalaryBreakdown, BudgetForm, ExpenseForm, InvoiceForm, RejectTarget, SalaryModalTab, PolicyData } from "./types";
 import { useFinanceData, useInvoices, useReports, useLeaveImpacts, usePolicyData, useMySalarySlips, useSalaryCycle } from "./hooks";
 import { toggleRoleInSet } from "./helpers";
 import { DashboardCards } from "./sections/dashboard-cards";
@@ -49,9 +49,10 @@ export function FinanceTab({
   const [salaryDeductions, setSalaryDeductions] = useState("");
   const [salaryBreakdown, setSalaryBreakdown] = useState<SalaryBreakdown | null>(null);
   const [memberPfNumber, setMemberPfNumber] = useState("");
-  const [memberPfAmount, setMemberPfAmount] = useState("");
   const [memberEsicNumber, setMemberEsicNumber] = useState("");
-  const [memberEsicAmount, setMemberEsicAmount] = useState("");
+  const [memberPfExempted, setMemberPfExempted] = useState(false);
+  const [memberEsicExempted, setMemberEsicExempted] = useState(false);
+  const [memberTdsExempted, setMemberTdsExempted] = useState(false);
   const [salaryGenerating, setSalaryGenerating] = useState(false);
   const [budgetForm, setBudgetForm] = useState<BudgetForm>({ boardId: "", totalBudget: "", teamSpendingLimit: "", resourceBudget: "", deadline: "", assignedTo: "" });
   const [showBudgetModal, setShowBudgetModal] = useState(false);
@@ -79,11 +80,19 @@ export function FinanceTab({
   const [financeSubTab, setFinanceSubTab] = useState<"my" | "ops" | "reports">("my");
   const [foodOptedIn, setFoodOptedIn] = useState(true);
   const [travelOptedIn, setTravelOptedIn] = useState(true);
+  const [pfPctInput, setPfPctInput] = useState("");
+  const [esicPctInput, setEsicPctInput] = useState("");
+  const [tdsPctInput, setTdsPctInput] = useState("");
 
   useEffect(() => {
-    if (!policyData || !profileId) return;
-    setFoodOptedIn(!policyData.foodOptedOutMembers.some((m) => String(m._id) === String(profileId)));
-    setTravelOptedIn(!policyData.travelOptedOutMembers.some((m) => String(m._id) === String(profileId)));
+    if (!policyData) return;
+    if (profileId) {
+      setFoodOptedIn(!policyData.foodOptedOutMembers.some((m) => String(m._id) === String(profileId)));
+      setTravelOptedIn(!policyData.travelOptedOutMembers.some((m) => String(m._id) === String(profileId)));
+    }
+    setPfPctInput(String(policyData.pfPercentage));
+    setEsicPctInput(String(policyData.esicPercentage));
+    setTdsPctInput(String(policyData.tdsPercentage));
   }, [policyData, profileId]);
 
   async function toggleOptInOut(type: "food" | "travel", optedIn: boolean) {
@@ -110,6 +119,23 @@ export function FinanceTab({
     }
   }
 
+  async function savePercentages() {
+    try {
+      const res = await apiFetch<PolicyData>("/api/finance/policy", {
+        method: "POST",
+        body: JSON.stringify({
+          pfPercentage: Number(pfPctInput),
+          esicPercentage: Number(esicPctInput),
+          tdsPercentage: Number(tdsPctInput),
+        }),
+      });
+      setPolicyData((prev) => prev ? { ...prev, pfPercentage: res.pfPercentage, esicPercentage: res.esicPercentage, tdsPercentage: res.tdsPercentage } : prev);
+      showToast("Deduction percentages saved.", "success");
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Failed to save percentages.", "error");
+    }
+  }
+
   async function calculateSalary(event: FormEvent) {
     event.preventDefault();
     try {
@@ -119,9 +145,10 @@ export function FinanceTab({
       });
       setSalaryBreakdown(res.breakdown);
       setMemberPfNumber(String(res.employee?.pfNumber ?? ""));
-      setMemberPfAmount(String(Number(res.employee?.pfDeductionAmount ?? 0) > 0 ? Number(res.employee?.pfDeductionAmount) : ""));
       setMemberEsicNumber(String(res.employee?.esicNumber ?? ""));
-      setMemberEsicAmount(String(Number(res.employee?.esicDeductionAmount ?? 0) > 0 ? Number(res.employee?.esicDeductionAmount) : ""));
+      setMemberPfExempted(Boolean(res.employee?.pfExempted));
+      setMemberEsicExempted(Boolean(res.employee?.esicExempted));
+      setMemberTdsExempted(Boolean(res.employee?.tdsExempted));
       setSalaryAllowances("");
       setSalaryDeductions("");
       setSalaryStep(3);
@@ -140,8 +167,10 @@ export function FinanceTab({
         body: JSON.stringify({
           action: "generate-salary", employeeId: salaryEmployeeId, periodStart: salaryPeriod.start, periodEnd: salaryPeriod.end,
           allowances: salaryAllowances, deductions: salaryDeductions, pfNumber: memberPfNumber,
-          pfDeductionAmount: memberPfAmount ? Number(memberPfAmount) : 0, esicNumber: memberEsicNumber,
-          esicDeductionAmount: memberEsicAmount ? Number(memberEsicAmount) : 0,
+          pfDeductionAmount: salaryBreakdown?.pfDeduction ?? 0, esicNumber: memberEsicNumber,
+          esicDeductionAmount: salaryBreakdown?.esicDeduction ?? 0,
+          tdsDeductionAmount: salaryBreakdown?.tdsDeduction ?? 0,
+          pfExempted: memberPfExempted, esicExempted: memberEsicExempted, tdsExempted: memberTdsExempted,
         }),
       });
       showToast("Salary record generated and sent for approval.", "success");
@@ -267,6 +296,7 @@ export function FinanceTab({
   }
 
   const isFinanceOrAdmin = actorRole === "finance" || actorRole === "admin";
+  const hasFinanceMember = (data.financeMembers ?? []).length > 0;
   const adminOptions = data.members.filter((m) => String(m.role) === "admin");
   const approvers = [
     ...(data.financeMembers ?? []),
@@ -311,7 +341,7 @@ export function FinanceTab({
           <h4 className="mb-3 text-sm font-semibold text-slate-800">Reports</h4>
           <div className="space-y-5">
             <ReportsSection reports={reports} />
-            <PoliciesSection policyData={policyData} foodOptedIn={foodOptedIn} travelOptedIn={travelOptedIn} actorRole={actorRole} salaryCycle={salaryCycle} onToggleOptInOut={toggleOptInOut} onToggleAdvanceSalary={toggleAdvanceSalary} />
+<PoliciesSection policyData={policyData} foodOptedIn={foodOptedIn} travelOptedIn={travelOptedIn} actorRole={actorRole} salaryCycle={salaryCycle} hasFinanceMember={hasFinanceMember} onToggleOptInOut={toggleOptInOut} onToggleAdvanceSalary={toggleAdvanceSalary} pfPctInput={pfPctInput} esicPctInput={esicPctInput} tdsPctInput={tdsPctInput} onPfPctChange={setPfPctInput} onEsicPctChange={setEsicPctInput} onTdsPctChange={setTdsPctInput} onSavePercentages={savePercentages} />
             <LeaveImpactSection leaveImpacts={leaveImpacts} month={month} />
           </div>
         </div>
@@ -359,7 +389,7 @@ export function FinanceTab({
       {financeSubTab === "ops" && data.canManage ? (
         <div className="space-y-5">
           <div className="grid gap-5 xl:grid-cols-2">
-            <SalaryWizardSection actorRole={actorRole} salaryStep={salaryStep} salaryPeriod={salaryPeriod} salaryEmployeeId={salaryEmployeeId} salaryAllowances={salaryAllowances} salaryDeductions={salaryDeductions} salaryBreakdown={salaryBreakdown} memberPfNumber={memberPfNumber} memberPfAmount={memberPfAmount} memberEsicNumber={memberEsicNumber} memberEsicAmount={memberEsicAmount} salaryGenerating={salaryGenerating} members={data.members} onStepChange={setSalaryStep} onPeriodChange={setSalaryPeriod} onEmployeeChange={setSalaryEmployeeId} onAllowancesChange={setSalaryAllowances} onDeductionsChange={setSalaryDeductions} onPfNumberChange={setMemberPfNumber} onPfAmountChange={setMemberPfAmount} onEsicNumberChange={setMemberEsicNumber} onEsicAmountChange={setMemberEsicAmount} onCalculate={calculateSalary} onSubmit={submitSalary} />
+            <SalaryWizardSection actorRole={actorRole} salaryStep={salaryStep} salaryPeriod={salaryPeriod} salaryEmployeeId={salaryEmployeeId} salaryAllowances={salaryAllowances} salaryDeductions={salaryDeductions} salaryBreakdown={salaryBreakdown} memberPfNumber={memberPfNumber} memberEsicNumber={memberEsicNumber} memberPfExempted={memberPfExempted} memberEsicExempted={memberEsicExempted} memberTdsExempted={memberTdsExempted} salaryGenerating={salaryGenerating} members={data.members} pfPercentage={policyData?.pfPercentage ?? 0} esicPercentage={policyData?.esicPercentage ?? 0} tdsPercentage={policyData?.tdsPercentage ?? 0} onStepChange={setSalaryStep} onPeriodChange={setSalaryPeriod} onEmployeeChange={setSalaryEmployeeId} onAllowancesChange={setSalaryAllowances} onDeductionsChange={setSalaryDeductions} onPfNumberChange={setMemberPfNumber} onEsicNumberChange={setMemberEsicNumber} onCalculate={calculateSalary} onSubmit={submitSalary} />
             <ExpenseAllocatorSection expenses={data.expenses} onStatusUpdate={updateStatus} />
           </div>
           <InvoicesSection invoices={invoices} isFinanceOrAdmin={isFinanceOrAdmin} onCreateInvoice={() => setShowInvoiceForm(true)} onMarkInvoice={markInvoice} />
@@ -373,7 +403,7 @@ export function FinanceTab({
       {financeSubTab === "reports" ? (
         <div className="space-y-5">
           <ReportsSection reports={reports} />
-          <PoliciesSection policyData={policyData} foodOptedIn={foodOptedIn} travelOptedIn={travelOptedIn} actorRole={actorRole} salaryCycle={salaryCycle} onToggleOptInOut={toggleOptInOut} onToggleAdvanceSalary={toggleAdvanceSalary} />
+          <PoliciesSection policyData={policyData} foodOptedIn={foodOptedIn} travelOptedIn={travelOptedIn} actorRole={actorRole} salaryCycle={salaryCycle} hasFinanceMember={hasFinanceMember} onToggleOptInOut={toggleOptInOut} onToggleAdvanceSalary={toggleAdvanceSalary} pfPctInput={pfPctInput} esicPctInput={esicPctInput} tdsPctInput={tdsPctInput} onPfPctChange={setPfPctInput} onEsicPctChange={setEsicPctInput} onTdsPctChange={setTdsPctInput} onSavePercentages={savePercentages} />
           <LeaveImpactSection leaveImpacts={leaveImpacts} month={month} />
           <SalarySlipSection mySlips={mySlips} slipsLoading={slipsLoading} month={month} />
         </div>

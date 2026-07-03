@@ -101,6 +101,7 @@ function SalaryDetailContent({ detail }: { detail: AnyRecord }) {
             <RowDetail label="Travel Deduction" value={`-₹${breakdown.travelDeduction.toLocaleString("en-IN")}`} />
             <RowDetail label="PF Deduction" value={`-₹${breakdown.pfDeduction.toLocaleString("en-IN")}`} />
             <RowDetail label="ESIC Deduction" value={`-₹${breakdown.esicDeduction.toLocaleString("en-IN")}`} />
+            <RowDetail label="TDS Deduction" value={`-₹${breakdown.tdsDeduction.toLocaleString("en-IN")}`} />
             <RowDetail label="Total Deductions" value={`-₹${breakdown.totalDeductions.toLocaleString("en-IN")}`} />
             <RowDetail label="Allowances" value={`+₹${breakdown.allowances.toLocaleString("en-IN")}`} />
             <div className="border-t border-slate-300 pt-1.5 mt-1.5">

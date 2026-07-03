@@ -12,7 +12,7 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!userId) return jsonError("Unauthorized", 401);
   if (!isObjectId(memberId)) return jsonError("Invalid member id.");
 
-  let body: { pfNumber?: string; pfDeductionAmount?: number; esicNumber?: string; esicDeductionAmount?: number; pfExempted?: boolean; esicExempted?: boolean };
+  let body: { tdsDeductionAmount?: number; tdsExempted?: boolean };
   try {
     body = await request.json();
   } catch {
@@ -28,36 +28,29 @@ export async function PATCH(request: Request, { params }: Params) {
 
   const actorRole = String(actor.role ?? "");
   if (!["human-resource", "admin", "finance"].includes(actorRole)) {
-    return jsonError("Only HR, admin, or finance can update PF/ESIC details.", 403);
+    return jsonError("Only HR, admin, or finance can update TDS details.", 403);
   }
 
   const member = await User.findOne({
     _id: memberId,
     company: actor.company,
     companyStatus: "approved",
-  }).select("name pfNumber pfDeductionAmount esicNumber esicDeductionAmount pfExempted esicExempted");
+  }).select("name tdsDeductionAmount");
   if (!member) return jsonError("Member not found.", 404);
 
   if (actorRole === "human-resource") {
     const enrollingHr = await resolveEnrollingHr(member);
     if (enrollingHr?.id && enrollingHr.id !== userId) {
-      return jsonError("Only the enrolling HR or admin can update this member's PF/ESIC.", 403);
+      return jsonError("Only the enrolling HR or admin can update this member's TDS.", 403);
     }
   }
 
-  if (body.pfNumber !== undefined) member.pfNumber = String(body.pfNumber).trim();
-  if (body.pfDeductionAmount !== undefined) member.pfDeductionAmount = Math.max(0, Number(body.pfDeductionAmount));
-  if (body.esicNumber !== undefined) member.esicNumber = String(body.esicNumber).trim();
-  if (body.esicDeductionAmount !== undefined) member.esicDeductionAmount = Math.max(0, Number(body.esicDeductionAmount));
-  if (body.pfExempted !== undefined) member.pfExempted = Boolean(body.pfExempted);
-  if (body.esicExempted !== undefined) member.esicExempted = Boolean(body.esicExempted);
+  if (body.tdsDeductionAmount !== undefined) member.tdsDeductionAmount = Math.max(0, Number(body.tdsDeductionAmount));
+  if (body.tdsExempted !== undefined) member.tdsExempted = Boolean(body.tdsExempted);
   await member.save();
 
   return NextResponse.json({
     ok: true,
-    pfNumber: member.pfNumber,
-    pfDeductionAmount: member.pfDeductionAmount,
-    esicNumber: member.esicNumber,
-    esicDeductionAmount: member.esicDeductionAmount,
+    tdsDeductionAmount: member.tdsDeductionAmount,
   });
 }

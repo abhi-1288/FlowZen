@@ -14,20 +14,22 @@ export function SalaryWizardSection({
   salaryDeductions,
   salaryBreakdown,
   memberPfNumber,
-  memberPfAmount,
   memberEsicNumber,
-  memberEsicAmount,
+  memberPfExempted,
+  memberEsicExempted,
+  memberTdsExempted,
   salaryGenerating,
   members,
+  pfPercentage,
+  esicPercentage,
+  tdsPercentage,
   onStepChange,
   onPeriodChange,
   onEmployeeChange,
   onAllowancesChange,
   onDeductionsChange,
   onPfNumberChange,
-  onPfAmountChange,
   onEsicNumberChange,
-  onEsicAmountChange,
   onCalculate,
   onSubmit,
 }: {
@@ -39,20 +41,22 @@ export function SalaryWizardSection({
   salaryDeductions: string;
   salaryBreakdown: SalaryBreakdown | null;
   memberPfNumber: string;
-  memberPfAmount: string;
   memberEsicNumber: string;
-  memberEsicAmount: string;
+  memberPfExempted: boolean;
+  memberEsicExempted: boolean;
+  memberTdsExempted: boolean;
   salaryGenerating: boolean;
   members: AnyRecord[];
+  pfPercentage: number;
+  esicPercentage: number;
+  tdsPercentage: number;
   onStepChange: (step: 1 | 2 | 3) => void;
   onPeriodChange: (period: { start: string; end: string }) => void;
   onEmployeeChange: (id: string) => void;
   onAllowancesChange: (value: string) => void;
   onDeductionsChange: (value: string) => void;
   onPfNumberChange: (value: string) => void;
-  onPfAmountChange: (value: string) => void;
   onEsicNumberChange: (value: string) => void;
-  onEsicAmountChange: (value: string) => void;
   onCalculate: (event: FormEvent) => void;
   onSubmit: (event: FormEvent) => void;
 }) {
@@ -98,17 +102,19 @@ export function SalaryWizardSection({
             salaryAllowances={salaryAllowances}
             salaryDeductions={salaryDeductions}
             memberPfNumber={memberPfNumber}
-            memberPfAmount={memberPfAmount}
             memberEsicNumber={memberEsicNumber}
-            memberEsicAmount={memberEsicAmount}
+            memberPfExempted={memberPfExempted}
+            memberEsicExempted={memberEsicExempted}
+            memberTdsExempted={memberTdsExempted}
             salaryGenerating={salaryGenerating}
+            pfPercentage={pfPercentage}
+            esicPercentage={esicPercentage}
+            tdsPercentage={tdsPercentage}
             onBack={() => onStepChange(2)}
             onAllowancesChange={onAllowancesChange}
             onDeductionsChange={onDeductionsChange}
             onPfNumberChange={onPfNumberChange}
-            onPfAmountChange={onPfAmountChange}
             onEsicNumberChange={onEsicNumberChange}
-            onEsicAmountChange={onEsicAmountChange}
             onSubmit={onSubmit}
           />
         )}
@@ -125,17 +131,19 @@ function SalaryBreakdownForm({
   salaryAllowances,
   salaryDeductions,
   memberPfNumber,
-  memberPfAmount,
   memberEsicNumber,
-  memberEsicAmount,
+  memberPfExempted,
+  memberEsicExempted,
+  memberTdsExempted,
   salaryGenerating,
+  pfPercentage,
+  esicPercentage,
+  tdsPercentage,
   onBack,
   onAllowancesChange,
   onDeductionsChange,
   onPfNumberChange,
-  onPfAmountChange,
   onEsicNumberChange,
-  onEsicAmountChange,
   onSubmit,
 }: {
   salaryBreakdown: SalaryBreakdown;
@@ -145,25 +153,28 @@ function SalaryBreakdownForm({
   salaryAllowances: string;
   salaryDeductions: string;
   memberPfNumber: string;
-  memberPfAmount: string;
   memberEsicNumber: string;
-  memberEsicAmount: string;
+  memberPfExempted: boolean;
+  memberEsicExempted: boolean;
+  memberTdsExempted: boolean;
   salaryGenerating: boolean;
+  pfPercentage: number;
+  esicPercentage: number;
+  tdsPercentage: number;
   onBack: () => void;
   onAllowancesChange: (value: string) => void;
   onDeductionsChange: (value: string) => void;
   onPfNumberChange: (value: string) => void;
-  onPfAmountChange: (value: string) => void;
   onEsicNumberChange: (value: string) => void;
-  onEsicAmountChange: (value: string) => void;
   onSubmit: (event: FormEvent) => void;
 }) {
   const member = members.find((x: AnyRecord) => String(x.id) === salaryEmployeeId);
   const fixedAllowances = Number(salaryAllowances || 0);
   const fixedDeductions = Number(salaryDeductions || 0);
-  const pfAmount = memberPfAmount ? Number(memberPfAmount) : (salaryBreakdown.pfDeduction ?? 0);
-  const esicAmount = memberEsicAmount ? Number(memberEsicAmount) : (salaryBreakdown.esicDeduction ?? 0);
-  const netSalary = Math.max(0, salaryBreakdown.grossSalary + fixedAllowances - (fixedDeductions + (salaryBreakdown.foodDeduction ?? 0) + (salaryBreakdown.travelDeduction ?? 0) + pfAmount + esicAmount));
+  const pfAmount = salaryBreakdown.pfDeduction ?? 0;
+  const esicAmount = salaryBreakdown.esicDeduction ?? 0;
+  const tdsAmount = salaryBreakdown.tdsDeduction ?? 0;
+  const netSalary = Math.max(0, salaryBreakdown.grossSalary + fixedAllowances - (fixedDeductions + (salaryBreakdown.foodDeduction ?? 0) + (salaryBreakdown.travelDeduction ?? 0) + pfAmount + esicAmount + tdsAmount));
 
   return (
     <form onSubmit={onSubmit} className="grid gap-3 text-sm">
@@ -188,7 +199,15 @@ function SalaryBreakdownForm({
         {salaryBreakdown.travelDeduction > 0 ? (
           <div className="flex justify-between text-rose-600"><span>Travel Accommodation Deduction:</span> <span>- &#x20B9;{salaryBreakdown.travelDeduction.toLocaleString("en-IN")}</span></div>
         ) : null}
-        <div className="flex justify-between text-emerald-600"><span>Total In Hand:</span> <span>&#x20B9;{Math.max(0, salaryBreakdown.grossSalary + fixedAllowances - (fixedDeductions + (salaryBreakdown.foodDeduction ?? 0) + (salaryBreakdown.travelDeduction ?? 0))).toLocaleString("en-IN")}</span></div>
+        {!memberPfExempted ? (
+          <div className="flex justify-between text-rose-600"><span>PF Deduction ({pfPercentage}%):</span> <span>- &#x20B9;{salaryBreakdown.pfDeduction.toLocaleString("en-IN")}</span></div>
+        ) : null}
+        {!memberEsicExempted ? (
+          <div className="flex justify-between text-rose-600"><span>ESIC Deduction ({esicPercentage}%):</span> <span>- &#x20B9;{salaryBreakdown.esicDeduction.toLocaleString("en-IN")}</span></div>
+        ) : null}
+        {!memberTdsExempted ? (
+          <div className="flex justify-between text-rose-600"><span>TDS Deduction ({tdsPercentage}%):</span> <span>- &#x20B9;{salaryBreakdown.tdsDeduction.toLocaleString("en-IN")}</span></div>
+        ) : null}
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -201,28 +220,18 @@ function SalaryBreakdownForm({
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
+        {!memberPfExempted ? (
         <div>
           <label className="text-xs font-medium text-slate-500 mb-1 block">PF Account No.</label>
           <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" type="text" placeholder="Enter PF number" value={memberPfNumber} onChange={(e) => onPfNumberChange(e.target.value)} />
         </div>
-        <div>
-          <label className="text-xs font-medium text-slate-500 mb-1 block">
-            PF Amount (&#x20B9;)
-            {(salaryBreakdown.pfDeduction ?? 0) > 0 ? <span className="ml-1 text-rose-600">(-&#x20B9;{salaryBreakdown.pfDeduction.toLocaleString("en-IN")})</span> : null}
-          </label>
-          <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" type="number" min="0" placeholder="Leave empty for auto %" value={memberPfAmount} onChange={(e) => onPfAmountChange(e.target.value)} />
-        </div>
+        ) : null}
+        {!memberEsicExempted ? (
         <div>
           <label className="text-xs font-medium text-slate-500 mb-1 block">ESIC Account No.</label>
           <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" type="text" placeholder="Enter ESIC number" value={memberEsicNumber} onChange={(e) => onEsicNumberChange(e.target.value)} />
         </div>
-        <div>
-          <label className="text-xs font-medium text-slate-500 mb-1 block">
-            ESIC Amount (&#x20B9;)
-            {(salaryBreakdown.esicDeduction ?? 0) > 0 ? <span className="ml-1 text-rose-600">(-&#x20B9;{salaryBreakdown.esicDeduction.toLocaleString("en-IN")})</span> : null}
-          </label>
-          <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" type="number" min="0" placeholder="Leave empty for auto %" value={memberEsicAmount} onChange={(e) => onEsicAmountChange(e.target.value)} />
-        </div>
+        ) : null}
       </div>
       <div className="rounded-lg bg-emerald-50 p-3 flex justify-between font-bold text-emerald-700 text-lg mt-2">
         <span>Net Salary:</span>

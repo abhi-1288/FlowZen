@@ -11,6 +11,7 @@ import { Notification } from "@/models/Notification";
 import { JoinRequest } from "@/models/JoinRequest";
 import { Team } from "@/models/Team";
 import { Company } from "@/models/Company";
+import { CompanyPolicy } from "@/models/CompanyPolicy";
 import { FinanceSalary } from "@/models/FinanceSalary";
 import { resolveEnrollingHr, resolveJoinedByInfo } from "@/lib/enrolling-hr";
 import "@/models/Company";
@@ -210,13 +211,15 @@ export async function GET() {
 
   if (["human-resource", "finance", "admin"].includes(safeRole) && user.company && user.companyStatus === "approved") {
     const companyId = typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
-    const [members, teams] = await Promise.all([
+    const [members, teams, companyPolicy] = await Promise.all([
       User.find({ company: companyId, companyStatus: "approved" })
-        .select("name email role customRole team teamStatus activeTeams membershipHistory companyJoined createdAt baseSalary pfNumber pfDeductionAmount esicNumber esicDeductionAmount")
+        .select("name email role customRole team teamStatus activeTeams membershipHistory companyJoined createdAt baseSalary pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted")
         .populate("membershipHistory.inviter", "name role")
         .sort({ role: 1, name: 1 }),
       Team.find({ company: companyId }).select("name manager employees"),
+      CompanyPolicy.findOne({ company: companyId }).select("tdsPercentage"),
     ]);
+    const companyTdsPct = Number(companyPolicy?.tdsPercentage ?? 0);
 
     const teamNamesByMember = new Map<string, string[]>();
     teams.forEach((team: any) => {
@@ -262,8 +265,13 @@ export async function GET() {
           joinedBy: inviter,
           createdAt: member.createdAt,
           companyJoined: member.companyJoined,
+          tdsDeductionAmount: Math.max(0, Number(member.tdsDeductionAmount ?? 0)),
+          pfExempted: Boolean(member.pfExempted ?? false),
+          esicExempted: Boolean(member.esicExempted ?? false),
+          tdsExempted: Boolean(member.tdsExempted ?? false),
         };
       }),
+      companyTdsPct,
     };
   }
 

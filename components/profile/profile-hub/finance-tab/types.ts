@@ -10,6 +10,7 @@ export type SalaryBreakdown = {
   leaveDeduction: number;
   pfDeduction: number;
   esicDeduction: number;
+  tdsDeduction: number;
   allowances: number;
   manualDeductions: number;
   totalDeductions: number;
@@ -27,6 +28,9 @@ export type PolicyData = {
   foodOptedOutMembers: { _id: string; name: string; email: string; role: string }[];
   travelOptedOutMembers: { _id: string; name: string; email: string; role: string }[];
   advanceSalaryEnabled: boolean;
+  pfPercentage: number;
+  esicPercentage: number;
+  tdsPercentage: number;
 };
 
 export type PolicyApiResponse = PolicyData & { nowOptedOut: boolean };

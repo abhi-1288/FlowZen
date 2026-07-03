@@ -23,6 +23,7 @@ export function MemberListModal({
   onRequestFire,
   onOpenSalaryModal,
   onOpenPfEsicModal,
+  onOpenTdsModal,
   onOpenDocModal,
   onOpenRoleModal,
   onOpenCustomRoleModal,
@@ -47,6 +48,7 @@ export function MemberListModal({
   onRequestFire: (member: AnyRecord) => void;
   onOpenSalaryModal: (member: AnyRecord) => void;
   onOpenPfEsicModal: (member: AnyRecord) => void;
+  onOpenTdsModal: (member: AnyRecord) => void;
   onOpenDocModal: (member: AnyRecord) => void;
   onOpenRoleModal: (member: AnyRecord) => void;
   onOpenCustomRoleModal: (member: AnyRecord) => void;
@@ -149,7 +151,8 @@ export function MemberListModal({
               ? modalMembers.filter((m) => {
                   const name = String(m.name ?? "").toLowerCase();
                   const email = String(m.email ?? "").toLowerCase();
-                  return name.includes(query) || email.includes(query);
+                  const code = String(m.companyIdentityCode ?? "").toLowerCase();
+                  return name.includes(query) || email.includes(query) || code.includes(query);
                 })
               : modalMembers;
             if (filtered.length === 0) {
@@ -193,6 +196,7 @@ export function MemberListModal({
                         <div className="flex flex-wrap gap-2 sm:col-span-3">
                           <ActionButton variant="primary" className="px-3" type="button" onClick={() => onOpenSalaryModal(member)}>Base Salary</ActionButton>
                           <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenPfEsicModal(member)}>PF & ESIC</ActionButton>
+                          <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenTdsModal(member)}>TDS</ActionButton>
                           <ActionButton variant="secondary" className="px-3" type="button" onClick={() => void onOpenDocModal(member)}>Documents</ActionButton>
                           {canEditOthersRole && !isSelf && String(member.role ?? "") === "others" ? (
                             <>
