@@ -12,7 +12,7 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!userId) return jsonError("Unauthorized", 401);
   if (!isObjectId(memberId)) return jsonError("Invalid member id.");
 
-  let body: { pfNumber?: string; pfDeductionAmount?: number; esicNumber?: string; esicDeductionAmount?: number; pfExempted?: boolean; esicExempted?: boolean };
+  let body: { pfNumber?: string; pfDeductionAmount?: number; esicNumber?: string; esicDeductionAmount?: number; pfExempted?: boolean; esicExempted?: boolean; tdsDeductionAmount?: number; tdsExempted?: boolean };
   try {
     body = await request.json();
   } catch {
@@ -35,7 +35,7 @@ export async function PATCH(request: Request, { params }: Params) {
     _id: memberId,
     company: actor.company,
     companyStatus: "approved",
-  }).select("name pfNumber pfDeductionAmount esicNumber esicDeductionAmount pfExempted esicExempted");
+  }).select("name pfNumber pfDeductionAmount esicNumber esicDeductionAmount pfExempted esicExempted tdsDeductionAmount tdsExempted");
   if (!member) return jsonError("Member not found.", 404);
 
   if (actorRole === "human-resource") {
@@ -51,6 +51,8 @@ export async function PATCH(request: Request, { params }: Params) {
   if (body.esicDeductionAmount !== undefined) member.esicDeductionAmount = Math.max(0, Number(body.esicDeductionAmount));
   if (body.pfExempted !== undefined) member.pfExempted = Boolean(body.pfExempted);
   if (body.esicExempted !== undefined) member.esicExempted = Boolean(body.esicExempted);
+  if (body.tdsDeductionAmount !== undefined) member.tdsDeductionAmount = Math.max(0, Number(body.tdsDeductionAmount));
+  if (body.tdsExempted !== undefined) member.tdsExempted = Boolean(body.tdsExempted);
   await member.save();
 
   return NextResponse.json({

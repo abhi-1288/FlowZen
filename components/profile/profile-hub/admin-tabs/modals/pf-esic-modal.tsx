@@ -10,12 +10,17 @@ export type PfEsicFormData = {
   esicDeductionAmount: string;
   pfExempted: boolean;
   esicExempted: boolean;
+  tdsDeductionAmount: string;
+  tdsExempted: boolean;
 };
 
 export function PfEsicModal({
   member,
   data,
   saving,
+  companyPfPct,
+  companyEsicPct,
+  companyTdsPct,
   onDataChange,
   onCancel,
   onSave,
@@ -23,6 +28,9 @@ export function PfEsicModal({
   member: { id?: string; name?: string } | null;
   data: PfEsicFormData;
   saving: boolean;
+  companyPfPct?: number;
+  companyEsicPct?: number;
+  companyTdsPct?: number;
   onDataChange: (data: PfEsicFormData) => void;
   onCancel: () => void;
   onSave: () => void;
@@ -32,9 +40,9 @@ export function PfEsicModal({
   return (
     <div className={overlayClass}>
       <div className={modalClass}>
-        <h3 className="text-lg font-semibold text-slate-900">PF & ESIC Details</h3>
+        <h3 className="text-lg font-semibold text-slate-900">PF, ESIC & TDS Details</h3>
         <p className="mt-1 text-sm text-slate-500">
-          Update PF and ESIC information for <strong>{String(member.name ?? "")}</strong>.
+          Update PF, ESIC and TDS information for <strong>{String(member.name ?? "")}</strong>.
         </p>
         <div className="mt-4 space-y-4">
           <div>
@@ -42,8 +50,9 @@ export function PfEsicModal({
             <input className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm" type="text" placeholder="Enter PF number" value={data.pfNumber} onChange={(e) => onDataChange({ ...data, pfNumber: e.target.value })} />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-500 mb-1 block">PF Monthly Deduction (&#x20B9;)</label>
-            <input className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm" type="number" min="0" placeholder="Leave empty to use company %" value={data.pfDeductionAmount} onChange={(e) => onDataChange({ ...data, pfDeductionAmount: e.target.value })} />
+            <label className="text-xs font-medium text-slate-500 mb-1 block">PF Deduction (%)</label>
+            <input className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm" type="number" min="0" step="0.01" placeholder={`Company default: ${companyPfPct ?? 12}%`} value={data.pfDeductionAmount} onChange={(e) => onDataChange({ ...data, pfDeductionAmount: e.target.value })} />
+            <p className="mt-1 text-xs text-slate-400">Percentage of monthly salary. Default: {companyPfPct ?? 12}%</p>
           </div>
           <hr className="border-slate-100" />
           <div>
@@ -51,8 +60,15 @@ export function PfEsicModal({
             <input className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm" type="text" placeholder="Enter ESIC number" value={data.esicNumber} onChange={(e) => onDataChange({ ...data, esicNumber: e.target.value })} />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-500 mb-1 block">ESIC Monthly Deduction (&#x20B9;)</label>
-            <input className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm" type="number" min="0" placeholder="Leave empty to use company %" value={data.esicDeductionAmount} onChange={(e) => onDataChange({ ...data, esicDeductionAmount: e.target.value })} />
+            <label className="text-xs font-medium text-slate-500 mb-1 block">ESIC Deduction (%)</label>
+            <input className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm" type="number" min="0" step="0.01" placeholder={`Company default: ${companyEsicPct ?? 0.75}%`} value={data.esicDeductionAmount} onChange={(e) => onDataChange({ ...data, esicDeductionAmount: e.target.value })} />
+            <p className="mt-1 text-xs text-slate-400">Percentage of monthly salary. Default: {companyEsicPct ?? 0.75}%</p>
+          </div>
+          <hr className="border-slate-100" />
+          <div>
+            <label className="text-xs font-medium text-slate-500 mb-1 block">TDS Deduction (%)</label>
+            <input className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm" type="number" min="0" step="0.01" placeholder={companyTdsPct && companyTdsPct > 0 ? `Company default: ${companyTdsPct}%` : "Company TDS not configured"} value={data.tdsDeductionAmount} onChange={(e) => onDataChange({ ...data, tdsDeductionAmount: e.target.value })} />
+            <p className="mt-1 text-xs text-slate-400">Percentage of monthly salary{companyTdsPct && companyTdsPct > 0 ? `. Default: ${companyTdsPct}%` : ". Company TDS rate not configured."}</p>
           </div>
           <hr className="border-slate-100" />
           <label className="flex items-center gap-3 cursor-pointer">
@@ -62,6 +78,10 @@ export function PfEsicModal({
           <label className="flex items-center gap-3 cursor-pointer">
             <input type="checkbox" checked={data.esicExempted} onChange={(e) => onDataChange({ ...data, esicExempted: e.target.checked })} className="rounded border-slate-300 text-slate-900" />
             <span className="text-sm text-slate-700">Exempt from ESIC deduction</span>
+          </label>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" checked={data.tdsExempted} onChange={(e) => onDataChange({ ...data, tdsExempted: e.target.checked })} className="rounded border-slate-300 text-slate-900" />
+            <span className="text-sm text-slate-700">Exempt from TDS deduction</span>
           </label>
         </div>
         <div className="mt-5 flex justify-end gap-3">

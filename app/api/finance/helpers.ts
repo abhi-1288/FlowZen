@@ -130,7 +130,7 @@ export async function computeSalaryBreakdown(params: {
     _id: employeeId,
     company: actorCompany,
     companyStatus: "approved",
-  }).select("_id name baseSalary companyJoined createdAt pfNumber pfDeductionAmount esicNumber esicDeductionAmount");
+  }).select("_id name baseSalary companyJoined createdAt pfNumber pfDeductionAmount esicNumber esicDeductionAmount pfExempted esicExempted tdsDeductionAmount tdsExempted");
   if (!employee)
     return { error: "Employee not found in this company." as const };
 
@@ -312,21 +312,31 @@ export async function computeSalaryBreakdown(params: {
 
     const pfPct = Number((policy as any).pfPercentage ?? 12);
     const esicPct = Number((policy as any).esicPercentage ?? 0.75);
-    const empPfAmount = Number((employee as any).pfDeductionAmount ?? 0);
-    const empEsicAmount = Number((employee as any).esicDeductionAmount ?? 0);
+    const empPfPct = Number((employee as any).pfDeductionAmount ?? 0);
+    const empEsicPct = Number((employee as any).esicDeductionAmount ?? 0);
+    const empTdsPct = Number((employee as any).tdsDeductionAmount ?? 0);
+    const hasPfNumber = Boolean((employee as any).pfNumber);
+    const hasEsicNumber = Boolean((employee as any).esicNumber);
     if (!(employee as any).pfExempted) {
-      pfDeduction = empPfAmount > 0 ? roundCurrency(empPfAmount) : roundCurrency(grossSalary * pfPct / 100);
+      if (empPfPct > 0) {
+        pfDeduction = roundCurrency(monthlySalary * empPfPct / 100);
+      } else if (hasPfNumber) {
+        pfDeduction = roundCurrency(monthlySalary * pfPct / 100);
+      }
     }
     if (!(employee as any).esicExempted) {
-      esicDeduction = empEsicAmount > 0 ? roundCurrency(empEsicAmount) : roundCurrency(grossSalary * esicPct / 100);
+      if (empEsicPct > 0) {
+        esicDeduction = roundCurrency(monthlySalary * empEsicPct / 100);
+      } else if (hasEsicNumber) {
+        esicDeduction = roundCurrency(monthlySalary * esicPct / 100);
+      }
     }
     const tdsPct = Number((policy as any).tdsPercentage ?? 0);
-    const empTdsAmount = Number((employee as any).tdsDeductionAmount ?? 0);
     if (!(employee as any).tdsExempted) {
-      if (empTdsAmount > 0) {
-        tdsDeduction = roundCurrency(empTdsAmount);
+      if (empTdsPct > 0) {
+        tdsDeduction = roundCurrency(monthlySalary * empTdsPct / 100);
       } else if (tdsPct > 0) {
-        tdsDeduction = roundCurrency(grossSalary * tdsPct / 100);
+        tdsDeduction = roundCurrency(monthlySalary * tdsPct / 100);
       }
     }
     finalSalary = Math.max(0, finalSalary - pfDeduction - esicDeduction - tdsDeduction);

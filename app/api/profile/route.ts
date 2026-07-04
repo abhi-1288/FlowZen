@@ -217,8 +217,10 @@ export async function GET() {
         .populate("membershipHistory.inviter", "name role")
         .sort({ role: 1, name: 1 }),
       Team.find({ company: companyId }).select("name manager employees"),
-      CompanyPolicy.findOne({ company: companyId }).select("tdsPercentage"),
+      CompanyPolicy.findOne({ company: companyId }).select("pfPercentage esicPercentage tdsPercentage"),
     ]);
+    const companyPfPct = Number(companyPolicy?.pfPercentage ?? 12);
+    const companyEsicPct = Number(companyPolicy?.esicPercentage ?? 0.75);
     const companyTdsPct = Number(companyPolicy?.tdsPercentage ?? 0);
 
     const teamNamesByMember = new Map<string, string[]>();
@@ -266,11 +268,17 @@ export async function GET() {
           createdAt: member.createdAt,
           companyJoined: member.companyJoined,
           tdsDeductionAmount: Math.max(0, Number(member.tdsDeductionAmount ?? 0)),
+          pfNumber: String(member.pfNumber ?? ""),
+          pfDeductionAmount: Math.max(0, Number(member.pfDeductionAmount ?? 0)),
+          esicNumber: String(member.esicNumber ?? ""),
+          esicDeductionAmount: Math.max(0, Number(member.esicDeductionAmount ?? 0)),
           pfExempted: Boolean(member.pfExempted ?? false),
           esicExempted: Boolean(member.esicExempted ?? false),
           tdsExempted: Boolean(member.tdsExempted ?? false),
         };
       }),
+      companyPfPct,
+      companyEsicPct,
       companyTdsPct,
     };
   }

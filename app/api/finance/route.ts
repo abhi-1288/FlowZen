@@ -392,20 +392,14 @@ export async function POST(request: Request) {
     const manualDeductions = Math.max(0, Number(body.deductions ?? 0));
 
     const pfNumber = String(body.pfNumber ?? "").trim();
-    const pfDeductionAmount = Math.max(0, Number(body.pfDeductionAmount ?? 0));
     const esicNumber = String(body.esicNumber ?? "").trim();
-    const esicDeductionAmount = Math.max(0, Number(body.esicDeductionAmount ?? 0));
-    const tdsDeductionAmount = Math.max(0, Number(body.tdsDeductionAmount ?? 0));
     const pfExempted = body.pfExempted === true;
     const esicExempted = body.esicExempted === true;
     const tdsExempted = body.tdsExempted === true;
-    if (pfNumber || esicNumber || pfDeductionAmount > 0 || esicDeductionAmount > 0 || tdsDeductionAmount > 0 || pfExempted || esicExempted || tdsExempted) {
+    if (pfNumber || esicNumber || pfExempted || esicExempted || tdsExempted) {
       const updateData: Record<string, string | number | boolean> = {};
       if (pfNumber) updateData.pfNumber = pfNumber;
       if (esicNumber) updateData.esicNumber = esicNumber;
-      if (pfDeductionAmount > 0) updateData.pfDeductionAmount = pfDeductionAmount;
-      if (esicDeductionAmount > 0) updateData.esicDeductionAmount = esicDeductionAmount;
-      if (tdsDeductionAmount > 0) updateData.tdsDeductionAmount = tdsDeductionAmount;
       if (pfExempted) updateData.pfExempted = true;
       if (esicExempted) updateData.esicExempted = true;
       if (tdsExempted) updateData.tdsExempted = true;

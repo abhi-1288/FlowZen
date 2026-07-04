@@ -28,6 +28,8 @@ export function MembersTab({
   const selfId = session?.user?.id ?? "";
   const hr = (insights?.hr as AnyRecord | undefined) ?? null;
   const members = Array.isArray(hr?.members) ? (hr.members as AnyRecord[]) : [];
+  const companyPfPct = Number(hr?.companyPfPct ?? 12);
+  const companyEsicPct = Number(hr?.companyEsicPct ?? 0.75);
   const companyTdsPct = Number(hr?.companyTdsPct ?? 0);
   const roleCounts = (hr?.roleCounts as AnyRecord | undefined) ?? {};
   const [modalRole, setModalRole] = useState<(typeof HR_MEMBER_ROLE_KEYS)[number] | null>(null);
@@ -51,7 +53,7 @@ export function MembersTab({
   const [modalSearchQuery, setModalSearchQuery] = useState("");
   const [modalSearchInput, setModalSearchInput] = useState("");
   const [pfEsicModalMember, setPfEsicModalMember] = useState<AnyRecord | null>(null);
-  const [pfEsicInput, setPfEsicInput] = useState<PfEsicFormData>({ pfNumber: "", pfDeductionAmount: "", esicNumber: "", esicDeductionAmount: "", pfExempted: false, esicExempted: false });
+  const [pfEsicInput, setPfEsicInput] = useState<PfEsicFormData>({ pfNumber: "", pfDeductionAmount: "", esicNumber: "", esicDeductionAmount: "", pfExempted: false, esicExempted: false, tdsDeductionAmount: "", tdsExempted: false });
   const [savingPfEsic, setSavingPfEsic] = useState(false);
   const [tdsModalMember, setTdsModalMember] = useState<AnyRecord | null>(null);
   const [tdsInput, setTdsInput] = useState<TdsFormData>({ tdsDeductionAmount: "", tdsExempted: false });
@@ -84,11 +86,13 @@ export function MembersTab({
   function openPfEsicModal(member: AnyRecord) {
     setPfEsicInput({
       pfNumber: String(member.pfNumber ?? ""),
-      pfDeductionAmount: String(Number(member.pfDeductionAmount ?? 0) > 0 ? Number(member.pfDeductionAmount) : ""),
+      pfDeductionAmount: String(Number(member.pfDeductionAmount ?? 0) > 0 ? Number(member.pfDeductionAmount) : companyPfPct),
       esicNumber: String(member.esicNumber ?? ""),
-      esicDeductionAmount: String(Number(member.esicDeductionAmount ?? 0) > 0 ? Number(member.esicDeductionAmount) : ""),
+      esicDeductionAmount: String(Number(member.esicDeductionAmount ?? 0) > 0 ? Number(member.esicDeductionAmount) : companyEsicPct),
       pfExempted: Boolean(member.pfExempted ?? false),
       esicExempted: Boolean(member.esicExempted ?? false),
+      tdsDeductionAmount: String(Number(member.tdsDeductionAmount ?? 0) > 0 ? Number(member.tdsDeductionAmount) : (companyTdsPct > 0 ? companyTdsPct : "")),
+      tdsExempted: Boolean(member.tdsExempted ?? false),
     });
     setPfEsicModalMember(member);
   }
@@ -201,9 +205,11 @@ export function MembersTab({
           esicDeductionAmount: pfEsicInput.esicDeductionAmount ? Number(pfEsicInput.esicDeductionAmount) : 0,
           pfExempted: pfEsicInput.pfExempted,
           esicExempted: pfEsicInput.esicExempted,
+          tdsDeductionAmount: pfEsicInput.tdsDeductionAmount ? Number(pfEsicInput.tdsDeductionAmount) : 0,
+          tdsExempted: pfEsicInput.tdsExempted,
         }),
       });
-      showToast("PF & ESIC details saved.");
+      showToast("PF, ESIC & TDS details saved.");
       setPfEsicModalMember(null);
       await refresh(true);
     } catch (err) {
@@ -419,6 +425,9 @@ export function MembersTab({
         member={pfEsicModalMember}
         data={pfEsicInput}
         saving={savingPfEsic}
+        companyPfPct={companyPfPct}
+        companyEsicPct={companyEsicPct}
+        companyTdsPct={companyTdsPct}
         onDataChange={setPfEsicInput}
         onCancel={() => setPfEsicModalMember(null)}
         onSave={savePfEsicModal}

@@ -36,15 +36,16 @@ export function TdsModal({
         </p>
         <div className="mt-4 space-y-4">
           <div>
-            <label className="text-xs font-medium text-slate-500 mb-1 block">Monthly TDS Deduction (&#x20B9;)</label>
+            <label className="text-xs font-medium text-slate-500 mb-1 block">TDS Deduction (%)</label>
             <input className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
-              type="number" min="0" placeholder={companyTdsPct && companyTdsPct > 0 ? `Leave 0 to use company ${companyTdsPct}%` : "Set fixed monthly TDS amount"}
+              type="number" min="0" step="0.01"
+              placeholder={companyTdsPct && companyTdsPct > 0 ? `Leave empty to use company ${companyTdsPct}%` : "Leave empty to use company %"}
               value={data.tdsDeductionAmount}
               onChange={(e) => onDataChange({ ...data, tdsDeductionAmount: e.target.value })} />
             <p className="mt-1 text-xs text-slate-400">
               {companyTdsPct && companyTdsPct > 0
-                ? `Set a fixed monthly TDS amount. Leave 0 to use company rate of ${companyTdsPct}% of gross salary.`
-                : "Set a fixed monthly TDS amount. Company TDS rate not configured."}
+                ? `Set a custom TDS percentage. Leave empty to use company rate of ${companyTdsPct}% of monthly salary.`
+                : "Set a custom TDS percentage. Company TDS rate not configured."}
             </p>
           </div>
           <hr className="border-slate-100" />

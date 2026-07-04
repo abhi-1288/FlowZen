@@ -167,9 +167,7 @@ export function FinanceTab({
         body: JSON.stringify({
           action: "generate-salary", employeeId: salaryEmployeeId, periodStart: salaryPeriod.start, periodEnd: salaryPeriod.end,
           allowances: salaryAllowances, deductions: salaryDeductions, pfNumber: memberPfNumber,
-          pfDeductionAmount: salaryBreakdown?.pfDeduction ?? 0, esicNumber: memberEsicNumber,
-          esicDeductionAmount: salaryBreakdown?.esicDeduction ?? 0,
-          tdsDeductionAmount: salaryBreakdown?.tdsDeduction ?? 0,
+          esicNumber: memberEsicNumber,
           pfExempted: memberPfExempted, esicExempted: memberEsicExempted, tdsExempted: memberTdsExempted,
         }),
       });

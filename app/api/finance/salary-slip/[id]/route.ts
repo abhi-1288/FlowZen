@@ -209,20 +209,30 @@ export async function GET(request: Request, { params }: Params) {
         pfPercentage = Number((policy as any).pfPercentage ?? 12);
         esicPercentage = Number((policy as any).esicPercentage ?? 0.75);
         tdsPercentage = Number((policy as any).tdsPercentage ?? 0);
-        const empPfAmount = Number((employee as any).pfDeductionAmount ?? 0);
-        const empEsicAmount = Number((employee as any).esicDeductionAmount ?? 0);
-        const empTdsAmount = Number((employee as any).tdsDeductionAmount ?? 0);
+        const empPfPct = Number((employee as any).pfDeductionAmount ?? 0);
+        const empEsicPct = Number((employee as any).esicDeductionAmount ?? 0);
+        const empTdsPct = Number((employee as any).tdsDeductionAmount ?? 0);
+        const hasPfNumber = Boolean((employee as any).pfNumber);
+        const hasEsicNumber = Boolean((employee as any).esicNumber);
         if (!(employee as any).pfExempted) {
-          pfDeduction = empPfAmount > 0 ? roundCurrency(empPfAmount) : roundCurrency(grossSalary * pfPercentage / 100);
+          if (empPfPct > 0) {
+            pfDeduction = roundCurrency(monthlySalary * empPfPct / 100);
+          } else if (hasPfNumber) {
+            pfDeduction = roundCurrency(monthlySalary * pfPercentage / 100);
+          }
         }
         if (!(employee as any).esicExempted) {
-          esicDeduction = empEsicAmount > 0 ? roundCurrency(empEsicAmount) : roundCurrency(grossSalary * esicPercentage / 100);
+          if (empEsicPct > 0) {
+            esicDeduction = roundCurrency(monthlySalary * empEsicPct / 100);
+          } else if (hasEsicNumber) {
+            esicDeduction = roundCurrency(monthlySalary * esicPercentage / 100);
+          }
         }
         if (!(employee as any).tdsExempted) {
-          if (empTdsAmount > 0) {
-            tdsDeduction = roundCurrency(empTdsAmount);
+          if (empTdsPct > 0) {
+            tdsDeduction = roundCurrency(monthlySalary * empTdsPct / 100);
           } else if (tdsPercentage > 0) {
-            tdsDeduction = roundCurrency(grossSalary * tdsPercentage / 100);
+            tdsDeduction = roundCurrency(monthlySalary * tdsPercentage / 100);
           }
         }
       }
