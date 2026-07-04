@@ -36,6 +36,26 @@ export function LandingPage() {
   // Card 2 Animation (Slight bump when dropped near)
   const card2Y = useTransform(scrollYProgress, [0.5, 0.6, 0.7], [0, 15, 0]);
 
+  // Chat Mockup Refs & Animations
+  const chatRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress: chatScrollProgress } = useScroll({
+    target: chatRef,
+    offset: ["start end", "end center"]
+  });
+
+  const chatMsg1X = useTransform(chatScrollProgress, [0.1, 0.3], [60, 0]);
+  const chatMsg1Opacity = useTransform(chatScrollProgress, [0.1, 0.2], [0, 1]);
+  const chatMsg2X = useTransform(chatScrollProgress, [0.25, 0.45], [-60, 0]);
+  const chatMsg2Opacity = useTransform(chatScrollProgress, [0.25, 0.35], [0, 1]);
+  const chatMsg3X = useTransform(chatScrollProgress, [0.4, 0.6], [60, 0]);
+  const chatMsg3Opacity = useTransform(chatScrollProgress, [0.4, 0.5], [0, 1]);
+  const chatMsg4X = useTransform(chatScrollProgress, [0.55, 0.75], [-60, 0]);
+  const chatMsg4Opacity = useTransform(chatScrollProgress, [0.55, 0.65], [0, 1]);
+  const chatMsg5X = useTransform(chatScrollProgress, [0.7, 0.9], [60, 0]);
+  const chatMsg5Opacity = useTransform(chatScrollProgress, [0.7, 0.8], [0, 1]);
+  const chatTypingY = useTransform(chatScrollProgress, [0.8, 0.95], [20, 0]);
+  const chatTypingOpacity = useTransform(chatScrollProgress, [0.8, 0.85], [0, 1]);
+
   useEffect(() => {
     setIsLoaded(true);
     const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -245,7 +265,7 @@ export function LandingPage() {
                 </motion.p>
 
                 <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto">
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="w-full sm:w-auto">
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="w-full mb-10 sm:w-auto">
                     <Link
                       href="/signup"
                       className="px-8 py-4 rounded-full bg-indigo-600 text-white font-bold text-lg hover:bg-indigo-500 transition-all shadow-[0_0_40px_-10px_rgba(99,102,241,0.6)] hover:shadow-[0_0_60px_-15px_rgba(99,102,241,0.8)] flex items-center gap-3 group w-full sm:w-auto justify-center"
@@ -260,14 +280,15 @@ export function LandingPage() {
           </AnimatePresence>
 
           {/* Interactive Dashboard Mockup */}
+          
           <motion.div
             ref={dashboardRef}
             initial={{ opacity: 0, y: 100 }}
             animate={{ opacity: isLoaded ? 1 : 0, y: isLoaded ? 0 : 100 }}
             transition={{ duration: 1, delay: 0.4, type: "spring" }}
-            className="mt-28 w-full relative"
+            className="w-full relative group"
           >
-            <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl blur opacity-30 group-hover:opacity-50 transition duration-1000 animate-pulse"></div>
+            <div className="absolute inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl blur opacity-30 group-hover:opacity-50 transition duration-1000 animate-pulse"></div>
             <div className="relative rounded-2xl border border-white/10 bg-slate-900/80 backdrop-blur-xl p-2 shadow-2xl overflow-hidden">
               <div className="rounded-xl overflow-hidden bg-ink aspect-[16/9] border border-white/5 flex flex-col relative">
                 {/* Mock Header */}
@@ -453,6 +474,161 @@ export function LandingPage() {
                 </motion.div>
               ))}
             </div>
+          </div>
+        </section>
+
+        {/* Chat Messaging Mockup */}
+        <section className="py-24 px-6 border-t border-white/5 relative overflow-hidden">
+          <div className="max-w-7xl mx-auto relative z-10">
+            <motion.div
+              ref={chatRef}
+              initial={{ opacity: 0, y: 100 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 1, type: "spring" }}
+              className="w-full relative group"
+            >
+              <div className="absolute -inset-1 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-2xl blur opacity-30 group-hover:opacity-50 transition duration-1000 animate-pulse"></div>
+              <div className="relative rounded-2xl border border-white/10 bg-slate-900/80 backdrop-blur-xl p-2 shadow-2xl overflow-hidden">
+                <div className="rounded-xl overflow-hidden bg-ink aspect-[16/9] border border-white/5 flex flex-col relative">
+                  {/* Chat Header */}
+                  <div className="h-14 border-b border-white/10 flex items-center px-6 gap-4 bg-slate-900/50">
+                    <div className="flex gap-2">
+                      <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
+                      <div className="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+                      <div className="w-3 h-3 rounded-full bg-green-500/80"></div>
+                    </div>
+                    <div className="flex items-center gap-3 ml-2">
+                      <motion.div
+                        animate={{ scale: [1, 1.12, 1] }}
+                        transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                        className="w-9 h-9 rounded-full bg-gradient-to-tr from-teal-400 to-cyan-400 shadow-lg shadow-teal-500/30"
+                      />
+                      <div>
+                        <div className="h-4 w-28 bg-white/10 rounded mb-1" />
+                        <div className="flex items-center gap-1.5">
+                          <motion.div
+                            animate={{ opacity: [0.3, 1, 0.3] }}
+                            transition={{ duration: 2, repeat: Infinity }}
+                            className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_6px_rgba(74,222,128,0.6)]"
+                          />
+                          <div className="h-2.5 w-12 bg-white/5 rounded" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex-1" />
+                    <motion.div
+                      style={{
+                        color: useTransform(chatScrollProgress, [0.5, 0.7], ['#64748b', '#22c55e'])
+                      }}
+                      className="text-xs font-bold"
+                    >
+                      ✓✓
+                    </motion.div>
+                  </div>
+
+                  {/* Chat Body */}
+                  <div className="flex flex-1 overflow-hidden bg-slate-900/20">
+                    {/* Conversations Sidebar */}
+                    <div className="w-1/3 border-r border-white/10 p-4 space-y-3 bg-slate-900/30 hidden md:block">
+                      {[
+                        { color: "from-teal-400 to-cyan-400", active: true },
+                        { color: "from-indigo-400 to-purple-400", active: false },
+                        { color: "from-amber-400 to-orange-400", active: false },
+                        { color: "from-rose-400 to-pink-400", active: false },
+                      ].map((conv, i) => (
+                        <div
+                          key={i}
+                          className={`flex items-center gap-3 p-2.5 rounded-xl transition-all cursor-default ${conv.active ? "bg-white/10 border border-white/10" : "bg-white/5 hover:bg-white/10"}`}
+                        >
+                          <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${conv.color} shrink-0`} />
+                          <div className="flex-1 min-w-0">
+                            <div className={`h-3 rounded mb-1.5 ${conv.active ? "w-20 bg-white/20" : "w-16 bg-white/10"}`} />
+                            <div className="h-2 w-24 bg-white/5 rounded" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Messages Area */}
+                    <div className="flex-1 flex flex-col gap-2.5 p-4 justify-end">
+                      {/* Sent Message */}
+                      <motion.div
+                        style={{ x: chatMsg1X, opacity: chatMsg1Opacity }}
+                        className="self-end max-w-[75%] bg-indigo-500/20 rounded-2xl rounded-br-sm p-3 border border-indigo-500/15"
+                      >
+                        <div className="h-3 w-32 bg-indigo-300/20 rounded mb-1.5" />
+                        <div className="h-3 w-20 bg-indigo-300/20 rounded" />
+                      </motion.div>
+
+                      {/* Received Message */}
+                      <motion.div
+                        style={{ x: chatMsg2X, opacity: chatMsg2Opacity }}
+                        className="self-start max-w-[75%] bg-slate-700/40 rounded-2xl rounded-bl-sm p-3 border border-white/5"
+                      >
+                        <div className="h-3 w-36 bg-white/10 rounded mb-1.5" />
+                        <div className="h-3 w-24 bg-white/10 rounded" />
+                      </motion.div>
+
+                      {/* Sent Message (green read tick) */}
+                      <motion.div
+                        style={{ x: chatMsg3X, opacity: chatMsg3Opacity }}
+                        className="self-end max-w-[75%] bg-indigo-500/20 rounded-2xl rounded-br-sm p-3 border border-indigo-500/15"
+                      >
+                        <div className="h-3 w-28 bg-indigo-300/20 rounded mb-1.5" />
+                        <div className="h-3 w-14 bg-indigo-300/20 rounded" />
+                        <div className="flex justify-end mt-1.5">
+                          <motion.span
+                            style={{
+                              color: useTransform(chatScrollProgress, [0.5, 0.7], ['#64748b', '#22c55e'])
+                            }}
+                            className="text-[9px] font-bold"
+                          >
+                            ✓✓
+                          </motion.span>
+                        </div>
+                      </motion.div>
+
+                      {/* Received Message */}
+                      <motion.div
+                        style={{ x: chatMsg4X, opacity: chatMsg4Opacity }}
+                        className="self-start max-w-[75%] bg-slate-700/40 rounded-2xl rounded-bl-sm p-3 border border-white/5"
+                      >
+                        <div className="h-3 w-40 bg-white/10 rounded mb-1.5" />
+                        <div className="h-3 w-20 bg-white/10 rounded" />
+                      </motion.div>
+
+                      {/* Sent Message (grey delivered tick) */}
+                      <motion.div
+                        style={{ x: chatMsg5X, opacity: chatMsg5Opacity }}
+                        className="self-end max-w-[75%] bg-indigo-500/20 rounded-2xl rounded-br-sm p-3 border border-indigo-500/15"
+                      >
+                        <div className="h-3 w-24 bg-indigo-300/20 rounded mb-1.5" />
+                        <div className="h-3 w-28 bg-indigo-300/20 rounded" />
+                        <div className="flex justify-end mt-1.5">
+                          <span className="text-[9px] text-slate-400 font-bold">✓</span>
+                        </div>
+                      </motion.div>
+
+                      {/* Typing Indicator */}
+                      <motion.div
+                        style={{ y: chatTypingY, opacity: chatTypingOpacity }}
+                        className="self-start flex items-center gap-1 bg-slate-700/40 rounded-full px-4 py-2.5 border border-white/5"
+                      >
+                        {[0, 1, 2].map(i => (
+                          <motion.div
+                            key={i}
+                            animate={{ y: [0, -5, 0] }}
+                            transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.18, ease: "easeInOut" }}
+                            className="w-2 h-2 rounded-full bg-slate-400"
+                          />
+                        ))}
+                      </motion.div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           </div>
         </section>
 
