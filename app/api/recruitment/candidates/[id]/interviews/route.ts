@@ -8,6 +8,8 @@ import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { isObjectId, jsonError, requireUserId, serializeDocs } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
+import { sendMail } from "@/lib/mailer";
+import { interviewScheduledEmail } from "@/lib/email-templates";
 
 type Params = { params: Promise<{ id: string }> };
 const ALL_ROLES = ["admin", "human-resource", "project-manager", "qa-tester", "finance"];
@@ -125,6 +127,37 @@ export async function POST(request: Request, { params }: Params) {
   const recUsers = await User.find({ company: user.company, role: { $in: ["admin", "human-resource", "project-manager", "qa-tester", "finance"] }, _id: { $ne: userId } });
   for (const ru of recUsers) {
     emitToUser(String(ru._id), "recruitment:update", { type: "interview-scheduled", candidateId: String(candidate._id) });
+  }
+
+  // Send email notifications
+  try {
+    const candidateName = `${candidate.firstName} ${candidate.lastName}`.trim();
+    const jobTitle = (candidate.job as any)?.title ?? "Position";
+
+    const interviewerUser = await User.findById(body.interviewer).select("name email");
+    if (interviewerUser?.email) {
+      const interviewerEmail = interviewScheduledEmail({
+        candidateName: candidateName,
+        jobTitle,
+        roundType: body.roundType || "screening",
+        scheduledAt: new Date(body.scheduledAt),
+        meetingLink: body.meetingLink,
+      });
+      await sendMail({ to: interviewerUser.email, subject: interviewerEmail.subject, text: "", html: interviewerEmail.html });
+    }
+
+    if (candidate.email) {
+      const candidateEmail = interviewScheduledEmail({
+        candidateName: candidateName,
+        jobTitle,
+        roundType: body.roundType || "screening",
+        scheduledAt: new Date(body.scheduledAt),
+        meetingLink: body.meetingLink,
+      });
+      await sendMail({ to: candidate.email, subject: candidateEmail.subject, text: "", html: candidateEmail.html });
+    }
+  } catch (emailErr) {
+    console.error("Failed to send interview email:", emailErr);
   }
 
   const populated = await ATSInterview.findById(interview._id)

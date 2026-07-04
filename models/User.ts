@@ -18,6 +18,7 @@ const UserSchema = new Schema(
       index: true,
     },
     emailVerified: { type: Boolean, default: false },
+    pendingEmail: { type: String, lowercase: true, trim: true, default: null },
     otpHash: { type: String, select: false },
     otpExpiresAt: { type: Date, default: null, select: false },
     passwordResetTokenHash: { type: String, select: false },
@@ -136,6 +137,9 @@ const UserSchema = new Schema(
       }
     ],
     lastOnline: { type: Date, default: null },
+    phone: { type: String, default: "", trim: true, maxlength: 20 },
+    dob: { type: Date, default: null },
+    address: { type: String, default: "", trim: true, maxlength: 500 },
   },
   { timestamps: true },
 );

@@ -55,6 +55,9 @@ export async function POST(request: Request, { params }: Params) {
     companyStatus: "pending",
     emailVerified: true,
     authProvider: "credentials",
+    phone: candidate.phone || "",
+    dob: candidate.dob || null,
+    address: candidate.address || "",
   });
 
   const loginUrl = `${process.env.NODE_ENV === "development" ? request.headers.get("origin") || (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000") : process.env.NEXT_PUBLIC_APP_URL}/login`;

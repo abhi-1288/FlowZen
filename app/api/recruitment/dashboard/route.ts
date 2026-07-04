@@ -78,8 +78,24 @@ export async function GET() {
     ]);
 
   const stageOrder = ["applied", "screening", "technical-interview", "manager-round", "hr-round", "offer", "joined", "rejected"];
-  const stageMap = new Map(candidatesByStage.map((s: any) => [s._id, s.count]));
+  const stageMap = new Map<string, number>(candidatesByStage.map((s: any) => [s._id, s.count as number]));
   const hiringFunnel = stageOrder.map((stage) => ({ stage, count: stageMap.get(stage) || 0 }));
+
+  const conversionFunnel: { from: string; to: string; fromCount: number; toCount: number; conversionRate: number; dropOffRate: number }[] = [];
+  const funnelStages = ["applied", "screening", "technical-interview", "manager-round", "hr-round", "offer", "joined"];
+  for (let i = 0; i < funnelStages.length - 1; i++) {
+    const from = funnelStages[i];
+    const to = funnelStages[i + 1];
+    const fromCount: number = stageMap.get(from) || 0;
+    const toCount: number = stageMap.get(to) || 0;
+    const conversionRate = fromCount > 0 ? Math.round((toCount / fromCount) * 100) : 0;
+    conversionFunnel.push({
+      from, to,
+      fromCount, toCount,
+      conversionRate,
+      dropOffRate: 100 - conversionRate,
+    });
+  }
 
   const sourcePerformance = candidatesBySource.map((s: any) => ({ source: s._id, count: s.count }));
 
@@ -122,6 +138,7 @@ export async function GET() {
     offersSent,
     offersAccepted,
     hiringFunnel,
+    conversionFunnel,
     sourcePerformance,
     userName: user.name || "there",
     totalJobs,

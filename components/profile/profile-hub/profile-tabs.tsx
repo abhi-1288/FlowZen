@@ -259,7 +259,8 @@ export function ProfileTab({
         <PersonalInfoSection profile={profile} session={session as { user?: { name?: string; email?: string } } | null} avatarUrl={avatarUrl} displayName={displayName}
           uploading={uploading} onAvatarDelete={() => setAvatarDeleteModal(true)}
           onAvatarFileSelect={(file) => setAvatarCropFile(file)}
-          effectiveRole={effectiveRole} displayRole={displayRole} />
+          effectiveRole={effectiveRole} displayRole={displayRole}
+          refresh={refresh} showToast={showToast} />
 
         <CompanyTeamSection profile={profile} company={company} team={team} inApprovedCompany={inApprovedCompany}
           role={role} identityRequesting={identityRequesting} insights={insights} onRequestIdentity={requestIdentityCode} />

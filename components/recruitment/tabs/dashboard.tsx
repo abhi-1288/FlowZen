@@ -131,21 +131,67 @@ export function DashboardTab() {
           <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
             <BarChart3 size={16} /> Hiring Funnel
           </h2>
-          <div className="mt-4 space-y-3">
-            {dashboard.hiringFunnel.map((item) => {
-              const pct = Math.round((item.count / maxFunnel) * 100);
-              return (
-                <div key={item.stage}>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-700">{STAGE_LABELS[item.stage as Stage]}</span>
-                    <span className="font-semibold text-slate-900">{item.count}</span>
+          <div className="mt-4 space-y-4">
+            {(dashboard as any).conversionFunnel && (dashboard as any).conversionFunnel.length > 0 ? (
+              (dashboard as any).conversionFunnel.map((pair: any, idx: number) => {
+                const maxWidth = Math.max(pair.fromCount, pair.toCount) || 1;
+                const fromPct = (pair.fromCount / maxWidth) * 100;
+                const toPct = (pair.toCount / maxWidth) * 100;
+                return (
+                  <div key={pair.from}>
+                    <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                      <span className="font-medium text-slate-700">{STAGE_LABELS[pair.from as Stage] || pair.from}</span>
+                      <ArrowRight size={12} className="text-slate-300" />
+                      <span className="font-medium text-slate-700">{STAGE_LABELS[pair.to as Stage] || pair.to}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span className="font-semibold text-slate-900">{pair.fromCount}</span>
+                          <span className="font-semibold text-slate-900">{pair.toCount}</span>
+                        </div>
+                        <div className="relative h-8">
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div
+                              className="h-3 rounded-sm bg-slate-200 transition-all"
+                              style={{ width: `${fromPct}%` }}
+                            />
+                          </div>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div
+                              className="h-3 rounded-sm bg-slate-950 transition-all"
+                              style={{ width: `${toPct}%`, marginLeft: `${(fromPct - toPct) / 2}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right min-w-[70px]">
+                        <p className="text-xs font-bold text-emerald-600">{pair.conversionRate}%</p>
+                        <p className="text-[10px] text-slate-400">{pair.dropOffRate}% drop</p>
+                      </div>
+                    </div>
+                    {idx < (dashboard as any).conversionFunnel.length - 1 && (
+                      <div className="mt-3 border-t border-dashed border-slate-100" />
+                    )}
                   </div>
-                  <div className="mt-1 h-2 w-full rounded-full bg-slate-100">
-                    <div className="h-2 rounded-full bg-slate-950 transition-all" style={{ width: `${pct}%` }} />
+                );
+              })
+            ) : (
+              dashboard.hiringFunnel.map((item) => {
+                const pct = Math.round((item.count / maxFunnel) * 100);
+                return (
+                  <div key={item.stage}>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-700">{STAGE_LABELS[item.stage as Stage]}</span>
+                      <span className="font-semibold text-slate-900">{item.count}</span>
+                    </div>
+                    <div className="mt-1 h-2 w-full rounded-full bg-slate-100">
+                      <div className="h-2 rounded-full bg-slate-950 transition-all" style={{ width: `${pct}%` }} />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
 

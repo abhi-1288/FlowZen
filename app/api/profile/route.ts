@@ -358,6 +358,20 @@ export async function PATCH(request: Request) {
   const newRole = String(body.role ?? "");
   const newPassword = String(body.newPassword ?? "");
 
+  // Update personal info fields (name, phone, dob, address — email is NOT allowed)
+  const personalFields: (keyof typeof body)[] = ["name", "phone", "dob", "address"];
+  let personalUpdated = false;
+  for (const field of personalFields) {
+    if (body[field] !== undefined) {
+      (user as any)[field] = body[field];
+      personalUpdated = true;
+    }
+  }
+  if (personalUpdated) {
+    await user.save();
+    return NextResponse.json({ ok: true });
+  }
+
   if (newRole && user.role === "others") {
     if (user.authProvider !== "credentials" && !user.emailVerified) {
       return jsonError("Please verify your email with OTP before setting a role.", 400);

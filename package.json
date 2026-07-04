@@ -25,6 +25,7 @@
     "next": "15",
     "next-auth": "4.24.11",
     "nodemailer": "6.9.16",
+    "pdf-parse": "^1.1.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-easy-crop": "^6.0.2",

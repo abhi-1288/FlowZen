@@ -198,11 +198,8 @@ export default function CandidateProfilePage() {
   async function handleSaveNote() {
     if (!noteText.trim()) return;
     await updateCandidate(id, {
-      notes:
-        activeCandidate!.notes +
-        "\n" +
-        `[${new Date().toLocaleDateString()}] ${noteText}`,
-    });
+      notes: { action: "add", content: noteText },
+    } as any);
     setNoteText("");
   }
 
@@ -918,11 +915,53 @@ export default function CandidateProfilePage() {
 
           {activeTab === "notes" && (
             <div>
-              {activeCandidate.notes && (
+              {Array.isArray(activeCandidate.notes) && activeCandidate.notes.length > 0 ? (
+                <div className="mb-4 space-y-3">
+                  {[...activeCandidate.notes].reverse().map((note: any, idx: number) => (
+                    <div key={note._id || idx} className="rounded-lg border border-slate-200 bg-white p-3">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-600">
+                            {(note.author?.name?.[0] || "U").toUpperCase()}
+                          </div>
+                          <span className="text-xs font-medium text-slate-700">
+                            {note.author?.name || "Unknown"}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {note.createdAt ? new Date(note.createdAt).toLocaleDateString("en-US", {
+                              month: "short", day: "numeric", year: "numeric",
+                              hour: "numeric", minute: "2-digit", hour12: true,
+                            }) : ""}
+                          </span>
+                        </div>
+                        {String(note.author?._id || note.author) === session?.user?.id && (
+                          <button
+                            onClick={async () => {
+                              if (!confirm("Delete this note?")) return;
+                              await apiFetch(`/api/recruitment/candidates/${id}`, {
+                                method: "PATCH",
+                                body: JSON.stringify({
+                                  notes: { action: "delete", noteId: note._id },
+                                }),
+                              });
+                              fetchCandidate(id);
+                            }}
+                            className="text-slate-400 hover:text-red-500 transition-colors"
+                            title="Delete note"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-sm text-slate-700 whitespace-pre-wrap">{note.content}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : typeof activeCandidate.notes === "string" && activeCandidate.notes ? (
                 <div className="mb-4 whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700">
                   {activeCandidate.notes}
                 </div>
-              )}
+              ) : null}
               <div className="flex gap-2">
                 <textarea
                   value={noteText}

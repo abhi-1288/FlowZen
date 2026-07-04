@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Search, Send, Users, Check } from "lucide-react";
+import { Search, Send, Users, Check, Info, X } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import { ActionButton, AnyRecord, formatRole, SectionHeader } from "../shared";
 
@@ -31,6 +31,7 @@ export function MessagesTab({
   // Search State
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [showInfoModal, setShowInfoModal] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
@@ -428,7 +429,7 @@ export function MessagesTab({
                     getInitials(String(selectedMember.name ?? "Member"))
                   )}
                 </div>
-                <div>
+                <div className="flex-1">
                   <h4 className="text-xs font-bold text-slate-900 capitalize">{String(selectedMember.name)}</h4>
                   <p className="text-[10px] text-slate-400">
                     {formatRole(String(selectedMember.role))} • {String(selectedMember.email)}
@@ -441,6 +442,13 @@ export function MessagesTab({
                     </p>
                   )}
                 </div>
+                <button
+                  onClick={() => setShowInfoModal(true)}
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                  title="User info"
+                >
+                  <Info size={15} />
+                </button>
               </div>
 
               {/* Chat Message History Scroll */}
@@ -547,6 +555,97 @@ export function MessagesTab({
               <p className="mt-1 text-xs text-slate-400 max-w-xs">
                 Select a teammate on the left to start a conversation, or use Bulk Message to announce something.
               </p>
+            </div>
+          )}
+
+          {/* User Info Modal */}
+          {showInfoModal && selectedMember && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowInfoModal(false)}>
+              <div
+                className="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => setShowInfoModal(false)}
+                  className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                >
+                  <X size={15} />
+                </button>
+
+                <div className="flex flex-col items-center text-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-200 font-semibold text-slate-700 text-lg">
+                    {(selectedMember as any).avatarUrl ? (
+                      <img
+                        src={String((selectedMember as any).avatarUrl)}
+                        alt={String((selectedMember as any).name)}
+                        className="h-full w-full rounded-full object-cover"
+                      />
+                    ) : (
+                      getInitials(String((selectedMember as any).name ?? "Member"))
+                    )}
+                  </div>
+                  <h3 className="mt-3 text-sm font-bold text-slate-900 capitalize">
+                    {String((selectedMember as any).name)}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {formatRole(String((selectedMember as any).role))}
+                  </p>
+                  {(selectedMember as any).isOnline ? (
+                    <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Online
+                    </span>
+                  ) : (
+                    <span className="mt-1 text-[10px] text-amber-600">
+                      Last online: {formatLastOnline((selectedMember as any).lastOnline)}
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-5 space-y-3 border-t border-slate-100 pt-4 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Email</span>
+                    <span className="font-medium text-slate-800">{String((selectedMember as any).email)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Phone</span>
+                    <span className="font-medium text-slate-800">
+                      {(selectedMember as any).phone || "—"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Date of Birth</span>
+                    <span className="font-medium text-slate-800">
+                      {(selectedMember as any).dob
+                        ? new Date((selectedMember as any).dob).toLocaleDateString("en-US", {
+                            month: "short", day: "numeric", year: "numeric",
+                          })
+                        : "—"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Employee ID</span>
+                    <span className="font-medium text-slate-800">
+                      {(selectedMember as any).companyIdentityCode || "—"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Team</span>
+                    <span className="font-medium text-slate-800">
+                      {((selectedMember as any).team as any)?.name || "—"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Joined</span>
+                    <span className="font-medium text-slate-800">
+                      {(selectedMember as any).companyJoined
+                        ? new Date((selectedMember as any).companyJoined).toLocaleDateString("en-US", {
+                            month: "short", day: "numeric", year: "numeric",
+                          })
+                        : "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>

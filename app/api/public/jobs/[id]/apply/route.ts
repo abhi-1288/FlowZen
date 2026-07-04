@@ -15,6 +15,7 @@ import { emitToUser } from "@/lib/socket-emit";
 import { createMagicLinkToken } from "@/lib/codes";
 import { sendMail } from "@/lib/mailer";
 import { autoCloseOverdueJobs } from "@/lib/recruitment-utils";
+import { parseResume } from "@/lib/resume-parser";
 
 export async function POST(
   request: Request,
@@ -48,12 +49,26 @@ export async function POST(
   if (!resumeFile || resumeFile.size === 0) return jsonError("Resume is required.", 400);
 
   let resumeUrl = "";
+  let parsedDob: string | null = null;
+  let parsedAddress: string | null = null;
   if (resumeFile && resumeFile.size > 0) {
     if (resumeFile.size > 20 * 1024 * 1024) return jsonError("Resume exceeds 20 MB limit.", 400);
     const ext = resumeFile.name.split(".").pop()?.toLowerCase() ?? "bin";
     const key = `${id}_${Date.now()}.${ext}`;
     const result = await saveDocument(resumeFile, key, "job-resumes");
     resumeUrl = result.url;
+
+    // Parse resume for additional fields (DOB, address)
+    if (ext === "pdf") {
+      try {
+        const buffer = Buffer.from(await resumeFile.arrayBuffer());
+        const parsed = await parseResume(buffer);
+        parsedDob = parsed.dob || null;
+        parsedAddress = parsed.address || null;
+      } catch (parseErr) {
+        console.error("Resume parsing error:", parseErr);
+      }
+    }
   }
 
   let referralEmployee: any = null;
@@ -87,7 +102,9 @@ export async function POST(
     linkedInUrl,
     source: referralEmployee ? "Referral" : "Company Website",
     stage: "applied",
-    notes,
+    notes: notes ? [{ content: notes, author: (job as any).createdBy }] : [],
+    dob: parsedDob ? new Date(parsedDob) : null,
+    address: parsedAddress || "",
     job: job._id,
     company: job.company,
   });

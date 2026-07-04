@@ -27,7 +27,7 @@ export async function GET() {
     companyStatus: "approved",
     _id: { $ne: user._id },
   })
-    .select("name email role teamStatus team activeTeams companyJoined companyIdentityCode avatarUrl lastOnline")
+    .select("name email role teamStatus team activeTeams companyJoined companyIdentityCode avatarUrl lastOnline phone dob")
     .populate({ path: "team", select: "name" })
     .populate({ path: "company", select: "name" });
 

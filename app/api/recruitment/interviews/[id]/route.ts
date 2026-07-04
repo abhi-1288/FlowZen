@@ -5,6 +5,9 @@ import { ATSTimeline } from "@/models/ATSTimeline";
 import { ATSAuditLog } from "@/models/ATSAuditLog";
 import { User } from "@/models/User";
 import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
+import { emitToUser } from "@/lib/socket-emit";
+import { sendMail } from "@/lib/mailer";
+import { interviewRescheduledEmail, interviewCancelledEmail } from "@/lib/email-templates";
 
 type Params = { params: Promise<{ id: string }> };
 const HR_ROLES = ["admin", "human-resource"];
@@ -37,7 +40,7 @@ export async function PATCH(request: Request, { params }: Params) {
     { new: true }
   )
     .populate("interviewer", "name email")
-    .populate("candidate", "firstName lastName")
+    .populate("candidate", "firstName lastName email")
     .populate("job", "title");
 
   if (!interview) return jsonError("Interview not found.", 404);
@@ -61,6 +64,34 @@ export async function PATCH(request: Request, { params }: Params) {
     metadata: { status: interview.status, roundType: interview.roundType },
     company: user.company,
   });
+
+  // Send email notifications
+  try {
+    const candidateName = `${(interview.candidate as any)?.firstName ?? ""} ${(interview.candidate as any)?.lastName ?? ""}`.trim();
+    const jobTitle = (interview.job as any)?.title ?? "Position";
+    const scheduledAt = interview.scheduledAt;
+    const meetingLink = interview.meetingLink || undefined;
+
+    if (wasCancelled) {
+      const candidateEmail = interviewCancelledEmail({ candidateName, jobTitle, roundType: interview.roundType });
+      if ((interview.candidate as any)?.email) {
+        await sendMail({ to: (interview.candidate as any).email, subject: candidateEmail.subject, text: "", html: candidateEmail.html });
+      }
+      if ((interview.interviewer as any)?.email) {
+        await sendMail({ to: (interview.interviewer as any).email, subject: candidateEmail.subject, text: "", html: candidateEmail.html });
+      }
+    } else if (wasRescheduled) {
+      const email = interviewRescheduledEmail({ candidateName, jobTitle, roundType: interview.roundType, scheduledAt, meetingLink });
+      if ((interview.candidate as any)?.email) {
+        await sendMail({ to: (interview.candidate as any).email, subject: email.subject, text: "", html: email.html });
+      }
+      if ((interview.interviewer as any)?.email) {
+        await sendMail({ to: (interview.interviewer as any).email, subject: email.subject, text: "", html: email.html });
+      }
+    }
+  } catch (emailErr) {
+    console.error("Failed to send interview email:", emailErr);
+  }
 
   return NextResponse.json({ interview: serializeDoc(interview) });
 }

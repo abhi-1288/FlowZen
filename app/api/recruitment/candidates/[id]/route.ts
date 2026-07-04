@@ -22,7 +22,8 @@ export async function GET(_request: Request, { params }: Params) {
   const candidate = await ATSCandidate.findOne({ _id: id, company: user.company })
     .populate("assignedRecruiter", "name email")
     .populate("assignedTeam.user", "name email")
-    .populate("job", "title department");
+    .populate("job", "title department")
+    .populate("notes.author", "name email");
 
   if (!candidate) return jsonError("Candidate not found.", 404);
 
@@ -38,8 +39,8 @@ export async function PATCH(request: Request, { params }: Params) {
   const body = await request.json();
   const allowedFields = [
     "firstName", "lastName", "email", "phone", "currentCompany", "experienceYears",
-    "currentCTC", "expectedCTC", "noticePeriod", "source", "rating", "notes",
-    "portfolioUrl", "linkedInUrl", "assignedRecruiter",
+    "currentCTC", "expectedCTC", "noticePeriod", "source", "rating",
+    "portfolioUrl", "linkedInUrl", "assignedRecruiter", "dob", "address",
   ];
   const updates: Record<string, unknown> = {};
   for (const field of allowedFields) {
@@ -51,13 +52,59 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
   if (!user.company) return jsonError("No company found.", 400);
 
+  // Handle structured notes
+  if (body.notes && typeof body.notes === "object") {
+    if (body.notes.action === "add") {
+      const updateResult = await ATSCandidate.findOneAndUpdate(
+        { _id: id, company: user.company },
+        { $push: { notes: { author: userId, content: String(body.notes.content).trim(), createdAt: new Date() } } },
+        { new: true }
+      )
+        .populate("assignedRecruiter", "name email")
+        .populate("job", "title");
+
+      if (!updateResult) return jsonError("Candidate not found.", 404);
+
+      await updateResult.populate("notes.author", "name email");
+
+      try {
+        const { ATSTimeline } = await import("@/models/ATSTimeline");
+        await ATSTimeline.create({
+          candidate: id,
+          job: updateResult.job,
+          action: "note-added",
+          metadata: { note: String(body.notes.content).trim().slice(0, 100) },
+          actor: userId,
+          company: user.company,
+        });
+      } catch { /* best-effort */ }
+
+      return NextResponse.json({ candidate: serializeDoc(updateResult) });
+    }
+
+    if (body.notes.action === "delete" && body.notes.noteId) {
+      const updateResult = await ATSCandidate.findOneAndUpdate(
+        { _id: id, company: user.company, "notes._id": body.notes.noteId, "notes.author": userId },
+        { $pull: { notes: { _id: body.notes.noteId } } },
+        { new: true }
+      )
+        .populate("assignedRecruiter", "name email")
+        .populate("job", "title");
+
+      if (!updateResult) return jsonError("Note not found or not authorized.", 404);
+
+      return NextResponse.json({ candidate: serializeDoc(updateResult) });
+    }
+  }
+
   const candidate = await ATSCandidate.findOneAndUpdate(
     { _id: id, company: user.company },
     { $set: updates },
     { new: true }
   )
     .populate("assignedRecruiter", "name email")
-    .populate("job", "title");
+    .populate("job", "title")
+    .populate("notes.author", "name email");
 
   if (!candidate) return jsonError("Candidate not found.", 404);
 
