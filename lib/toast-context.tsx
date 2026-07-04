@@ -7,6 +7,7 @@ type ToastItem = {
   id: number;
   title: string;
   body?: string;
+  time?: string;
 };
 
 type ToastContextType = {
@@ -30,7 +31,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const showNotificationToast = useCallback((title: string, body?: string) => {
     const id = Date.now() + Math.random();
-    setToasts((prev) => [...prev, { id, title, body }]);
+    const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    setToasts((prev) => [...prev, { id, title, body, time }]);
     setTimeout(() => removeToast(id), 5000);
   }, [removeToast]);
 
@@ -49,6 +51,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 <p className="text-sm font-semibold leading-tight text-white">{toast.title}</p>
                 {toast.body ? (
                   <p className="mt-1 text-xs text-slate-200 leading-relaxed line-clamp-2">{toast.body}</p>
+                ) : null}
+                {toast.time ? (
+                  <p className="mt-1.5 text-right text-[10px] text-slate-400 font-medium">{toast.time}</p>
                 ) : null}
               </div>
               <button

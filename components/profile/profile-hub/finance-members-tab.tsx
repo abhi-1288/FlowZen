@@ -324,7 +324,9 @@ export function FinanceMembersView({
                 const name = String(m.name ?? "").toLowerCase();
                 const email = String(m.email ?? "").toLowerCase();
                 const teams = Array.isArray(m.teams) ? m.teams.map(String).join(" ").toLowerCase() : "";
-                return name.includes(query) || email.includes(query) || teams.includes(query);
+                const code = String(m.companyIdentityCode ?? "").toLowerCase();
+                const codeNum = code.split("-").pop() ?? "";
+                return name.includes(query) || email.includes(query) || teams.includes(query) || code.includes(query) || codeNum.includes(query);
               })
             : membersState;
           if (filtered.length === 0) {

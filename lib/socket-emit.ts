@@ -7,6 +7,10 @@ export function emitToUser(userId: string, event: string, payload: any) {
   eventHub.emit(userId, event, payload);
 }
 
+export function isUserOnline(userId: string): boolean {
+  return eventHub.hasSubscriber(userId);
+}
+
 export function emitToBoard(board: any, event: string, payload: any) {
   if (!board?.members) return;
 

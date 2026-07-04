@@ -213,7 +213,7 @@ export async function GET() {
     const companyId = typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
     const [members, teams, companyPolicy] = await Promise.all([
       User.find({ company: companyId, companyStatus: "approved" })
-        .select("name email role customRole team teamStatus activeTeams membershipHistory companyJoined createdAt baseSalary pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted")
+        .select("name email role customRole team teamStatus activeTeams membershipHistory companyJoined createdAt baseSalary companyIdentityCode pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted")
         .populate("membershipHistory.inviter", "name role")
         .sort({ role: 1, name: 1 }),
       Team.find({ company: companyId }).select("name manager employees"),
@@ -268,6 +268,7 @@ export async function GET() {
           createdAt: member.createdAt,
           companyJoined: member.companyJoined,
           tdsDeductionAmount: Math.max(0, Number(member.tdsDeductionAmount ?? 0)),
+          companyIdentityCode: String(member.companyIdentityCode ?? ""),
           pfNumber: String(member.pfNumber ?? ""),
           pfDeductionAmount: Math.max(0, Number(member.pfDeductionAmount ?? 0)),
           esicNumber: String(member.esicNumber ?? ""),

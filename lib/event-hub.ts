@@ -37,6 +37,11 @@ class EventHub {
     }
   }
 
+  public hasSubscriber(userId: string): boolean {
+    const userClients = this.clients.get(userId);
+    return !!userClients && userClients.length > 0;
+  }
+
   public emit(userId: string, event: string, data: any) {
     const userClients = this.clients.get(userId);
     console.log(`EventHub: Emitting ${event} to user ${userId}. Clients found: ${userClients?.length ?? 0}`);

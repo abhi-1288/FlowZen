@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { ATSJob } from "@/models/ATSJob";
 import { serializeDoc } from "@/lib/api";
+import { autoCloseOverdueJobs } from "@/lib/recruitment-utils";
 
 export async function GET() {
   await connectDb();
+  await autoCloseOverdueJobs();
 
   const jobs = await ATSJob.find({ status: "open" })
     .populate("company", "name icon")

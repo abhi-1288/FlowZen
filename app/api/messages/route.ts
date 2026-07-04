@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
-import { databaseUnavailable, jsonError, requireUserId, serializeDocs } from "@/lib/api";
-import { Notification } from "@/models/Notification";
+import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { User } from "@/models/User";
-import { emitNotification } from "@/lib/realtime";
+import { Message } from "@/models/Message";
+import { emitToUser, isUserOnline } from "@/lib/socket-emit";
 
 export async function GET() {
   const userId = await requireUserId();
@@ -27,12 +27,54 @@ export async function GET() {
     companyStatus: "approved",
     _id: { $ne: user._id },
   })
-    .select("name email role teamStatus team activeTeams companyJoined")
+    .select("name email role teamStatus team activeTeams companyJoined companyIdentityCode avatarUrl lastOnline")
     .populate({ path: "team", select: "name" })
-    .populate({ path: "company", select: "name" })
-    .sort({ role: 1, name: 1 });
+    .populate({ path: "company", select: "name" });
 
-  return NextResponse.json({ members: serializeDocs(members) });
+  const enrichedMembers = await Promise.all(
+    members.map(async (m) => {
+      const memberId = String(m._id);
+      const unreadCount = await Message.countDocuments({
+        sender: memberId,
+        recipient: userId,
+        readAt: null,
+      });
+      const lastMessage = await Message.findOne({
+        $or: [
+          { sender: userId, recipient: memberId },
+          { sender: memberId, recipient: userId }
+        ]
+      })
+        .sort({ createdAt: -1 })
+        .select("message createdAt sender receivedAt readAt");
+
+      return {
+        ...m.toObject(),
+        unreadCount,
+        isOnline: isUserOnline(memberId),
+        lastMessage: lastMessage ? {
+          message: lastMessage.message,
+          createdAt: lastMessage.createdAt,
+          sender: String(lastMessage.sender),
+          receivedAt: lastMessage.receivedAt,
+          readAt: lastMessage.readAt,
+        } : null
+      };
+    })
+  );
+
+  enrichedMembers.sort((a, b) => {
+    const timeA = a.lastMessage ? new Date(a.lastMessage.createdAt).getTime() : 0;
+    const timeB = b.lastMessage ? new Date(b.lastMessage.createdAt).getTime() : 0;
+    if (timeA || timeB) {
+      return timeB - timeA;
+    }
+    const roleCompare = String(a.role || "").localeCompare(String(b.role || ""));
+    if (roleCompare !== 0) return roleCompare;
+    return String(a.name || "").localeCompare(String(b.name || ""));
+  });
+
+  return NextResponse.json({ members: enrichedMembers.map((m: any) => ({ ...m, id: String(m._id), _id: undefined, __v: undefined })) });
 }
 
 export async function POST(request: Request) {
@@ -66,15 +108,27 @@ export async function POST(request: Request) {
     return jsonError("You can only message approved members in your company.", 403);
   }
 
-  await Notification.create({
-    user: recipient._id,
+  const newMessage = await Message.create({
+    sender: sender._id,
+    recipient: recipient._id,
     company: sender.company,
-    type: "info",
-    title: `Message from ${sender.name}`,
     message,
-    body: `${sender.name}: ${message}`,
   });
-  emitNotification(String(recipient._id));
+
+  // If recipient is online, mark as received immediately
+  if (isUserOnline(String(recipient._id))) {
+    newMessage.receivedAt = new Date();
+    await newMessage.save();
+  }
+
+  // Emit real-time message event via SSE to recipient
+  emitToUser(String(recipient._id), "message:new", {
+    senderId: String(sender._id),
+    senderName: sender.name,
+    message,
+    createdAt: newMessage.createdAt,
+    receivedAt: newMessage.receivedAt,
+  });
 
   return NextResponse.json({ ok: true });
 }

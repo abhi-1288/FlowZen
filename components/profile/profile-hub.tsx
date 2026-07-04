@@ -52,6 +52,7 @@ type ProfileHubCache = {
   checkOutRequestCount: number;
   jobsCount: number;
   recruitmentCount: number;
+  messagesCount: number;
   fetchedAt: number;
 };
 
@@ -139,6 +140,7 @@ export function ProfileHub() {
   const [checkOutRequestCount, setCheckOutRequestCount] = useState(0);
   const [jobsCount, setJobsCount] = useState(0);
   const [recruitmentCount, setRecruitmentCount] = useState(0);
+  const [messagesCount, setMessagesCount] = useState(0);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
@@ -158,6 +160,7 @@ export function ProfileHub() {
     setCheckOutRequestCount(profileHubCache.checkOutRequestCount);
     setJobsCount(profileHubCache.jobsCount);
     setRecruitmentCount(profileHubCache.recruitmentCount);
+    setMessagesCount(profileHubCache.messagesCount ?? 0);
     setLoading(false);
   }, []);
 
@@ -230,6 +233,7 @@ export function ProfileHub() {
         setFinanceCount(cached.financeCount);
         setCheckOutRequestCount(cached.checkOutRequestCount);
         setJobsCount(cached.jobsCount);
+        setMessagesCount(cached.messagesCount ?? 0);
         setLoading(false);
         void load(true);
         return;
@@ -321,6 +325,15 @@ export function ProfileHub() {
         }
       }
 
+      let nextMessagesCount = messagesCount;
+      if (actualHasCompany) {
+        const msgRes = await apiFetch<{ unreadCount: number }>("/api/messages/unread-count").catch(() => null);
+        if (msgRes) {
+          nextMessagesCount = msgRes.unreadCount;
+          setMessagesCount(nextMessagesCount);
+        }
+      }
+
       profileHubCache = {
         profile: nextProfile,
         insights: nextInsights,
@@ -333,6 +346,7 @@ export function ProfileHub() {
         checkOutRequestCount: nextCheckOutRequestCount,
         jobsCount: nextJobsCount,
         recruitmentCount: nextRecruitmentCount,
+        messagesCount: nextMessagesCount,
         fetchedAt: Date.now(),
       };
     } finally {
@@ -416,6 +430,51 @@ export function ProfileHub() {
             silentLoadThrottleRef.current = now;
             void load(true);
           }
+        });
+
+        eventSource.addEventListener("message:new", (e: MessageEvent) => {
+          if (!mounted) return;
+          console.log("SSE: ProfileHub message:new received");
+          if (notificationSndRef.current) {
+            notificationSndRef.current.currentTime = 0;
+            notificationSndRef.current.play().catch(() => {});
+          } else {
+            new Audio("/sound/notification_sound.mp3").play().catch((err) => console.warn("Notification sound unavailable:", err));
+          }
+          try {
+            const data = JSON.parse(e.data);
+            showNotificationToast(`Message from ${data.senderName}`, data.message);
+          } catch (err) {
+            showNotificationToast("New Message", "You have received a new message.");
+          }
+          apiFetch<{ unreadCount: number }>("/api/messages/unread-count")
+            .then((res) => {
+              if (mounted) setMessagesCount(res.unreadCount);
+            })
+            .catch(() => {});
+          window.dispatchEvent(new CustomEvent("messages:refresh"));
+        });
+
+        eventSource.addEventListener("message:received", () => {
+          if (!mounted) return;
+          console.log("SSE: ProfileHub message:received received");
+          window.dispatchEvent(new CustomEvent("messages:refresh"));
+        });
+
+        eventSource.addEventListener("message:read", () => {
+          if (!mounted) return;
+          console.log("SSE: ProfileHub message:read received");
+          window.dispatchEvent(new CustomEvent("messages:refresh"));
+        });
+
+        eventSource.addEventListener("user:online", () => {
+          if (!mounted) return;
+          window.dispatchEvent(new CustomEvent("messages:refresh"));
+        });
+
+        eventSource.addEventListener("user:offline", () => {
+          if (!mounted) return;
+          window.dispatchEvent(new CustomEvent("messages:refresh"));
         });
 
         eventSource.onerror = () => {
@@ -653,7 +712,7 @@ export function ProfileHub() {
             <NavButton
               active={tab === "messages"}
               icon={<MessageSquare size={16} />}
-              label="Messages"
+              label={`Messages${messagesCount ? ` (${messagesCount})` : ""}`}
               onClick={() => setTab("messages")}
             />
           ) : null}
@@ -771,7 +830,9 @@ export function ProfileHub() {
                           ? `Notifications (${unreadCount})`
                           : item === "careers" && jobsCount > 0
                             ? `Careers (${jobsCount})`
-                            : item.charAt(0).toUpperCase() + item.slice(1);
+                            : item === "messages" && messagesCount > 0
+                              ? `Messages (${messagesCount})`
+                              : item.charAt(0).toUpperCase() + item.slice(1);
 
               return (
                 <button

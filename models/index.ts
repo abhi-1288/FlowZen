@@ -24,6 +24,7 @@ export * from "./ResourceRequest";
 export * from "./Task";
 export * from "./Team";
 export * from "./User";
+export * from "./Message";
 
 // Importing the files above has the side-effect of registering mongoose models
 // with `mongoose.models`. Consumers can import from this module to ensure

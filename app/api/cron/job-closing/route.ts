@@ -4,6 +4,7 @@ import { ATSJob } from "@/models/ATSJob";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitToUser } from "@/lib/socket-emit";
+import { autoCloseOverdueJobs } from "@/lib/recruitment-utils";
 
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
@@ -13,17 +14,21 @@ export async function GET(request: Request) {
 
   await connectDb();
 
+  // Auto-close overdue jobs (also sends detailed notifications)
+  const autoClosed = await autoCloseOverdueJobs();
+
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date();
   todayEnd.setHours(23, 59, 59, 999);
 
+  const results: { jobId: string; notified: string[] }[] = [];
+
+  // Notify about jobs closing today
   const closingJobs = await ATSJob.find({
     status: "open",
     autoCloseDate: { $gte: todayStart, $lte: todayEnd },
   }).populate("company", "name");
-
-  const results: { jobId: string; notified: string[] }[] = [];
 
   for (const job of closingJobs) {
     const hrAndAdmin = await User.find({
@@ -53,6 +58,7 @@ export async function GET(request: Request) {
       emitToUser(String(u._id), "notification:new", {
         message: `${job.title} closes today.`,
       });
+      emitToUser(String(u._id), "recruitment:update", {});
 
       notified.push(String(u._id));
     }
@@ -60,5 +66,10 @@ export async function GET(request: Request) {
     results.push({ jobId: String(job._id), notified });
   }
 
-  return NextResponse.json({ ok: true, processed: results.length, results });
+  return NextResponse.json({
+    ok: true,
+    autoClosed,
+    closingToday: results.length,
+    results,
+  });
 }

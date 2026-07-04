@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
+import { Search, Send, Users, Check } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import { ActionButton, AnyRecord, formatRole, SectionHeader } from "../shared";
 
@@ -8,207 +9,549 @@ export function MessagesTab({
 }: {
   showToast: (text: string, type?: "success" | "error") => void;
 }) {
+  const { data: session } = useSession();
+  const currentUserId = session?.user?.id;
+
   const [members, setMembers] = useState<AnyRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<"normal" | "bulk">("normal");
-  const [chatMember, setChatMember] = useState<AnyRecord | null>(null);
+  
+  // Normal Chat State
+  const [selectedMember, setSelectedMember] = useState<AnyRecord | null>(null);
+  const [conversation, setConversation] = useState<AnyRecord[]>([]);
+  const [loadingChat, setLoadingChat] = useState(false);
   const [chatMessage, setChatMessage] = useState("");
   const [sendingChat, setSendingChat] = useState(false);
+  
+  // Bulk Message State
   const [bulkMessage, setBulkMessage] = useState("");
   const [bulkSelected, setBulkSelected] = useState<Record<string, boolean>>({});
   const [sendingBulk, setSendingBulk] = useState(false);
-  const [messageSearchQuery, setMessageSearchQuery] = useState("");
-  const [messageSearchInput, setMessageSearchInput] = useState("");
+  
+  // Search State
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement | null>(null);
+
+  function formatLastOnline(date: Date | string | null | undefined): string {
+    if (!date) return "";
+    const d = new Date(date);
+    return d.toLocaleString("en-US", {
+      month: "short", day: "numeric",
+      hour: "numeric", minute: "2-digit", hour12: true
+    });
+  }
+
+  // Fetch company members
+  async function fetchMembers() {
+    try {
+      const result = await apiFetch<{ members: AnyRecord[] }>("/api/messages");
+      setMembers(result.members ?? []);
+    } catch {
+      setMembers([]);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    let mounted = true;
-    apiFetch<{ members: AnyRecord[] }>("/api/messages")
-      .then((result) => { if (mounted) setMembers(result.members ?? []); })
-      .catch(() => { if (mounted) setMembers([]); })
-      .finally(() => { if (mounted) setLoading(false); });
-    return () => { mounted = false; };
+    fetchMembers();
   }, []);
 
+  // Listen to realtime refresh event
   useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      setChatMember(null);
+    function onRefresh() {
+      fetchMembers();
+      if (selectedMember) {
+        const memberId = String(selectedMember.id ?? selectedMember._id ?? "");
+        fetchConversation(memberId, false);
+      }
     }
-    if (!chatMember) return;
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [chatMember]);
+    window.addEventListener("messages:refresh", onRefresh);
+    return () => window.removeEventListener("messages:refresh", onRefresh);
+  }, [selectedMember]);
 
-  const membersById = useMemo(() => {
-    const map = new Map<string, AnyRecord>();
-    members.forEach((m) => { const id = String(m.id ?? m._id ?? ""); if (id) map.set(id, m); });
-    return map;
-  }, [members]);
+  // Fetch conversation with selected user
+  async function fetchConversation(recipientId: string, showLoading = true) {
+    if (!recipientId) return;
+    if (showLoading) setLoadingChat(true);
+    try {
+      const result = await apiFetch<{ messages: AnyRecord[] }>(`/api/messages/conversation?recipientId=${recipientId}`);
+      setConversation(result.messages ?? []);
+      
+      // If we mark messages as read, reload members count in background to update badges
+      if (showLoading) {
+        fetchMembers();
+      }
+    } catch {
+      setConversation([]);
+    } finally {
+      if (showLoading) setLoadingChat(false);
+    }
+  }
 
-  const bulkSelectedIds = useMemo(() => {
-    return Object.keys(bulkSelected).filter((id) => bulkSelected[id] && membersById.has(id));
-  }, [bulkSelected, membersById]);
+  // Effect to load conversation when selected member changes
+  useEffect(() => {
+    if (selectedMember) {
+      const memberId = String(selectedMember.id ?? selectedMember._id ?? "");
+      fetchConversation(memberId, true);
+    } else {
+      setConversation([]);
+    }
+  }, [selectedMember]);
+
+  // Scroll to bottom on conversation update
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [conversation]);
+
+  const filteredMembers = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return members;
+    return members.filter((m) => {
+      const name = String(m.name ?? "").toLowerCase();
+      const email = String(m.email ?? "").toLowerCase();
+      const role = String(m.role ?? "").toLowerCase();
+      const code = String(m.companyIdentityCode ?? "").toLowerCase();
+      return name.includes(query) || email.includes(query) || role.includes(query) || code.includes(query);
+    });
+  }, [members, searchQuery]);
 
   function toggleBulkSelected(memberId: string) {
     setBulkSelected((current) => ({ ...current, [memberId]: !current[memberId] }));
   }
 
-  async function sendChat() {
-    const recipientId = String(chatMember?.id ?? chatMember?._id ?? "");
-    const message = String(chatMessage ?? "").trim();
-    if (!recipientId) return;
-    if (!message) { showToast("Write a message first.", "error"); return; }
+  const selectedBulkIds = useMemo(() => {
+    return Object.keys(bulkSelected).filter((id) => bulkSelected[id]);
+  }, [bulkSelected]);
+
+  async function handleSendChat() {
+    const recipientId = String(selectedMember?.id ?? selectedMember?._id ?? "");
+    const text = chatMessage.trim();
+    if (!recipientId || !text) return;
     try {
       setSendingChat(true);
-      await apiFetch("/api/messages", { method: "POST", body: JSON.stringify({ recipientId, message }) });
-      setChatMessage(""); setChatMember(null); showToast("Message sent.");
+      await apiFetch("/api/messages", {
+        method: "POST",
+        body: JSON.stringify({ recipientId, message: text }),
+      });
+      setChatMessage("");
+      // Fetch immediate history update
+      await fetchConversation(recipientId, false);
+      // Refresh member list to show latest message preview
+      fetchMembers();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Unable to send message.", "error");
-    } finally { setSendingChat(false); }
+    } finally {
+      setSendingChat(false);
+    }
   }
 
-  async function sendBulk() {
-    const message = String(bulkMessage ?? "").trim();
-    if (!message) { showToast("Write a message first.", "error"); return; }
-    if (bulkSelectedIds.length === 0) { showToast("Select at least one user.", "error"); return; }
+  async function handleSendBulk() {
+    const text = bulkMessage.trim();
+    if (!text) {
+      showToast("Write a message first.", "error");
+      return;
+    }
+    if (selectedBulkIds.length === 0) {
+      showToast("Select at least one user.", "error");
+      return;
+    }
     try {
       setSendingBulk(true);
-      await Promise.all(bulkSelectedIds.map((recipientId) => apiFetch("/api/messages", { method: "POST", body: JSON.stringify({ recipientId, message }) })));
-      setBulkMessage(""); setBulkSelected({}); showToast(`Message sent to ${bulkSelectedIds.length} user(s).`);
+      await Promise.all(
+        selectedBulkIds.map((recipientId) =>
+          apiFetch("/api/messages", {
+            method: "POST",
+            body: JSON.stringify({ recipientId, message: text }),
+          })
+        )
+      );
+      setBulkMessage("");
+      setBulkSelected({});
+      showToast(`Bulk message sent to ${selectedBulkIds.length} user(s).`);
+      fetchMembers();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Unable to send bulk message.", "error");
-    } finally { setSendingBulk(false); }
+    } finally {
+      setSendingBulk(false);
+    }
   }
 
+  const getMessageDateLabel = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+    if (d.toDateString() === today.toDateString()) return "Today";
+    if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
-      <SectionHeader title="Messages" description="Send messages to your team or the entire company." accent="sky" />
-      <div className="mb-4">
-        <span className="rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 ring-1 ring-slate-100">{members.length} members</span>
-      </div>
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md">
+      <SectionHeader title="Messages" description="Real-time company chat and announcements." accent="sky" />
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
-          <button className={`rounded-md px-3 py-1.5 text-sm font-medium ${mode === "normal" ? "bg-slate-950 text-white" : "text-slate-700 hover:bg-slate-50"}`} type="button" onClick={() => setMode("normal")}>Normal messages</button>
-          <button className={`rounded-md px-3 py-1.5 text-sm font-medium ${mode === "bulk" ? "bg-slate-950 text-white" : "text-slate-700 hover:bg-slate-50"}`} type="button" onClick={() => setMode("bulk")}>Bulk messages</button>
-        </div>
-        {mode === "bulk" ? (
-          <div className="flex items-center gap-2 text-sm text-slate-600">
-            <span className="rounded-lg bg-slate-50 px-3 py-2">Selected: <span className="font-semibold text-slate-900">{bulkSelectedIds.length}</span></span>
-            <ActionButton variant="secondary" className="px-3" disabled={bulkSelectedIds.length === 0} type="button" onClick={() => setBulkSelected({})}>Clear</ActionButton>
-          </div>
-        ) : null}
-      </div>
-
-      {mode === "bulk" ? (
-        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-          <p className="text-sm font-semibold text-slate-900">Bulk message</p>
-          <p className="mt-1 text-sm text-slate-500">Write one message, then click users below to send.</p>
-          <textarea className="mt-3 min-h-28 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="Type your bulk message…" value={bulkMessage} onChange={(e) => setBulkMessage(e.target.value)} />
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-slate-500">Tip: click user cards to select/unselect.</p>
-            <ActionButton variant="primary" disabled={sendingBulk || bulkSelectedIds.length === 0 || String(bulkMessage ?? "").trim().length === 0} type="button" onClick={() => void sendBulk()}>
-              {sendingBulk ? "Sending…" : "Send to selected"}
-            </ActionButton>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="mt-5 flex gap-2">
-        <input value={messageSearchInput} onChange={(e) => setMessageSearchInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") setMessageSearchQuery(messageSearchInput.trim()); }}
-          placeholder="Search members by name, email, or role..." className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-950 focus:ring-0" />
-        <button onClick={() => setMessageSearchQuery(messageSearchInput.trim())} className="rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800">Search</button>
-      </div>
-
-      <div className="mt-4 space-y-3">
-        {(() => {
-          const query = messageSearchQuery.toLowerCase().trim();
-          const filtered = query ? members.filter((m) => {
-            const name = String(m.name ?? "").toLowerCase();
-            const email = String(m.email ?? "").toLowerCase();
-            const role = String(m.role ?? "").toLowerCase();
-            return name.includes(query) || email.includes(query) || role.includes(query);
-          }) : members;
-          if (filtered.length === 0) {
-            return <p className="py-8 text-center text-sm text-slate-500 bg-slate-50 rounded-xl border border-slate-100">No members match your search.</p>;
-          }
-          return filtered.map((member) => {
-            const memberId = String(member.id ?? member._id ?? "");
-            const name = String(member.name ?? "Member");
-            const roleRaw = String(member.role ?? "employee");
-            const role = formatRole(roleRaw);
-            const email = String(member.email ?? "");
-            const isHighProfile = ["admin", "human-resource", "finance"].includes(roleRaw);
-            const joinDateStr = member.companyJoined ? new Date(String(member.companyJoined)).toLocaleDateString() : member.createdAt ? new Date(String(member.createdAt)).toLocaleDateString() : null;
-            let label: string;
-            if (isHighProfile) {
-              const companyName = member.company && typeof member.company === "object" ? String((member.company as AnyRecord).name ?? "") : "";
-              label = companyName || "No company";
-            } else {
-              const teamObj = member.team && typeof member.team === "object" ? member.team : null;
-              label = teamObj && (teamObj as AnyRecord).name ? String((teamObj as AnyRecord).name) : Array.isArray(member.teams) && member.teams.length ? member.teams.map(String).join(", ") : "No team joined";
-            }
-            const isSelected = !!bulkSelected[memberId];
-
-            return (
-              <button className={`w-full rounded-xl border p-4 text-left transition-all duration-200 ${mode === "bulk" ? isSelected ? "border-slate-900 bg-slate-950 text-white shadow-md" : "border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-slate-300" : "border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-slate-300"}`}
-                key={memberId} type="button"
-                onClick={() => { if (mode === "bulk") { toggleBulkSelected(memberId); } else { setChatMember(member); setChatMessage(""); } }}
+      {/* Main chat window split grid */}
+      <div className="mt-6 grid grid-cols-1 overflow-hidden rounded-2xl border border-slate-200 lg:grid-cols-12" style={{ height: "650px" }}>
+        
+        {/* Left Side Pane (Members / Channels) */}
+        <div className="flex flex-col border-r border-slate-200 bg-slate-50 lg:col-span-4">
+          
+          {/* Header Action Mode Switchers */}
+          <div className="border-b border-slate-200 bg-white p-4">
+            <div className="flex rounded-lg bg-slate-100 p-1">
+              <button
+                className={`flex-1 rounded-md py-2 text-center text-xs font-semibold transition-all ${
+                  mode === "normal" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                }`}
+                onClick={() => {
+                  setMode("normal");
+                  setSelectedMember(null);
+                }}
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className={`font-semibold ${mode === "bulk" && isSelected ? "text-white" : "text-slate-900"}`}>{name}</p>
-                    <p className={`text-sm ${mode === "bulk" && isSelected ? "text-white/70" : "text-slate-500"}`}>{email}</p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${mode === "bulk" && isSelected ? "bg-white/10 text-white" : "bg-slate-100 text-slate-700"}`}>{role}</span>
-                    <span className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${mode === "bulk" && isSelected ? "border-white/20 bg-white/10 text-white" : "border-slate-200 bg-white text-slate-700"}`} title={isHighProfile ? label : `Team: ${label}`}>
-                      {isHighProfile ? `Company: ${label}` : `Team: ${label}`}{joinDateStr ? ` · ${joinDateStr}` : ""}
-                    </span>
-                    {mode === "normal" ? (
-                      <span className="inline-flex items-center rounded-lg bg-slate-950 px-3 py-2 text-xs font-semibold text-white">Chat</span>
-                    ) : (
-                      <span className={`inline-flex items-center rounded-lg px-3 py-2 text-xs font-semibold ${isSelected ? "bg-white text-slate-950" : "bg-slate-950 text-white"}`}>{isSelected ? "Selected" : "Select"}</span>
-                    )}
-                  </div>
-                </div>
+                Messages
               </button>
-            );
-          });
-        })()}
-
-        {!loading && messageSearchQuery === "" && members.length === 0 ? (
-          <p className="rounded-lg bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">No other approved company members yet.</p>
-        ) : null}
-        {loading ? (
-          <p className="rounded-lg bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">Loading company members...</p>
-        ) : null}
-      </div>
-
-      {chatMember ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation"
-          onClick={(e) => { if (e.target === e.currentTarget) setChatMember(null); }}
-        >
-          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="chat-modal-title">
-            <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
-              <div>
-                <h4 className="text-lg font-semibold" id="chat-modal-title">Chat</h4>
-                <p className="text-sm text-slate-500">To <span className="font-medium text-slate-900">{String(chatMember.name ?? "Member")}</span> • {formatRole(String(chatMember.role ?? "employee"))}</p>
-              </div>
-              <ActionButton aria-label="Close" variant="ghost" className="h-9 w-9" type="button" onClick={() => setChatMember(null)}><X size={18} /></ActionButton>
+              <button
+                className={`flex-1 rounded-md py-2 text-center text-xs font-semibold transition-all ${
+                  mode === "bulk" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                }`}
+                onClick={() => {
+                  setMode("bulk");
+                  setSelectedMember(null);
+                }}
+              >
+                Bulk Message
+              </button>
             </div>
-            <div className="px-5 py-4">
-              <textarea className="min-h-32 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Type your message…" value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} />
-              <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-                <ActionButton variant="secondary" type="button" onClick={() => setChatMember(null)}>Cancel</ActionButton>
-                <ActionButton variant="primary" disabled={sendingChat || String(chatMessage ?? "").trim().length === 0} type="button" onClick={() => void sendChat()}>
-                  {sendingChat ? "Sending…" : "Send"}
+
+            {/* Search Input Box */}
+            <div className="mt-3 flex gap-2">
+              <div className="relative flex-1">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search members..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") setSearchQuery(searchInput);
+                  }}
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-3 py-2 text-xs outline-none transition focus:border-slate-400 focus:bg-white"
+                />
+              </div>
+              <button
+                onClick={() => setSearchQuery(searchInput)}
+                className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+              >
+                Go
+              </button>
+            </div>
+          </div>
+
+          {/* Members Scroll List */}
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            {loading ? (
+              <div className="py-8 text-center text-xs text-slate-400">Loading members...</div>
+            ) : filteredMembers.length === 0 ? (
+              <div className="py-8 text-center text-xs text-slate-400">No members found.</div>
+            ) : (
+              filteredMembers.map((member) => {
+                const memberId = String(member.id ?? member._id ?? "");
+                const name = String(member.name ?? "Member");
+                const role = formatRole(String(member.role ?? "employee"));
+                const isSelected = mode === "normal" ? selectedMember?.id === memberId || selectedMember?._id === memberId : !!bulkSelected[memberId];
+                
+                // unread message badge count
+                const unread = Number(member.unreadCount ?? 0);
+                
+                return (
+                  <button
+                    key={memberId}
+                    onClick={() => {
+                      if (mode === "bulk") {
+                        toggleBulkSelected(memberId);
+                      } else {
+                        setSelectedMember(member);
+                      }
+                    }}
+                    className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition-all ${
+                      isSelected
+                        ? mode === "bulk"
+                          ? "bg-slate-900 text-white"
+                          : "bg-white text-slate-950 shadow-sm ring-1 ring-slate-100"
+                        : "hover:bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    {/* Avatar Initials / Image */}
+                    <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 font-semibold text-slate-700 text-xs">
+                      {member.avatarUrl ? (
+                        <img
+                          src={String(member.avatarUrl)}
+                          alt={name}
+                          className="h-full w-full rounded-full object-cover"
+                        />
+                      ) : (
+                        getInitials(name)
+                      )}
+                      
+                      {/* Online indicator */}
+                      {(member as any).isOnline && (
+                        <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500"></span>
+                      )}
+
+                      {/* Bulk mode selection indicator */}
+                      {mode === "bulk" && isSelected && (
+                        <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white">
+                          <Check size={10} strokeWidth={3} />
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <p className={`truncate text-xs font-semibold ${isSelected && mode === "bulk" ? "text-white" : "text-slate-900"}`}>
+                          {name}
+                        </p>
+                        {/* Unread badge count next to username */}
+                        {unread > 0 && mode === "normal" && (
+                          <span className="ml-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-sky-500 px-1 text-[10px] font-bold text-white">
+                            {unread}
+                          </span>
+                        )}
+                      </div>
+                      <p className={`truncate text-[10px] ${isSelected && mode === "bulk" ? "text-slate-300" : "text-slate-400"}`}>
+                        {role}
+                      </p>
+                      {/* Last message preview */}
+                      {mode === "normal" && !!(member.lastMessage as any) && (
+                          <p className={`mt-0.5 truncate text-[10px] ${isSelected ? "text-slate-600" : "text-slate-400"}`}>
+                            {(member.lastMessage as any).sender === currentUserId ? (
+                              <>
+                                {(member.lastMessage as any).readAt ? (
+                                  <span className="text-emerald-500 mr-0.5">✓✓</span>
+                                ) : (member.lastMessage as any).receivedAt ? (
+                                  <span className="text-slate-400 mr-0.5">✓✓</span>
+                                ) : (
+                                  <span className="text-slate-400 mr-0.5">✓</span>
+                                )}
+                                You:{" "}
+                              </>
+                            ) : ""}
+                            {(member.lastMessage as any).message}
+                          </p>
+                      )}
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Right Side Chat Conversation Area */}
+        <div className="flex flex-col bg-white lg:col-span-8">
+          {mode === "bulk" ? (
+            /* Bulk message writing panel */
+            <div className="flex flex-col h-full p-6">
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  <Users size={16} className="text-slate-500" />
+                  Bulk Announcement
+                </h3>
+                <p className="mt-1 text-xs text-slate-400">
+                  Select users on the left pane and write a message below. It will send individual messages to each user.
+                </p>
+
+                <div className="mt-4 flex flex-wrap gap-1.5 max-h-40 overflow-y-auto border border-slate-100 rounded-lg p-2 bg-slate-50">
+                  {selectedBulkIds.length === 0 ? (
+                    <span className="text-[11px] text-slate-400 italic">No users selected. Click users on the sidebar to add them.</span>
+                  ) : (
+                    selectedBulkIds.map((id) => {
+                      const memberObj = members.find((m) => String(m.id ?? m._id) === id);
+                      if (!memberObj) return null;
+                      return (
+                        <span key={id} className="inline-flex items-center gap-1 rounded bg-slate-200 px-2 py-1 text-[10px] font-medium text-slate-700">
+                          {String(memberObj.name)}
+                          <button onClick={() => toggleBulkSelected(id)} className="hover:text-red-500 font-bold ml-1 text-slate-400">×</button>
+                        </span>
+                      );
+                    })
+                  )}
+                </div>
+
+                <textarea
+                  placeholder="Type here your bulk messages..."
+                  value={bulkMessage}
+                  onChange={(e) => setBulkMessage(e.target.value)}
+                  className="mt-4 h-48 w-full rounded-xl border border-slate-200 p-3 text-xs outline-none focus:border-slate-400 resize-none"
+                />
+              </div>
+
+              <div className="mt-4 flex justify-end">
+                <ActionButton
+                  variant="primary"
+                  disabled={sendingBulk || selectedBulkIds.length === 0 || !bulkMessage.trim()}
+                  onClick={handleSendBulk}
+                >
+                  {sendingBulk ? "Sending..." : `Send to ${selectedBulkIds.length} users`}
                 </ActionButton>
               </div>
             </div>
-          </div>
+          ) : selectedMember ? (
+            /* Active Conversation View */
+            <div className="flex flex-col h-full overflow-hidden">
+              
+              {/* Active User Header */}
+              <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 font-semibold text-slate-700 text-xs">
+                  {selectedMember.avatarUrl ? (
+                    <img
+                      src={String(selectedMember.avatarUrl)}
+                      alt={String(selectedMember.name)}
+                      className="h-full w-full rounded-full object-cover"
+                    />
+                  ) : (
+                    getInitials(String(selectedMember.name ?? "Member"))
+                  )}
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900 capitalize">{String(selectedMember.name)}</h4>
+                  <p className="text-[10px] text-slate-400">
+                    {formatRole(String(selectedMember.role))} • {String(selectedMember.email)}
+                  </p>
+                  {(selectedMember as any).isOnline ? (
+                    <p className="text-[10px] font-medium text-emerald-600 mt-0.5">Online</p>
+                  ) : (
+                    <p className="text-[10px] text-amber-600 mt-0.5">
+                      Last online: {formatLastOnline((selectedMember as any).lastOnline)}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Chat Message History Scroll */}
+              <div
+                ref={chatContainerRef}
+                className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50 scrollbar-thin"
+              >
+                {loadingChat ? (
+                  <div className="py-8 text-center text-xs text-slate-400">Loading conversation history...</div>
+                ) : conversation.length === 0 ? (
+                  <div className="py-12 text-center text-xs text-slate-400 italic">No messages yet. Say hello!</div>
+                ) : (
+                  (() => {
+                    let lastDateStr = "";
+                    return conversation.map((msg, index) => {
+                      const msgCreatedAt = (msg as any).createdAt as string;
+                      const msgDateStr = new Date(msgCreatedAt).toDateString();
+                      const showDateHeader = msgDateStr !== lastDateStr;
+                      lastDateStr = msgDateStr;
+
+                      const isMe = String((msg as any).sender) === currentUserId;
+                      const time = new Date(msgCreatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+                      return (
+                        <div key={String((msg as any)._id ?? index)} className="flex flex-col space-y-1">
+                          {/* Date Header Separator */}
+                          {showDateHeader && (
+                            <div className="my-4 flex items-center justify-center">
+                              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider bg-slate-200/60 px-3 py-1 rounded-full">
+                                {getMessageDateLabel(msgCreatedAt)}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Message Bubble Container */}
+                          <div className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                            <div
+                              className={`max-w-[70%] rounded-2xl px-4 py-2.5 shadow-sm text-xs ${
+                                isMe
+                                  ? "bg-slate-950 text-white rounded-tr-none"
+                                  : "bg-white border border-slate-100 text-slate-800 rounded-tl-none"
+                              }`}
+                            >
+                              <p className="leading-relaxed break-words whitespace-pre-wrap">{String((msg as any).message ?? "")}</p>
+                              {/* Message time tag inside the bubble */}
+                              <p className={`mt-1.5 text-right text-[8px] font-medium leading-none ${isMe ? "text-white/60" : "text-slate-400"}`}>
+                                {time}
+                                {isMe ? (() => {
+                                  const readAt = (msg as any).readAt;
+                                  const receivedAt = (msg as any).receivedAt;
+                                  if (readAt) {
+                                    return <span className="ml-1 text-emerald-400 text-[9px]">✓✓</span>;
+                                  }
+                                  if (receivedAt) {
+                                    return <span className="ml-1 text-white/50 text-[9px]">✓✓</span>;
+                                  }
+                                  return <span className="ml-1 text-white/50 text-[9px]">✓</span>;
+                                })() : null}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Chat Send Input Box */}
+              <div className="border-t border-slate-200 p-4">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSendChat();
+                  }}
+                  className="flex gap-2"
+                >
+                  <input
+                    type="text"
+                    placeholder="Type here your messages..."
+                    value={chatMessage}
+                    onChange={(e) => setChatMessage(e.target.value)}
+                    className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-xs outline-none focus:border-slate-400 focus:ring-0"
+                  />
+                  <button
+                    type="submit"
+                    disabled={sendingChat || !chatMessage.trim()}
+                    className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-950 text-white hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                  >
+                    <Send size={14} />
+                  </button>
+                </form>
+              </div>
+
+            </div>
+          ) : (
+            /* Blank state */
+            <div className="flex flex-col h-full items-center justify-center p-8 text-center bg-slate-50/20">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400 shadow-inner">
+                <Send size={24} />
+              </div>
+              <h4 className="mt-4 text-xs font-bold text-slate-800">Your Chat Board</h4>
+              <p className="mt-1 text-xs text-slate-400 max-w-xs">
+                Select a teammate on the left to start a conversation, or use Bulk Message to announce something.
+              </p>
+            </div>
+          )}
         </div>
-      ) : null}
+
+      </div>
     </section>
   );
 }

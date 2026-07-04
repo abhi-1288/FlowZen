@@ -11,6 +11,7 @@ import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
+import { autoCloseOverdueJobs } from "@/lib/recruitment-utils";
 import { deleteFileByUrl } from "@/lib/storage";
 
 type Params = { params: Promise<{ id: string }> };
@@ -23,6 +24,7 @@ export async function GET(_request: Request, { params }: Params) {
   if (!isObjectId(id)) return jsonError("Invalid job id.");
 
   await connectDb();
+  await autoCloseOverdueJobs();
   const user = await User.findById(userId);
   if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
   if (!user.company) return jsonError("No company found.", 400);

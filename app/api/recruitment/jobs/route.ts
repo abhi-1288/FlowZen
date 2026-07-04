@@ -7,6 +7,7 @@ import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { isObjectId, jsonError, requireUserId, serializeDoc, serializeDocs } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
+import { autoCloseOverdueJobs } from "@/lib/recruitment-utils";
 
 const HR_ROLES = ["admin", "human-resource"];
 
@@ -15,6 +16,7 @@ export async function GET(request: Request) {
   if (!userId) return jsonError("Unauthorized", 401);
 
   await connectDb();
+  await autoCloseOverdueJobs();
   const user = await User.findById(userId);
   if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
   if (!user.company) return jsonError("No company found.", 400);

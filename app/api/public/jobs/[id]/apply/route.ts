@@ -14,12 +14,14 @@ import { companyCodePrefix } from "@/lib/company-identity";
 import { emitToUser } from "@/lib/socket-emit";
 import { createMagicLinkToken } from "@/lib/codes";
 import { sendMail } from "@/lib/mailer";
+import { autoCloseOverdueJobs } from "@/lib/recruitment-utils";
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   await connectDb();
+  await autoCloseOverdueJobs();
   const { id } = await params;
 
   const job = await ATSJob.findById(id);

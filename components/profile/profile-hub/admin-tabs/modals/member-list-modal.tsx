@@ -152,7 +152,8 @@ export function MemberListModal({
                   const name = String(m.name ?? "").toLowerCase();
                   const email = String(m.email ?? "").toLowerCase();
                   const code = String(m.companyIdentityCode ?? "").toLowerCase();
-                  return name.includes(query) || email.includes(query) || code.includes(query);
+                  const codeNum = code.split("-").pop() ?? "";
+                  return name.includes(query) || email.includes(query) || code.includes(query) || codeNum.includes(query);
                 })
               : modalMembers;
             if (filtered.length === 0) {

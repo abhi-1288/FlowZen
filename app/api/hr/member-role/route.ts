@@ -34,7 +34,7 @@ export async function PATCH(request: Request) {
   }
 
   const [actor, member] = await Promise.all([
-    User.findById(userId).select("role company companyStatus"),
+    User.findById(userId).select("name role company companyStatus"),
     User.findById(memberId),
   ]);
   if (!actor) return jsonError("User not found.", 404);
@@ -82,7 +82,7 @@ export async function PATCH(request: Request) {
       member.roleHistory.push({
         oldRole,
         newRole,
-        changedBy: actor.name ?? "Unknown",
+        changedBy: `${actor.name ?? "Unknown"}:${actor.role ?? "?"}`,
         changedAt: new Date(),
       });
     }
