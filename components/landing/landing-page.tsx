@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, ArrowUp, Layout, Users, Zap, CheckCircle, Lock, MousePointer2, Clock, DollarSign, Building2, UserPlus, ChevronDown } from "lucide-react";
+import { ArrowRight, ArrowUp, Layout, Users, Zap, CheckCircle, Lock, MousePointer2, Clock, DollarSign, Building2, UserPlus, MessageCircle, ChevronDown } from "lucide-react";
 import { FaGithub } from "react-icons/fa";
 import { motion, useScroll, useTransform, AnimatePresence, Variants, useInView } from "framer-motion";
 
@@ -84,7 +84,7 @@ export function LandingPage() {
     {
       icon: UserPlus,
       title: "Recruitment & Hiring",
-      desc: "Full recruitment lifecycle — job postings, candidate applications, interview scheduling & feedback, offer letters with CTC breakdown, and convert-to-employee with welcome emails.",
+      desc: "Full recruitment lifecycle — job postings, candidate applications, interview scheduling & feedback, pipeline funnel, auto-close, resume parsing, offer letters with CTC breakdown, and convert-to-employee with welcome emails.",
       color: "violet"
     },
     {
@@ -98,6 +98,12 @@ export function LandingPage() {
       title: "Role-based Access",
       desc: "Seven user roles with granular board-level permissions — Admin, HR, Finance, PM, QA, Employee, and more.",
       color: "cyan"
+    },
+    {
+      icon: MessageCircle,
+      title: "Chat & Messaging",
+      desc: "Real-time messaging with read/delivery receipts, online presence indicators, member sidebar with last messages, and info modals with user details.",
+      color: "teal"
     }
   ] as const;
 
@@ -129,6 +135,10 @@ export function LandingPage() {
     violet: {
       card: "hover:border-violet-500/40",
       icon: "bg-violet-500/10 text-violet-400 group-hover:bg-violet-500/20 group-hover:shadow-[0_0_30px_-5px_rgba(139,92,246,0.4)]",
+    },
+    teal: {
+      card: "hover:border-teal-500/40",
+      icon: "bg-teal-500/10 text-teal-400 group-hover:bg-teal-500/20 group-hover:shadow-[0_0_30px_-5px_rgba(20,184,166,0.4)]",
     },
   } as const;
 
@@ -221,7 +231,7 @@ export function LandingPage() {
                 <motion.div variants={itemVariants}>
                   <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-indigo-500/10 text-indigo-300 text-[10px] sm:text-sm font-medium mb-6 sm:mb-8 border border-indigo-500/20 backdrop-blur-sm hover:bg-indigo-500/20 transition-colors cursor-default max-w-[90vw]">
                     <Zap className="w-3 h-3 sm:w-4 sm:h-4 text-indigo-400 animate-pulse shrink-0" />
-                    <span className="truncate">Kanban · Attendance · Finance · HR · Recruitment</span>
+                    <span className="truncate">Kanban · Attendance · Finance · HR · Recruitment · Chat</span>
                   </div>
                 </motion.div>
 
@@ -231,7 +241,7 @@ export function LandingPage() {
                 </motion.h1>
 
                 <motion.p variants={itemVariants} className="text-base sm:text-xl md:text-2xl text-slate-400 mb-8 sm:mb-12 max-w-3xl mx-auto leading-relaxed px-2 sm:px-0">
-                  FlowZen is the all-in-one workflow platform where teams manage kanban boards, attendance, finance, HR, recruitment, approvals, and roles in one beautifully animated workspace.
+                  FlowZen is the all-in-one workflow platform where teams manage kanban boards, attendance, finance, HR, recruitment, chat, approvals, and roles in one beautifully animated workspace.
                 </motion.p>
 
                 <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto">
@@ -513,7 +523,8 @@ export function LandingPage() {
                   "Full recruitment pipeline: jobs, candidates, interviews, offers, and hiring",
                   "Multi-step approval workflows for joins, leaves, and quits",
                   "Seven user roles with granular board-level permissions",
-                  "HR tools: policies, broadcasts, meeting invites, recruitment, and role changes"
+                  "HR tools: policies, broadcasts, meeting invites, recruitment, and role changes",
+                  "Real-time chat with read receipts, online presence, and delivery tracking"
                 ].map((item, i) => (
                   <motion.li
                     key={i}
