@@ -77,6 +77,7 @@ export function IdCardModal({
   return (
     <>
       <style>{`
+        .id-card-side-hidden { display: none !important; }
         @media print {
           body > *:not(.id-card-print-wrapper) { display: none !important; }
           .id-card-print-wrapper { position: fixed !important; inset: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important; background: white !important; z-index: 9999 !important; }
