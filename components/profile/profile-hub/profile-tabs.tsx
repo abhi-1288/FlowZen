@@ -20,6 +20,7 @@ import { ReleaseNotesSection } from "./sections/release-notes-section";
 import { MonthlyCheckBox } from "./monthly-check-box";
 import { ConfirmActionModal } from "./modals/confirm-action-modal";
 import { SetupModal } from "./modals/setup-modal";
+import { IdCardModal } from "./id-card-modal";
 import { AnyRecord, formatRoleWithCustom } from "./shared";
 import { WfhAdminSection, type WfhAdminState } from "./sections/wfh-admin-section";
 
@@ -64,6 +65,7 @@ export function ProfileTab({
   const [identityRequesting, setIdentityRequesting] = useState(false);
   const [showDocLetterModal, setShowDocLetterModal] = useState(false);
   const [docLetterMode, setDocLetterMode] = useState<"request" | "send">("request");
+  const [showIdCardModal, setShowIdCardModal] = useState(false);
 
   const company = typeof profile?.company === "object" && profile.company ? (profile.company as AnyRecord) : null;
   const team = typeof profile?.team === "object" && profile.team ? (profile.team as AnyRecord) : null;
@@ -255,6 +257,20 @@ export function ProfileTab({
         </div>
       ) : null}
 
+      <div className="mb-5 flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)]">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">ID Card</p>
+          <p className="text-xs text-slate-500">View and print your company identity card</p>
+        </div>
+        <button
+          className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          onClick={() => setShowIdCardModal(true)}
+          type="button"
+        >
+          Show ID Card
+        </button>
+      </div>
+
       <div className="grid gap-5 xl:grid-cols-2">
         <PersonalInfoSection profile={profile} session={session as { user?: { name?: string; email?: string } } | null} avatarUrl={avatarUrl} displayName={displayName}
           uploading={uploading} onAvatarDelete={() => setAvatarDeleteModal(true)}
@@ -382,6 +398,16 @@ export function ProfileTab({
         loading={setup.setupLoading} error={setup.setupError}
         onClose={setup.closeSetupModal} onSendOtp={setup.sendOtp}
         onVerifyOtp={setup.verifyOtp} onCompleteSetup={setup.completeSetup} />
+
+      <IdCardModal
+        open={showIdCardModal}
+        onClose={() => setShowIdCardModal(false)}
+        profile={profile}
+        company={company}
+        avatarUrl={avatarUrl}
+        displayName={displayName}
+        displayRole={displayRole}
+      />
     </>
   );
 }

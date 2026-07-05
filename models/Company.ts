@@ -36,6 +36,7 @@ const CompanySchema = new Schema(
     wfhCheckInMode: { type: String, enum: ["all-day", "wfh-only"], default: "all-day" },
     minWorkHours: { type: Number, default: 8 },
     icon: { type: String, default: "" },
+    address: { type: String, default: "", maxlength: 500 },
     startDate: { type: Date, default: null },
     requiredDocuments: [{
       name: { type: String, required: true },

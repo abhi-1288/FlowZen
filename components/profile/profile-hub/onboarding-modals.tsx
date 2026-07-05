@@ -289,6 +289,10 @@ export function CompanyIconSection({
   onCropDone,
   onCropCancel,
   cropFile,
+  address,
+  onAddressChange,
+  onAddressSave,
+  addressSaving,
 }: {
   company: AnyRecord | null;
   uploading: boolean;
@@ -297,13 +301,17 @@ export function CompanyIconSection({
   onCropDone: (blob: Blob) => Promise<void>;
   onCropCancel: () => void;
   cropFile: File | null;
+  address: string;
+  onAddressChange: (v: string) => void;
+  onAddressSave: () => Promise<void>;
+  addressSaving: boolean;
 }) {
   return (
     <>
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
         <div className="mb-4 flex items-center gap-2">
           <Building2 size={18} />
-          <h3 className="text-lg font-semibold uppercase tracking-wide text-slate-700">Company Icon</h3>
+          <h3 className="text-lg font-semibold uppercase tracking-wide text-slate-700">Company Settings</h3>
         </div>
         <div className="flex items-center gap-4">
           <img src={company?.icon ? String(company.icon) : "/Logos/logo.jpg"} alt="Company icon" className="h-16 w-16 rounded-xl border border-slate-200 object-cover" />
@@ -321,6 +329,23 @@ export function CompanyIconSection({
               )}
             </>
           )}
+        </div>
+        <div className="mt-5 border-t border-slate-100 pt-5">
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">Company Address</label>
+          <textarea
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 min-h-[80px] resize-y"
+            placeholder="Enter company address"
+            value={address}
+            onChange={(e) => onAddressChange(e.target.value)}
+          />
+          <button
+            className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            disabled={addressSaving}
+            onClick={() => void onAddressSave()}
+            type="button"
+          >
+            {addressSaving ? "Saving..." : "Save Address"}
+          </button>
         </div>
       </section>
       {cropFile ? <ImageCropModal file={cropFile} aspect={1} onCancel={onCropCancel} onDone={(blob) => void onCropDone(blob)} /> : null}

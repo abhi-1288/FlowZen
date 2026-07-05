@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Building2, ChevronDown, Plus, Users } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
@@ -73,6 +73,12 @@ export function OnboardingTab({
   const [companyIconDeleteModal, setCompanyIconDeleteModal] = useState(false);
   const [deletingCompanyIcon, setDeletingCompanyIcon] = useState(false);
   const [companyIconCropFile, setCompanyIconCropFile] = useState<File | null>(null);
+  const [companyAddress, setCompanyAddress] = useState("");
+  const [addressSaving, setAddressSaving] = useState(false);
+
+  useEffect(() => {
+    if (company?.address) setCompanyAddress(String(company.address));
+  }, [company?.address]);
   const createdTeamsCount = Number(managerInsight?.createdTeamsCount ?? managerTeams.length);
   const teamLimit = role === "human-resource" ? 2 : role === "admin" ? 10 : 5;
   const canCreateMoreTeams = createdTeamsCount < teamLimit;
@@ -141,6 +147,22 @@ export function OnboardingTab({
       showToast(err instanceof Error ? err.message : "Unable to delete company icon.", "error");
     } finally {
       setDeletingCompanyIcon(false);
+    }
+  }
+
+  async function saveCompanyAddress() {
+    try {
+      setAddressSaving(true);
+      await apiFetch("/api/company/address", {
+        method: "PATCH",
+        body: JSON.stringify({ address: companyAddress }),
+      });
+      showToast("Company address updated.");
+      await refresh(true);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to save address.", "error");
+    } finally {
+      setAddressSaving(false);
     }
   }
 
@@ -291,6 +313,7 @@ export function OnboardingTab({
             />
             <CompanyIconSection company={company} uploading={companyIconUploading} onUpload={() => {}} onDelete={() => setCompanyIconDeleteModal(true)}
               onCropDone={(blob) => { const file = new File([blob], "icon.png"); setCompanyIconCropFile(file); return Promise.resolve(); }} onCropCancel={() => setCompanyIconCropFile(null)} cropFile={companyIconCropFile}
+              address={companyAddress} onAddressChange={setCompanyAddress} onAddressSave={saveCompanyAddress} addressSaving={addressSaving}
             />
           </>
         ) : (
