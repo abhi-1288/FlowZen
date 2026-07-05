@@ -85,18 +85,18 @@ export function IdCardModal({
           body > *:not(.id-card-print-wrapper) { display: none !important; }
           .id-card-print-wrapper { position: fixed !important; inset: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important; background: white !important; z-index: 9999 !important; }
           .id-card-print-hide { display: none !important; }
-          .id-card-side { display: flex !important; border: 2px solid #000 !important; box-shadow: none !important; border-radius: 0 !important; }
-          .id-card-back-side { border-top: 2px solid #000 !important; }
+          .id-card-print-inner { display: flex !important; flex-direction: row !important; gap: 24px !important; align-items: flex-start !important; max-width: none !important; width: auto !important; }
+          .id-card-side { display: flex !important; width: 380px !important; border: 1px solid #cbd5e1 !important; border-radius: 8px !important; box-shadow: none !important; }
           .id-card-side-hidden { display: flex !important; }
-          @page { margin: 0; }
-          .id-card-back-side { page-break-before: always; padding-top: 20px; }
+          .id-card-back-side { border-top: none !important; }
+          @page { margin: 0; size: auto; }
         }
       `}</style>
       <div
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 id-card-print-wrapper"
         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       >
-        <div className="w-full max-w-[420px]">
+        <div className="w-full max-w-[420px] id-card-print-inner">
 
           {/* ── Toolbar ── */}
           <div className="flex items-center justify-between rounded-t-2xl border border-slate-200 bg-white px-5 py-3 id-card-print-hide">
