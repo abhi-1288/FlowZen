@@ -1,6 +1,8 @@
 "use client";
 
-import { X, Printer } from "lucide-react";
+import { useEffect, useState } from "react";
+import { X, Printer, RotateCw } from "lucide-react";
+import QRCode from "qrcode";
 import type { AnyRecord } from "./shared";
 
 function formatDate(val: unknown): string {
@@ -13,10 +15,7 @@ function formatDate(val: unknown): string {
 }
 
 function deriveCompanyDomain(name: string): string {
-  return name
-    .replace(/[^a-zA-Z0-9]/g, "")
-    .toLowerCase()
-    .slice(0, 20) || "company";
+  return name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase().slice(0, 20) || "company";
 }
 
 export function IdCardModal({
@@ -36,14 +35,12 @@ export function IdCardModal({
   displayName: string;
   displayRole: string;
 }) {
+  const [flipped, setFlipped] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState("");
+
   if (!open) return null;
 
-  const initials = displayName
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("") || "U";
+  const initials = displayName.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "U";
 
   const uniqueId = profile?.companyIdentityCode ? String(profile.companyIdentityCode) : "—";
   const phone = profile?.phone ? String(profile.phone) : "—";
@@ -59,6 +56,15 @@ export function IdCardModal({
   const supportEmail = `support@${domain}.com`;
   const website = `www.${domain}.com`;
 
+  const qrValue = typeof window !== "undefined" ? `${window.location.origin}/verify/${uniqueId}` : "";
+
+  useEffect(() => {
+    if (!qrValue || !open) return;
+    QRCode.toDataURL(qrValue, { width: 160, margin: 1, color: { dark: "#1e293b", light: "#ffffff" } })
+      .then(setQrDataUrl)
+      .catch(() => setQrDataUrl(""));
+  }, [qrValue, open]);
+
   const detailRows: { label: string; value: string }[] = [
     { label: "Employee ID", value: uniqueId },
     { label: "Name", value: displayName },
@@ -68,10 +74,6 @@ export function IdCardModal({
     { label: "Email", value: email },
   ];
 
-  function handlePrint() {
-    window.print();
-  }
-
   return (
     <>
       <style>{`
@@ -79,22 +81,32 @@ export function IdCardModal({
           body > *:not(.id-card-print-wrapper) { display: none !important; }
           .id-card-print-wrapper { position: fixed !important; inset: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important; background: white !important; z-index: 9999 !important; }
           .id-card-print-hide { display: none !important; }
-          .id-card-inner { box-shadow: none !important; border: 2px solid #000 !important; width: 500px !important; border-radius: 0 !important; }
+          .id-card-side { display: flex !important; border: 2px solid #000 !important; box-shadow: none !important; border-radius: 0 !important; }
+          .id-card-back-side { border-top: 2px solid #000 !important; }
+          .id-card-side-hidden { display: flex !important; }
           @page { margin: 0; }
+          .id-card-back-side { page-break-before: always; padding-top: 20px; }
         }
       `}</style>
       <div
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 id-card-print-wrapper"
         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       >
-        <div className="w-full max-w-[500px] rounded-2xl border border-slate-200 bg-white shadow-xl id-card-inner">
+        <div className="w-full max-w-[420px]">
 
           {/* ── Toolbar ── */}
-          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3 id-card-print-hide">
+          <div className="flex items-center justify-between rounded-t-2xl border border-slate-200 bg-white px-5 py-3 id-card-print-hide">
             <h3 className="text-sm font-semibold text-slate-900">ID Card</h3>
             <div className="flex items-center gap-2">
               <button
-                onClick={handlePrint}
+                onClick={() => setFlipped((f) => !f)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <RotateCw size={14} />
+                {flipped ? "Front" : "Back"}
+              </button>
+              <button
+                onClick={() => window.print()}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
               >
                 <Printer size={14} />
@@ -106,138 +118,123 @@ export function IdCardModal({
             </div>
           </div>
 
-          {/* ── Company Header (bordered box) ── */}
-          <div className="border-b border-slate-200 px-5 py-4 text-center">
-            <div className="mx-auto inline-flex flex-col items-center gap-1.5">
-              <img src={companyIcon} alt="Company" className="h-12 w-12 rounded-lg border border-slate-300 object-cover" />
-              <p className="text-base font-bold uppercase text-slate-900 tracking-wide leading-tight">{companyName}</p>
-              {companyAddr ? <p className="text-[11px] text-slate-600 leading-tight">{companyAddr}</p> : null}
-            </div>
-          </div>
-
-          {/* ── EMPLOYEE ID CARD heading ── */}
-          <div className="px-5 pt-4 pb-3 text-center">
-            <p className="text-sm font-bold uppercase tracking-[0.15em] text-slate-800">Employee ID Card</p>
-          </div>
-
-          {/* ── Photo + Details ── */}
-          <div className="flex gap-5 px-5 pb-4">
-            {/* Photo */}
-            <div className="flex shrink-0 flex-col items-center">
-              <div className="flex h-24 w-24 items-center justify-center border-2 border-slate-300 bg-slate-50">
-                {avatarUrl ? (
-                  <img
-                    alt={`${displayName} avatar`}
-                    className="h-full w-full object-cover"
-                    src={avatarUrl}
-                  />
-                ) : (
-                  <div className="grid h-full w-full place-items-center bg-gradient-to-br from-indigo-500 to-indigo-700 text-2xl font-bold text-white">
-                    {initials}
-                  </div>
-                )}
+          {/* ══════ FRONT SIDE ══════ */}
+          <div className={`id-card-side ${flipped ? "id-card-side-hidden" : ""} rounded-b-2xl border-x border-b border-slate-200 bg-white shadow-xl`}>
+            <div className="border-b border-slate-200 px-5 pt-4 pb-3 text-center">
+              <div className="mx-auto inline-flex flex-col items-center gap-1">
+                <img src={companyIcon} alt="Company" className="h-10 w-10 rounded-lg border border-slate-300 object-cover" />
+                <p className="text-sm font-bold uppercase text-slate-900 tracking-wide leading-tight">{companyName}</p>
+                {companyAddr ? <p className="text-[10px] text-slate-600 leading-tight">{companyAddr}</p> : null}
               </div>
             </div>
 
-            {/* Details */}
-            <div className="min-w-0 flex-1 space-y-1.5">
-              {detailRows.map((row) => (
-                <div key={row.label} className="flex gap-2">
-                  <span className="w-24 shrink-0 text-[11px] font-semibold text-slate-500">{row.label}</span>
-                  <span className="text-[11px] font-medium text-slate-900 break-all">{row.value}</span>
+            <div className="px-5 pt-3 pb-2 text-center">
+              <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-800">Employee ID Card</p>
+            </div>
+
+            <div className="flex gap-4 px-5 pb-3">
+              <div className="flex shrink-0 flex-col items-center">
+                <div className="flex h-20 w-20 items-center justify-center border-2 border-slate-300 bg-slate-50">
+                  {avatarUrl ? (
+                    <img alt="" className="h-full w-full object-cover" src={avatarUrl} />
+                  ) : (
+                    <div className="grid h-full w-full place-items-center bg-gradient-to-br from-indigo-500 to-indigo-700 text-xl font-bold text-white">
+                      {initials}
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* ── Divider ── */}
-          <div className="border-t border-slate-300 mx-5" />
-
-          {/* ── Issue Date / Valid Till ── */}
-          <div className="flex gap-8 px-5 py-3 text-[11px]">
-            <div className="flex gap-2">
-              <span className="font-semibold text-slate-500">Issue Date :</span>
-              <span className="text-slate-900">{issueDate}</span>
-            </div>
-            <div className="flex gap-2">
-              <span className="font-semibold text-slate-500">Valid Till :</span>
-              <span className="font-medium text-green-700">Active Employee</span>
-            </div>
-          </div>
-
-          {/* ── Divider ── */}
-          <div className="border-t border-slate-300 mx-5" />
-
-          {/* ── Authorized Signature + Address ── */}
-          <div className="flex gap-4 px-5 py-3">
-            <div className="flex-1">
-              <p className="text-[11px] font-semibold text-slate-500 mb-1">Authorized Signature</p>
-              <div className="mt-5 border-b border-slate-400 w-40" />
-            </div>
-            {personalAddr && (
-              <div className="flex-1 border border-slate-300 p-2">
-                <p className="text-[11px] font-semibold text-slate-500 mb-0.5">Address</p>
-                <p className="text-[11px] text-slate-900 whitespace-pre-line leading-snug">{personalAddr}</p>
               </div>
-            )}
-          </div>
-
-          {/* ── Divider ── */}
-          <div className="border-t border-slate-300 mx-5" />
-
-          {/* ── Emergency Contact ── */}
-          <div className="px-5 py-2">
-            <p className="text-[11px] font-semibold text-slate-500">Emergency Contact</p>
-            <p className="text-[11px] text-slate-900">—</p>
-          </div>
-
-          {/* ── Divider ── */}
-          <div className="border-t border-slate-300 mx-5" />
-
-          {/* ── Blood Group ── */}
-          <div className="px-5 py-2">
-            <p className="text-[11px] font-semibold text-slate-500">Blood Group</p>
-            <p className="text-[11px] text-slate-900">—</p>
-          </div>
-
-          {/* ── Divider ── */}
-          <div className="border-t border-slate-300 mx-5" />
-
-          {/* ── Joining Date ── */}
-          <div className="px-5 py-2">
-            <p className="text-[11px] font-semibold text-slate-500">Joining Date</p>
-            <p className="text-[11px] text-slate-900">{joiningDate}</p>
-          </div>
-
-          {/* ── Divider ── */}
-          <div className="border-t border-slate-300 mx-5" />
-
-          {/* ── QR Code ── */}
-          <div className="flex flex-col items-center px-5 py-3">
-            <div className="grid h-16 w-16 place-items-center border-2 border-slate-800">
-              <div className="grid grid-cols-5 gap-0.5">
-                {Array.from({ length: 25 }).map((_, i) => (
-                  <div key={i} className={`h-1.5 w-1.5 ${Math.random() > 0.5 ? "bg-slate-900" : "bg-white"}`} />
+              <div className="min-w-0 flex-1 space-y-0.5">
+                {detailRows.map((row) => (
+                  <div key={row.label} className="flex gap-1.5">
+                    <span className="w-[72px] shrink-0 text-[10px] font-semibold text-slate-500">{row.label}</span>
+                    <span className="text-[10px] font-medium text-slate-900 break-all">{row.value}</span>
+                  </div>
                 ))}
               </div>
             </div>
-            <p className="mt-1 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">QR Code</p>
-            <p className="text-[9px] text-slate-400">Scan to verify employee</p>
+
+            <div className="border-t border-slate-300 mx-5" />
+
+            <div className="flex gap-6 px-5 py-2.5 text-[10px]">
+              <div className="flex gap-1.5">
+                <span className="font-semibold text-slate-500">Issue Date :</span>
+                <span className="text-slate-900">{issueDate}</span>
+              </div>
+              <div className="flex gap-1.5">
+                <span className="font-semibold text-slate-500">Valid Till :</span>
+                <span className="font-medium text-green-700">Active Employee</span>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-300 mx-5" />
+
+            <div className="flex gap-4 px-5 py-2.5">
+              <div className="flex-1">
+                <p className="text-[10px] font-semibold text-slate-500 mb-1">Authorized Signature</p>
+                <div className="mt-4 border-b border-slate-400 w-32" />
+              </div>
+              {personalAddr && (
+                <div className="flex-1 border border-slate-300 p-1.5">
+                  <p className="text-[10px] font-semibold text-slate-500 mb-0.5">Address</p>
+                  <p className="text-[10px] text-slate-900 whitespace-pre-line leading-snug">{personalAddr}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="h-2" />
           </div>
 
-          {/* ── Divider ── */}
-          <div className="border-t border-slate-300 mx-5" />
+          {/* ══════ BACK SIDE ══════ */}
+          <div className={`id-card-side id-card-back-side ${flipped ? "" : "id-card-side-hidden"} rounded-b-2xl border-x border-b border-slate-200 bg-white shadow-xl`}>
+            <div className="px-5 pt-5 pb-2.5">
+              <p className="text-[11px] font-semibold text-slate-500">Emergency Contact</p>
+              <p className="text-[11px] text-slate-900">—</p>
+            </div>
+            <div className="border-t border-slate-300 mx-5" />
 
-          {/* ── Footer ── */}
-          <div className="px-5 py-3 text-center">
-            <p className="text-[10px] text-slate-500">If found please return to</p>
-            <p className="text-[11px] font-bold text-slate-900">{companyName}</p>
-            <p className="text-[10px] text-slate-600">{supportEmail}</p>
-            <p className="text-[10px] text-slate-600">{website}</p>
+            <div className="px-5 py-2.5">
+              <p className="text-[11px] font-semibold text-slate-500">Blood Group</p>
+              <p className="text-[11px] text-slate-900">—</p>
+            </div>
+            <div className="border-t border-slate-300 mx-5" />
+
+            <div className="px-5 py-2.5">
+              <p className="text-[11px] font-semibold text-slate-500">Joining Date</p>
+              <p className="text-[11px] text-slate-900">{joiningDate}</p>
+            </div>
+            <div className="border-t border-slate-300 mx-5" />
+
+            <div className="flex flex-col items-center px-5 py-3">
+              {qrDataUrl ? (
+                <img src={qrDataUrl} alt="QR Code" className="h-16 w-16" />
+              ) : (
+                <div className="grid h-16 w-16 place-items-center border-2 border-slate-300 bg-slate-50">
+                  <span className="text-[9px] font-bold text-slate-400">QR</span>
+                </div>
+              )}
+              <p className="mt-1 text-[9px] font-semibold text-slate-500 uppercase tracking-wider">QR Code</p>
+              <p className="text-[8px] text-slate-400">Scan to verify employee</p>
+            </div>
+            <div className="border-t border-slate-300 mx-5" />
+
+            <div className="px-5 py-3 text-center">
+              <p className="text-[9px] text-slate-500">If found please return to</p>
+              <p className="text-[10px] font-bold text-slate-900">{companyName}</p>
+              <p className="text-[9px] text-slate-600">{supportEmail}</p>
+              <p className="text-[9px] text-slate-600">{website}</p>
+            </div>
           </div>
 
-          {/* bottom padding */}
-          <div className="h-3" />
+          {/* Flip hint */}
+          <div className="mt-2 text-center id-card-print-hide">
+            <button
+              onClick={() => setFlipped((f) => !f)}
+              className="text-[10px] font-medium text-indigo-600 hover:text-indigo-700"
+            >
+              {flipped ? "← Flip to Front" : "Flip to Back →"}
+            </button>
+          </div>
         </div>
       </div>
     </>
