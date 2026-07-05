@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, Printer, RotateCw } from "lucide-react";
 import QRCode from "qrcode";
 import type { AnyRecord } from "./shared";
@@ -74,7 +75,9 @@ export function IdCardModal({
     { label: "Email", value: email },
   ];
 
-  return (
+  if (typeof window === "undefined") return null;
+
+  return createPortal(
     <>
       <style>{`
         .id-card-side-hidden { display: none !important; }
@@ -238,6 +241,7 @@ export function IdCardModal({
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
