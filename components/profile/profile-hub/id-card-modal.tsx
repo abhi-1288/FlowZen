@@ -86,10 +86,9 @@ export function IdCardModal({
           .id-card-print-wrapper { position: fixed !important; inset: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important; background: white !important; z-index: 9999 !important; }
           .id-card-print-hide { display: none !important; }
           .id-card-print-inner { display: flex !important; flex-direction: row !important; gap: 24px !important; align-items: flex-start !important; max-width: none !important; width: auto !important; }
-          .id-card-side { display: flex !important; width: 380px !important; border: 1px solid #cbd5e1 !important; border-radius: 8px !important; box-shadow: none !important; }
+          .id-card-side { display: flex !important; }
           .id-card-side-hidden { display: flex !important; }
-          .id-card-back-side { border-top: none !important; }
-          @page { margin: 0; size: auto; }
+          @page { margin: 0; }
         }
       `}</style>
       <div
