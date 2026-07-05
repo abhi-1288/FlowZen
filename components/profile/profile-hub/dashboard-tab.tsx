@@ -37,6 +37,8 @@ export function DashboardTab({
   notifications,
   approvals,
   attendanceHistory,
+  leaveRequests,
+  wfhRequests,
   financeCount,
   checkOutRequestCount,
   role,
