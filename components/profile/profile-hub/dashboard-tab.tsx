@@ -37,8 +37,6 @@ export function DashboardTab({
   notifications,
   approvals,
   attendanceHistory,
-  leaveRequests,
-  wfhRequests,
   financeCount,
   checkOutRequestCount,
   role,
@@ -156,7 +154,13 @@ export function DashboardTab({
   const totalMembers = Number((insights?.hr as any)?.totalMembers ?? 0);
   const pendingJoins = Number((insights?.hr as any)?.pendingJoins ?? 0);
   const totalTeams = Number((insights?.admin as any)?.totalTeams ?? (insights?.manager as any)?.teams?.length ?? 0);
-  const leaveTrendCount = leaveRequests.length;
+  const yesterdayEntry = attendanceHistory?.[1] ?? null;
+  const yesterdayCheckedIn = Boolean(yesterdayEntry?.checkIn);
+  const leaveTrendValue = checkedIn
+    ? `Present ${checkInTime ?? ""}`
+    : yesterdayCheckedIn
+      ? "Absent (was present yesterday)"
+      : "Absent";
 
   const kpiCards = [
     { label: "Attendance %", value: attendanceRate, icon: CalendarCheck, color: "text-emerald-600", bg: "bg-emerald-100" },
@@ -164,7 +168,7 @@ export function DashboardTab({
     { label: "Revenue vs Expenses", value: "—", icon: BarChart3, color: "text-purple-600", bg: "bg-purple-100" },
     { label: "Active Projects", value: String(totalTeams || "—"), icon: Briefcase, color: "text-amber-600", bg: "bg-amber-100" },
     { label: "Hiring Pipeline", value: String(pendingJoins || "—"), icon: UserPlus, color: "text-cyan-600", bg: "bg-cyan-100" },
-    { label: "Leave Trends", value: String(leaveTrendCount || "—"), icon: Activity, color: "text-rose-600", bg: "bg-rose-100" },
+    { label: "Leave Trends", value: leaveTrendValue, icon: Activity, color: "text-rose-600", bg: "bg-rose-100" },
     { label: "Employee Growth", value: String(totalMembers || "—"), icon: TrendingUp, color: "text-indigo-600", bg: "bg-indigo-100" },
   ];
 
