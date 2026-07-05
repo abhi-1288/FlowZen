@@ -25,6 +25,7 @@ import {
   User,
   Users,
   Wallet,
+  CalendarDays,
 } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import { useNotificationToast } from "@/lib/toast-context";
@@ -38,6 +39,7 @@ import { TimelineTab } from "./profile-hub/timeline-tab";
 import { OnboardingTab } from "./profile-hub/onboarding-tab";
 import { DocumentsTab } from "./profile-hub/documents-tab";
 import { CareersTab } from "./profile-hub/careers-tab";
+import { CompanyCalendarTab } from "./profile-hub/company-calendar-tab";
 import { AnyRecord, AvatarBadge, formatRoleWithCustom } from "./profile-hub/shared";
 
 type ProfileHubCache = {
@@ -71,9 +73,10 @@ export type Tab =
   | "finance"
   | "attendance"
   | "documents"
-  | "careers";
+  | "careers"
+  | "calendar";
 
-const VALID_TABS = new Set<string>(["dashboard", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers"]);
+const VALID_TABS = new Set<string>(["dashboard", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers", "calendar"]);
 
 
 export function ProfileHub() {
@@ -203,6 +206,7 @@ export function ProfileHub() {
     ...(canViewCompanyTabs ? (["approvals"] as Tab[]) : []),
     "notifications",
     ...(canViewCompanyTabs ? (["attendance"] as Tab[]) : []),
+    ...(canViewCompanyTabs ? (["calendar"] as Tab[]) : []),
   ];
 
   const { showNotificationToast } = useNotificationToast();
@@ -736,6 +740,14 @@ export function ProfileHub() {
               onClick={() => setTab("attendance")}
             />
           ) : null}
+          {canViewCompanyTabs ? (
+            <NavButton
+              active={tab === "calendar"}
+              icon={<CalendarDays size={16} />}
+              label="Calendar"
+              onClick={() => setTab("calendar")}
+            />
+          ) : null}
           <NavButton
             active={tab === "notifications"}
             icon={<Bell size={16} />}
@@ -996,6 +1008,10 @@ export function ProfileHub() {
 
               {tab === "attendance" && canViewCompanyTabs ? (
                 <AttendanceTab profile={profile} showToast={showToast} />
+              ) : null}
+
+              {tab === "calendar" && canViewCompanyTabs ? (
+                <CompanyCalendarTab />
               ) : null}
             </>}
           </>
