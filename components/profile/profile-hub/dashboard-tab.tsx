@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { Bell, CheckSquare, Users, Wallet, Clock, User, Building2, ExternalLink, FileText } from "lucide-react";
+import { Bell, CheckSquare, Users, Wallet, Clock, User, Building2, ExternalLink, FileText, TrendingUp, BarChart3, DollarSign, Briefcase, UserPlus, CalendarCheck, Activity } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import type { AnyRecord } from "./shared";
 
@@ -137,6 +137,35 @@ export function DashboardTab({
     }
   }, [role, currentUserId]);
 
+  const attendanceRate = useMemo(() => {
+    if (!attendanceHistory?.length) return "--";
+    const total = attendanceHistory.length;
+    const present = attendanceHistory.filter((a: AnyRecord) => Boolean(a.checkIn)).length;
+    return total > 0 ? `${Math.round((present / total) * 100)}%` : "--";
+  }, [attendanceHistory]);
+
+  const hrMembers = useMemo(() => (insights?.hr as any)?.members ?? [], [insights]);
+  const totalSalaryCost = useMemo(() => {
+    if (!hrMembers.length) return null;
+    const total = hrMembers.reduce((s: number, m: any) => s + Math.max(0, Number(m.baseSalary ?? 0)), 0);
+    return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(total);
+  }, [hrMembers]);
+
+  const totalMembers = Number((insights?.hr as any)?.totalMembers ?? 0);
+  const pendingJoins = Number((insights?.hr as any)?.pendingJoins ?? 0);
+  const totalTeams = Number((insights?.admin as any)?.totalTeams ?? (insights?.manager as any)?.teams?.length ?? 0);
+  const leaveTrendCount = leaveRequests.length;
+
+  const kpiCards = [
+    { label: "Attendance %", value: attendanceRate, icon: CalendarCheck, color: "text-emerald-600", bg: "bg-emerald-100" },
+    { label: "Salary Cost", value: totalSalaryCost ?? "—", icon: DollarSign, color: "text-blue-600", bg: "bg-blue-100" },
+    { label: "Revenue vs Expenses", value: "—", icon: BarChart3, color: "text-purple-600", bg: "bg-purple-100" },
+    { label: "Active Projects", value: String(totalTeams || "—"), icon: Briefcase, color: "text-amber-600", bg: "bg-amber-100" },
+    { label: "Hiring Pipeline", value: String(pendingJoins || "—"), icon: UserPlus, color: "text-cyan-600", bg: "bg-cyan-100" },
+    { label: "Leave Trends", value: String(leaveTrendCount || "—"), icon: Activity, color: "text-rose-600", bg: "bg-rose-100" },
+    { label: "Employee Growth", value: String(totalMembers || "—"), icon: TrendingUp, color: "text-indigo-600", bg: "bg-indigo-100" },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Greeting */}
@@ -147,6 +176,30 @@ export function DashboardTab({
         <p className="mt-1 text-indigo-100">
           {companyName ? `${companyName}  ·  ` : ""}{today}
         </p>
+      </div>
+
+      {/* ══════ Analytics Dashboard ══════ */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-4 flex items-center gap-2 text-base font-bold text-slate-900">
+          <BarChart3 size={18} className="text-indigo-600" />
+          Analytics Dashboard
+        </h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {kpiCards.map((kpi) => {
+            const Icon = kpi.icon;
+            return (
+              <div key={kpi.label} className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                <div className={`rounded-lg ${kpi.bg} p-2.5`}>
+                  <Icon size={20} className={kpi.color} />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-[11px] font-medium uppercase tracking-wide text-slate-500">{kpi.label}</p>
+                  <p className="text-lg font-bold text-slate-900">{kpi.value}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Missing Documents Alert */}
