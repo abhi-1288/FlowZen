@@ -38,11 +38,20 @@ export function IdCardModal({
   const [flipped, setFlipped] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState("");
 
+  const uniqueId = profile?.companyIdentityCode ? String(profile.companyIdentityCode) : "—";
+  const qrValue = typeof window !== "undefined" ? `${window.location.origin}/verify/${uniqueId}` : "";
+
+  useEffect(() => {
+    if (!qrValue || !open) return;
+    QRCode.toDataURL(qrValue, { width: 160, margin: 1, color: { dark: "#1e293b", light: "#ffffff" } })
+      .then(setQrDataUrl)
+      .catch(() => setQrDataUrl(""));
+  }, [qrValue, open]);
+
   if (!open) return null;
 
   const initials = displayName.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "U";
 
-  const uniqueId = profile?.companyIdentityCode ? String(profile.companyIdentityCode) : "—";
   const phone = profile?.phone ? String(profile.phone) : "—";
   const email = profile?.email ? String(profile.email) : "—";
   const personalAddr = profile?.address ? String(profile.address) : "";
@@ -55,15 +64,6 @@ export function IdCardModal({
   const domain = deriveCompanyDomain(companyName);
   const supportEmail = `support@${domain}.com`;
   const website = `www.${domain}.com`;
-
-  const qrValue = typeof window !== "undefined" ? `${window.location.origin}/verify/${uniqueId}` : "";
-
-  useEffect(() => {
-    if (!qrValue || !open) return;
-    QRCode.toDataURL(qrValue, { width: 160, margin: 1, color: { dark: "#1e293b", light: "#ffffff" } })
-      .then(setQrDataUrl)
-      .catch(() => setQrDataUrl(""));
-  }, [qrValue, open]);
 
   const detailRows: { label: string; value: string }[] = [
     { label: "Employee ID", value: uniqueId },
