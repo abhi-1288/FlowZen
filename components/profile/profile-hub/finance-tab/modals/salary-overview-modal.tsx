@@ -157,7 +157,7 @@ function SalaryOverviewContent({
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <span className="font-semibold text-slate-800">₹{Number(salary.netSalary ?? 0).toLocaleString("en-IN")}</span>
-                    <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${String(salary.status) === "paid" ? "bg-emerald-100 text-emerald-700" : String(salary.status) === "approved" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
+                    <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${String(salary.status) === "paid" ? "bg-emerald-100 text-emerald-700" : String(salary.status) === "approved" ? "bg-[var(--color-primary-bg)] text-[var(--color-primary-dark)]" : "bg-amber-100 text-amber-700"}`}>
                       {String(salary.status)}
                     </span>
                   </div>

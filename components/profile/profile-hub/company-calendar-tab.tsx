@@ -17,6 +17,8 @@ import {
 import { apiFetch } from "@/lib/client-utils";
 import { ActionButton } from "./shared";
 import type { AnyRecord } from "./shared";
+import { DayEventsModal } from "./admin-tabs/modals/day-events-modal";
+import { EventListModal } from "./admin-tabs/modals/event-list-modal";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const WEEKDAYS = ["SUN.", "Mon.", "Tue.", "Wed.", "Thr.", "Fri.", "Sat."];
@@ -34,7 +36,7 @@ const EVENT_STYLES: Record<string, { bg: string; text: string; border: string; l
   birthday: { bg: "bg-pink-100",    text: "text-pink-700",    border: "border-pink-200",    label: "Birthday" },
   leave:    { bg: "bg-amber-100",   text: "text-amber-700",   border: "border-amber-200",   label: "Leave" },
   payroll:  { bg: "bg-green-100",   text: "text-green-700",   border: "border-green-200",   label: "Payroll" },
-  meeting:  { bg: "bg-blue-100",    text: "text-blue-700",    border: "border-blue-200",    label: "Meeting" },
+  meeting:  { bg: "bg-[var(--color-primary-bg)]",    text: "text-[var(--color-primary-dark)]",    border: "border-[var(--color-primary-bg)]",    label: "Meeting" },
   interview:{ bg: "bg-purple-100",  text: "text-purple-700",  border: "border-purple-200",  label: "Interview" },
   event:    { bg: "bg-indigo-100",  text: "text-indigo-700",  border: "border-indigo-200",  label: "Event" },
   deadline: { bg: "bg-red-100",     text: "text-red-700",     border: "border-red-200",     label: "Deadline" },
@@ -46,16 +48,22 @@ export function CompanyCalendarTab() {
   const [year, setYear] = useState(() => today.getFullYear());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedType, setSelectedType] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       try {
-        const profileData = await apiFetch<AnyRecord>("/api/profile").catch(() => null);
-        const holidaysRes = await apiFetch<AnyRecord>("/api/attendance/holidays").catch(() => null);
-        const leaveRes = await apiFetch<AnyRecord>("/api/attendance/leave").catch(() => null);
+        const [profileData, holidaysRes, leaveRes, salaryCycleRes, birthdaysRes, meetingsRes] = await Promise.all([
+          apiFetch<AnyRecord>("/api/profile").catch(() => null),
+          apiFetch<AnyRecord>("/api/attendance/holidays").catch(() => null),
+          apiFetch<AnyRecord>("/api/attendance/leave").catch(() => null),
+          apiFetch<AnyRecord>("/api/finance/salary-cycle").catch(() => null),
+          apiFetch<AnyRecord>("/api/company/members/birthdays").catch(() => null),
+          apiFetch<AnyRecord>(`/api/company/meetings?year=${year}&month=${month}`).catch(() => null),
+        ]);
 
         const memberRes = (profileData as any)?.user ?? null;
-        const hrMembers: AnyRecord[] = (profileData as any)?.insights?.hr?.members ?? [];
         const allEvents: CalendarEvent[] = [];
         const holidayList: AnyRecord[] = (holidaysRes as any)?.holidays ?? [];
         const leaveList: AnyRecord[] = (leaveRes as any)?.requests ?? [];
@@ -76,32 +84,43 @@ export function CompanyCalendarTab() {
           }
         }
 
-        if (memberRes) {
-          if (memberRes.dob) {
-            const bday = new Date(String(memberRes.dob));
+        // Birthdays from dedicated API
+        const birthdayMembers: AnyRecord[] = (birthdaysRes as any)?.members ?? [];
+        for (const m of birthdayMembers) {
+          if (m.dob) {
+            const bday = new Date(String(m.dob));
             allEvents.push({
               date: new Date(year, bday.getMonth(), bday.getDate()),
-              title: `Birthday: ${String(memberRes.name ?? "")}`,
+              title: `Birthday: ${String(m.name ?? "")}`,
               type: "birthday",
             });
           }
-          for (const m of hrMembers) {
-            if (m.dob) {
-              const bday = new Date(String(m.dob));
-              allEvents.push({
-                date: new Date(year, bday.getMonth(), bday.getDate()),
-                title: `Birthday: ${String(m.name ?? "")}`,
-                type: "birthday",
-              });
-            }
-          }
         }
 
+        // Payroll from salary cycle
+        const scd = (salaryCycleRes as any)?.salaryCycleDay ?? 29;
+        const scStart = (salaryCycleRes as any)?.salaryCycleStartDay;
+        const scEnd = (salaryCycleRes as any)?.salaryCycleEndDay;
+        const triggerDay = scStart && scEnd ? scEnd + 1 : scd;
+        const lastDay = new Date(year, month + 1, 0).getDate();
+        const payrollDay = Math.min(triggerDay, lastDay);
         allEvents.push({
-          date: new Date(year, month, 1),
+          date: new Date(year, month, payrollDay),
           title: "Payroll Date",
           type: "payroll",
         });
+
+        // Meetings
+        const meetingList: AnyRecord[] = (meetingsRes as any)?.meetings ?? [];
+        for (const m of meetingList) {
+          const md = new Date(String(m.date));
+          const creatorName = (m.creator as any)?.name ?? "Someone";
+          allEvents.push({
+            date: new Date(year, md.getMonth(), md.getDate()),
+            title: `Meeting: ${String(m.title ?? "")} (${creatorName})`,
+            type: "meeting",
+          });
+        }
 
         setEvents(allEvents);
       } catch {
@@ -225,17 +244,23 @@ export function CompanyCalendarTab() {
                     const hasEvents = day ? getEventsForDay(day).length > 0 : false;
 
                     return (
-                      <div
+                      <button
                         key={rowIndex}
+                        disabled={!day}
+                        onClick={() => {
+                          if (day) {
+                            setSelectedDate(new Date(year, month, day));
+                          }
+                        }}
                         className={`relative grid h-10 w-full place-items-center rounded-xl text-xs font-bold sm:h-14 sm:text-sm transition-all ${
                           day
                             ? primaryType
                               ? `${style?.bg} ${style?.text} ${style?.border} border shadow-sm`
                               : isToday
                                 ? "bg-white text-rose-600 border border-rose-200 shadow-sm"
-                                : "bg-white shadow-sm border border-slate-100 text-slate-700"
+                                : "bg-white shadow-sm border border-slate-100 text-slate-700 hover:border-slate-300"
                             : "opacity-0"
-                        } ${isToday && !primaryType ? "ring-2 ring-inset ring-rose-300" : ""}`}
+                        } ${isToday && !primaryType ? "ring-2 ring-inset ring-rose-300" : ""} ${day ? "cursor-pointer" : "cursor-default"}`}
                       >
                         {day}
                         {day && hasEvents && (
@@ -248,7 +273,7 @@ export function CompanyCalendarTab() {
                             )}
                           </span>
                         )}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -274,7 +299,11 @@ export function CompanyCalendarTab() {
           const count = (groupedEvents[key] ?? []).length;
           if (!count) return null;
           return (
-            <div key={key} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <button
+              key={key}
+              onClick={() => setSelectedType(key)}
+              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:shadow-md hover:border-slate-300 text-left w-full"
+            >
               <div className="flex items-center gap-3">
                 <div className={`rounded-lg ${s.bg} p-2.5`}>
                   {key === "holiday"   && <Sun size={18} className={s.text} />}
@@ -291,10 +320,30 @@ export function CompanyCalendarTab() {
                   <p className="text-xs text-slate-500">{count} this month</p>
                 </div>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
+
+      {selectedDate && (
+        <DayEventsModal
+          date={selectedDate}
+          events={getEventsForDay(selectedDate.getDate())}
+          onClose={() => setSelectedDate(null)}
+        />
+      )}
+
+      {selectedType && (
+        <EventListModal
+          type={selectedType}
+          events={groupedEvents[selectedType] ?? []}
+          onClose={() => setSelectedType(null)}
+          onViewDay={(date) => {
+            setSelectedType(null);
+            setSelectedDate(date);
+          }}
+        />
+      )}
     </div>
   );
 }

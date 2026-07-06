@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { X } from "lucide-react";
 import { ActionButton, AnyRecord, formatRole, formatRoleWithCustom } from "../../shared";
-import type { HrMemberRoleKey, MeetingDuration } from "../types";
+import type { MeetingDuration } from "../types";
 import { MEETING_DURATION_OPTIONS } from "../types";
 import { currencySymbol } from "../helpers";
 
@@ -31,7 +31,7 @@ export function MemberListModal({
   onSearch,
   onSelectedOtherRoleChange,
 }: {
-  modalRole: HrMemberRoleKey | null;
+  modalRole: string | null;
   members: AnyRecord[];
   meetingDuration: MeetingDuration;
   invitingFor: string | null;
@@ -211,10 +211,10 @@ export function MemberListModal({
 
                         <div className="flex shrink-0 flex-col gap-2 sm:items-end">
                           <ActionButton variant="primary" className="px-3" disabled={!!isSelf || invitingFor === memberId} type="button" onClick={() => onSendMeetingInvite(memberId)}>
-                            {invitingFor === memberId ? "Sending…" : "Invite to meet"}
+                            {invitingFor === memberId ? "Sending..." : "Invite to meet"}
                           </ActionButton>
                           <ActionButton variant="danger" className="px-3" disabled={!!isSelf || firingFor === memberId} type="button" onClick={() => onRequestFire(member)}>
-                            {firingFor === memberId ? "Removing…" : "Fire"}
+                            {firingFor === memberId ? "Removing..." : "Fire"}
                           </ActionButton>
                         </div>
                       </div>

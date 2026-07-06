@@ -32,7 +32,7 @@ export function BudgetListSection({
           ) : null}
         </h3>
         {actorRole === "finance" ? (
-          <button className="text-sm text-blue-600 underline" onClick={onViewExpired}>View expired budgets</button>
+          <button className="text-sm text-[var(--color-primary)] underline" onClick={onViewExpired}>View expired budgets</button>
         ) : null}
       </div>
       <div className="mt-4 divide-y divide-slate-200">

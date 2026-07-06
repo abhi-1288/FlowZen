@@ -2,7 +2,7 @@ import type { WorkflowStatus } from "@/lib/recruitment-types";
 
 const STYLES: Record<WorkflowStatus, { bg: string; text: string; label: string }> = {
   requested: { bg: "bg-slate-100", text: "text-slate-600", label: "Requested" },
-  assigned: { bg: "bg-blue-50", text: "text-blue-700", label: "Assigned" },
+  assigned: { bg: "bg-[var(--color-primary-bg)]", text: "text-[var(--color-primary-dark)]", label: "Assigned" },
   drafting: { bg: "bg-amber-50", text: "text-amber-700", label: "Drafting" },
   "salary-pending": { bg: "bg-purple-50", text: "text-purple-700", label: "Salary Pending" },
   "salary-approved": { bg: "bg-indigo-50", text: "text-indigo-700", label: "Salary Approved" },

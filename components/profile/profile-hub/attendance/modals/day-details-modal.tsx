@@ -69,12 +69,12 @@ export function DayDetailsModal({
 
         <div className="space-y-4">
           {approvedWfh && (
-            <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+            <div className="rounded-xl border border-[var(--color-primary-bg)] bg-[var(--color-primary-bg)]/50 p-4">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-bold text-blue-800 flex items-center gap-1.5">
-                  <Pen className="h-4 w-4 text-blue-600" /> Work From Home (Approved)
+                <p className="text-sm font-bold text-[var(--color-primary-dark)] flex items-center gap-1.5">
+                  <Pen className="h-4 w-4 text-[var(--color-primary)]" /> Work From Home (Approved)
                 </p>
-                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700">
+                <span className="rounded-full bg-[var(--color-primary-bg)] px-2 py-0.5 text-xs font-bold text-[var(--color-primary-dark)]">
                   Approved
                 </span>
               </div>

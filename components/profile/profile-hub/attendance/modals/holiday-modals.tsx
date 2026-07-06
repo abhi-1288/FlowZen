@@ -414,7 +414,7 @@ export function AdminLeaveHistoryModal({
                           <button
                             type="button"
                             onClick={() => onEditHoliday(h)}
-                            className="rounded-lg px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50"
+                            className="rounded-lg px-3 py-2 text-sm font-medium text-[var(--color-primary)] hover:bg-[var(--color-primary-bg)]"
                           >
                             Edit
                           </button>

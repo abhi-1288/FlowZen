@@ -895,7 +895,7 @@ export function AttendanceTab({
                                         : companyWfh
                                           ? "bg-teal-100 text-teal-700 border border-teal-200 shadow-sm"
                                           : wfh
-                                            ? "bg-blue-100 text-blue-700 border border-blue-200 shadow-sm"
+                                            ? "bg-[var(--color-primary-bg)] text-[var(--color-primary-dark)] border border-[var(--color-primary-bg)] shadow-sm"
                                             : leave
                                           ? "bg-pink-100 text-pink-700 border border-pink-200 shadow-sm"
                                           : weekend
@@ -952,7 +952,7 @@ export function AttendanceTab({
         <div className="mt-6 flex flex-wrap justify-center gap-6 text-xs font-semibold text-slate-600 bg-slate-50 py-3 px-6 rounded-full w-fit mx-auto border border-slate-200">
           <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-emerald-100 border border-emerald-300"></span> Present</div>
           <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-amber-100 border border-amber-300"></span> Half-Day</div>
-          <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-blue-100 border border-blue-300"></span> WFH</div>
+          <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-[var(--color-primary-bg)] border border-[var(--color-primary-light)]"></span> WFH</div>
           <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-pink-100 border border-pink-300"></span> Leave</div>
           <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-rose-50 border border-rose-300"></span> Absent</div>
           <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-fuchsia-100 border border-fuchsia-300"></span> Holiday</div>

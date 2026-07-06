@@ -15,6 +15,7 @@ declare module "next-auth" {
       email?: string | null;
       image?: string | null;
       company?: string | null;
+      companyColor?: string | null;
       team?: string | null;
       teamId?: string | null;
       managedTeamCount?: number;

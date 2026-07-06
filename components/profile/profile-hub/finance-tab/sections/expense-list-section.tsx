@@ -83,7 +83,7 @@ export function ExpenseListSection({
                       ))}
                     </select>
                     <button
-                      className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+                      className="rounded-lg bg-[var(--color-primary)] px-3 py-2 text-sm text-white disabled:opacity-50"
                       disabled={!forwardAdminByExpense[expenseId]}
                       onClick={() => onStatusUpdate("expense", expenseId, "forwarded", { adminApprover: forwardAdminByExpense[expenseId] })}
                     >

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Search, Send, Users, Check, Info, X } from "lucide-react";
+import { Search, Send, Users, Check, Info, X, Calendar, Clock, Video, MapPin } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import { ActionButton, AnyRecord, formatRole, SectionHeader } from "../shared";
 
@@ -14,7 +14,7 @@ export function MessagesTab({
 
   const [members, setMembers] = useState<AnyRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState<"normal" | "bulk">("normal");
+  const [mode, setMode] = useState<"normal" | "bulk" | "meeting">("normal");
   
   // Normal Chat State
   const [selectedMember, setSelectedMember] = useState<AnyRecord | null>(null);
@@ -27,6 +27,21 @@ export function MessagesTab({
   const [bulkMessage, setBulkMessage] = useState("");
   const [bulkSelected, setBulkSelected] = useState<Record<string, boolean>>({});
   const [sendingBulk, setSendingBulk] = useState(false);
+
+  // Schedule Meeting State
+  const [meetingTitle, setMeetingTitle] = useState("");
+  const [meetingDate, setMeetingDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  });
+  const [meetingTime, setMeetingTime] = useState("10:00");
+  const [meetingDuration, setMeetingDuration] = useState(30);
+  const [meetingType, setMeetingType] = useState<"online" | "offline">("online");
+  const [meetingLink, setMeetingLink] = useState("");
+  const [meetingLocation, setMeetingLocation] = useState("");
+  const [meetingDescription, setMeetingDescription] = useState("");
+  const [sendingMeeting, setSendingMeeting] = useState(false);
   
   // Search State
   const [searchInput, setSearchInput] = useState("");
@@ -152,6 +167,62 @@ export function MessagesTab({
     }
   }
 
+  async function handleScheduleMeeting() {
+    if (!meetingTitle.trim()) {
+      showToast("Meeting title is required.", "error");
+      return;
+    }
+    if (!meetingDate) {
+      showToast("Meeting date is required.", "error");
+      return;
+    }
+    if (selectedBulkIds.length === 0) {
+      showToast("Select at least one participant.", "error");
+      return;
+    }
+    if (meetingType === "online" && !meetingLink.trim()) {
+      showToast("Meeting link is required for online meetings.", "error");
+      return;
+    }
+    if (meetingType === "offline" && !meetingLocation.trim()) {
+      showToast("Location is required for offline meetings.", "error");
+      return;
+    }
+    try {
+      setSendingMeeting(true);
+      await apiFetch("/api/company/meetings", {
+        method: "POST",
+        body: JSON.stringify({
+          title: meetingTitle.trim(),
+          date: meetingDate,
+          time: meetingTime,
+          durationMinutes: meetingDuration,
+          meetingType,
+          meetingLink: meetingLink.trim(),
+          location: meetingLocation.trim(),
+          description: meetingDescription.trim(),
+          participantIds: selectedBulkIds,
+        }),
+      });
+      showToast(`Meeting scheduled with ${selectedBulkIds.length} participant(s).`);
+      setMeetingTitle("");
+      setMeetingDescription("");
+      setMeetingLink("");
+      setMeetingLocation("");
+      setBulkSelected({});
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      setMeetingDate(d.toISOString().slice(0, 10));
+      setMeetingTime("10:00");
+      setMeetingDuration(30);
+      setMeetingType("online");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Could not schedule meeting.", "error");
+    } finally {
+      setSendingMeeting(false);
+    }
+  }
+
   async function handleSendBulk() {
     const text = bulkMessage.trim();
     if (!text) {
@@ -237,6 +308,17 @@ export function MessagesTab({
               >
                 Bulk Message
               </button>
+              <button
+                className={`flex-1 rounded-md py-2 text-center text-xs font-semibold transition-all ${
+                  mode === "meeting" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                }`}
+                onClick={() => {
+                  setMode("meeting");
+                  setSelectedMember(null);
+                }}
+              >
+                Schedule Meeting
+              </button>
             </div>
 
             {/* Search Input Box */}
@@ -283,7 +365,7 @@ export function MessagesTab({
                   <button
                     key={memberId}
                     onClick={() => {
-                      if (mode === "bulk") {
+                      if (mode === "bulk" || mode === "meeting") {
                         toggleBulkSelected(memberId);
                       } else {
                         setSelectedMember(member);
@@ -291,7 +373,7 @@ export function MessagesTab({
                     }}
                     className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition-all ${
                       isSelected
-                        ? mode === "bulk"
+                        ? mode === "bulk" || mode === "meeting"
                           ? "bg-slate-900 text-white"
                           : "bg-white text-slate-950 shadow-sm ring-1 ring-slate-100"
                         : "hover:bg-slate-100 text-slate-700"
@@ -314,8 +396,8 @@ export function MessagesTab({
                         <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500"></span>
                       )}
 
-                      {/* Bulk mode selection indicator */}
-                      {mode === "bulk" && isSelected && (
+                      {/* Bulk/Meeting mode selection indicator */}
+                      {(mode === "bulk" || mode === "meeting") && isSelected && (
                         <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white">
                           <Check size={10} strokeWidth={3} />
                         </span>
@@ -324,7 +406,7 @@ export function MessagesTab({
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
-                        <p className={`truncate text-xs font-semibold ${isSelected && mode === "bulk" ? "text-white" : "text-slate-900"}`}>
+                        <p className={`truncate text-xs font-semibold ${isSelected && (mode === "bulk" || mode === "meeting") ? "text-white" : "text-slate-900"}`}>
                           {name}
                         </p>
                         {/* Unread badge count next to username */}
@@ -334,7 +416,7 @@ export function MessagesTab({
                           </span>
                         )}
                       </div>
-                      <p className={`truncate text-[10px] ${isSelected && mode === "bulk" ? "text-slate-300" : "text-slate-400"}`}>
+                      <p className={`truncate text-[10px] ${isSelected && (mode === "bulk" || mode === "meeting") ? "text-slate-300" : "text-slate-400"}`}>
                         {role}
                       </p>
                       {/* Last message preview */}
@@ -365,7 +447,159 @@ export function MessagesTab({
 
         {/* Right Side Chat Conversation Area */}
         <div className="flex flex-col bg-white lg:col-span-8">
-          {mode === "bulk" ? (
+          {mode === "meeting" ? (
+            /* Schedule Meeting panel */
+            <div className="flex flex-col h-full overflow-y-auto p-6">
+              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <Calendar size={16} className="text-slate-500" />
+                Schedule Meeting
+              </h3>
+              <p className="mt-1 text-xs text-slate-400">
+                Select participants on the left and fill in the meeting details below.
+              </p>
+
+              <div className="mt-4 flex flex-wrap gap-1.5 max-h-24 overflow-y-auto border border-slate-100 rounded-lg p-2 bg-slate-50">
+                {selectedBulkIds.length === 0 ? (
+                  <span className="text-[11px] text-slate-400 italic">No participants selected. Click users on the sidebar to add them.</span>
+                ) : (
+                  selectedBulkIds.map((id) => {
+                    const memberObj = members.find((m) => String(m.id ?? m._id) === id);
+                    if (!memberObj) return null;
+                    return (
+                      <span key={id} className="inline-flex items-center gap-1 rounded bg-slate-200 px-2 py-1 text-[10px] font-medium text-slate-700">
+                        {String(memberObj.name)}
+                        <button onClick={() => toggleBulkSelected(id)} className="hover:text-red-500 font-bold ml-1 text-slate-400">&times;</button>
+                      </span>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="mt-4 space-y-4 flex-1">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Title</label>
+                  <input
+                    value={meetingTitle}
+                    onChange={(e) => setMeetingTitle(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                    placeholder="Meeting title"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Meeting Type</label>
+                  <div className="flex gap-3">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="meetingType"
+                        checked={meetingType === "online"}
+                        onChange={() => setMeetingType("online")}
+                        className="text-slate-900"
+                      />
+                      <Video size={14} className="text-slate-500" />
+                      <span className="text-sm text-slate-700">Online</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="meetingType"
+                        checked={meetingType === "offline"}
+                        onChange={() => setMeetingType("offline")}
+                        className="text-slate-900"
+                      />
+                      <MapPin size={14} className="text-slate-500" />
+                      <span className="text-sm text-slate-700">Offline</span>
+                    </label>
+                  </div>
+                </div>
+
+                {meetingType === "online" ? (
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Meeting Link</label>
+                    <input
+                      value={meetingLink}
+                      onChange={(e) => setMeetingLink(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                      placeholder="https://meet.google.com/... or Zoom/Teams link"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Location</label>
+                    <input
+                      value={meetingLocation}
+                      onChange={(e) => setMeetingLocation(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                      placeholder="Room 301, Conference Hall, etc."
+                    />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase text-slate-500">
+                      <Calendar size={12} /> Date
+                    </label>
+                    <input
+                      type="date"
+                      value={meetingDate}
+                      onChange={(e) => setMeetingDate(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase text-slate-500">
+                      <Clock size={12} /> Time
+                    </label>
+                    <input
+                      type="time"
+                      value={meetingTime}
+                      onChange={(e) => setMeetingTime(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Duration</label>
+                  <select
+                    value={meetingDuration}
+                    onChange={(e) => setMeetingDuration(Number(e.target.value))}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                  >
+                    <option value={15}>15 minutes</option>
+                    <option value={30}>30 minutes</option>
+                    <option value={45}>45 minutes</option>
+                    <option value={60}>1 hour</option>
+                    <option value={90}>1.5 hours</option>
+                    <option value={120}>2 hours</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Notes (optional)</label>
+                  <textarea
+                    value={meetingDescription}
+                    onChange={(e) => setMeetingDescription(e.target.value)}
+                    rows={2}
+                    className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                    placeholder="Any additional details..."
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 flex justify-end border-t border-slate-100 pt-4">
+                <ActionButton
+                  variant="primary"
+                  disabled={sendingMeeting || selectedBulkIds.length === 0 || !meetingTitle.trim() || !meetingDate || (meetingType === "online" && !meetingLink.trim()) || (meetingType === "offline" && !meetingLocation.trim())}
+                  onClick={handleScheduleMeeting}
+                >
+                  {sendingMeeting ? "Scheduling..." : `Schedule with ${selectedBulkIds.length} participant(s)`}
+                </ActionButton>
+              </div>
+            </div>
+          ) : mode === "bulk" ? (
             /* Bulk message writing panel */
             <div className="flex flex-col h-full p-6">
               <div className="flex-1">

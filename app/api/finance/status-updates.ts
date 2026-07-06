@@ -553,14 +553,28 @@ export async function handleStatusUpdates(request: Request) {
       policy.salaryCycleChangeRequestedAt = null;
       await policy.save();
 
-      const currentMonth = new Date().toISOString().slice(0, 7);
-      await autoGenerateSalariesForMonth({
-        actorCompany: actor.company,
-        userId,
-        actorName: actor.name ?? "Admin",
-        month: currentMonth,
-        policy: policy || {},
-      });
+      // Only auto-generate if today is on/after the new cycle's trigger day
+      const now = new Date();
+      const dayOfMonth = now.getDate();
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const newTriggerDay = Math.min(
+        policy.salaryCycleStartDay && policy.salaryCycleEndDay
+          ? policy.salaryCycleEndDay + 1
+          : (policy.salaryCycleDay ?? 29),
+        lastDay,
+      );
+      const isCycleDay = dayOfMonth >= Math.max(1, newTriggerDay) && dayOfMonth <= lastDay;
+
+      if (isCycleDay) {
+        const currentMonth = now.toISOString().slice(0, 7);
+        await autoGenerateSalariesForMonth({
+          actorCompany: actor.company,
+          userId,
+          actorName: actor.name ?? "Admin",
+          month: currentMonth,
+          policy: policy || {},
+        });
+      }
 
       if (policy.salaryCycleChangeRequestedBy) {
         const msg = policy.salaryCycleStartDay && policy.salaryCycleEndDay 

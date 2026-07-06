@@ -23,6 +23,7 @@ import { SetupModal } from "./modals/setup-modal";
 import { IdCardModal } from "./id-card-modal";
 import { AnyRecord, formatRoleWithCustom } from "./shared";
 import { WfhAdminSection, type WfhAdminState } from "./sections/wfh-admin-section";
+import { CompanyThemeSection } from "./sections/company-theme-section";
 
 export function ProfileTab({
   profile,
@@ -338,6 +339,10 @@ export function ProfileTab({
             )}
             <WfhAdminSection state={wfhAdminState} company={company} showToast={showToast} />
           </>
+        ) : null}
+
+        {(role === "admin" || role === "human-resource") && profile?.companyStatus === "approved" ? (
+          <CompanyThemeSection company={company} showToast={showToast} />
         ) : null}
 
         {["project-manager", "qa-tester", "finance", "admin"].includes(role) ? (

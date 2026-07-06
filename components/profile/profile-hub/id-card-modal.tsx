@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { darken, lighten } from "@/lib/theme";
 import {
   X,
   Printer,
@@ -47,9 +48,6 @@ function deriveCompanyDomain(name: string): string {
 /* ─── inline styles (not Tailwind) for the card internals so they render
        identically in print / canvas capture ─── */
 
-const BLUE = "#2563eb";
-const BLUE_DARK = "#1d4ed8";
-const BLUE_LIGHT = "#eff6ff";
 const SLATE_50 = "#f8fafc";
 const SLATE_200 = "#e2e8f0";
 const SLATE_400 = "#94a3b8";
@@ -153,6 +151,10 @@ export function IdCardModal({
   const companyName = company?.name ? String(company.name) : "—";
   const companyAddr = company?.address ? String(company.address) : "";
   const companyIcon = company?.icon ? String(company.icon) : "/Logos/logo.jpg";
+  const PRIMARY = useMemo(() => {
+    const hex = company?.primaryColor ? String(company.primaryColor) : "#2563eb";
+    return { hex, dark: darken(hex, 14), light: lighten(hex, 95) };
+  }, [company?.primaryColor]);
   const joiningDate = formatDate(profile?.companyJoined);
   const issueDate = formatDate(new Date().toISOString());
   const domain = deriveCompanyDomain(companyName);
@@ -187,8 +189,8 @@ export function IdCardModal({
         .idc-toolbar-actions { display:flex;align-items:center;gap:8px; }
         .idc-btn-outline { display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1px solid ${SLATE_200};background:#fff;color:${SLATE_700};font-size:13px;font-weight:600;cursor:pointer;transition:all .15s; }
         .idc-btn-outline:hover { background:${SLATE_50};border-color:${SLATE_400}; }
-        .idc-btn-fill { display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;border:none;background:${BLUE};color:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s; }
-        .idc-btn-fill:hover { background:${BLUE_DARK}; }
+        .idc-btn-fill { display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;border:none;background:${PRIMARY.hex};color:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s; }
+        .idc-btn-fill:hover { background:${PRIMARY.dark}; }
         .idc-btn-close { display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;border:none;background:transparent;color:${SLATE_400};cursor:pointer;transition:all .15s; }
         .idc-btn-close:hover { background:${SLATE_50};color:${SLATE_700}; }
 
@@ -203,7 +205,7 @@ export function IdCardModal({
         .idc-card { width:100%;max-width:420px;min-height:480px;border-radius:16px;overflow:hidden;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.08); }
 
         /* ── Front card ── */
-        .idc-front-header { position:relative;padding:28px 24px 24px;text-align:center;background:linear-gradient(135deg,${BLUE} 0%,${BLUE_DARK} 100%);color:#fff;overflow:hidden; }
+        .idc-front-header { position:relative;padding:28px 24px 24px;text-align:center;background:linear-gradient(135deg,${PRIMARY.hex} 0%,${PRIMARY.dark} 100%);color:#fff;overflow:hidden; }
         .idc-front-header::before { content:'';position:absolute;top:-40px;right:-40px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.08); }
         .idc-front-header::after { content:'';position:absolute;bottom:-20px;left:-30px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.05); }
         .idc-front-header img { position:relative;z-index:1;width:48px;height:48px;border-radius:12px;border:2px solid rgba(255,255,255,.3);object-fit:cover;margin-bottom:8px; }
@@ -211,26 +213,26 @@ export function IdCardModal({
         .idc-front-company-addr { position:relative;z-index:1;font-size:11px;color:rgba(255,255,255,.85);margin:0;line-height:1.4; }
 
         .idc-eid-title { display:flex;align-items:center;justify-content:center;gap:12px;padding:14px 24px; }
-        .idc-eid-line { flex:0 0 32px;height:2px;border-radius:1px;background:${BLUE}; }
+        .idc-eid-line { flex:0 0 32px;height:2px;border-radius:1px;background:${PRIMARY.hex}; }
         .idc-eid-text { font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${SLATE_900}; }
 
         .idc-front-body { display:flex;gap:16px;padding:0 24px 16px; }
         .idc-avatar-frame { flex-shrink:0;width:120px;height:140px;border-radius:12px;border:2px solid ${SLATE_200};overflow:hidden;background:${SLATE_50}; }
         .idc-avatar-frame img { width:100%;height:100%;object-fit:cover; }
-        .idc-avatar-initials { width:100%;height:100%;display:grid;place-items:center;background:linear-gradient(135deg,${BLUE},${BLUE_DARK});font-size:32px;font-weight:700;color:#fff; }
+        .idc-avatar-initials { width:100%;height:100%;display:grid;place-items:center;background:linear-gradient(135deg,${PRIMARY.hex},${PRIMARY.dark});font-size:32px;font-weight:700;color:#fff; }
 
         .idc-detail-rows { flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;padding-top:4px; }
         .idc-detail-row { display:flex;align-items:flex-start;gap:10px; }
-        .idc-detail-icon { flex-shrink:0;width:28px;height:28px;border-radius:8px;background:${BLUE_LIGHT};display:grid;place-items:center;color:${BLUE}; }
+        .idc-detail-icon { flex-shrink:0;width:28px;height:28px;border-radius:8px;background:${PRIMARY.light};display:grid;place-items:center;color:${PRIMARY.hex}; }
         .idc-detail-content { min-width:0; }
         .idc-detail-label { font-size:10px;font-weight:600;color:${SLATE_500};letter-spacing:.3px;margin:0;line-height:1.2; }
         .idc-detail-value { font-size:12px;font-weight:700;color:${SLATE_900};margin:0;word-break:break-all;line-height:1.4; }
-        .idc-detail-value.blue { color:${BLUE}; }
+        .idc-detail-value.blue { color:${PRIMARY.hex}; }
 
         .idc-front-footer { display:flex;border-top:1px solid ${SLATE_200};margin:0 24px; }
         .idc-front-footer-item { flex:1;display:flex;align-items:center;gap:8px;padding:12px 0; }
         .idc-front-footer-item + .idc-front-footer-item { border-left:1px solid ${SLATE_200};padding-left:16px; }
-        .idc-front-footer-icon { color:${BLUE};flex-shrink:0; }
+        .idc-front-footer-icon { color:${PRIMARY.hex};flex-shrink:0; }
         .idc-front-footer-label { font-size:10px;font-weight:600;color:${SLATE_500};margin:0; }
         .idc-front-footer-val { font-size:12px;font-weight:700;margin:0; }
 
@@ -238,7 +240,7 @@ export function IdCardModal({
         .idc-signature-script { font-family:'Segoe Script','Dancing Script',cursive;font-size:20px;color:${SLATE_700};margin:0 0 2px; }
         .idc-signature-label { font-size:10px;font-weight:600;color:${SLATE_500};letter-spacing:.5px; }
 
-        .idc-blue-bar { height:10px;background:linear-gradient(90deg,${BLUE},${BLUE_DARK});border-radius:0 0 16px 16px; }
+        .idc-blue-bar { height:10px;background:linear-gradient(90deg,${PRIMARY.hex},${PRIMARY.dark});border-radius:0 0 16px 16px; }
 
         /* ---  center line --- */
         .idc-divider {display:flex; justify-content:center; align-items:center; padding:0 20px;}
@@ -246,30 +248,30 @@ export function IdCardModal({
 
         /* ── Back card ── */
         .idc-back-info-row { display:flex;align-items:flex-start;gap:14px;padding:16px 24px; }
-        .idc-back-icon-circle { flex-shrink:0;width:36px;height:36px;border-radius:50%;background:${BLUE_LIGHT};display:grid;place-items:center;color:${BLUE}; }
+        .idc-back-icon-circle { flex-shrink:0;width:36px;height:36px;border-radius:50%;background:${PRIMARY.light};display:grid;place-items:center;color:${PRIMARY.hex}; }
         .idc-back-info-label { font-size:12px;font-weight:600;color:${SLATE_700};margin:0; }
         .idc-back-info-value { font-size:12px;font-weight:400;color:${SLATE_500};margin:2px 0 0; }
         .idc-back-divider { height:1px;background:${SLATE_200};margin:0 24px; }
 
         .idc-qr-section { display:flex;flex-direction:column;align-items:center;padding:20px 24px 16px; }
-        .idc-qr-frame { width:120px;height:120px;border:2px dashed ${BLUE};border-radius:12px;padding:8px;display:grid;place-items:center; }
+        .idc-qr-frame { width:120px;height:120px;border:2px dashed ${PRIMARY.hex};border-radius:12px;padding:8px;display:grid;place-items:center; }
         .idc-qr-frame img { width:100%;height:100%; }
-        .idc-qr-label { font-size:12px;font-weight:700;color:${BLUE};letter-spacing:.5px;margin:10px 0 2px;text-transform:uppercase; }
+        .idc-qr-label { font-size:12px;font-weight:700;color:${PRIMARY.hex};letter-spacing:.5px;margin:10px 0 2px;text-transform:uppercase; }
         .idc-qr-id { font-size:11px;color:${SLATE_500};margin:0; }
 
         .idc-return-section { text-align:center;padding:8px 24px 20px; }
         .idc-return-text { font-size:11px;color:${SLATE_500};margin:0 0 6px; }
         .idc-return-company { font-size:14px;font-weight:700;color:${SLATE_900};margin:0 0 4px; }
         .idc-return-addr { font-size:11px;color:${SLATE_700};margin:0;line-height:1.5; }
-        .idc-return-link { font-size:11px;color:${BLUE};margin:2px 0 0;font-weight:500; }
+        .idc-return-link { font-size:11px;color:${PRIMARY.hex};margin:2px 0 0;font-weight:500; }
 
         /* ── Bottom action bar ── */
         .idc-actions-bar { display:flex;align-items:center;justify-content:center;gap:12px;padding:20px 24px;background:#fff;border:1px solid ${SLATE_200};border-top:none;border-radius:0 0 16px 16px; }
         .idc-action-btn { display:inline-flex;align-items:center;gap:8px;padding:10px 24px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s; }
         .idc-action-outline { border:1.5px solid ${SLATE_200};background:#fff;color:${SLATE_700}; }
         .idc-action-outline:hover { background:${SLATE_50};border-color:${SLATE_400}; }
-        .idc-action-primary { border:none;background:${BLUE};color:#fff; }
-        .idc-action-primary:hover { background:${BLUE_DARK}; }
+        .idc-action-primary { border:none;background:${PRIMARY.hex};color:#fff; }
+        .idc-action-primary:hover { background:${PRIMARY.dark}; }
 
         /* ── Print styles ── */
         @media print {
@@ -417,7 +419,7 @@ export function IdCardModal({
                       <p className="idc-front-footer-label">Valid Till</p>
                       <p
                         className="idc-front-footer-val"
-                        style={{ color: BLUE, fontWeight: 700 }}
+                        style={{ color: PRIMARY.hex, fontWeight: 700 }}
                       >
                         Active Employee
                       </p>

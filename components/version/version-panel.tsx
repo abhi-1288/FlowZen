@@ -24,7 +24,7 @@ interface VersionData {
 }
 
 const prefixColors: Record<string, string> = {
-  NEW: "bg-blue-100 text-blue-700",
+  NEW: "bg-[var(--color-primary-bg)] text-[var(--color-primary-dark)]",
   FIX: "bg-red-100 text-red-700",
   IMPROVED: "bg-emerald-100 text-emerald-700",
   DEV: "bg-purple-100 text-purple-700",

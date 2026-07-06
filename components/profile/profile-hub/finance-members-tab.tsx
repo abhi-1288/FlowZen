@@ -572,7 +572,7 @@ export function FinanceMembersView({
                                           : dayData.checkIn
                                             ? "bg-emerald-100 text-emerald-900 border border-emerald-200 hover:bg-emerald-200"
                                             : dayData.wfh
-                                              ? "bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-200"
+                                              ? "bg-[var(--color-primary-bg)] text-[var(--color-primary-dark)] border border-[var(--color-primary-bg)] hover:bg-[var(--color-primary-bg)]"
                                               : dayData.leave
                                                 ? "bg-pink-100 text-pink-700 border border-pink-200 hover:bg-pink-200"
                                                 : dayData.absent
@@ -603,7 +603,7 @@ export function FinanceMembersView({
                 <div className="mt-6 flex flex-wrap justify-center gap-6 text-xs font-semibold text-slate-600 bg-slate-50 py-3 px-6 rounded-full w-fit mx-auto border border-slate-200">
                   <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-emerald-100 border border-emerald-300"></span> Present</div>
                   <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-amber-100 border border-amber-300"></span> Half-Day</div>
-                  <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-blue-100 border border-blue-300"></span> WFH</div>
+                  <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-[var(--color-primary-bg)] border border-[var(--color-primary-light)]"></span> WFH</div>
                   <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-pink-100 border border-pink-300"></span> Leave</div>
                   <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-rose-50 border border-rose-300"></span> Absent</div>
                   <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-purple-100 border border-purple-300"></span> Holiday</div>
@@ -676,12 +676,12 @@ export function FinanceMembersView({
                 </div>
               ) : null}
               {dayModal.leave ? (
-                <div className={`rounded-xl px-4 py-3 border ${dayModal.leaveStatus === "approved" ? "bg-amber-50 border-amber-100" : "bg-blue-50 border-blue-100"}`}>
+                <div className={`rounded-xl px-4 py-3 border ${dayModal.leaveStatus === "approved" ? "bg-amber-50 border-amber-100" : "bg-[var(--color-primary-bg)] border-[var(--color-primary-bg)]"}`}>
                   <div className="flex justify-between items-center mb-2">
-                    <span className={`font-semibold ${dayModal.leaveStatus === "approved" ? "text-amber-800" : "text-blue-800"}`}>
+                    <span className={`font-semibold ${dayModal.leaveStatus === "approved" ? "text-amber-800" : "text-[var(--color-primary-dark)]"}`}>
                       {dayModal.leaveStatus === "approved" ? "Leave" : "Leave (Pending)"}
                     </span>
-                    <span className={`capitalize font-bold ${dayModal.leaveStatus === "approved" ? "text-amber-600" : "text-blue-600"}`}>{dayModal.leaveStatus}</span>
+                    <span className={`capitalize font-bold ${dayModal.leaveStatus === "approved" ? "text-amber-600" : "text-[var(--color-primary)]"}`}>{dayModal.leaveStatus}</span>
                   </div>
                   <div className="mt-2 bg-white/50 p-2 rounded-lg">
                     <p className="text-sm text-slate-700"><span className="font-semibold">Reason: </span>{dayModal.leaveReason || "No reason provided"}</p>
@@ -697,10 +697,10 @@ export function FinanceMembersView({
                 </div>
               ) : null}
               {dayModal.wfh ? (
-                <div className="rounded-xl bg-blue-50 px-4 py-3 border border-blue-100">
+                <div className="rounded-xl bg-[var(--color-primary-bg)] px-4 py-3 border border-[var(--color-primary-bg)]">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="font-semibold text-blue-800">Work From Home (Approved)</span>
-                    <span className="text-blue-600 font-bold">Approved</span>
+                    <span className="font-semibold text-[var(--color-primary-dark)]">Work From Home (Approved)</span>
+                    <span className="text-[var(--color-primary)] font-bold">Approved</span>
                   </div>
                   <div className="mt-2 bg-white/50 p-2 rounded-lg">
                     <p className="text-sm text-slate-700"><span className="font-semibold">Reason: </span>{dayModal.wfhReason || "No reason provided"}</p>
@@ -937,12 +937,12 @@ export function FinanceMembersView({
                         const estimatedDate = new Date(checkInMs + hoursToAdd * 60 * 60 * 1000);
                         const estimatedTime = estimatedDate.toLocaleTimeString();
                         return (
-                          <div className="rounded-xl border border-slate-200 bg-blue-50 px-4 py-3">
+                          <div className="rounded-xl border border-slate-200 bg-[var(--color-primary-bg)] px-4 py-3">
                             <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium text-blue-800">Estimated Check-out</span>
-                              <span className="text-sm font-bold text-blue-900">{estimatedTime}</span>
+                              <span className="text-sm font-medium text-[var(--color-primary-dark)]">Estimated Check-out</span>
+                              <span className="text-sm font-bold text-[var(--color-primary-dark)]">{estimatedTime}</span>
                             </div>
-                            <p className="mt-0.5 text-xs text-blue-600">
+                            <p className="mt-0.5 text-xs text-[var(--color-primary)]">
                               {checkOutStatusType === "absent"
                                 ? "Check-out set to same as check-in (0 hrs)"
                                 : checkOutStatusType === "halfDay"

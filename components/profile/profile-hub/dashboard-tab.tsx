@@ -164,7 +164,7 @@ export function DashboardTab({
 
   const kpiCards = [
     { label: "Attendance %", value: attendanceRate, icon: CalendarCheck, color: "text-emerald-600", bg: "bg-emerald-100" },
-    { label: "Salary Cost", value: totalSalaryCost ?? "—", icon: DollarSign, color: "text-blue-600", bg: "bg-blue-100" },
+    { label: "Salary Cost", value: totalSalaryCost ?? "—", icon: DollarSign, color: "text-[var(--color-primary)]", bg: "bg-[var(--color-primary-bg)]" },
     { label: "Revenue vs Expenses", value: "—", icon: BarChart3, color: "text-purple-600", bg: "bg-purple-100" },
     { label: "Active Projects", value: String(totalTeams || "—"), icon: Briefcase, color: "text-amber-600", bg: "bg-amber-100" },
     { label: "Hiring Pipeline", value: String(pendingJoins || "—"), icon: UserPlus, color: "text-cyan-600", bg: "bg-cyan-100" },

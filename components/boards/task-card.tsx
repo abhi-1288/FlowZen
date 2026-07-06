@@ -130,7 +130,7 @@ export function TaskCard({
             </span>
           )}
           {task.takenTeamName && (
-            <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700">
+            <span className="rounded-full bg-[var(--color-primary-bg)] px-2 py-1 text-[10px] font-semibold text-[var(--color-primary-dark)]">
               Team: {task.takenTeamName}
             </span>
           )}
