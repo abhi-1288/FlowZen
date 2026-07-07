@@ -111,6 +111,11 @@ export function PersonalInfoSection({
   const [editCountryCode, setEditCountryCode] = useState("+1");
   const [editDob, setEditDob] = useState("");
   const [editAddress, setEditAddress] = useState("");
+  const [editRegionLabel, setEditRegionLabel] = useState("");
+  const [editEmergencyPhone, setEditEmergencyPhone] = useState("");
+  const [editEmergencyCountryCode, setEditEmergencyCountryCode] = useState("+1");
+  const [editBloodGroup, setEditBloodGroup] = useState("");
+  const [editMaskPhone, setEditMaskPhone] = useState(false);
 
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [emailStep, setEmailStep] = useState<"credentials" | "otp">("credentials");
@@ -126,6 +131,14 @@ export function PersonalInfoSection({
   const oldPhone = profile?.phone ? String(profile.phone) : "";
   const oldDob = profile?.dob ? String(profile.dob).slice(0, 10) : "";
   const oldAddress = profile?.address ? String(profile.address) : "";
+  const oldRegionLabel = profile?.regionLabel ? String(profile.regionLabel) : "";
+  const oldEmergencyContact = profile?.emergencyContact ? String(profile.emergencyContact) : "";
+  const oldBloodGroup = profile?.bloodGroup ? String(profile.bloodGroup) : "";
+  const oldMaskPhone = profile?.maskPhone ? Boolean(profile.maskPhone) : false;
+
+  const companyData = (profile?.company && typeof profile.company === "object" ? profile.company : null) as AnyRecord | null;
+  const approvedAddresses = (companyData?.multiOffice && Array.isArray(companyData?.addresses) ? companyData.addresses : []) as AnyRecord[];
+  const regionOptions = approvedAddresses.map((a) => String(a.label ?? "")).filter(Boolean);
 
   function openModal() {
     setEditName(oldName);
@@ -133,6 +146,10 @@ export function PersonalInfoSection({
     setEditCountryCode(detectCountryCode(oldPhone));
     setEditDob(oldDob);
     setEditAddress(oldAddress);
+    setEditRegionLabel(oldRegionLabel);
+    setEditEmergencyPhone(stripCountryCode(oldEmergencyContact));
+    setEditEmergencyCountryCode(detectCountryCode(oldEmergencyContact));
+    setEditBloodGroup(oldBloodGroup);
     setOpen(true);
     setConfirming(false);
   }
@@ -216,9 +233,10 @@ export function PersonalInfoSection({
     setSaving(true);
     try {
       const fullPhone = editPhone ? `${editCountryCode} ${editPhone}` : "";
+      const fullEmergency = editEmergencyPhone ? `${editEmergencyCountryCode} ${editEmergencyPhone}` : "";
       await apiFetch("/api/profile", {
         method: "PATCH",
-        body: JSON.stringify({ name: editName, phone: fullPhone, dob: editDob || null, address: editAddress }),
+        body: JSON.stringify({ name: editName, phone: fullPhone, dob: editDob || null, address: editAddress, regionLabel: editRegionLabel, emergencyContact: fullEmergency, bloodGroup: editBloodGroup, maskPhone: editMaskPhone }),
       });
       await refresh(true);
       setOpen(false);
@@ -293,6 +311,9 @@ export function PersonalInfoSection({
         <Row label="Phone" value={profile?.phone ? String(profile.phone) : undefined} />
         <Row label="Date of Birth" value={profile?.dob ? new Date(String(profile.dob)).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : undefined} />
         <Row label="Address" value={profile?.address ? String(profile.address) : undefined} />
+        <Row label="Emergency Contact" value={profile?.emergencyContact ? String(profile.emergencyContact) : undefined} />
+        <Row label="Blood Group" value={profile?.bloodGroup ? String(profile.bloodGroup) : undefined} />
+        {oldRegionLabel ? <Row label="Region" value={oldRegionLabel} /> : null}
         <Row label="Role" value={effectiveRole ? displayRole : undefined} />
         <Row label="Unique Identity" value={profile?.companyIdentityCode ? String(profile.companyIdentityCode) : undefined} />
       </dl>
@@ -315,15 +336,15 @@ export function PersonalInfoSection({
 
       {/* Edit modal */}
       {open && !confirming ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm p-4 pt-8 pb-8 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl my-auto">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-slate-900">Edit Personal Info</h2>
               <button className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600" onClick={() => setOpen(false)} type="button">
                 <X size={18} />
               </button>
             </div>
-            <form className="space-y-4" onSubmit={handleRequestSave}>
+            <form className="space-y-4 max-h-[60vh] overflow-y-auto pr-1" onSubmit={handleRequestSave}>
               <EditField label="Name" value={editName} onChange={setEditName} placeholder={oldName || "Your name"} required />
               <div>
                 <label className="mb-1 block text-xs font-medium text-slate-500">Phone</label>
@@ -353,6 +374,81 @@ export function PersonalInfoSection({
               </div>
               <EditField label="Date of Birth" value={editDob} onChange={setEditDob} placeholder={oldDob || "YYYY-MM-DD"} type="date" />
               <EditField label="Address" value={editAddress} onChange={setEditAddress} placeholder={oldAddress || "Your address"} />
+              {regionOptions.length > 0 ? (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-500">Region</label>
+                  <select
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                    value={editRegionLabel}
+                    onChange={(e) => setEditRegionLabel(e.target.value)}
+                  >
+                    <option value="">Select region</option>
+                    {regionOptions.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-500">Emergency Contact</label>
+                <div className="flex gap-2">
+                  <div className="relative">
+                    <select
+                      className="appearance-none rounded-lg border border-slate-200 bg-white py-2 pl-2.5 pr-7 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                      value={editEmergencyCountryCode}
+                      onChange={(e) => setEditEmergencyCountryCode(e.target.value)}
+                    >
+                      {COUNTRY_CODES.map((cc) => (
+                        <option key={cc.code} value={cc.code}>
+                          {cc.flag} {cc.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown size={13} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" />
+                  </div>
+                  <input
+                    className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                    type="tel"
+                    value={editEmergencyPhone}
+                    placeholder={stripCountryCode(oldEmergencyContact) || "Emergency contact number"}
+                    onChange={(e) => setEditEmergencyPhone(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-500">Blood Group</label>
+                <select
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  value={editBloodGroup}
+                  onChange={(e) => setEditBloodGroup(e.target.value)}
+                >
+                  <option value="">Select blood group</option>
+                  <option value="A+">A+</option>
+                  <option value="A-">A-</option>
+                  <option value="B+">B+</option>
+                  <option value="B-">B-</option>
+                  <option value="O+">O+</option>
+                  <option value="O-">O-</option>
+                  <option value="AB+">AB+</option>
+                  <option value="AB-">AB-</option>
+                </select>
+              </div>
+              <div className={`flex items-center justify-between rounded-lg border p-3 ${editPhone && editEmergencyPhone ? "border-slate-200" : "border-slate-100 bg-slate-50"}`}>
+                <div>
+                  <span className={`text-sm font-medium ${editPhone && editEmergencyPhone ? "text-slate-700" : "text-slate-400"}`}>Mask personal number on ID card</span>
+                  <p className="text-xs text-slate-400">
+                    {editPhone && editEmergencyPhone ? "Hides your phone number with asterisks" : "Add both phone and emergency contact to enable"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={!editPhone || !editEmergencyPhone}
+                  onClick={() => setEditMaskPhone(!editMaskPhone)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${editMaskPhone ? "bg-indigo-600" : "bg-slate-300"} ${!editPhone || !editEmergencyPhone ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editMaskPhone ? "translate-x-6" : "translate-x-1"}`} />
+                </button>
+              </div>
               <div className="flex items-center gap-2 pt-2">
                 <button
                   className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"
@@ -375,8 +471,8 @@ export function PersonalInfoSection({
 
       {/* Confirm modal */}
       {open && confirming ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={(e) => { if (e.target === e.currentTarget) { setConfirming(false); } }}>
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 backdrop-blur-sm p-4 pt-8 pb-8 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) { setConfirming(false); } }}>
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl my-auto">
             <h2 className="text-lg font-semibold text-slate-900">Is your data correct?</h2>
             <p className="mt-1 text-sm text-slate-500">Please review before saving.</p>
             <div className="mt-4 space-y-2 rounded-xl bg-slate-50 p-4 text-sm">
@@ -384,6 +480,10 @@ export function PersonalInfoSection({
               <ConfirmRow label="Phone" value={editCountryCode && editPhone ? `${editCountryCode} ${editPhone}` : editPhone || editCountryCode} />
               <ConfirmRow label="Date of Birth" value={editDob} />
               <ConfirmRow label="Address" value={editAddress} />
+              {editRegionLabel ? <ConfirmRow label="Region" value={editRegionLabel} /> : null}
+              {editEmergencyPhone ? <ConfirmRow label="Emergency Contact" value={`${editEmergencyCountryCode} ${editEmergencyPhone}`} /> : null}
+              {editBloodGroup ? <ConfirmRow label="Blood Group" value={editBloodGroup} /> : null}
+              <ConfirmRow label="Mask Phone" value={editMaskPhone ? "Yes" : "No"} />
             </div>
             <div className="mt-5 flex justify-end gap-3">
               <button

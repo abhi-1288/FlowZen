@@ -378,6 +378,8 @@ export function MembersTab({
         onSearchInputChange={setModalSearchInput}
         onSearch={() => setModalSearchQuery(modalSearchInput.trim())}
         onSelectedOtherRoleChange={setSelectedOtherRole}
+        showToast={showToast}
+        onRefresh={refresh}
       />
 
       <FireModal

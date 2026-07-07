@@ -552,6 +552,55 @@ export async function PATCH(request: Request, { params }: Params) {
       }
     }
 
+    if (joinRequest.kind === "id-card") {
+      if (status === "approved") {
+        const meta = (joinRequest.metadata ?? {}) as Record<string, unknown>;
+        meta.approvedAt = new Date().toISOString();
+        const signed = Boolean(body.signed);
+        if (signed) {
+          const signer = await User.findById(userId).select("name role");
+          meta.isSigned = true;
+          meta.signedBy = signer?.name ?? "Unknown";
+          meta.signedRole = signer?.role ?? "";
+          meta.signedAt = new Date().toISOString();
+        }
+        joinRequest.metadata = { ...meta };
+        joinRequest.markModified("metadata");
+      } else if (status === "rejected" && rejectionReason) {
+        const meta = (joinRequest.metadata ?? {}) as Record<string, unknown>;
+        meta.rejectionReason = rejectionReason;
+        joinRequest.metadata = { ...meta };
+        joinRequest.markModified("metadata");
+      }
+    }
+
+    if (joinRequest.kind === "region-address") {
+      if (status === "approved") {
+        const meta = (joinRequest.metadata ?? {}) as Record<string, unknown>;
+        const newAddress = {
+          label: String(meta.label ?? "").trim(),
+          line1: String(meta.line1 ?? "").trim(),
+          city: String(meta.city ?? "").trim(),
+          state: String(meta.state ?? "").trim(),
+          zip: String(meta.zip ?? "").trim(),
+          country: String(meta.country ?? "").trim(),
+          isMain: false,
+        };
+        if (!newAddress.label) return jsonError("Address label is missing.", 400);
+
+        const company = await Company.findById(joinRequest.company);
+        if (!company) return jsonError("Company not found.", 404);
+
+        if (!Array.isArray(company.addresses)) company.addresses = [];
+        company.addresses.push(newAddress);
+        if (!company.address) {
+          company.address = [newAddress.line1, newAddress.city, newAddress.state, newAddress.zip, newAddress.country]
+            .filter(Boolean).join(", ");
+        }
+        await company.save();
+      }
+    }
+
     if (joinRequest.kind === "quit-team") {
       if (status === "approved") {
         const teamId = joinRequest.team;
@@ -712,6 +761,19 @@ export async function PATCH(request: Request, { params }: Params) {
         status === "approved"
           ? `Your ${letterType} request has been approved. View it here.`
           : `Your ${letterType} request was rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`;
+    } else if (joinRequest.kind === "region-address") {
+      const regionLabel = String((joinRequest.metadata as any)?.label ?? "");
+      title = status === "approved" ? "Region address approved" : "Region address rejected";
+      message =
+        status === "approved"
+          ? `The office address "${regionLabel}" has been approved and added.`
+          : `The office address "${regionLabel}" submission was rejected.`;
+    } else if (joinRequest.kind === "id-card") {
+      title = status === "approved" ? "ID Card Approved" : "ID Card Request Declined";
+      message =
+        status === "approved"
+          ? "Your ID card has been approved. You can now view it from your profile."
+          : `Your ID card request was declined.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`;
     }
 
     const notificationLink =

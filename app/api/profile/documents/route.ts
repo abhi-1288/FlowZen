@@ -4,6 +4,7 @@ import { jsonError, requireUserId } from "@/lib/api";
 import { User } from "@/models/User";
 import { Company } from "@/models/Company";
 import { saveDocument, deleteDocument } from "@/lib/storage";
+import { parseResume } from "@/lib/resume-parser";
 
 export async function GET() {
   const userId = await requireUserId();
@@ -86,6 +87,28 @@ export async function POST(request: Request) {
     const key = `${userId}_${category}_${Date.now()}.${ext}`;
 
     const { url, fileName, fileType, fileSize } = await saveDocument(file, key);
+
+    // Try to extract blood group from PDF or field values
+    let bloodGroupExtracted = "";
+    if (ext === "pdf") {
+      try {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const parsed = await parseResume(buffer);
+        bloodGroupExtracted = parsed.bloodGroup;
+      } catch { /* silent */ }
+    }
+    if (!bloodGroupExtracted) {
+      for (const fv of fieldValues) {
+        const val = fv.value.trim().toUpperCase();
+        if (/^(A|B|O|AB)[+-]$/.test(val)) {
+          bloodGroupExtracted = val;
+          break;
+        }
+      }
+    }
+    if (bloodGroupExtracted) {
+      user.bloodGroup = bloodGroupExtracted;
+    }
 
     user.documents.push({ category, fileName, fileType, fileSize, fileUrl: url, fieldValues });
     await user.save();

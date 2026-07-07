@@ -10,10 +10,6 @@ export async function PATCH(request: Request) {
   if (!userId) return jsonError("Unauthorized", 401);
 
   const body = await request.json();
-  const primaryColor = String(body.primaryColor ?? "").trim();
-
-  const validHex = COMPANY_PALETTE.some((c) => c.hex === primaryColor);
-  if (!validHex) return jsonError("Invalid colour. Choose from the available palette.");
 
   try {
     await connectDb();
@@ -35,8 +31,26 @@ export async function PATCH(request: Request) {
   const company = await Company.findById(companyId);
   if (!company) return jsonError("Company not found.", 404);
 
-  company.primaryColor = primaryColor;
+  if (body.primaryColor !== undefined) {
+    const primaryColor = String(body.primaryColor ?? "").trim();
+    const validHex = COMPANY_PALETTE.some((c) => c.hex === primaryColor);
+    if (!validHex) return jsonError("Invalid colour. Choose from the available palette.");
+    company.primaryColor = primaryColor;
+  }
+
+  if (body.supportEmail !== undefined) {
+    company.supportEmail = String(body.supportEmail ?? "").trim();
+  }
+
+  if (body.website !== undefined) {
+    company.website = String(body.website ?? "").trim();
+  }
+
   await company.save();
 
-  return NextResponse.json({ primaryColor: company.primaryColor });
+  return NextResponse.json({
+    primaryColor: company.primaryColor,
+    supportEmail: company.supportEmail,
+    website: company.website,
+  });
 }

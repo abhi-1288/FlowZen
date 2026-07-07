@@ -20,10 +20,16 @@ import { ReleaseNotesSection } from "./sections/release-notes-section";
 import { MonthlyCheckBox } from "./monthly-check-box";
 import { ConfirmActionModal } from "./modals/confirm-action-modal";
 import { SetupModal } from "./modals/setup-modal";
-import { IdCardModal } from "./id-card-modal";
 import { AnyRecord, formatRoleWithCustom } from "./shared";
 import { WfhAdminSection, type WfhAdminState } from "./sections/wfh-admin-section";
 import { CompanyThemeSection } from "./sections/company-theme-section";
+import { CompanyAddressSection } from "./sections/company-address-section";
+import dynamic from "next/dynamic";
+
+const IdCardModal = dynamic(
+  () => import("./id-card-modal").then((mod) => mod.IdCardModal),
+  { ssr: false },
+);
 
 export function ProfileTab({
   profile,
@@ -67,6 +73,9 @@ export function ProfileTab({
   const [showDocLetterModal, setShowDocLetterModal] = useState(false);
   const [docLetterMode, setDocLetterMode] = useState<"request" | "send">("request");
   const [showIdCardModal, setShowIdCardModal] = useState(false);
+  const [idCardRequestStatus, setIdCardRequestStatus] = useState<string | null>(null);
+  const [idCardSignature, setIdCardSignature] = useState<{ name: string; role: string; signedAt: string } | null>(null);
+  const [idCardIssueDate, setIdCardIssueDate] = useState<string | null>(null);
 
   const company = typeof profile?.company === "object" && profile.company ? (profile.company as AnyRecord) : null;
   const team = typeof profile?.team === "object" && profile.team ? (profile.team as AnyRecord) : null;
@@ -218,6 +227,16 @@ export function ProfileTab({
       .then(setSalaryCycle).catch(() => {});
   }, [inApprovedCompany]);
 
+  useEffect(() => {
+    if (!inApprovedCompany) { setIdCardRequestStatus(null); setIdCardSignature(null); setIdCardIssueDate(null); return; }
+    apiFetch<{ status: string | null; requestId?: string; signature?: { name: string; role: string; signedAt: string } | null; issueDate?: string }>("/api/profile/id-card/status")
+      .then((data) => {
+        setIdCardRequestStatus(data.status);
+        setIdCardSignature(data.signature ?? null);
+        setIdCardIssueDate(data.issueDate ?? null);
+      }).catch(() => {});
+  }, [inApprovedCompany]);
+
   const wfhAdminState: WfhAdminState = {
     ...wfh,
     wfhDates: wfh.wfhDates,
@@ -258,19 +277,21 @@ export function ProfileTab({
         </div>
       ) : null}
 
-      <div className="mb-5 flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)]">
-        <div>
-          <p className="text-sm font-semibold text-slate-900">ID Card</p>
-          <p className="text-xs text-slate-500">View and print your company identity card</p>
+      {idCardRequestStatus === "approved" ? (
+        <div className="mb-5 flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)]">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">ID Card</p>
+            <p className="text-xs text-slate-500">View and print your company identity card</p>
+          </div>
+          <button
+            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            onClick={() => setShowIdCardModal(true)}
+            type="button"
+          >
+            Show ID Card
+          </button>
         </div>
-        <button
-          className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-          onClick={() => setShowIdCardModal(true)}
-          type="button"
-        >
-          Show ID Card
-        </button>
-      </div>
+      ) : null}
 
       <div className="grid gap-5 xl:grid-cols-2">
         <PersonalInfoSection profile={profile} session={session as { user?: { name?: string; email?: string } } | null} avatarUrl={avatarUrl} displayName={displayName}
@@ -365,6 +386,12 @@ export function ProfileTab({
         <MonthlyCheckBox sectionClass={sectionClass} showToast={showToast} />
       </div>
 
+      {(role === "admin" || role === "human-resource") && profile?.companyStatus === "approved" ? (
+        <div className="mt-5">
+          <CompanyAddressSection company={company} role={role} userId={profileId} showToast={showToast} refresh={refresh} />
+        </div>
+      ) : null}
+
       {showDocLetterModal ? (
         <DocumentLetterModal mode={docLetterMode} onClose={() => setShowDocLetterModal(false)}
           onSuccess={() => { setShowDocLetterModal(false); void refresh(true); }} showToast={showToast} />
@@ -404,15 +431,19 @@ export function ProfileTab({
         onClose={setup.closeSetupModal} onSendOtp={setup.sendOtp}
         onVerifyOtp={setup.verifyOtp} onCompleteSetup={setup.completeSetup} />
 
-      <IdCardModal
-        open={showIdCardModal}
-        onClose={() => setShowIdCardModal(false)}
-        profile={profile}
-        company={company}
-        avatarUrl={avatarUrl}
-        displayName={displayName}
-        displayRole={displayRole}
-      />
+      {showIdCardModal ? (
+        <IdCardModal
+          open={showIdCardModal}
+          onClose={() => setShowIdCardModal(false)}
+          profile={profile}
+          company={company}
+          avatarUrl={avatarUrl}
+          displayName={displayName}
+          displayRole={displayRole}
+          signature={idCardSignature}
+          issueDate={idCardIssueDate}
+        />
+      ) : null}
     </>
   );
 }

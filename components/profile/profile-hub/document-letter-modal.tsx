@@ -25,6 +25,7 @@ const LETTER_TYPES = [
   { value: "internship", label: "Internship Certificate" },
   { value: "resignation", label: "Resignation Letter" },
   { value: "other", label: "Other" },
+  { value: "id-card", label: "ID Card" },
 ];
 
 export function DocumentLetterModal({ mode, onClose, onSuccess, showToast }: Props) {
@@ -47,6 +48,10 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast }: Pro
   const [showPreview, setShowPreview] = useState(false);
 
   function handlePreview() {
+    if (letterType === "id-card") {
+      setShowPreview(true);
+      return;
+    }
     if (letterType === "resignation" && !resignationLastWorkingDay) {
       showToast("Please enter the last working day first.", "error");
       return;
@@ -109,6 +114,23 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast }: Pro
   }, [letterType, noticePeriodDays]);
 
   async function handleSubmit() {
+    if (letterType === "id-card") {
+      try {
+        setSubmitting(true);
+        await apiFetch("/api/profile/id-card/request", {
+          method: "POST",
+          body: JSON.stringify({ adminId: selectedHrId || undefined }),
+        });
+        showToast("ID card request sent for approval.");
+        onSuccess();
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Failed to send request.", "error");
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
     if (!purpose.trim()) {
       showToast("Please enter a purpose.", "error");
       return;
@@ -203,7 +225,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast }: Pro
                 {showPreview ? "Edit Letter Content" : mode === "send" ? "Send Resignation Letter" : "Request Document Letter"}
               </h4>
               <p className="mt-0.5 text-sm text-slate-500">
-                {showPreview ? "Customize the text before submitting." : mode === "send" ? "Submit your resignation letter to HR." : "Submit a request to HR for a company document letter."}
+                {letterType === "id-card" ? "Request an ID card for approval." : showPreview ? "Customize the text before submitting." : mode === "send" ? "Submit your resignation letter to HR." : "Submit a request to HR for a company document letter."}
               </p>
             </div>
           </div>
@@ -247,6 +269,10 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast }: Pro
               ))}
             </select>
           </div>
+
+          {letterType === "id-card" ? (
+            <p className="text-sm text-slate-600">Select an HR to review and approve your ID card request. No additional details are needed.</p>
+          ) : null}
 
           {letterType === "other" ? (
             <div>
@@ -352,18 +378,20 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast }: Pro
             </>
           ) : null}
 
-          <div>
-            <label className="text-xs font-semibold uppercase text-slate-500">
-              Purpose
-            </label>
-            <textarea
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-              rows={3}
-              placeholder="e.g., For visa application, higher education, bank loan..."
-              value={purpose}
-              onChange={(e) => setPurpose(e.target.value)}
-            />
-          </div>
+          {letterType !== "id-card" ? (
+            <div>
+              <label className="text-xs font-semibold uppercase text-slate-500">
+                Purpose
+              </label>
+              <textarea
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                rows={3}
+                placeholder="e.g., For visa application, higher education, bank loan..."
+                value={purpose}
+                onChange={(e) => setPurpose(e.target.value)}
+              />
+            </div>
+          ) : null}
 
           <div>
             <label className="text-xs font-semibold uppercase text-slate-500">
@@ -382,23 +410,27 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast }: Pro
               ))}
             </select>
             <p className="mt-1 text-xs text-slate-400">
-              {hrs.length === 0
-                ? "No HR members found. The request will be auto-assigned."
-                : hrs.length > 1
-                  ? "Select a specific HR or leave as auto-assign."
-                  : ""}
+              {letterType === "id-card"
+                ? "Select the HR who will review and approve your ID card request."
+                : hrs.length === 0
+                  ? "No HR members found. The request will be auto-assigned."
+                  : hrs.length > 1
+                    ? "Select a specific HR or leave as auto-assign."
+                    : ""}
             </p>
           </div>
 
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={handlePreview}
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
-            >
-              {letterContent ? "Edit Letter Content" : "Preview & Edit Letter Content"}
-            </button>
-          </div>
+          {letterType !== "id-card" ? (
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handlePreview}
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+              >
+                {letterContent ? "Edit Letter Content" : "Preview & Edit Letter Content"}
+              </button>
+            </div>
+          ) : null}
         </div>
         )}
 
@@ -426,7 +458,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast }: Pro
                 disabled={submitting}
                 onClick={() => void handleSubmit()}
               >
-                {submitting ? "Submitting..." : (mode === "send" ? "Send Letter" : "Submit Request")}
+                {submitting ? "Submitting..." : (mode === "send" ? "Send Letter" : letterType === "id-card" ? "Request ID Card" : "Submit Request")}
               </button>
             </>
           )}

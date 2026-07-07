@@ -38,6 +38,19 @@ const CompanySchema = new Schema(
     icon: { type: String, default: "" },
     primaryColor: { type: String, default: "#2563eb" },
     address: { type: String, default: "", maxlength: 500 },
+    supportEmail: { type: String, default: "", trim: true },
+    website: { type: String, default: "", trim: true },
+    multiOffice: { type: Boolean, default: false },
+    addressManagers: [{ type: Schema.Types.ObjectId, ref: "User" }],
+    addresses: [{
+      label: { type: String, default: "" },
+      line1: { type: String, default: "" },
+      city: { type: String, default: "" },
+      state: { type: String, default: "" },
+      zip: { type: String, default: "" },
+      country: { type: String, default: "" },
+      isMain: { type: Boolean, default: false }
+    }],
     startDate: { type: Date, default: null },
     requiredDocuments: [{
       name: { type: String, required: true },
