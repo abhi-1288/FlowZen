@@ -17,6 +17,8 @@ import {
   Droplets,
   FileDown,
   ImageDown,
+  Building2,
+  MapPin,
 } from "lucide-react";
 import QRCode from "qrcode";
 import type { AnyRecord } from "./shared";
@@ -90,6 +92,7 @@ export function IdCardModal({
   onSign,
   signerName,
   signerRole,
+  variant = "employee",
 }: {
   open: boolean;
   onClose: () => void;
@@ -103,6 +106,7 @@ export function IdCardModal({
   onSign?: () => void;
   signerName?: string;
   signerRole?: string;
+  variant?: "employee" | "visitor";
 }) {
   const [signing, setSigning] = useState(false);
   const [localSigned, setLocalSigned] = useState(false);
@@ -111,10 +115,13 @@ export function IdCardModal({
 
   const uniqueId = profile?.companyIdentityCode
     ? String(profile.companyIdentityCode)
-    : "—";
+    : variant === "visitor" && profile?.identityCode
+      ? String(profile.identityCode)
+      : "—";
+  const isVisitor = variant === "visitor";
   const qrValue =
     typeof window !== "undefined"
-      ? `${window.location.origin}/verify/${uniqueId}`
+      ? `${window.location.origin}/${isVisitor ? "verify-visitor" : "verify"}/${uniqueId}`
       : "";
 
   useEffect(() => {
@@ -263,11 +270,14 @@ export function IdCardModal({
   const companyAddr = company?.address ? String(company.address) : "";
   const companyIcon = company?.icon ? String(company.icon) : "/Logos/logo.jpg";
   const PRIMARY = useMemo(() => {
+    if (isVisitor) {
+      return { hex: "#d97706", dark: "#b45309", light: "#fef3c7" };
+    }
     const hex = company?.primaryColor
       ? String(company.primaryColor)
       : "#2563eb";
     return { hex, dark: darken(hex, 14), light: lighten(hex, 95) };
-  }, [company?.primaryColor]);
+  }, [company?.primaryColor, isVisitor]);
   const joiningDate = formatDate(profile?.companyJoined);
   const issueDateStr = issueDate
     ? formatDate(issueDate)
@@ -553,6 +563,9 @@ export function IdCardModal({
                 <div className="idc-front-header">
                   <img src={companyIcon} alt={companyName} />
                   <p className="idc-front-company-name">{companyName}</p>
+                  {isVisitor ? (
+                    <span className="idc-region-tag" style={{ background: "#d97706", color: "#fff", border: "none" }}>VISITOR</span>
+                  ) : null}
                   {regionLabel && multiOffice ? (
                     <span className="idc-region-tag">{regionLabel}</span>
                   ) : null}
@@ -569,10 +582,10 @@ export function IdCardModal({
                   )}
                 </div>
 
-                {/* Employee ID Card title */}
+                {/* ID Card title */}
                 <div className="idc-eid-title">
                   <span className="idc-eid-line" />
-                  <span className="idc-eid-text">Employee ID Card</span>
+                  <span className="idc-eid-text">{isVisitor ? "Visitor ID Card" : "Employee ID Card"}</span>
                   <span className="idc-eid-line" />
                 </div>
 
@@ -587,16 +600,28 @@ export function IdCardModal({
                   </div>
 
                   <div className="idc-detail-rows">
-                    {/* Employee ID */}
-                    <div className="idc-detail-row">
-                      <div className="idc-detail-icon">
-                        <IdCard size={14} />
+                    {/* ID / Pass ID */}
+                    {isVisitor ? (
+                      <div className="idc-detail-row">
+                        <div className="idc-detail-icon">
+                          <IdCard size={14} />
+                        </div>
+                        <div className="idc-detail-content">
+                          <p className="idc-detail-label">Pass ID</p>
+                          <p className="idc-detail-value blue">{uniqueId}</p>
+                        </div>
                       </div>
-                      <div className="idc-detail-content">
-                        <p className="idc-detail-label">Employee ID</p>
-                        <p className="idc-detail-value blue">{uniqueId}</p>
+                    ) : (
+                      <div className="idc-detail-row">
+                        <div className="idc-detail-icon">
+                          <IdCard size={14} />
+                        </div>
+                        <div className="idc-detail-content">
+                          <p className="idc-detail-label">Employee ID</p>
+                          <p className="idc-detail-value blue">{uniqueId}</p>
+                        </div>
                       </div>
-                    </div>
+                    )}
                     {/* Name */}
                     <div className="idc-detail-row">
                       <div className="idc-detail-icon">
@@ -607,14 +632,14 @@ export function IdCardModal({
                         <p className="idc-detail-value">{displayName}</p>
                       </div>
                     </div>
-                    {/* Designation */}
+                    {/* Designation / Role */}
                     <div className="idc-detail-row">
                       <div className="idc-detail-icon">
                         <Briefcase size={14} />
                       </div>
                       <div className="idc-detail-content">
-                        <p className="idc-detail-label">Designation</p>
-                        <p className="idc-detail-value">{displayRole}</p>
+                        <p className="idc-detail-label">{isVisitor ? "Type" : "Designation"}</p>
+                        <p className="idc-detail-value">{isVisitor ? "Visitor" : displayRole}</p>
                       </div>
                     </div>
                     {/* Phone */}
@@ -645,24 +670,28 @@ export function IdCardModal({
                   <div className="idc-front-footer-item">
                     <CalendarDays size={14} className="idc-front-footer-icon" />
                     <div>
-                      <p className="idc-front-footer-label">Issue Date</p>
+                      <p className="idc-front-footer-label">{isVisitor ? "Valid From" : "Issue Date"}</p>
                       <p
                         className="idc-front-footer-val"
                         style={{ color: SLATE_900 }}
                       >
-                        {issueDateStr}
+                        {isVisitor && profile?.validFrom
+                          ? formatDate(profile.validFrom)
+                          : issueDateStr}
                       </p>
                     </div>
                   </div>
                   <div className="idc-front-footer-item">
                     <CalendarDays size={14} className="idc-front-footer-icon" />
                     <div>
-                      <p className="idc-front-footer-label">Valid Till</p>
+                      <p className="idc-front-footer-label">{isVisitor ? "Valid Until" : "Valid Till"}</p>
                       <p
                         className="idc-front-footer-val"
                         style={{ color: PRIMARY.hex, fontWeight: 700 }}
                       >
-                        Active Employee
+                        {isVisitor && profile?.validUntil
+                          ? formatDate(profile.validUntil)
+                          : "Active Employee"}
                       </p>
                     </div>
                   </div>
@@ -722,38 +751,83 @@ export function IdCardModal({
 
               <div className="idc-card border-2 border-gray-300 border-dashed">
                 <div className="pt-8 "></div>
-                {/* Emergency Contact */}
-                <div className="idc-back-info-row">
-                  <div className="idc-back-icon-circle">
-                    <PhoneCall size={16} />
-                  </div>
-                  <div>
-                    <p className="idc-back-info-label">Emergency Contact</p>
-                    <p className="idc-back-info-value">{emergencyContact}</p>
-                  </div>
-                </div>
-
-                {/* Blood Group */}
-                <div className="idc-back-info-row">
-                  <div className="idc-back-icon-circle">
-                    <Droplets size={16} />
-                  </div>
-                  <div>
-                    <p className="idc-back-info-label">Blood Group</p>
-                    <p className="idc-back-info-value">{bloodGroup}</p>
-                  </div>
-                </div>
-
-                {/* Joining Date */}
-                <div className="idc-back-info-row">
-                  <div className="idc-back-icon-circle">
-                    <CalendarDays size={16} />
-                  </div>
-                  <div>
-                    <p className="idc-back-info-label">Joining Date</p>
-                    <p className="idc-back-info-value">{joiningDate}</p>
-                  </div>
-                </div>
+                {isVisitor ? (
+                  <>
+                    {/* Purpose */}
+                    <div className="idc-back-info-row">
+                      <div className="idc-back-icon-circle">
+                        <Briefcase size={16} />
+                      </div>
+                      <div>
+                        <p className="idc-back-info-label">Purpose of Visit</p>
+                        <p className="idc-back-info-value">{profile?.purpose ? String(profile.purpose) : "—"}</p>
+                      </div>
+                    </div>
+                    {/* Host */}
+                    <div className="idc-back-info-row">
+                      <div className="idc-back-icon-circle">
+                        <User size={16} />
+                      </div>
+                      <div>
+                        <p className="idc-back-info-label">Host</p>
+                        <p className="idc-back-info-value">{profile?.hostName ? String(profile.hostName) : "—"}</p>
+                      </div>
+                    </div>
+                    {/* Company */}
+                    <div className="idc-back-info-row">
+                      <div className="idc-back-icon-circle">
+                        <Building2 size={16} />
+                      </div>
+                      <div>
+                        <p className="idc-back-info-label">Company</p>
+                        <p className="idc-back-info-value">{profile?.visitorCompany ? String(profile.visitorCompany) : "—"}</p>
+                      </div>
+                    </div>
+                    {/* Visiting Address */}
+                    <div className="idc-back-info-row">
+                      <div className="idc-back-icon-circle">
+                        <MapPin size={16} />
+                      </div>
+                      <div>
+                        <p className="idc-back-info-label">Visiting Office</p>
+                        <p className="idc-back-info-value">{profile?.visitAddress ? String(profile.visitAddress) : "—"}</p>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Emergency Contact */}
+                    <div className="idc-back-info-row">
+                      <div className="idc-back-icon-circle">
+                        <PhoneCall size={16} />
+                      </div>
+                      <div>
+                        <p className="idc-back-info-label">Emergency Contact</p>
+                        <p className="idc-back-info-value">{emergencyContact}</p>
+                      </div>
+                    </div>
+                    {/* Blood Group */}
+                    <div className="idc-back-info-row">
+                      <div className="idc-back-icon-circle">
+                        <Droplets size={16} />
+                      </div>
+                      <div>
+                        <p className="idc-back-info-label">Blood Group</p>
+                        <p className="idc-back-info-value">{bloodGroup}</p>
+                      </div>
+                    </div>
+                    {/* Joining Date */}
+                    <div className="idc-back-info-row">
+                      <div className="idc-back-icon-circle">
+                        <CalendarDays size={16} />
+                      </div>
+                      <div>
+                        <p className="idc-back-info-label">Joining Date</p>
+                        <p className="idc-back-info-value">{joiningDate}</p>
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <div className="idc-back-divider" />
 
@@ -780,27 +854,30 @@ export function IdCardModal({
 
                 <div className="idc-back-divider" />
 
-                {/* Return info */}
-                <div className="idc-return-section">
-                  <p className="idc-return-text">If found please return to</p>
-                  <p className="idc-return-company">{companyName}</p>
-                  {(companyAddr || addrLine1) && (
-                    <p className="idc-return-addr">
-                      {addrLine1}
-                      {addrLine2 ? (
-                        <>
-                          <br />
-                          {renderMultiline(addrLine2)}
-                        </>
-                      ) : null}
-                    </p>
-                  )}
-                  <p className="idc-return-link">{supportEmail}</p>
-                  <p className="idc-return-link">{website}</p>
-                </div>
-
-                {/* Blue bar */}
-                <div className="idc-blue-bar" />
+                {!isVisitor ? (
+                  <>
+                    {/* Return info */}
+                    <div className="idc-return-section">
+                      <p className="idc-return-text">If found please return to</p>
+                      <p className="idc-return-company">{companyName}</p>
+                      {(companyAddr || addrLine1) && (
+                        <p className="idc-return-addr">
+                          {addrLine1}
+                          {addrLine2 ? (
+                            <>
+                              <br />
+                              {renderMultiline(addrLine2)}
+                            </>
+                          ) : null}
+                        </p>
+                      )}
+                      <p className="idc-return-link">{supportEmail}</p>
+                    </div>
+                    <div className="idc-blue-bar" />
+                  </>
+                ) : (
+                  <div className="idc-blue-bar" />
+                )}
               </div>
             </div>
           </div>

@@ -92,6 +92,19 @@ export async function PATCH(request: Request) {
 
   if (body.multiOffice !== undefined) {
     company.multiOffice = Boolean(body.multiOffice);
+
+    // When enabling multi-office, migrate old single address into addresses as "Main Office"
+    if (company.multiOffice && company.address && (!company.addresses || company.addresses.length === 0)) {
+      company.addresses = [{
+        label: "Main Office",
+        line1: company.address,
+        city: "",
+        state: "",
+        zip: "",
+        country: "",
+        isMain: true,
+      }];
+    }
   }
 
   if (body.addressManagers !== undefined) {

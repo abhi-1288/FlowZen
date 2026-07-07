@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { apiFetch } from "@/lib/client-utils";
-import { AnyRecord, formatRole, SectionHeader } from "../shared";
+import { AnyRecord, formatRole, SectionHeader, ActionButton } from "../shared";
 import { FinanceMembersView } from "../finance-members-tab";
 import { HR_MEMBER_ROLE_KEYS, type MeetingDuration } from "./types";
 import { FireModal } from "./modals/fire-modal";
@@ -18,11 +18,13 @@ export function MembersTab({
   actorRole,
   showToast,
   refresh,
+  regionOptions = [],
 }: {
   insights: AnyRecord | null;
   actorRole: string;
   showToast: (text: string, type?: "success" | "error") => void;
   refresh: (silent?: boolean) => Promise<void>;
+  regionOptions?: string[];
 }) {
   const { data: session } = useSession();
   const selfId = session?.user?.id ?? "";
@@ -65,6 +67,11 @@ export function MembersTab({
     documents: { category: string; fileName: string; fileUrl: string; fileType: string; fileSize: number; fieldValues: { label: string; value: string }[] }[];
   } | null>(null);
   const [loadingDocModal, setLoadingDocModal] = useState(false);
+
+  /* ── Region Modal ── */
+  const [regionModalMember, setRegionModalMember] = useState<AnyRecord | null>(null);
+  const [regionLabelValue, setRegionLabelValue] = useState("");
+  const [savingRegion, setSavingRegion] = useState(false);
 
   function openSalaryModal(member: AnyRecord) {
     setSalaryInput(String(Math.max(0, Number(member.baseSalary ?? 0)) > 0 ? Number(member.baseSalary) : ""));
@@ -122,6 +129,31 @@ export function MembersTab({
       setDocModalMember(null);
     } finally {
       setLoadingDocModal(false);
+    }
+  }
+
+  function openRegionModal(member: AnyRecord) {
+    setRegionModalMember(member);
+    setRegionLabelValue(String(member.regionLabel ?? ""));
+  }
+
+  async function saveRegionModal() {
+    const member = regionModalMember;
+    const memberId = String(member?.id ?? "");
+    if (!memberId) return;
+    try {
+      setSavingRegion(true);
+      await apiFetch(`/api/hr/member-region`, {
+        method: "PATCH",
+        body: JSON.stringify({ memberId, regionLabel: regionLabelValue }),
+      });
+      showToast("Region updated.");
+      setRegionModalMember(null);
+      await refresh(true);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to update region.", "error");
+    } finally {
+      setSavingRegion(false);
     }
   }
 
@@ -380,6 +412,8 @@ export function MembersTab({
         onSelectedOtherRoleChange={setSelectedOtherRole}
         showToast={showToast}
         onRefresh={refresh}
+        regionOptions={regionOptions}
+        onOpenRegionModal={openRegionModal}
       />
 
       <FireModal
@@ -451,6 +485,44 @@ export function MembersTab({
         data={docModalData}
         onClose={() => { setDocModalMember(null); setDocModalData(null); }}
       />
+
+      {/* ── Region Modal ── */}
+      {regionModalMember ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+            <h3 className="mb-3 text-sm font-semibold text-slate-800">
+              Assign Region — {String(regionModalMember.name ?? "")}
+            </h3>
+            <select
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              value={regionLabelValue}
+              onChange={(e) => setRegionLabelValue(e.target.value)}
+            >
+              <option value="">— None —</option>
+              {regionOptions.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-300 px-4 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+                onClick={() => setRegionModalMember(null)}
+              >
+                Cancel
+              </button>
+              <ActionButton
+                variant="primary"
+                className="px-4"
+                disabled={savingRegion}
+                onClick={saveRegionModal}
+              >
+                {savingRegion ? "Saving..." : "Save"}
+              </ActionButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

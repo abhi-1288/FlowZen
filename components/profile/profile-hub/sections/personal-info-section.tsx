@@ -111,7 +111,6 @@ export function PersonalInfoSection({
   const [editCountryCode, setEditCountryCode] = useState("+1");
   const [editDob, setEditDob] = useState("");
   const [editAddress, setEditAddress] = useState("");
-  const [editRegionLabel, setEditRegionLabel] = useState("");
   const [editEmergencyPhone, setEditEmergencyPhone] = useState("");
   const [editEmergencyCountryCode, setEditEmergencyCountryCode] = useState("+1");
   const [editBloodGroup, setEditBloodGroup] = useState("");
@@ -136,17 +135,12 @@ export function PersonalInfoSection({
   const oldBloodGroup = profile?.bloodGroup ? String(profile.bloodGroup) : "";
   const oldMaskPhone = profile?.maskPhone ? Boolean(profile.maskPhone) : false;
 
-  const companyData = (profile?.company && typeof profile.company === "object" ? profile.company : null) as AnyRecord | null;
-  const approvedAddresses = (companyData?.multiOffice && Array.isArray(companyData?.addresses) ? companyData.addresses : []) as AnyRecord[];
-  const regionOptions = approvedAddresses.map((a) => String(a.label ?? "")).filter(Boolean);
-
   function openModal() {
     setEditName(oldName);
     setEditPhone(stripCountryCode(oldPhone));
     setEditCountryCode(detectCountryCode(oldPhone));
     setEditDob(oldDob);
     setEditAddress(oldAddress);
-    setEditRegionLabel(oldRegionLabel);
     setEditEmergencyPhone(stripCountryCode(oldEmergencyContact));
     setEditEmergencyCountryCode(detectCountryCode(oldEmergencyContact));
     setEditBloodGroup(oldBloodGroup);
@@ -236,7 +230,7 @@ export function PersonalInfoSection({
       const fullEmergency = editEmergencyPhone ? `${editEmergencyCountryCode} ${editEmergencyPhone}` : "";
       await apiFetch("/api/profile", {
         method: "PATCH",
-        body: JSON.stringify({ name: editName, phone: fullPhone, dob: editDob || null, address: editAddress, regionLabel: editRegionLabel, emergencyContact: fullEmergency, bloodGroup: editBloodGroup, maskPhone: editMaskPhone }),
+        body: JSON.stringify({ name: editName, phone: fullPhone, dob: editDob || null, address: editAddress, emergencyContact: fullEmergency, bloodGroup: editBloodGroup, maskPhone: editMaskPhone }),
       });
       await refresh(true);
       setOpen(false);
@@ -374,21 +368,6 @@ export function PersonalInfoSection({
               </div>
               <EditField label="Date of Birth" value={editDob} onChange={setEditDob} placeholder={oldDob || "YYYY-MM-DD"} type="date" />
               <EditField label="Address" value={editAddress} onChange={setEditAddress} placeholder={oldAddress || "Your address"} />
-              {regionOptions.length > 0 ? (
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-500">Region</label>
-                  <select
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                    value={editRegionLabel}
-                    onChange={(e) => setEditRegionLabel(e.target.value)}
-                  >
-                    <option value="">Select region</option>
-                    {regionOptions.map((r) => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
-                  </select>
-                </div>
-              ) : null}
               <div>
                 <label className="mb-1 block text-xs font-medium text-slate-500">Emergency Contact</label>
                 <div className="flex gap-2">
@@ -480,7 +459,6 @@ export function PersonalInfoSection({
               <ConfirmRow label="Phone" value={editCountryCode && editPhone ? `${editCountryCode} ${editPhone}` : editPhone || editCountryCode} />
               <ConfirmRow label="Date of Birth" value={editDob} />
               <ConfirmRow label="Address" value={editAddress} />
-              {editRegionLabel ? <ConfirmRow label="Region" value={editRegionLabel} /> : null}
               {editEmergencyPhone ? <ConfirmRow label="Emergency Contact" value={`${editEmergencyCountryCode} ${editEmergencyPhone}`} /> : null}
               {editBloodGroup ? <ConfirmRow label="Blood Group" value={editBloodGroup} /> : null}
               <ConfirmRow label="Mask Phone" value={editMaskPhone ? "Yes" : "No"} />

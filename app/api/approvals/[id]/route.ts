@@ -265,6 +265,10 @@ export async function PATCH(request: Request, { params }: Params) {
             if (fallbackHr) historyInviterId = fallbackHr._id;
           }
         }
+        const inviterHr = await User.findById(historyInviterId).select("regionLabel");
+        if (inviterHr?.regionLabel) {
+          requester.regionLabel = String(inviterHr.regionLabel);
+        }
         requester.membershipHistory.push({
           company: joinRequest.company,
           inviter: historyInviterId,

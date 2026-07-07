@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { X, Building2 } from "lucide-react";
 import { ActionButton, AnyRecord, formatRole, formatRoleWithCustom } from "../../shared";
 import type { MeetingDuration } from "../types";
 import { MEETING_DURATION_OPTIONS } from "../types";
@@ -33,6 +33,8 @@ export function MemberListModal({
   onSelectedOtherRoleChange,
   showToast,
   onRefresh,
+  regionOptions = [],
+  onOpenRegionModal,
 }: {
   modalRole: string | null;
   members: AnyRecord[];
@@ -60,6 +62,8 @@ export function MemberListModal({
   onSelectedOtherRoleChange: (role: string) => void;
   showToast: (text: string, type?: "success" | "error") => void;
   onRefresh?: (silent?: boolean) => Promise<void>;
+  regionOptions?: string[];
+  onOpenRegionModal?: (member: AnyRecord) => void;
 }) {
   const modalMembers = useMemo(() => {
     if (!modalRole) return [];
@@ -222,6 +226,11 @@ export function MemberListModal({
                           <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenPfEsicModal(member)}>PF & ESIC</ActionButton>
                           <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenTdsModal(member)}>TDS</ActionButton>
                           <ActionButton variant="secondary" className="px-3" type="button" onClick={() => void onOpenDocModal(member)}>Documents</ActionButton>
+                          {onOpenRegionModal ? (
+                            <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenRegionModal(member)}>
+                              <Building2 className="mr-1 inline-block h-3.5 w-3.5" />Region
+                            </ActionButton>
+                          ) : null}
                           <ActionButton variant="danger" className="px-3" type="button" disabled={revokingIdCardFor === memberId} onClick={() => revokeIdCard(memberId)}>
                             {revokingIdCardFor === memberId ? "Revoking..." : "Revoke ID Card"}
                           </ActionButton>

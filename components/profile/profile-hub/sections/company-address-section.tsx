@@ -49,6 +49,9 @@ export function CompanyAddressSection({
   const multiOffice = company?.multiOffice ? Boolean(company.multiOffice) : false;
   const approvedAddresses = multiOffice && Array.isArray(company?.addresses) ? (company.addresses as AnyRecord[]) : [];
 
+  // Show old single company.address when multi-office is off
+  const legacyAddress = !multiOffice && company?.address ? String(company.address).trim() : "";
+
   const isAuthHr = !isAdmin && role === "human-resource" && multiOffice
     && (company?.addressManagers as string[] ?? []).includes(userId);
 
@@ -239,9 +242,43 @@ export function CompanyAddressSection({
                         {[String(addr.line1 ?? ""), String(addr.city ?? ""), String(addr.state ?? "")].filter(Boolean).join(", ")}
                       </p>
                     </div>
-                    <CheckCircle size={16} className="shrink-0 text-emerald-500" />
+                    <div className="flex items-center gap-2">
+                      {approvedAddresses.length >= 2 && isAdmin ? (
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-red-500 hover:text-red-700"
+                          onClick={async () => {
+                            const next = approvedAddresses.filter((_, idx) => idx !== i);
+                            try {
+                              await apiFetch("/api/company/address", {
+                                method: "PATCH",
+                                body: JSON.stringify({ addresses: next }),
+                              });
+                              await refresh();
+                              showToast("Office address removed.");
+                            } catch {
+                              showToast("Failed to remove address.", "error");
+                            }
+                          }}
+                        >
+                          Delete
+                        </button>
+                      ) : null}
+                      <CheckCircle size={16} className="shrink-0 text-emerald-500" />
+                    </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Show legacy single address when multi-office is off */}
+          {!multiOffice && legacyAddress && (
+            <div className="mb-4">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Office Address</span>
+              <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/50 p-3">
+                <p className="text-sm font-medium text-slate-800">Main Office</p>
+                <p className="text-xs text-slate-500">{legacyAddress}</p>
               </div>
             </div>
           )}
