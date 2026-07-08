@@ -1,7 +1,7 @@
 import { ActionButton } from "../../shared";
 
 const overlayClass = "fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4";
-const modalClass = "w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl";
+const modalClass = "w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl overflow-y-auto max-h-[90vh]";
 
 export type PfEsicFormData = {
   pfNumber: string;

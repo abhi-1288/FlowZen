@@ -18,7 +18,8 @@ export async function GET() {
     if (!user.company) return jsonError("No company found", 400);
 
     const companyId = user.company;
-    const isHr = user.role === "admin" || user.role === "human-resource";
+    const isSeniorSecurity = user.role === "security" && Boolean((user as any).isSeniorSecurity);
+    const isHr = user.role === "admin" || user.role === "human-resource" || isSeniorSecurity;
     const isAdmin = user.role === "admin";
 
     const [jobsOpen, jobsClosed, candidatesOpen, candidatesClosed, interviewsOpen, interviewsClosed, offersOpen, offersClosed, referralsOpen, referralsClosed] = await Promise.all([

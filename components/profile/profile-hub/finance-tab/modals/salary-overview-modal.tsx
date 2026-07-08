@@ -170,7 +170,7 @@ function SalaryOverviewContent({
                 <div className="flex items-center justify-between px-4 py-2.5 text-sm" key={String(member.id)}>
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-slate-900">{String(member.name ?? "Unknown")}</p>
-                    <p className="text-xs text-slate-400 capitalize">{formatRoleWithCustom(String(member.role ?? "employee"), member.customRole)}</p>
+                    <p className="text-xs text-slate-400 capitalize">{formatRoleWithCustom(String(member.role ?? "employee"), member.customRole, Boolean((member as any).isSeniorSecurity))}</p>
                   </div>
                   <div className="shrink-0">
                     <span className="inline-block rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-600">Not generated</span>

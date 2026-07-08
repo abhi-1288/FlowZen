@@ -46,7 +46,8 @@ export function RecruitmentSidebar() {
   const router = useRouter();
   const { data: session } = useSession();
   const role = session?.user?.role;
-  const isFullAccess = role === "admin" || role === "human-resource";
+  const isSeniorSecurity = role === "security" && Boolean((session?.user as any)?.isSeniorSecurity);
+  const isFullAccess = role === "admin" || role === "human-resource" || isSeniorSecurity;
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [counts, setCounts] = useState<SidebarCounts | null>(null);
   const { showNotificationToast } = useNotificationToast();

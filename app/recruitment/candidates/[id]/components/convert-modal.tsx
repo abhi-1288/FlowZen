@@ -3,21 +3,34 @@
 import { useState } from "react";
 import { X, Eye, EyeOff } from "lucide-react";
 
+const ROLE_OPTIONS = [
+  { value: "others", label: "Others" },
+  { value: "employee", label: "Employee" },
+  { value: "project-manager", label: "Project Manager" },
+  { value: "qa-tester", label: "QA Tester" },
+  { value: "human-resource", label: "Human Resource" },
+  { value: "finance", label: "Finance" },
+  { value: "security", label: "Junior Security" },
+];
+
 export default function ConvertEmployeeModal({
   isOpen,
   onClose,
   onSubmit,
   candidateName,
   candidateEmail,
+  isSeniorSecurity,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (password: string) => Promise<void>;
+  onSubmit: (password: string, role: string) => Promise<void>;
   candidateName: string;
   candidateEmail: string;
+  isSeniorSecurity?: boolean;
 }) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [selectedRole, setSelectedRole] = useState("others");
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -29,9 +42,10 @@ export default function ConvertEmployeeModal({
     if (password !== confirmPassword) return;
     setSubmitting(true);
     try {
-      await onSubmit(password);
+      await onSubmit(password, selectedRole);
       setPassword("");
       setConfirmPassword("");
+      setSelectedRole("others");
       onClose();
     } finally {
       setSubmitting(false);
@@ -43,7 +57,7 @@ export default function ConvertEmployeeModal({
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold">Convert To Employee</h2>
-          <button onClick={() => { setPassword(""); setConfirmPassword(""); onClose(); }} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+          <button onClick={() => { setPassword(""); setConfirmPassword(""); setSelectedRole("others"); onClose(); }} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
             <X size={20} />
           </button>
         </div>
@@ -51,6 +65,22 @@ export default function ConvertEmployeeModal({
           <p className="text-sm text-slate-500">
             Set a password for {candidateName}. A welcome email with login credentials will be sent to {candidateEmail}.
           </p>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Role</label>
+            <select
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+              disabled={isSeniorSecurity}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {ROLE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            {isSeniorSecurity && (
+              <p className="mt-1 text-xs text-slate-400">Senior security can only convert to Junior Security.</p>
+            )}
+          </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Set Password</label>
             <div className="relative">

@@ -82,7 +82,8 @@ export function ProfileTab({
   const role = profile?.role ? String(profile.role) : "";
   const sessionRole = session?.user?.role ? String(session.user.role) : "";
   const effectiveRole = role || sessionRole;
-  const displayRole = formatRoleWithCustom(effectiveRole, profile?.customRole);
+  const displayRole = formatRoleWithCustom(effectiveRole, profile?.customRole, Boolean((profile as any)?.isSeniorSecurity));
+  const isJuniorSecurity = effectiveRole === "security" && !Boolean((profile as any)?.isSeniorSecurity);
   const inApprovedCompany = Boolean(profile?.company) && String(profile?.companyStatus ?? "") === "approved";
   const effectiveBaseSalary = inApprovedCompany ? Math.max(Number(insights?.baseSalary ?? 0), 0) : 0;
   const joinedBy = (insights?.joinedBy as AnyRecord | undefined) ?? null;
@@ -394,7 +395,8 @@ export function ProfileTab({
 
       {showDocLetterModal ? (
         <DocumentLetterModal mode={docLetterMode} onClose={() => setShowDocLetterModal(false)}
-          onSuccess={() => { setShowDocLetterModal(false); void refresh(true); }} showToast={showToast} />
+          onSuccess={() => { setShowDocLetterModal(false); void refresh(true); }} showToast={showToast}
+          isJuniorSecurity={isJuniorSecurity} />
       ) : null}
 
       <ConfirmActionModal open={modal} title="Delete account?"

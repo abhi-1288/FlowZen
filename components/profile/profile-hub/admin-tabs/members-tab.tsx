@@ -3,13 +3,12 @@ import { useSession } from "next-auth/react";
 import { apiFetch } from "@/lib/client-utils";
 import { AnyRecord, formatRole, SectionHeader, ActionButton } from "../shared";
 import { FinanceMembersView } from "../finance-members-tab";
-import { HR_MEMBER_ROLE_KEYS, type MeetingDuration } from "./types";
+import { HR_MEMBER_ROLE_KEYS } from "./types";
 import { FireModal } from "./modals/fire-modal";
 import { SalaryModal } from "./modals/salary-modal";
 import { RoleModal } from "./modals/role-modal";
 import { CustomRoleModal } from "./modals/custom-role-modal";
 import { PfEsicModal, type PfEsicFormData } from "./modals/pf-esic-modal";
-import { TdsModal, type TdsFormData } from "./modals/tds-modal";
 import { DocumentsModal } from "./modals/documents-modal";
 import { MemberListModal } from "./modals/member-list-modal";
 
@@ -34,9 +33,7 @@ export function MembersTab({
   const companyEsicPct = Number(hr?.companyEsicPct ?? 0.75);
   const companyTdsPct = Number(hr?.companyTdsPct ?? 0);
   const roleCounts = (hr?.roleCounts as AnyRecord | undefined) ?? {};
-  const [modalRole, setModalRole] = useState<(typeof HR_MEMBER_ROLE_KEYS)[number] | null>(null);
-  const [meetingDuration, setMeetingDuration] = useState<MeetingDuration>(30);
-  const [invitingFor, setInvitingFor] = useState<string | null>(null);
+  const [modalRole, setModalRole] = useState<string | null>(null);
   const [firingFor, setFiringFor] = useState<string | null>(null);
   const [fireConfirmMember, setFireConfirmMember] = useState<AnyRecord | null>(null);
   const [fireConfirmText, setFireConfirmText] = useState("");
@@ -48,6 +45,7 @@ export function MembersTab({
   const [savingSalaryModal, setSavingSalaryModal] = useState(false);
   const [roleModalMember, setRoleModalMember] = useState<AnyRecord | null>(null);
   const [newRoleValue, setNewRoleValue] = useState("");
+  const [isSeniorSecurityChecked, setIsSeniorSecurityChecked] = useState(false);
   const [savingRoleModal, setSavingRoleModal] = useState(false);
   const [customRoleModalMember, setCustomRoleModalMember] = useState<AnyRecord | null>(null);
   const [customRoleInput, setCustomRoleInput] = useState("");
@@ -57,9 +55,6 @@ export function MembersTab({
   const [pfEsicModalMember, setPfEsicModalMember] = useState<AnyRecord | null>(null);
   const [pfEsicInput, setPfEsicInput] = useState<PfEsicFormData>({ pfNumber: "", pfDeductionAmount: "", esicNumber: "", esicDeductionAmount: "", pfExempted: false, esicExempted: false, tdsDeductionAmount: "", tdsExempted: false });
   const [savingPfEsic, setSavingPfEsic] = useState(false);
-  const [tdsModalMember, setTdsModalMember] = useState<AnyRecord | null>(null);
-  const [tdsInput, setTdsInput] = useState<TdsFormData>({ tdsDeductionAmount: "", tdsExempted: false });
-  const [savingTds, setSavingTds] = useState(false);
   const [docModalMember, setDocModalMember] = useState<AnyRecord | null>(null);
   const [docModalData, setDocModalData] = useState<{
     member: { name: string; email: string; role: string };
@@ -82,6 +77,7 @@ export function MembersTab({
 
   function openRoleModal(member: AnyRecord) {
     setNewRoleValue(String(member.role ?? ""));
+    setIsSeniorSecurityChecked(Boolean((member as any).isSeniorSecurity ?? false));
     setRoleModalMember(member);
   }
 
@@ -102,14 +98,6 @@ export function MembersTab({
       tdsExempted: Boolean(member.tdsExempted ?? false),
     });
     setPfEsicModalMember(member);
-  }
-
-  function openTdsModal(member: AnyRecord) {
-    setTdsInput({
-      tdsDeductionAmount: String(Number(member.tdsDeductionAmount ?? 0) > 0 ? Number(member.tdsDeductionAmount) : ""),
-      tdsExempted: Boolean(member.tdsExempted ?? false),
-    });
-    setTdsModalMember(member);
   }
 
   async function openDocModal(member: AnyRecord) {
@@ -190,7 +178,11 @@ export function MembersTab({
       setSavingRoleModal(true);
       await apiFetch("/api/hr/member-role", {
         method: "PATCH",
-        body: JSON.stringify({ memberId, role: newRoleValue }),
+        body: JSON.stringify({
+          memberId,
+          role: newRoleValue,
+          isSeniorSecurity: newRoleValue === "security" ? isSeniorSecurityChecked : false,
+        }),
       });
       showToast("Role updated.");
       setRoleModalMember(null);
@@ -251,29 +243,6 @@ export function MembersTab({
     }
   }
 
-  async function saveTdsModal() {
-    const member = tdsModalMember;
-    const memberId = String(member?.id ?? "");
-    if (!memberId) return;
-    try {
-      setSavingTds(true);
-      await apiFetch(`/api/hr/member-tds/${memberId}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          tdsDeductionAmount: tdsInput.tdsDeductionAmount ? Number(tdsInput.tdsDeductionAmount) : 0,
-          tdsExempted: tdsInput.tdsExempted,
-        }),
-      });
-      showToast("TDS details saved.");
-      setTdsModalMember(null);
-      await refresh(true);
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Unable to save TDS details.", "error");
-    } finally {
-      setSavingTds(false);
-    }
-  }
-
   const otherRoleOptions = useMemo(() => {
     const labels = new Set<string>();
     members.filter((member) => String(member.role ?? "") === "others").forEach((member) => {
@@ -308,22 +277,8 @@ export function MembersTab({
     return () => window.removeEventListener("keydown", onKey);
   }, [modalRole]);
 
-  const canEditOthersRole = actorRole === "human-resource" || actorRole === "admin";
-
-  async function sendMeetingInvite(memberId: string) {
-    try {
-      setInvitingFor(memberId);
-      await apiFetch("/api/hr/meeting-invite", {
-        method: "POST",
-        body: JSON.stringify({ memberId, durationMinutes: meetingDuration }),
-      });
-      showToast("Meeting invite sent.");
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Could not send invite.", "error");
-    } finally {
-      setInvitingFor(null);
-    }
-  }
+  const actorIsSeniorSecurity = actorRole === "security" && Boolean((session?.user as any)?.isSeniorSecurity);
+  const canEditOthersRole = actorRole === "human-resource" || actorRole === "admin" || actorIsSeniorSecurity;
 
   function requestFire(member: AnyRecord) {
     setFireConfirmText("");
@@ -366,12 +321,12 @@ export function MembersTab({
       </div>
 
       <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-        {HR_MEMBER_ROLE_KEYS.map((roleName) => {
+        {actorIsSeniorSecurity ? null : HR_MEMBER_ROLE_KEYS.map((roleName) => {
           const count = Number(roleCounts[roleName] ?? 0);
           return (
             <button className="rounded-lg border border-transparent bg-slate-50 px-3 py-2 text-left transition hover:border-slate-200 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
               key={roleName} type="button"
-              onClick={() => { setModalRole(roleName); setMeetingDuration(30); setModalSearchQuery(""); setModalSearchInput(""); }}
+              onClick={() => { setModalRole(roleName); setModalSearchQuery(""); setModalSearchInput(""); }}
             >
               <p className="text-xs font-medium text-slate-500">{formatRole(roleName)}</p>
               <p className="text-lg font-semibold">{count}</p>
@@ -379,6 +334,26 @@ export function MembersTab({
             </button>
           );
         })}
+        {actorIsSeniorSecurity ? null : (
+          <button className="rounded-lg border border-transparent bg-slate-50 px-3 py-2 text-left transition hover:border-slate-200 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            type="button"
+            onClick={() => { setModalRole("senior-security"); setModalSearchQuery(""); setModalSearchInput(""); }}
+          >
+            <p className="text-xs font-medium text-slate-500">Senior Security</p>
+            <p className="text-lg font-semibold">{members.filter((m) => String(m.role) === "security" && Boolean((m as any).isSeniorSecurity)).length}</p>
+            <p className="mt-0.5 text-[11px] text-slate-400">View & invite</p>
+          </button>
+        )}
+        {actorRole === "human-resource" || actorRole === "admin" ? null : (
+          <button className="rounded-lg border border-transparent bg-slate-50 px-3 py-2 text-left transition hover:border-slate-200 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            type="button"
+            onClick={() => { setModalRole("junior-security"); setModalSearchQuery(""); setModalSearchInput(""); }}
+          >
+            <p className="text-xs font-medium text-slate-500">Junior Security</p>
+            <p className="text-lg font-semibold">{members.filter((m) => String(m.role) === "security" && !Boolean((m as any).isSeniorSecurity)).length}</p>
+            <p className="mt-0.5 text-[11px] text-slate-400">View & invite</p>
+          </button>
+        )}
       </div>
 
       {members.length === 0 ? (
@@ -388,8 +363,6 @@ export function MembersTab({
       <MemberListModal
         modalRole={modalRole}
         members={members}
-        meetingDuration={meetingDuration}
-        invitingFor={invitingFor}
         firingFor={firingFor}
         canEditOthersRole={canEditOthersRole}
         selfId={selfId}
@@ -398,12 +371,9 @@ export function MembersTab({
         modalSearchInput={modalSearchInput}
         modalSearchQuery={modalSearchQuery}
         onClose={() => { setModalRole(null); setModalSearchQuery(""); setModalSearchInput(""); }}
-        onMeetingDurationChange={setMeetingDuration}
-        onSendMeetingInvite={sendMeetingInvite}
         onRequestFire={requestFire}
         onOpenSalaryModal={openSalaryModal}
         onOpenPfEsicModal={openPfEsicModal}
-        onOpenTdsModal={openTdsModal}
         onOpenDocModal={openDocModal}
         onOpenRoleModal={openRoleModal}
         onOpenCustomRoleModal={openCustomRoleModal}
@@ -441,8 +411,10 @@ export function MembersTab({
       <RoleModal
         member={roleModalMember}
         newRoleValue={newRoleValue}
+        isSeniorSecurityChecked={isSeniorSecurityChecked}
         saving={savingRoleModal}
-        onRoleChange={setNewRoleValue}
+        onRoleChange={(val) => { setNewRoleValue(val); if (val !== "security") setIsSeniorSecurityChecked(false); }}
+        onIsSeniorSecurityChange={setIsSeniorSecurityChecked}
         onCancel={() => setRoleModalMember(null)}
         onSave={saveRoleModal}
       />
@@ -467,16 +439,6 @@ export function MembersTab({
         onDataChange={setPfEsicInput}
         onCancel={() => setPfEsicModalMember(null)}
         onSave={savePfEsicModal}
-      />
-
-      <TdsModal
-        member={tdsModalMember}
-        data={tdsInput}
-        saving={savingTds}
-        companyTdsPct={companyTdsPct}
-        onDataChange={setTdsInput}
-        onCancel={() => setTdsModalMember(null)}
-        onSave={saveTdsModal}
       />
 
       <DocumentsModal

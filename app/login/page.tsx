@@ -93,6 +93,8 @@ export default function LoginPage() {
                 ["QA Tester", "tester@flowzen.com", "tester@flowzen"],
                 ["Employee", "employee@flowzen.com", "employee@flowzen"],
                 ["Finance", "finance@flowzen.com", "finance@flowzen"],
+                ["Sr. Security", "s_security@flowzen.com", "s_security@flowzen"],
+                ["Jr. Security", "j_security@flowzen.com", "j_security@flowzen"],
                 ["Others", "other@flowzen.com", "other@flowzen"],
               ].map(([role, mail, pass]) => (
                 <div key={mail} className="flex items-center justify-between rounded-md bg-slate-50 px-3 py-2">

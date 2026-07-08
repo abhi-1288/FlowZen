@@ -63,6 +63,7 @@ export async function POST(
     hostName: String(event.hostName ?? ""),
     region,
     visitAddress,
+    identityCode: null,
     status: "pending",
   });
 

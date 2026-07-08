@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Building2, ChevronDown, Plus, Users } from "lucide-react";
+import { Building2, ChevronDown, Plus, ShieldCheck, Users } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import { CodePanel, JoinPanel } from "./admin-tabs";
 import { AnyRecord, ActionButton, formatRole, HistoryCard, toAdminHistoryRows, toEmployeeHistoryRows, toManagerHistoryRows } from "./shared";
@@ -25,6 +25,7 @@ export function OnboardingTab({
 }) {
   const { data: session } = useSession();
   const selfId = String(session?.user?.id ?? "");
+  const isSeniorSecurity = role === "security" && Boolean((session?.user as any)?.isSeniorSecurity);
   const hrSuffix = selfId
     ? `-HR${selfId.replace(/[^a-fA-F0-9]/g, "").toUpperCase().slice(-6)}`
     : "";
@@ -288,13 +289,14 @@ export function OnboardingTab({
     try {
       const normalizedCode = String(teamCode ?? "").trim().toUpperCase();
       if (!normalizedCode) { showToast("Enter a join code first.", "error"); return; }
-      if (normalizedCode.startsWith("CO-")) {
-        const data = await apiFetch<{ approvalNotifier?: "hr" | "admin" }>("/api/company/join", { method: "POST", body: JSON.stringify({ code: normalizedCode }) });
-        showToast(data.approvalNotifier === "hr" ? "Join request sent to HR." : "Join request sent to admin.");
+      if (normalizedCode.startsWith("CO-") || normalizedCode.startsWith("SC-")) {
+        const data = await apiFetch<{ approvalNotifier?: "hr" | "admin" | "security" }>("/api/company/join", { method: "POST", body: JSON.stringify({ code: normalizedCode }) });
+        const msg = data.approvalNotifier === "security" ? "Join request sent to senior security." : data.approvalNotifier === "hr" ? "Join request sent to HR." : "Join request sent to admin.";
+        showToast(msg);
       } else if (normalizedCode.startsWith("TM-")) {
         const data = await apiFetch<{ approvalNotifier?: "hr" | "manager" | "tester" }>("/api/team/join", { method: "POST", body: JSON.stringify({ code: normalizedCode }) });
         showToast(data.approvalNotifier === "hr" ? "Join request sent to HR." : data.approvalNotifier === "tester" ? "Join request sent to tester." : "Join request sent to manager.");
-      } else { showToast("Invalid join code. Use a CO- or TM- code.", "error"); return; }
+      } else { showToast("Invalid join code. Use a CO-, SC-, or TM- code.", "error"); return; }
       await refresh();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Unable to send join request.", "error");
@@ -341,6 +343,7 @@ export function OnboardingTab({
                 company?.testerJoinCode ? { code: `${String(company.testerJoinCode)}${hrSuffix}`, label: "Tester code" } : null,
                 company?.financeJoinCode ? { code: `${String(company.financeJoinCode)}${hrSuffix}`, label: "Finance code" } : null,
                 company?.employeeJoinCode ? { code: `${String(company.employeeJoinCode)}${hrSuffix}`, label: "Employee code" } : null,
+                company?.securityJoinCode ? { code: `${String(company.securityJoinCode)}${hrSuffix}`, label: "Senior Security code" } : null,
                 company?.otherJoinCode ? { code: `${String(company.otherJoinCode)}${hrSuffix}`, label: "Others code" } : null,
               ].filter(Boolean) as { code: string; label: string }[]}
               empty="Generating HR staff onboarding codes. Refresh once if they do not appear."
@@ -364,9 +367,45 @@ export function OnboardingTab({
         )
       ) : null}
 
+      {role === "security" && company?.status !== "taken-down" ? (
+        profile?.companyStatus === "approved" ? (
+          <>
+            {isSeniorSecurity ? (
+              <CodePanel title="Security Onboarding" code={company?.juniorSecurityJoinCode ? String(company.juniorSecurityJoinCode) : undefined} label="Junior Security code" empty="Refresh once the code appears." showToast={showToast} />
+            ) : (
+              <CodePanel title="Security" code={undefined} label="Security code" empty="Ask a senior security member for a join code." showToast={showToast} />
+            )}
+            <section className={sectionBase}>
+              <div className="mb-5 border-l-4 border-amber-500 pl-4">
+                <h3 className="text-base font-semibold text-slate-900">Security Membership</h3>
+                <p className="mt-0.5 text-sm text-slate-500">{isSeniorSecurity ? "You are a senior security member." : "You are a junior security member."}</p>
+              </div>
+              <div className="mt-5 space-y-4">
+                <div className="rounded-lg border border-slate-200 p-4">
+                  <div className="flex justify-between gap-4"><span className="text-slate-500">Company</span><span className="font-medium">{company?.name ? String(company.name) : "Not assigned"}</span></div>
+                  <div className="mt-3 flex justify-between gap-4"><span className="text-slate-500">Role</span><span className="font-medium capitalize">{isSeniorSecurity ? "Senior Security" : "Junior Security"}</span></div>
+                  <div className="mt-3 flex justify-between gap-4"><span className="text-slate-500">Status</span><span className="font-medium capitalize text-emerald-600">{String(profile?.companyStatus)}</span></div>
+                  {insights?.joinedBy ? (
+                    <div className="mt-3 flex justify-between gap-4"><span className="text-slate-500">Joined by</span><span className="font-medium capitalize">{String((insights.joinedBy as any).name ?? "")} <span className="text-xs text-slate-400">({String((insights.joinedBy as any).role ?? "")})</span></span></div>
+                  ) : null}
+                </div>
+                <button className="w-full rounded-lg border border-orange-300 bg-orange-50 px-4 py-2.5 text-sm font-medium text-orange-600 hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={Boolean(insights?.pendingQuit)} onClick={requestManagerQuit}>
+                  {pendingQuitText("Request Quit Company")}
+                </button>
+                {insights?.pendingQuit ? <button className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50" onClick={() => setCancelQuitModal(true)} type="button">Cancel Request</button> : null}
+              </div>
+            </section>
+          </>
+        ) : (
+          <JoinPanel title="Join company as Security" placeholder="Security code" value={companyCode} onChange={setCompanyCode} onSubmit={joinCompany}
+            status={profile?.companyStatus ? String(profile.companyStatus) : undefined} onCancelRequest={() => setCancelJoinModal(true)} />
+        )
+      ) : null}
+
       <HrQuitModal open={hrQuitModal} candidates={replacementHrCandidates} selectedHrId={replacementHrId} onSelectHr={setReplacementHrId} loading={requestingHrQuit}
         onClose={() => setHrQuitModal(false)} onConfirm={requestHrQuit} />
-      <RoleQuitModal open={roleQuitModal} role={role} candidates={replacementRoleCandidates} selectedUserId={replacementRoleUserId} onSelectUser={setReplacementRoleUserId}
+      <RoleQuitModal open={roleQuitModal} role={role} isSeniorSecurity={isSeniorSecurity} candidates={replacementRoleCandidates} selectedUserId={replacementRoleUserId} onSelectUser={setReplacementRoleUserId}
         loading={requestingRoleQuit} onClose={() => setRoleQuitModal(false)} onConfirm={requestRoleQuit} />
       <CancelQuitModal open={cancelQuitModal} reason={cancelQuitReason} onReasonChange={setCancelQuitReason} loading={cancellingQuit}
         onClose={() => setCancelQuitModal(false)} onConfirm={cancelQuitRequest} />
@@ -473,7 +512,7 @@ export function OnboardingTab({
                 <button className="flex w-full items-center justify-between" onClick={() => setTeamTransferOpen((prev) => !prev)} type="button">
                   <div className="border-l-4 border-amber-500 pl-4">
                     <h3 className="text-base font-semibold text-slate-900">Team Transfer</h3>
-                    <p className="mt-0.5 text-sm text-slate-500">Transfer teams to another {formatRole(role)}. Admin approval required.</p>
+                    <p className="mt-0.5 text-sm text-slate-500">Transfer teams to another {formatRole(role, isSeniorSecurity)}. Admin approval required.</p>
                   </div>
                   <ChevronDown size={20} className={`shrink-0 text-slate-400 transition-transform duration-200 ${teamTransferOpen ? "rotate-180" : ""}`} />
                 </button>

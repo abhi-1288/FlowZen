@@ -32,7 +32,7 @@ import { useNotificationToast } from "@/lib/toast-context";
 import { ProfileSkeleton, NavButton } from "./profile-hub/chrome";
 import { AttendanceTab } from "./profile-hub/attendance-tab";
 import { DashboardTab } from "./profile-hub/dashboard-tab";
-import { ApprovalsTab, MembersTab, MessagesTab, NotificationsTab, VisitorsTab } from "./profile-hub/admin-tabs";
+import { ApprovalsTab, MembersTab, MessagesTab, NotificationsTab, SecurityTab, VisitorsTab } from "./profile-hub/admin-tabs";
 import { FinanceTab } from "./profile-hub/finance-tab";
 import { ProfileTab } from "./profile-hub/profile-tabs";
 import { TimelineTab } from "./profile-hub/timeline-tab";
@@ -75,9 +75,10 @@ export type Tab =
   | "documents"
   | "careers"
   | "calendar"
-  | "visitors";
+  | "visitors"
+  | "security";
 
-const VALID_TABS = new Set<string>(["dashboard", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers", "calendar", "visitors"]);
+const VALID_TABS = new Set<string>(["dashboard", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers", "calendar", "visitors", "security"]);
 
 
 export function ProfileHub() {
@@ -169,7 +170,7 @@ export function ProfileHub() {
   }, []);
 
   const role = session?.user?.role ?? String(profile?.role ?? "employee");
-  const displayRole = formatRoleWithCustom(String(role), profile?.customRole);
+  const displayRole = formatRoleWithCustom(String(role), profile?.customRole, Boolean((profile as any)?.isSeniorSecurity));
   const displayName = String(profile?.name ?? session?.user?.name ?? "User");
   const avatarUrl = profile?.avatarUrl ? String(profile.avatarUrl) : "";
 
@@ -191,9 +192,12 @@ export function ProfileHub() {
   const hasCompany = Boolean(
     profile?.company && profile?.companyStatus === "approved",
   );
-  const canViewMembersTab = hasCompany && ["human-resource", "admin", "finance"].includes(String(role));
-  const canViewVisitorsTab = hasCompany && ["human-resource", "admin"].includes(String(role));
+  const actorIsSeniorSecurity = role === "security" && Boolean((session?.user as any)?.isSeniorSecurity);
+  const canViewMembersTab = hasCompany && (["human-resource", "admin", "finance"].includes(String(role)) || actorIsSeniorSecurity);
+  const canCreatePass = role !== "employee" && (role !== "security" || actorIsSeniorSecurity);
+  const canViewVisitorsTab = hasCompany && canCreatePass;
   const canViewFinanceTab = hasCompany;
+  const canViewSecurityTab = hasCompany && ["human-resource", "admin", "security"].includes(String(role));
   const canViewCompanyTabs = hasCompany;
   const mobileTabs: Tab[] = [
     "dashboard",
@@ -202,6 +206,7 @@ export function ProfileHub() {
     "onboarding",
     ...(canViewMembersTab ? (["members"] as Tab[]) : []),
     ...(canViewVisitorsTab ? (["visitors"] as Tab[]) : []),
+    ...(canViewSecurityTab ? (["security"] as Tab[]) : []),
     "careers",
     ...(canViewCompanyTabs ? (["documents"] as Tab[]) : []),
     ...(canViewCompanyTabs ? (["messages"] as Tab[]) : []),
@@ -699,7 +704,15 @@ export function ProfileHub() {
               onClick={() => setTab("visitors")}
             />
           ) : null}
-          {canViewCompanyTabs && ["admin", "human-resource", "project-manager", "qa-tester", "finance"].includes(String(role)) ? (
+          {canViewSecurityTab ? (
+            <NavButton
+              active={tab === "security"}
+              icon={<ShieldCheck size={16} />}
+              label="Security"
+              onClick={() => setTab("security")}
+            />
+          ) : null}
+          {canViewCompanyTabs && (["admin", "human-resource", "project-manager", "qa-tester", "finance"].includes(String(role)) || actorIsSeniorSecurity) ? (
             <NavButton
               active={pathname?.startsWith("/recruitment") ?? false}
               icon={<Briefcase size={16} />}
@@ -1032,8 +1045,12 @@ export function ProfileHub() {
                 <CompanyCalendarTab />
               ) : null}
 
+              {tab === "security" && canViewSecurityTab ? (
+                <SecurityTab company={company} showToast={showToast} />
+              ) : null}
+
               {tab === "visitors" && canViewVisitorsTab ? (
-                <VisitorsTab showToast={showToast} />
+                <VisitorsTab company={company} showToast={showToast} />
               ) : null}
             </>}
           </>

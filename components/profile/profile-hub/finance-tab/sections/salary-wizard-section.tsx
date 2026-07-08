@@ -83,7 +83,7 @@ export function SalaryWizardSection({
               <option value="">Select employee</option>
               {members.map((member) => (
                 <option key={String(member.id)} value={String(member.id)}>
-                  {String(member.name)} - {formatRoleWithCustom(String(member.role), member.customRole)}
+                  {String(member.name)} - {formatRoleWithCustom(String(member.role), member.customRole, Boolean((member as any).isSeniorSecurity))}
                 </option>
               ))}
             </select>
@@ -184,7 +184,7 @@ function SalaryBreakdownForm({
         {salaryBreakdown.periodStart !== salaryPeriod.start && (
           <p className="text-xs text-amber-600 bg-amber-50 rounded px-2 py-1">&#9888; Period adjusted — employee joined on {salaryBreakdown.periodStart}</p>
         )}
-        <div className="flex justify-between"><span>Employee:</span><span className="font-medium text-slate-900">{member ? `${String(member.name)} (${formatRoleWithCustom(String(member.role), member.customRole)})` : "-"}</span></div>
+        <div className="flex justify-between"><span>Employee:</span><span className="font-medium text-slate-900">{member ? `${String(member.name)} (${formatRoleWithCustom(String(member.role), member.customRole, Boolean((member as any).isSeniorSecurity))})` : "-"}</span></div>
         <div className="flex justify-between"><span>Total Days:</span> <span>{salaryBreakdown.totalDays}</span></div>
         <div className="flex justify-between text-rose-600"><span>Absent Days:</span> <span>{salaryBreakdown.absentDays}</span></div>
         <div className="flex justify-between text-emerald-600"><span>Paid Leave Days:</span> <span>{salaryBreakdown.paidLeaveDays}</span></div>

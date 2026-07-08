@@ -38,8 +38,10 @@ export async function GET(request: Request) {
         { employeeJoinCode: code },
         { otherJoinCode: code },
         { adminJoinCode: code },
+        { securityJoinCode: code },
+        { juniorSecurityJoinCode: code },
       ]
-    }).select("name joinCode hrJoinCode managerJoinCode testerJoinCode financeJoinCode employeeJoinCode otherJoinCode adminJoinCode members");
+    }).select("name joinCode hrJoinCode managerJoinCode testerJoinCode financeJoinCode employeeJoinCode otherJoinCode adminJoinCode securityJoinCode juniorSecurityJoinCode members");
     if (!company) return jsonError("Invalid company code.", 404);
     const joinState = userId ? await getCompanyJoinState(userId, company) : { status: "available" };
     const codeInfo = companyCodeInfo(company, code, baseCode);
@@ -113,6 +115,12 @@ function companyCodeInfo(company: any, code: string, baseCode: string) {
   }
   if (String(company.financeJoinCode ?? "") === code) {
     return { fromRole: "hr", toRole: "finance", joinCode: company.financeJoinCode };
+  }
+  if (String(company.securityJoinCode ?? "") === code) {
+    return { fromRole: "hr", toRole: "security", joinCode: company.securityJoinCode };
+  }
+  if (String(company.juniorSecurityJoinCode ?? "") === code) {
+    return { fromRole: "security", toRole: "security", joinCode: company.juniorSecurityJoinCode };
   }
   if (String(company.otherJoinCode ?? "") === code) {
     return { fromRole: "hr", toRole: "others", joinCode: company.otherJoinCode };

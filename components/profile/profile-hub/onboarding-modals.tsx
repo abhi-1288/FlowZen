@@ -53,6 +53,7 @@ export function HrQuitModal({
 export function RoleQuitModal({
   open,
   role,
+  isSeniorSecurity,
   candidates,
   selectedUserId,
   onSelectUser,
@@ -62,6 +63,7 @@ export function RoleQuitModal({
 }: {
   open: boolean;
   role: string;
+  isSeniorSecurity?: boolean;
   candidates: AnyRecord[];
   selectedUserId: string;
   onSelectUser: (id: string) => void;
@@ -75,8 +77,8 @@ export function RoleQuitModal({
       <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-5 shadow-xl">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h4 className="text-lg font-semibold">Quit company ({formatRole(role)})</h4>
-            <p className="mt-1 text-sm text-slate-500">Assign another approved {formatRole(role)} before quitting.</p>
+            <h4 className="text-lg font-semibold">Quit company ({formatRole(role, isSeniorSecurity)})</h4>
+            <p className="mt-1 text-sm text-slate-500">Assign another approved {formatRole(role, isSeniorSecurity)} before quitting.</p>
           </div>
           <button aria-label="Close" className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-100" type="button" onClick={onClose}><X size={18} /></button>
         </div>

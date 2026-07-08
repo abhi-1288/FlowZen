@@ -22,10 +22,11 @@ export async function GET() {
     throw error;
   }
 
-  const actor = await User.findById(userId).select("company role companyStatus");
+  const actor = await User.findById(userId).select("company role companyStatus isSeniorSecurity");
   if (!actor) return jsonError("User not found.", 404);
   if (!actor.company) return jsonError("No company.", 400);
-  if (!["admin", "human-resource"].includes(String(actor.role))) return jsonError("Forbidden.", 403);
+  if (String(actor.role) === "employee") return jsonError("Forbidden.", 403);
+  if (String(actor.role) === "security" && !Boolean((actor as any).isSeniorSecurity)) return jsonError("Forbidden.", 403);
 
   const events = await VisitorEvent.find({ company: actor.company })
     .sort({ createdAt: -1 })

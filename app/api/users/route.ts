@@ -16,11 +16,18 @@ export async function GET(req: Request) {
     const user = await User.findById(userId);
     if (!user || !user.company) return jsonError("No company", 400);
 
-    const users = await User.find({
+    const filter: Record<string, unknown> = {
       company: user.company,
       role,
       companyStatus: "approved",
-    }).select("name email role");
+    };
+
+    const isSeniorSecurity = url.searchParams.get("isSeniorSecurity") === "true";
+    if (isSeniorSecurity) {
+      filter.isSeniorSecurity = true;
+    }
+
+    const users = await User.find(filter).select("name email role isSeniorSecurity");
 
     return NextResponse.json({ users });
   } catch (err: any) {

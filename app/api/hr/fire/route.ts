@@ -43,19 +43,23 @@ export async function POST(request: Request) {
     throw error;
   }
 
-  const [hr, member] = await Promise.all([User.findById(userId), User.findById(memberId)]);
-  if (!hr) return jsonError("User not found.", 404);
+  const [actor, member] = await Promise.all([User.findById(userId), User.findById(memberId)]);
+  if (!actor) return jsonError("User not found.", 404);
   if (!member) return jsonError("Member not found.", 404);
 
-  if (!["human-resource", "admin"].includes(String(hr.role)) || hr.companyStatus !== "approved" || !hr.company) {
-    return jsonError("Only approved HR or admins can fire members.", 403);
+  const actorIsSeniorSecurity = String(actor.role) === "security" && Boolean((actor as any).isSeniorSecurity);
+  if (!["human-resource", "admin"].includes(String(actor.role)) && !actorIsSeniorSecurity) {
+    return jsonError("Only approved HR, admins, or senior security can fire members.", 403);
+  }
+  if (actor.companyStatus !== "approved" || !actor.company) {
+    return jsonError("Only approved members can fire.", 403);
   }
 
-  if (String(member.company ?? "") !== String(hr.company) || member.companyStatus !== "approved") {
+  if (String(member.company ?? "") !== String(actor.company) || member.companyStatus !== "approved") {
     return jsonError("You can only fire approved members in your company.", 403);
   }
 
-  const company = await Company.findById(hr.company);
+  const company = await Company.findById(actor.company);
   if (!company) return jsonError("Company not found.", 404);
   if (String(company.owner) === String(member._id)) {
     return jsonError("You cannot fire the company owner.", 403);
@@ -100,7 +104,7 @@ export async function POST(request: Request) {
   if (!Array.isArray(member.membershipHistory)) member.membershipHistory = [];
   member.membershipHistory.push({
     company: member.company,
-    inviter: hr._id,
+    inviter: actor._id,
     action: "removed-company",
     at: new Date(),
   });
@@ -118,14 +122,16 @@ export async function POST(request: Request) {
 
   await Company.updateOne({ _id: company._id }, { $pull: { members: member._id } });
 
+  const actorLabel = String(actor.role) === "admin" ? "admin" : actorIsSeniorSecurity ? "senior security" : "HR";
+
   // Notify the fired user.
   await Notification.create({
     user: member._id,
     company: company._id,
     type: "system",
     title: "Removed from company",
-    message: `You were removed from ${String(company.name ?? "your company")} by ${String(hr.role) === "admin" ? "admin" : "HR"}.${String(hr.name ?? "") ? ` (${String(hr.name)})` : ""}`,
-    body: `You were removed from ${String(company.name ?? "your company")} by ${String(hr.role) === "admin" ? "admin" : "HR"}.${String(hr.name ?? "") ? ` (${String(hr.name)})` : ""}`,
+    message: `You were removed from ${String(company.name ?? "your company")} by ${actorLabel}.${String(actor.name ?? "") ? ` (${String(actor.name)})` : ""}`,
+    body: `You were removed from ${String(company.name ?? "your company")} by ${actorLabel}.${String(actor.name ?? "") ? ` (${String(actor.name)})` : ""}`,
   });
   emitNotification(String(member._id));
 

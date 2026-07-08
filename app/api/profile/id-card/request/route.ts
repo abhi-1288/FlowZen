@@ -5,6 +5,7 @@ import { JoinRequest } from "@/models/JoinRequest";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
+import { resolveSeniorSecurityApprover } from "@/lib/join-approvers";
 
 export async function POST(request: Request) {
   const userId = await requireUserId();
@@ -26,8 +27,23 @@ export async function POST(request: Request) {
   const adminId = String(body.adminId ?? "").trim();
   if (!adminId) return jsonError("Please select an HR to send the request to.", 400);
 
-  const admin = await User.findOne({ _id: adminId, company: user.company, role: "human-resource", companyStatus: "approved" }).select("_id name");
-  if (!admin) return jsonError("Selected HR not found.", 404);
+  const isJuniorRequester = String(user.role) === "security" && !Boolean((user as any).isSeniorSecurity);
+  const approverFilter: Record<string, unknown> = {
+    _id: adminId,
+    company: user.company,
+    companyStatus: "approved",
+  };
+  if (isJuniorRequester) {
+    approverFilter.$or = [
+      { role: "human-resource" },
+      { role: "security", isSeniorSecurity: true },
+    ];
+  } else {
+    approverFilter.role = "human-resource";
+  }
+
+  const admin = await User.findOne(approverFilter).select("_id name role isSeniorSecurity");
+  if (!admin) return jsonError("Selected approver not found.", 404);
 
   const companyId = typeof user.company === "object" && user.company
     ? String((user.company as any)._id ?? "")
@@ -49,9 +65,19 @@ export async function POST(request: Request) {
   });
   if (existingApproved) return jsonError("Your ID card request is already approved.", 400);
 
+  // Junior security ID card requests go to senior security (unless they already picked one)
+  let approverId = String(admin._id);
+  const selectedIsSeniorSecurity = String(admin.role) === "security" && Boolean((admin as any).isSeniorSecurity);
+  if (!selectedIsSeniorSecurity) {
+    const ssApproverId = await resolveSeniorSecurityApprover(userId, companyId, null);
+    if (ssApproverId) {
+      approverId = ssApproverId;
+    }
+  }
+
   const joinRequest = await JoinRequest.create({
     requester: userId,
-    approver: admin._id,
+    approver: approverId,
     company: companyId,
     kind: "id-card",
     status: "pending",
@@ -69,7 +95,7 @@ export async function POST(request: Request) {
   });
 
   await Notification.create({
-    user: admin._id,
+    user: approverId,
     company: companyId,
     type: "approval",
     title: "ID Card Request",

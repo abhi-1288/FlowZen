@@ -166,6 +166,7 @@ export default function SignupPage() {
                   <option value="human-resource">Human Resource</option>
                   <option value="finance">Finance</option>
                   <option value="admin">Admin</option>
+                  <option value="security">Security</option>
                   <option value="others">Others</option>
                 </select>
               </label>

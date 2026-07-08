@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, UtensilsCrossed, Bus, Check, X } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
-import { ActionButton, AnyRecord, formatRoleWithCustom } from "./shared";
+import { ActionButton, AnyRecord, formatRole, formatRoleWithCustom } from "./shared";
+import { HR_MEMBER_ROLE_KEYS } from "./admin-tabs/types";
+
+const FINANCE_ROLE_CATEGORIES = [...HR_MEMBER_ROLE_KEYS, "senior-security", "junior-security"] as const;
 
 type PolicyData = {
   foodAmount: number;
@@ -66,6 +69,7 @@ export function FinanceMembersView({
   const [newSalary, setNewSalary] = useState("");
   const [savingSalary, setSavingSalary] = useState(false);
 
+  const [modalRole, setModalRole] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [policyModal, setPolicyModal] = useState(false);
@@ -271,20 +275,33 @@ export function FinanceMembersView({
         </ActionButton>
       </div>
 
-      <div className="mt-6 flex gap-2">
-        <input
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") setSearchQuery(searchInput.trim()); }}
-          placeholder="Search members by name, email, or team..."
-          className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-950 focus:ring-0"
-        />
+      <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
         <button
-          onClick={() => setSearchQuery(searchInput.trim())}
-          className="rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+          type="button"
+          className={`rounded-lg border px-3 py-2 text-left transition hover:border-slate-200 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 ${!modalRole ? "border-slate-950 bg-slate-100" : "border-transparent bg-slate-50"}`}
+          onClick={() => setModalRole(null)}
         >
-          Search
+          <p className="text-xs font-medium text-slate-500">All</p>
+          <p className="text-lg font-semibold">{membersState.length}</p>
         </button>
+        {FINANCE_ROLE_CATEGORIES.map((cat) => {
+          const count = cat === "senior-security"
+            ? membersState.filter((m) => String(m.role) === "security" && Boolean((m as any).isSeniorSecurity)).length
+            : cat === "junior-security"
+              ? membersState.filter((m) => String(m.role) === "security" && !Boolean((m as any).isSeniorSecurity)).length
+              : membersState.filter((m) => String(m.role) === cat).length;
+          return (
+            <button
+              key={cat}
+              type="button"
+              className={`rounded-lg border px-3 py-2 text-left transition hover:border-slate-200 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 ${modalRole === cat ? "border-slate-950 bg-slate-100" : "border-transparent bg-slate-50"}`}
+              onClick={() => { setModalRole(cat); setSearchQuery(""); setSearchInput(""); }}
+            >
+              <p className="text-xs font-medium text-slate-500">{cat === "senior-security" ? "Senior Security" : cat === "junior-security" ? "Junior Security" : formatRole(cat)}</p>
+              <p className="text-lg font-semibold">{count}</p>
+            </button>
+          );
+        })}
       </div>
 
       {(() => {
@@ -316,97 +333,9 @@ export function FinanceMembersView({
         return null;
       })()}
 
-      <ul className="mt-4 space-y-4">
-        {(() => {
-          const query = searchQuery.toLowerCase().trim();
-          const filtered = query
-            ? membersState.filter((m) => {
-                const name = String(m.name ?? "").toLowerCase();
-                const email = String(m.email ?? "").toLowerCase();
-                const teams = Array.isArray(m.teams) ? m.teams.map(String).join(" ").toLowerCase() : "";
-                const code = String(m.companyIdentityCode ?? "").toLowerCase();
-                const codeNum = code.split("-").pop() ?? "";
-                return name.includes(query) || email.includes(query) || teams.includes(query) || code.includes(query) || codeNum.includes(query);
-              })
-            : membersState;
-          if (filtered.length === 0) {
-            return <p className="py-8 text-center text-sm text-slate-500 bg-slate-50 rounded-xl border border-slate-100">No members match your search.</p>;
-          }
-          return filtered.map((member) => {
-            const memberId = String(member.id);
-            const teams = Array.isArray(member.teams) ? member.teams.map(String) : [];
-            const joinDate = member.companyJoined || member.createdAt;
-            const joinDateStr = joinDate ? new Date(String(joinDate)).toLocaleDateString() : "Unknown";
-            const currentSalary = Number(member.baseSalary ?? 0);
-            const hasBaseSalary = currentSalary > 0;
-
-            return (
-              <li key={memberId} className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between shadow-sm hover:shadow-md transition">
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold truncate text-lg">{String(member.name)}</p>
-                  <p className="text-sm text-slate-500 truncate">{String(member.email)}</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="rounded-lg bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600 border border-slate-200">
-                      Role: {formatRoleWithCustom(String(member.role), member.customRole)}
-                    </span>
-                    <span className="rounded-lg bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600 border border-slate-200">
-                      Team: {teams.length ? teams.join(", ") : "No Team"}
-                    </span>
-                    <span className="rounded-lg bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600 border border-slate-200">
-                      Joined: {joinDateStr}
-                    </span>
-                    {hasBaseSalary ? (
-                      <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 border border-emerald-200">
-                        Salary: ₹{Number(currentSalary ?? 0).toLocaleString("en-IN")}
-                      </span>
-                    ) : (
-                      <span className="rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 border border-amber-200">
-                        Salary not assigned
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex shrink-0 gap-2 w-full sm:w-auto">
-                  {checkOutRequests.some(
-                    (r: any) => r.status === "pending" && String((r.requester as any)?._id ?? "") === memberId
-                  ) ? (
-                    <button
-                      className="flex-1 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-700"
-                      onClick={() => {
-                        const req = checkOutRequests.find(
-                          (r: any) => r.status === "pending" && String((r.requester as any)?._id ?? "") === memberId
-                        );
-                        if (req) {
-                          setCheckOutModalRequest(req);
-                          setCheckOutStep("action");
-                          setCheckOutRejectReason("");
-                          setCheckOutStatusType("present");
-                        }
-                      }}
-                    >
-                      Update Check-out
-                    </button>
-                  ) : null}
-                  <ActionButton
-                    variant="primary"
-                    className="flex-1"
-                    onClick={() => selectMember(memberId, "attendance")}
-                  >
-                    See Attendance
-                  </ActionButton>
-                  <ActionButton
-                    variant="secondary"
-                    className="flex-1"
-                    onClick={() => selectMember(memberId, "salary")}
-                  >
-                    {hasBaseSalary ? "Update Salary" : "Assign Salary"}
-                  </ActionButton>
-                </div>
-              </li>
-            );
-          });
-        })()}
-      </ul>
+      {!modalRole && membersState.length === 0 && (
+        <p className="mt-5 rounded-lg bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">No approved company members yet.</p>
+      )}
 
       {/* Main Modal (Attendance or Salary) */}
       {modalType && (
@@ -714,6 +643,83 @@ export function FinanceMembersView({
           </div>
         </div>
       )}
+
+      {modalRole ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm transition-all" onClick={(e) => { if (e.target === e.currentTarget) { setModalRole(null); setSearchQuery(""); setSearchInput(""); } }}>
+          <div className="max-h-[min(90vh,720px)] w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+              <div>
+                <h4 className="text-xl font-semibold">{modalRole === "senior-security" ? "Senior Security" : modalRole === "junior-security" ? "Junior Security" : formatRole(modalRole)}</h4>
+                <p className="text-sm text-slate-500">{(() => {
+                  const roleFiltered = modalRole === "senior-security"
+                    ? membersState.filter((m) => String(m.role) === "security" && Boolean((m as any).isSeniorSecurity))
+                    : modalRole === "junior-security"
+                      ? membersState.filter((m) => String(m.role) === "security" && !Boolean((m as any).isSeniorSecurity))
+                      : membersState.filter((m) => String(m.role) === modalRole);
+                  return `${roleFiltered.length} member${roleFiltered.length === 1 ? "" : "s"}`;
+                })()}</p>
+              </div>
+              <button className="inline-flex items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-slate-50 hover:text-slate-700" type="button" onClick={() => { setModalRole(null); setSearchQuery(""); setSearchInput(""); }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-6 pt-4">
+              <div className="flex gap-2">
+                <input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") setSearchQuery(searchInput.trim()); }} placeholder="Search members by name, email, or team..." className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-950 focus:ring-0" />
+                <ActionButton variant="primary" onClick={() => setSearchQuery(searchInput.trim())}>Search</ActionButton>
+              </div>
+            </div>
+            <div className="max-h-[min(55vh,420px)] overflow-y-auto px-6 py-4">
+              {(() => {
+                const roleFiltered = modalRole === "senior-security"
+                  ? membersState.filter((m) => String(m.role) === "security" && Boolean((m as any).isSeniorSecurity))
+                  : modalRole === "junior-security"
+                    ? membersState.filter((m) => String(m.role) === "security" && !Boolean((m as any).isSeniorSecurity))
+                    : membersState.filter((m) => String(m.role) === modalRole);
+                const query = searchQuery.toLowerCase().trim();
+                const filtered = query
+                  ? roleFiltered.filter((m) => {
+                      const name = String(m.name ?? "").toLowerCase();
+                      const email = String(m.email ?? "").toLowerCase();
+                      const teams = Array.isArray(m.teams) ? m.teams.map(String).join(" ").toLowerCase() : "";
+                      const code = String(m.companyIdentityCode ?? "").toLowerCase();
+                      const codeNum = code.split("-").pop() ?? "";
+                      return name.includes(query) || email.includes(query) || teams.includes(query) || code.includes(query) || codeNum.includes(query);
+                    })
+                  : roleFiltered;
+                if (filtered.length === 0) {
+                  return <p className="py-8 text-center text-sm text-slate-500">No members match your search.</p>;
+                }
+                return (
+                  <ul className="space-y-4">
+                    {filtered.map((member) => {
+                      const memberId = String(member.id);
+                      const currentSalary = Number(member.baseSalary ?? 0);
+                      const hasBaseSalary = currentSalary > 0;
+                      return (
+                        <li key={memberId} className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between shadow-sm hover:shadow-md transition">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold truncate text-lg">{String(member.name)}</p>
+                            <p className="text-sm text-slate-500 truncate">{String(member.email)}</p>
+                          </div>
+                          <div className="flex shrink-0 gap-2 w-full sm:w-auto">
+                            <ActionButton variant="primary" className="flex-1" onClick={() => { setModalRole(null); setSearchQuery(""); setSearchInput(""); selectMember(memberId, "attendance"); }}>
+                              See Attendance
+                            </ActionButton>
+                            <ActionButton variant="secondary" className="flex-1" onClick={() => { setModalRole(null); setSearchQuery(""); setSearchInput(""); selectMember(memberId, "salary"); }}>
+                              {hasBaseSalary ? "Update Salary" : "Assign Salary"}
+                            </ActionButton>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {policyModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setPolicyModal(false); }}>

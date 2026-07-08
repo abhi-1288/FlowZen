@@ -7,7 +7,7 @@ import { JoinRequest } from "@/models/JoinRequest";
 import { Notification } from "@/models/Notification";
 import { Board } from "@/models/Board";
 import { emitNotification } from "@/lib/realtime";
-import { findApprovedHrUserId, listApprovedHrUserIds } from "@/lib/join-approvers";
+import { findApprovedHrUserId, listApprovedHrUserIds, resolveSeniorSecurityApprover } from "@/lib/join-approvers";
 
 export async function POST(request: Request) {
   const userId = await requireUserId();
@@ -138,8 +138,15 @@ export async function POST(request: Request) {
   if (hrIds.length === 0) {
     return jsonError("No approved HR available to review this quit request.", 409);
   }
-  const approverId = await findApprovedHrUserId(company._id);
+  let approverId = await findApprovedHrUserId(company._id);
   if (!approverId) return jsonError("No approved HR available to review this quit request.", 409);
+
+  // Junior security quit requests go to senior security instead of HR
+  const ssApproverId = await resolveSeniorSecurityApprover(userId, String(company._id), null);
+  const isJuniorSecurity = Boolean(ssApproverId);
+  if (ssApproverId) {
+    approverId = ssApproverId;
+  }
 
   await JoinRequest.create({
     requester: user._id,
@@ -149,16 +156,27 @@ export async function POST(request: Request) {
     replacementUser: replacementUserId || undefined,
   });
 
-  await Notification.insertMany(
-    hrIds.map((hrId) => ({
-      user: hrId,
+  if (isJuniorSecurity) {
+    await Notification.create({
+      user: approverId,
       company: user.company,
       type: "approval",
       title: "Quit Request",
-      message: `${user.name}: ${user.role} is requesting to quit from ${company.name}${assignedMessage}${replacementUserId ? ` (replacement assigned)` : ""}`,
-    })),
-  );
-  hrIds.forEach((id) => emitNotification(String(id)));
+      message: `${user.name}: ${user.role} is requesting to quit from ${company.name}${assignedMessage}`,
+    });
+    emitNotification(approverId);
+  } else {
+    await Notification.insertMany(
+      hrIds.map((hrId) => ({
+        user: hrId,
+        company: user.company,
+        type: "approval",
+        title: "Quit Request",
+        message: `${user.name}: ${user.role} is requesting to quit from ${company.name}${assignedMessage}${replacementUserId ? ` (replacement assigned)` : ""}`,
+      })),
+    );
+    hrIds.forEach((id) => emitNotification(String(id)));
+  }
 
   if (replacementUserId) {
     const admin = await User.findOne({

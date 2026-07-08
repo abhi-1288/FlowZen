@@ -9,7 +9,8 @@ export default async function RecruitmentLayout({ children }: { children: React.
   if (!session?.user) redirect("/login");
 
   const role = session.user.role ?? "";
-  if (!["admin", "human-resource", "project-manager", "qa-tester", "finance"].includes(role)) redirect("/profile");
+  const isSeniorSecurity = role === "security" && Boolean((session.user as any)?.isSeniorSecurity);
+  if (!["admin", "human-resource", "project-manager", "qa-tester", "finance"].includes(role) && !isSeniorSecurity) redirect("/profile");
 
   return (
     <div className="flex min-h-screen bg-[#f7f8fb]">

@@ -17,7 +17,8 @@ export async function GET(request: Request) {
 
   await connectDb();
   const user = await User.findById(userId);
-  if (!user || !ALL_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  const isSeniorSecurity = user?.role === "security" && Boolean((user as any).isSeniorSecurity);
+  if (!user || (!ALL_ROLES.includes(user.role) && !isSeniorSecurity)) return jsonError("Forbidden", 403);
   if (!user.company) return jsonError("No company found.", 400);
 
   const { searchParams } = new URL(request.url);

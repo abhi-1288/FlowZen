@@ -9,6 +9,7 @@ const COMPANY_JOIN_ROLES_USING_HR = new Set([
   "finance",
   "employee",
   "others",
+  "security",
 ]);
 
 /**
@@ -36,6 +37,47 @@ export function stripHrInviteSuffix(code: string): { baseCode: string; hrSuffix:
 
 export function companyJoinUsesHrApprover(codeRole: string): boolean {
   return COMPANY_JOIN_ROLES_USING_HR.has(codeRole);
+}
+
+export async function findApprovedSeniorSecurityUserId(
+  companyId: Types.ObjectId | string,
+): Promise<string | null> {
+  const ss = await User.findOne({
+    company: companyId,
+    role: "security",
+    companyStatus: "approved",
+    isSeniorSecurity: true,
+  })
+    .select("_id")
+    .sort({ createdAt: 1 });
+
+  return ss ? String(ss._id) : null;
+}
+
+export async function listApprovedSeniorSecurityUserIds(
+  companyId: Types.ObjectId | string,
+): Promise<string[]> {
+  const sss = await User.find({
+    company: companyId,
+    role: "security",
+    companyStatus: "approved",
+    isSeniorSecurity: true,
+  }).select("_id");
+  return sss.map((ss) => String(ss._id));
+}
+
+export async function resolveSeniorSecurityApprover(
+  requesterId: Types.ObjectId | string,
+  companyId: Types.ObjectId | string,
+  defaultApproverId: string | null,
+): Promise<string | null> {
+  const requester = await User.findById(requesterId).select("role isSeniorSecurity company");
+  if (!requester) return defaultApproverId;
+  if (String(requester.role) === "security" && !Boolean((requester as any).isSeniorSecurity)) {
+    const ssId = await findApprovedSeniorSecurityUserId(companyId);
+    if (ssId) return ssId;
+  }
+  return defaultApproverId;
 }
 
 export async function findApprovedHrUserId(
@@ -127,6 +169,10 @@ export async function resolveCompanyJoinApproverId(
     if (admin) return String(admin);
   }
   if (companyJoinUsesHrApprover(codeRole)) {
+    if (codeRole === "security") {
+      const ssId = await findApprovedSeniorSecurityUserId(company._id);
+      if (ssId) return ssId;
+    }
     const hrId = await findApprovedHrUserId(company._id);
     if (hrId) return hrId;
   }

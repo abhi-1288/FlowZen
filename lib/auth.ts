@@ -189,7 +189,7 @@ export const authOptions: NextAuthOptions = {
     },
     async jwt({ token, user }) {
       if (user?.id) token.sub = user.id;
-      if (user?.role) token.role = user.role;
+      if (user?.role) (token as any).role = user.role;
       if ((user as any)?.passwordResetRequired) token.passwordResetRequired = true;
       if (typeof (user as any)?.rememberMe === "boolean") token.rememberMe = (user as any).rememberMe;
 
@@ -206,7 +206,8 @@ export const authOptions: NextAuthOptions = {
               .populate("company", "name primaryColor")
               .populate("team", "name");
             if (!userDoc) return null!;
-            token.role = userDoc.role;
+            (token as any).role = userDoc.role;
+            (token as any).isSeniorSecurity = Boolean((userDoc as any).isSeniorSecurity);
             const team = userDoc.team as any;
             const companyDoc = userDoc.company as any;
             (token as any).company = companyDoc?.name || null;
@@ -230,7 +231,7 @@ export const authOptions: NextAuthOptions = {
       }
       if (session.user) {
         session.user.id = token.sub;
-        session.user.role = token.role as "employee" | "project-manager" | "qa-tester" | "human-resource" | "finance" | "admin" | "others" | undefined;
+        session.user.role = token.role as "employee" | "project-manager" | "qa-tester" | "human-resource" | "finance" | "admin" | "security" | "others" | undefined;
         session.user.passwordResetRequired = Boolean(token.passwordResetRequired);
         if (typeof token.rememberMe !== "undefined") session.user.rememberMe = token.rememberMe;
 
@@ -240,6 +241,7 @@ export const authOptions: NextAuthOptions = {
         session.user.team = (token as any).team || null;
         session.user.teamId = (token as any).teamId || null;
         session.user.managedTeamCount = (token as any).managedTeamCount || 0;
+        session.user.isSeniorSecurity = Boolean((token as any).isSeniorSecurity);
       }
       return session;
     }

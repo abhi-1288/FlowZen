@@ -40,6 +40,7 @@ export default function CandidateProfilePage() {
   const { data: session } = useSession();
   const role = session?.user?.role;
   const isHr = role === "admin" || role === "human-resource";
+  const isSeniorSecurity = role === "security" && Boolean((session?.user as any)?.isSeniorSecurity);
   const mountedRef = useRef(true);
 
   const {
@@ -581,6 +582,14 @@ export default function CandidateProfilePage() {
                   <Briefcase size={14} /> Convert To Employee
                 </button>
               )}
+              {isSeniorSecurity && activeCandidate.stage === "joined" && (
+                <button
+                  onClick={() => setShowConvertModal(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700"
+                >
+                  <Briefcase size={14} /> Convert To Junior Security
+                </button>
+              )}
               {activeCandidate.stage === "rejected" && (
                 <button
                   onClick={async () => {
@@ -994,9 +1003,10 @@ export default function CandidateProfilePage() {
       <ConvertEmployeeModal
         isOpen={showConvertModal}
         onClose={() => setShowConvertModal(false)}
-        onSubmit={async (password) => { await convertToEmployee(id, password); }}
+        onSubmit={async (password, role) => { await convertToEmployee(id, password, role); }}
         candidateName={`${(activeCandidate as any).firstName} ${(activeCandidate as any).lastName}`}
         candidateEmail={(activeCandidate as any).email}
+        isSeniorSecurity={isSeniorSecurity}
       />
     </div>
   );

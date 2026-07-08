@@ -16,10 +16,11 @@ export async function GET() {
     throw error;
   }
 
-  const actor = await User.findById(userId).select("company role companyStatus");
+  const actor = await User.findById(userId).select("company role companyStatus isSeniorSecurity");
   if (!actor) return jsonError("User not found.", 404);
   if (!actor.company) return jsonError("No company.", 400);
-  if (!["admin", "human-resource"].includes(String(actor.role))) return jsonError("Forbidden.", 403);
+  if (String(actor.role) === "employee") return jsonError("Forbidden.", 403);
+  if (String(actor.role) === "security" && !Boolean((actor as any).isSeniorSecurity)) return jsonError("Forbidden.", 403);
 
   type PassDoc = Record<string, unknown>;
   const passes = await VisitorPass.find({ company: actor.company })
@@ -53,24 +54,29 @@ export async function POST(request: Request) {
     throw error;
   }
 
-  const actor = await User.findById(userId).select("company role companyStatus name");
+  const actor = await User.findById(userId).select("company role companyStatus name isSeniorSecurity");
   if (!actor) return jsonError("User not found.", 404);
   if (!actor.company) return jsonError("No company.", 400);
-  if (!["admin", "human-resource"].includes(String(actor.role))) return jsonError("Forbidden.", 403);
+  if (String(actor.role) === "employee") return jsonError("Forbidden.", 403);
+  if (String(actor.role) === "security" && !Boolean((actor as any).isSeniorSecurity)) return jsonError("Forbidden.", 403);
 
   const body = await request.json();
-  const eventId = body.eventId ? String(body.eventId).trim() : null;
+
+  const timeIn = body.timeIn ? new Date(String(body.timeIn)) : null;
+  const timeOut = body.timeOut ? new Date(String(body.timeOut)) : null;
 
   const pass = await VisitorPass.create({
-    event: eventId || null,
+    createdBy: userId,
     company: actor.company,
     visitorName: String(body.visitorName ?? "").trim(),
     visitorEmail: String(body.visitorEmail ?? "").trim().toLowerCase(),
     visitorPhone: String(body.visitorPhone ?? "").trim(),
     visitorCompany: String(body.visitorCompany ?? "").trim(),
+    region: String(body.region ?? "").trim(),
     purpose: String(body.purpose ?? "").trim(),
-    idDocumentUrl: String(body.idDocumentUrl ?? "").trim(),
-    hostName: String(body.hostName ?? "").trim(),
+    identityCode: null,
+    timeIn,
+    timeOut,
     status: "pending",
   });
 

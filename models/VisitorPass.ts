@@ -3,6 +3,7 @@ import { Schema, model, models, type InferSchemaType } from "mongoose";
 const VisitorPassSchema = new Schema(
   {
     event: { type: Schema.Types.ObjectId, ref: "VisitorEvent", default: null, index: true },
+    createdBy: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
     company: { type: Schema.Types.ObjectId, ref: "Company", required: true, index: true },
     visitorName: { type: String, required: true },
     visitorEmail: { type: String, required: true },
@@ -15,7 +16,7 @@ const VisitorPassSchema = new Schema(
     visitAddress: { type: String, default: "" },
     status: {
       type: String,
-      enum: ["pending", "approved", "rejected", "expired"],
+      enum: ["pending", "approved", "rejected", "expired", "active", "completed"],
       default: "pending",
       index: true,
     },
@@ -28,6 +29,11 @@ const VisitorPassSchema = new Schema(
     signedAt: { type: Date, default: null },
     rejectionReason: { type: String, default: "" },
     identityCode: { type: String, default: "", unique: true, sparse: true, index: true },
+    acceptedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    timeIn: { type: Date, default: null },
+    timeOut: { type: Date, default: null },
+    entryTime: { type: Date, default: null },
+    exitTime: { type: Date, default: null },
   },
   { timestamps: true }
 );

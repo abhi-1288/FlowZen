@@ -6,7 +6,7 @@ import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
 
-const VALID_ROLES = ["employee", "project-manager", "qa-tester", "human-resource", "finance", "admin", "others"];
+const VALID_ROLES = ["employee", "project-manager", "qa-tester", "human-resource", "finance", "admin", "security", "others"];
 const ROLE_LABELS = [
   "Intern",
   "Trainee",
@@ -53,9 +53,14 @@ export async function PATCH(request: Request) {
     actorRole === "admin" &&
     (String(actor.company ?? "") === String(member.company) ||
       String(company?.owner ?? "") === String(actor._id));
+  const isSeniorSecurity =
+    actorRole === "security" &&
+    (actor as any).isSeniorSecurity &&
+    String(actor.companyStatus) === "approved" &&
+    String(actor.company ?? "") === String(member.company);
 
-  if (!isCompanyHr && !isCompanyAdmin) {
-    return jsonError("Only approved HR or admins can update members.", 403);
+  if (!isCompanyHr && !isCompanyAdmin && !isSeniorSecurity) {
+    return jsonError("Only approved HR, admins, or senior security can update members.", 403);
   }
 
   if (String(actor._id) === String(member._id)) {
@@ -75,6 +80,9 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: true, options: ROLE_LABELS, customRole });
   }
 
+  const newIsSeniorSecurity = (body as any).isSeniorSecurity;
+  const isSeniorSecurityChange = typeof newIsSeniorSecurity === "boolean";
+
   if (newRole) {
     if (!VALID_ROLES.includes(newRole)) return jsonError("Invalid role.", 400);
     const oldRole = member.role;
@@ -88,6 +96,9 @@ export async function PATCH(request: Request) {
     }
     member.role = newRole;
     member.customRole = "";
+    if (isSeniorSecurityChange) {
+      member.isSeniorSecurity = newIsSeniorSecurity;
+    }
     await member.save();
 
     await Notification.create({

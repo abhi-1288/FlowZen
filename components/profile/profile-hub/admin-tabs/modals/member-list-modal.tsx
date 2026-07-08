@@ -1,16 +1,12 @@
 import { useMemo, useState } from "react";
 import { X, Building2 } from "lucide-react";
 import { ActionButton, AnyRecord, formatRole, formatRoleWithCustom } from "../../shared";
-import type { MeetingDuration } from "../types";
-import { MEETING_DURATION_OPTIONS } from "../types";
 import { currencySymbol } from "../helpers";
 import { apiFetch } from "@/lib/client-utils";
 
 export function MemberListModal({
   modalRole,
   members,
-  meetingDuration,
-  invitingFor,
   firingFor,
   canEditOthersRole,
   selfId,
@@ -19,12 +15,9 @@ export function MemberListModal({
   modalSearchInput,
   modalSearchQuery,
   onClose,
-  onMeetingDurationChange,
-  onSendMeetingInvite,
   onRequestFire,
   onOpenSalaryModal,
   onOpenPfEsicModal,
-  onOpenTdsModal,
   onOpenDocModal,
   onOpenRoleModal,
   onOpenCustomRoleModal,
@@ -38,8 +31,6 @@ export function MemberListModal({
 }: {
   modalRole: string | null;
   members: AnyRecord[];
-  meetingDuration: MeetingDuration;
-  invitingFor: string | null;
   firingFor: string | null;
   canEditOthersRole: boolean;
   selfId: string;
@@ -48,12 +39,9 @@ export function MemberListModal({
   modalSearchInput: string;
   modalSearchQuery: string;
   onClose: () => void;
-  onMeetingDurationChange: (duration: MeetingDuration) => void;
-  onSendMeetingInvite: (memberId: string) => void;
   onRequestFire: (member: AnyRecord) => void;
   onOpenSalaryModal: (member: AnyRecord) => void;
   onOpenPfEsicModal: (member: AnyRecord) => void;
-  onOpenTdsModal: (member: AnyRecord) => void;
   onOpenDocModal: (member: AnyRecord) => void;
   onOpenRoleModal: (member: AnyRecord) => void;
   onOpenCustomRoleModal: (member: AnyRecord) => void;
@@ -68,6 +56,12 @@ export function MemberListModal({
   const modalMembers = useMemo(() => {
     if (!modalRole) return [];
     return members.filter((m) => {
+      if (modalRole === "senior-security") {
+        return String(m.role) === "security" && Boolean((m as any).isSeniorSecurity);
+      }
+      if (modalRole === "junior-security") {
+        return String(m.role) === "security" && !Boolean((m as any).isSeniorSecurity);
+      }
       if (String(m.role ?? "") !== modalRole) return false;
       if (modalRole === "others" && selectedOtherRole !== "all") {
         return String(m.customRole ?? "").trim() === selectedOtherRole;
@@ -110,24 +104,12 @@ export function MemberListModal({
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
           <div>
-            <h4 className="text-xl font-semibold" id="members-modal-title">{formatRole(modalRole)}</h4>
+            <h4 className="text-xl font-semibold" id="members-modal-title">{modalRole === "senior-security" ? "Senior Security" : modalRole === "junior-security" ? "Junior Security" : formatRole(modalRole)}</h4>
             <p className="text-sm text-slate-500">
               {modalMembers.length} member{modalMembers.length === 1 ? "" : "s"}
             </p>
           </div>
           <div className="flex items-start gap-3">
-            <div className="min-w-[260px]">
-              <p className="text-xs font-semibold uppercase text-slate-500">Meeting Time In</p>
-              <select
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-                value={meetingDuration}
-                onChange={(e) => onMeetingDurationChange(Number(e.target.value) as MeetingDuration)}
-              >
-                {MEETING_DURATION_OPTIONS.map((opt) => (
-                  <option key={opt.minutes} value={opt.minutes}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
             <button
               aria-label="Close"
               className="inline-flex items-center justify-center gap-2 rounded-lg p-2 text-sm font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 text-slate-500 hover:text-slate-700 hover:bg-slate-50"
@@ -208,7 +190,7 @@ export function MemberListModal({
 
                         <div className="grid items-center gap-2">
                           <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
-                            role: {formatRoleWithCustom(String(member.role ?? "employee"), member.customRole)}
+                            role: {formatRoleWithCustom(String(member.role ?? "employee"), member.customRole, Boolean((member as any).isSeniorSecurity))}
                           </span>
                           <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
                             salary: {(() => {
@@ -224,7 +206,6 @@ export function MemberListModal({
                         <div className="flex flex-wrap gap-2 sm:col-span-3">
                           <ActionButton variant="primary" className="px-3" type="button" onClick={() => onOpenSalaryModal(member)}>Base Salary</ActionButton>
                           <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenPfEsicModal(member)}>PF & ESIC</ActionButton>
-                          <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenTdsModal(member)}>TDS</ActionButton>
                           <ActionButton variant="secondary" className="px-3" type="button" onClick={() => void onOpenDocModal(member)}>Documents</ActionButton>
                           {onOpenRegionModal ? (
                             <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenRegionModal(member)}>
@@ -245,9 +226,6 @@ export function MemberListModal({
                         </div>
 
                         <div className="flex shrink-0 flex-col gap-2 sm:items-end">
-                          <ActionButton variant="primary" className="px-3" disabled={!!isSelf || invitingFor === memberId} type="button" onClick={() => onSendMeetingInvite(memberId)}>
-                            {invitingFor === memberId ? "Sending..." : "Invite to meet"}
-                          </ActionButton>
                           <ActionButton variant="danger" className="px-3" disabled={!!isSelf || firingFor === memberId} type="button" onClick={() => onRequestFire(member)}>
                             {firingFor === memberId ? "Removing..." : "Fire"}
                           </ActionButton>

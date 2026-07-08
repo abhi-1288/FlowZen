@@ -74,6 +74,9 @@ export async function GET() {
       company.testerJoinCode = `${company.joinCode}-TESTER`;
       company.financeJoinCode = `${company.joinCode}-FINANCE`;
       company.employeeJoinCode = `${company.joinCode}-EMPLOYEE`;
+      if (!company.securityJoinCode) {
+        company.securityJoinCode = `${company.joinCode}-SECURITY`;
+      }
       if (!company.otherJoinCode) {
         company.otherJoinCode = createRoleJoinCode(String(company.joinCode));
       }
@@ -209,11 +212,11 @@ export async function GET() {
     };
   }
 
-  if (["human-resource", "finance", "admin"].includes(safeRole) && user.company && user.companyStatus === "approved") {
+  if (["human-resource", "finance", "admin", "security"].includes(safeRole) && user.company && user.companyStatus === "approved") {
     const companyId = typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
     const [members, teams, companyPolicy] = await Promise.all([
       User.find({ company: companyId, companyStatus: "approved" })
-        .select("name email role customRole team teamStatus activeTeams membershipHistory companyJoined createdAt baseSalary companyIdentityCode pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted")
+        .select("name email role customRole isSeniorSecurity team teamStatus activeTeams membershipHistory companyJoined createdAt baseSalary companyIdentityCode pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted")
         .populate("membershipHistory.inviter", "name role")
         .sort({ role: 1, name: 1 }),
       Team.find({ company: companyId }).select("name manager employees"),
@@ -259,6 +262,7 @@ export async function GET() {
           email: member.email ?? "",
           role: member.role ?? "employee",
           customRole: member.customRole ?? "",
+          isSeniorSecurity: Boolean((member as any).isSeniorSecurity ?? false),
           baseSalary: Math.max(0, Number(member.baseSalary ?? 0)),
           salaryCurrency: String(member.salaryCurrency ?? "INR"),
           teamStatus: member.teamStatus ?? "none",
@@ -284,6 +288,21 @@ export async function GET() {
     };
   }
 
+  if (safeRole === "security" && user.company && user.companyStatus === "approved") {
+    const companyId = typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
+    const company = await Company.findById(companyId);
+    if (company && !company.securityJoinCode) {
+      company.securityJoinCode = `${company.joinCode}-SECURITY`;
+    }
+    if (company && !company.juniorSecurityJoinCode) {
+      company.juniorSecurityJoinCode = `${company.joinCode}-JR-SECURITY`;
+    }
+    if (company) {
+      await company.save();
+      user.company = company;
+    }
+  }
+
   if (safeRole === "admin" && user.company && user.companyStatus === "approved") {
     const company = await Company.findById(userCompanyId);
     if (company && !company.adminJoinCode) {
@@ -300,6 +319,7 @@ export async function GET() {
       "project-manager": "Project Manager",
       "qa-tester": "Q-A Tester",
       finance: "Finance",
+      security: "Security",
       employee: "Employee",
       admin: "Admin",
       others: "Others",

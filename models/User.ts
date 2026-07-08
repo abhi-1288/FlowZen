@@ -13,10 +13,11 @@ const UserSchema = new Schema(
     passwordHash: { type: String, select: false },
     role: {
       type: String,
-      enum: ["employee", "project-manager", "qa-tester", "human-resource", "finance", "admin", "others"],
+      enum: ["employee", "project-manager", "qa-tester", "human-resource", "finance", "admin", "security", "others"],
       default: "employee",
       index: true,
     },
+    isSeniorSecurity: { type: Boolean, default: false },
     emailVerified: { type: Boolean, default: false },
     pendingEmail: { type: String, lowercase: true, trim: true, default: null },
     otpHash: { type: String, select: false },

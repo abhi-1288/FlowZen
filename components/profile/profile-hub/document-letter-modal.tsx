@@ -9,9 +9,10 @@ type Props = {
   onClose: () => void;
   onSuccess: () => void;
   showToast: (text: string, type?: "success" | "error") => void;
+  isJuniorSecurity?: boolean;
 };
 
-type HrUser = {
+type ApproverUser = {
   _id: string;
   name: string;
   email: string;
@@ -28,13 +29,13 @@ const LETTER_TYPES = [
   { value: "id-card", label: "ID Card" },
 ];
 
-export function DocumentLetterModal({ mode, onClose, onSuccess, showToast }: Props) {
+export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJuniorSecurity = false }: Props) {
   const [letterType, setLetterType] = useState(mode === "send" ? "resignation" : "experience");
   const availableLetterTypes = LETTER_TYPES.filter(lt => mode === "send" ? lt.value === "resignation" : lt.value !== "resignation");
   const [customType, setCustomType] = useState("");
   const [purpose, setPurpose] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [hrs, setHrs] = useState<HrUser[]>([]);
+  const [approvers, setApprovers] = useState<ApproverUser[]>([]);
   const [selectedHrId, setSelectedHrId] = useState("");
   const [internshipStart, setInternshipStart] = useState("");
   const [internshipEnd, setInternshipEnd] = useState("");
@@ -89,9 +90,12 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast }: Pro
   }
 
   useEffect(() => {
-    apiFetch<{ users: HrUser[] }>("/api/users?role=human-resource")
+    const approverUrl = isJuniorSecurity
+      ? "/api/users?role=security&isSeniorSecurity=true"
+      : "/api/users?role=human-resource";
+    apiFetch<{ users: ApproverUser[] }>(approverUrl)
       .then((res) => {
-        setHrs(res.users ?? []);
+        setApprovers(res.users ?? []);
         if (res.users?.length === 1) {
           setSelectedHrId(res.users[0]._id);
         }
@@ -103,7 +107,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast }: Pro
         if (res.user?.companyJoined) setCompanyJoined(res.user.companyJoined);
       })
       .catch(() => {});
-  }, []);
+  }, [isJuniorSecurity]);
 
   useEffect(() => {
     if (letterType === "resignation" && noticePeriodDays > 0) {
@@ -225,7 +229,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast }: Pro
                 {showPreview ? "Edit Letter Content" : mode === "send" ? "Send Resignation Letter" : "Request Document Letter"}
               </h4>
               <p className="mt-0.5 text-sm text-slate-500">
-                {letterType === "id-card" ? "Request an ID card for approval." : showPreview ? "Customize the text before submitting." : mode === "send" ? "Submit your resignation letter to HR." : "Submit a request to HR for a company document letter."}
+                {letterType === "id-card" ? "Request an ID card for approval." : showPreview ? "Customize the text before submitting." : mode === "send" ? `Submit your resignation letter to ${isJuniorSecurity ? "senior security" : "HR"}.` : `Submit a request to ${isJuniorSecurity ? "senior security" : "HR"} for a company document letter.`}
               </p>
             </div>
           </div>
@@ -271,7 +275,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast }: Pro
           </div>
 
           {letterType === "id-card" ? (
-            <p className="text-sm text-slate-600">Select an HR to review and approve your ID card request. No additional details are needed.</p>
+            <p className="text-sm text-slate-600">{isJuniorSecurity ? "Select a senior security member to review and approve your ID card request." : "Select an HR to review and approve your ID card request."} No additional details are needed.</p>
           ) : null}
 
           {letterType === "other" ? (
@@ -395,7 +399,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast }: Pro
 
           <div>
             <label className="text-xs font-semibold uppercase text-slate-500">
-              Assign to HR
+              {isJuniorSecurity ? "Assign to Senior Security" : "Assign to HR"}
             </label>
             <select
               className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
@@ -403,20 +407,26 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast }: Pro
               onChange={(e) => setSelectedHrId(e.target.value)}
             >
               <option value="">Auto-assign</option>
-              {hrs.map((hr) => (
-                <option key={hr._id} value={hr._id}>
-                  {hr.name} ({hr.email})
+              {approvers.map((a) => (
+                <option key={a._id} value={a._id}>
+                  {a.name} ({a.email})
                 </option>
               ))}
             </select>
             <p className="mt-1 text-xs text-slate-400">
-              {letterType === "id-card"
-                ? "Select the HR who will review and approve your ID card request."
-                : hrs.length === 0
-                  ? "No HR members found. The request will be auto-assigned."
-                  : hrs.length > 1
-                    ? "Select a specific HR or leave as auto-assign."
-                    : ""}
+              {isJuniorSecurity
+                ? approvers.length === 0
+                  ? "No senior security members found. The request will be auto-assigned."
+                  : approvers.length > 1
+                    ? "Select a specific senior security member or leave as auto-assign."
+                    : ""
+                : letterType === "id-card"
+                  ? "Select the HR who will review and approve your ID card request."
+                  : approvers.length === 0
+                    ? "No HR members found. The request will be auto-assigned."
+                    : approvers.length > 1
+                      ? "Select a specific HR or leave as auto-assign."
+                      : ""}
             </p>
           </div>
 

@@ -24,7 +24,7 @@ export function parseDeadline(budget: AnyRecord): Date | null {
 export function pickMemberRole(members: AnyRecord[], memberId: string): string {
   const member = members.find((m) => String(m.id) === memberId);
   if (!member) return "-";
-  return formatRoleWithCustom(String(member.role), member.customRole);
+  return formatRoleWithCustom(String(member.role), member.customRole, Boolean((member as any).isSeniorSecurity));
 }
 
 export function getMemberName(members: AnyRecord[], memberId: string): string {

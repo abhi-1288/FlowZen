@@ -26,7 +26,8 @@ export async function GET(_request: Request, { params }: Params) {
   await connectDb();
   await autoCloseOverdueJobs();
   const user = await User.findById(userId);
-  if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  const isSeniorSecurity = user?.role === "security" && Boolean((user as any).isSeniorSecurity);
+  if (!user || (!HR_ROLES.includes(user.role) && !isSeniorSecurity)) return jsonError("Forbidden", 403);
   if (!user.company) return jsonError("No company found.", 400);
 
   const job = await ATSJob.findOne({ _id: id, company: user.company }).populate("company", "name");

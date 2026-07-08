@@ -7,6 +7,7 @@ import { Company } from "@/models/Company";
 import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
 import { resolveEnrollingHr } from "@/lib/enrolling-hr";
+import { resolveSeniorSecurityApprover } from "@/lib/join-approvers";
 
 export async function GET(request: Request) {
   const userId = await requireUserId();
@@ -104,18 +105,27 @@ export async function POST(request: Request) {
     const companyId = String(requester.company);
 
     let approverId: string | null = null;
+    let customApproverIsSeniorSecurity = false;
 
     if (customApproverId) {
-      const customApprover = await User.findById(customApproverId).select("role company companyStatus");
+      const customApprover = await User.findById(customApproverId).select("role company companyStatus isSeniorSecurity");
+      const isSeniorSecurityForCustom = String(customApprover?.role) === "security" && Boolean((customApprover as any)?.isSeniorSecurity);
+      const isJuniorRequester = String(requester.role) === "security" && !Boolean((requester as any).isSeniorSecurity);
+
+      const validRole = isJuniorRequester
+        ? ["human-resource", "admin"].includes(String(customApprover?.role)) || isSeniorSecurityForCustom
+        : ["human-resource", "admin"].includes(String(customApprover?.role));
+
       if (
         !customApprover ||
         String(customApprover.company) !== companyId ||
         customApprover.companyStatus !== "approved" ||
-        !["human-resource", "admin"].includes(String(customApprover.role))
+        !validRole
       ) {
         return jsonError("Selected approver is not a valid HR or admin in your company.", 400);
       }
       approverId = String(customApprover._id);
+      customApproverIsSeniorSecurity = isSeniorSecurityForCustom;
     }
 
     if (!approverId) {
@@ -153,6 +163,14 @@ export async function POST(request: Request) {
 
     if (!approverId) {
       return jsonError("No HR or admin found to approve this request.", 400);
+    }
+
+    // Junior security requests go to senior security (unless they already picked one)
+    if (!customApproverIsSeniorSecurity) {
+      const ssApproverId = await resolveSeniorSecurityApprover(userId, companyId, null);
+      if (ssApproverId) {
+        approverId = ssApproverId;
+      }
     }
 
     const metadataRecord: Record<string, unknown> = {

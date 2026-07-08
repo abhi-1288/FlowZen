@@ -147,7 +147,7 @@ export function displayNested(value: unknown, key: string, fallback: string) {
   return record[key] ? String(record[key]) : fallback;
 }
 
-export function formatRole(role: string) {
+export function formatRole(role: string, isSeniorSecurity?: boolean) {
   const labels: Record<string, string> = {
     "human-resource": "Human Resource",
     "project-manager": "Project Manager",
@@ -155,13 +155,17 @@ export function formatRole(role: string) {
     finance: "Finance",
     employee: "Employee",
     admin: "Admin",
+    security: "Security",
     others: "Others",
   };
+  if (role === "security") {
+    return isSeniorSecurity ? "Senior Security" : "Junior Security";
+  }
   return labels[role] ?? role;
 }
 
-export function formatRoleWithCustom(role: string, customRole: unknown) {
-  const baseRole = formatRole(role);
+export function formatRoleWithCustom(role: string, customRole: unknown, isSeniorSecurity?: boolean) {
+  const baseRole = formatRole(role, isSeniorSecurity);
   const label = String(customRole ?? "").trim();
   if (role === "others" && label) return `${baseRole} | ${label}`;
   return baseRole;

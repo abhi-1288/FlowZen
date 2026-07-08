@@ -12,10 +12,11 @@ export async function GET() {
     if (!userId) return jsonError("Unauthorized", 401);
     await connectDb();
     const user = await User.findById(userId);
-    if (!user || !ALLOWED.includes(user.role)) return jsonError("Forbidden", 403);
+    const isSeniorSecurity = user?.role === "security" && Boolean((user as any).isSeniorSecurity);
+    if (!user || (!ALLOWED.includes(user.role) && !isSeniorSecurity)) return jsonError("Forbidden", 403);
     if (!user.company) return jsonError("No company found.", 400);
 
-    const isHr = user.role === "admin" || user.role === "human-resource";
+    const isHr = user.role === "admin" || user.role === "human-resource" || isSeniorSecurity;
     const filter: any = { company: user.company };
     if (isHr) {
       filter.stage = { $nin: ["joined", "rejected"] };

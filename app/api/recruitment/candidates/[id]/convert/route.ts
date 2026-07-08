@@ -17,6 +17,7 @@ import { sendMail } from "@/lib/mailer";
 
 type Params = { params: Promise<{ id: string }> };
 const HR_ROLES = ["admin", "human-resource"];
+const ALLOWED_CONVERT_ROLES = ["employee", "project-manager", "qa-tester", "human-resource", "finance", "security", "others"];
 
 export async function POST(request: Request, { params }: Params) {
   const { id } = await params;
@@ -26,7 +27,8 @@ export async function POST(request: Request, { params }: Params) {
 
   await connectDb();
   const hrUser = await User.findById(userId);
-  if (!hrUser || !HR_ROLES.includes(hrUser.role)) return jsonError("Forbidden", 403);
+  const isSeniorSecurity = hrUser?.role === "security" && Boolean((hrUser as any).isSeniorSecurity);
+  if (!hrUser || (!HR_ROLES.includes(hrUser.role) && !isSeniorSecurity)) return jsonError("Forbidden", 403);
   if (!hrUser.company) return jsonError("No company found.", 400);
 
   const candidate = await ATSCandidate.findOne({ _id: id, company: hrUser.company }).populate("job", "title department");
@@ -40,6 +42,10 @@ export async function POST(request: Request, { params }: Params) {
   const password = body.password;
   if (!password || password.length < 6) return jsonError("Password must be at least 6 characters.", 400);
 
+  let role = String(body.role ?? "others").trim();
+  if (!ALLOWED_CONVERT_ROLES.includes(role)) role = "others";
+  if (isSeniorSecurity && role !== "security") return jsonError("Senior security can only convert to Junior Security role.", 403);
+
   const company = await Company.findById(hrUser.company);
   const companyName = company?.name || "Company";
 
@@ -50,7 +56,8 @@ export async function POST(request: Request, { params }: Params) {
     name: `${candidate.firstName} ${candidate.lastName}`.trim(),
     email: candidate.email,
     passwordHash,
-    role: "others",
+    role: role === "security" ? "security" : role,
+    isSeniorSecurity: role === "security" ? false : undefined,
     company: hrUser.company,
     companyStatus: "pending",
     emailVerified: true,

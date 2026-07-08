@@ -151,6 +151,22 @@ export async function PATCH(request: Request, { params }: Params) {
     if (!requester) return jsonError("Requester not found.", 404);
 
     let canDecide = String(joinRequest.approver) === userId;
+
+    // For junior security requesters, only senior security can decide
+    const requesterIsJuniorSecurity = String(requester.role) === "security" && !Boolean((requester as any).isSeniorSecurity);
+    if (requesterIsJuniorSecurity) {
+      if (!canDecide) {
+        const actor = await User.findById(userId).select("role isSeniorSecurity company companyStatus");
+        canDecide =
+          !!actor &&
+          String(actor.role) === "security" &&
+          Boolean((actor as any).isSeniorSecurity) &&
+          String(actor.companyStatus) === "approved" &&
+          String(actor.company ?? "") === String(joinRequest.company);
+      }
+      if (!canDecide) return jsonError("Forbidden", 403);
+    }
+
     if (!canDecide && joinRequest.kind === "quit-company" && String(requester.role) !== "human-resource") {
       const actor = await User.findById(userId).select("role company companyStatus");
       canDecide =
@@ -253,8 +269,10 @@ export async function PATCH(request: Request, { params }: Params) {
           }).select("_id");
           if (enrollingHr) historyInviterId = enrollingHr._id;
         } else {
-          const approverDoc = await User.findById(joinRequest.approver).select("role");
-          if (String(approverDoc?.role ?? "") !== "human-resource") {
+          const approverDoc = await User.findById(joinRequest.approver).select("role isSeniorSecurity");
+          const approverRole = String(approverDoc?.role ?? "");
+          const approverIsSeniorSecurity = approverRole === "security" && Boolean((approverDoc as any)?.isSeniorSecurity);
+          if (approverRole !== "human-resource" && !approverIsSeniorSecurity) {
             const fallbackHr = await User.findOne({
               company: joinRequest.company,
               role: "human-resource",

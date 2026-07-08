@@ -6,15 +6,19 @@ const modalClass = "w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl";
 export function RoleModal({
   member,
   newRoleValue,
+  isSeniorSecurityChecked,
   saving,
   onRoleChange,
+  onIsSeniorSecurityChange,
   onCancel,
   onSave,
 }: {
   member: { id?: string; name?: string } | null;
   newRoleValue: string;
+  isSeniorSecurityChecked?: boolean;
   saving: boolean;
   onRoleChange: (role: string) => void;
+  onIsSeniorSecurityChange?: (checked: boolean) => void;
   onCancel: () => void;
   onSave: () => void;
 }) {
@@ -37,9 +41,21 @@ export function RoleModal({
           <option value="qa-tester">QA Tester</option>
           <option value="human-resource">Human Resource</option>
           <option value="finance">Finance</option>
+          <option value="security">Security</option>
           <option value="admin">Admin</option>
           <option value="others">Others</option>
         </select>
+        {newRoleValue === "security" && onIsSeniorSecurityChange ? (
+          <label className="mt-3 flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+              checked={!!isSeniorSecurityChecked}
+              onChange={(e) => onIsSeniorSecurityChange(e.target.checked)}
+            />
+            <span className="text-sm text-slate-700">Senior Security</span>
+          </label>
+        ) : null}
         <div className="mt-5 flex justify-end gap-3">
           <ActionButton variant="secondary" onClick={onCancel} type="button">Cancel</ActionButton>
           <ActionButton variant="primary" disabled={saving || !newRoleValue} onClick={() => onSave()} type="button">

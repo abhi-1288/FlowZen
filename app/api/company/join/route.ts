@@ -20,9 +20,16 @@ function roleForCompanyCode(company: any, code: string, baseCode: string) {
   if (matches(company.testerJoinCode)) return "qa-tester";
   if (matches(company.financeJoinCode)) return "finance";
   if (matches(company.employeeJoinCode)) return "employee";
+  if (matches(company.securityJoinCode) || matches(company.juniorSecurityJoinCode)) return "security";
   if (matches(company.otherJoinCode)) return "others";
   if (matches(company.hrJoinCode) || matches(company.joinCode)) return "human-resource";
   return null;
+}
+
+function isSeniorSecurityCode(company: any, code: string, baseCode: string) {
+  const value = String(company.securityJoinCode ?? "").toUpperCase();
+  if (!value) return false;
+  return code === value || baseCode === value || code.startsWith(`${value}-HR`);
 }
 
 function joinTitleForRole(role: string) {
@@ -31,6 +38,7 @@ function joinTitleForRole(role: string) {
   if (role === "project-manager") return "Manager join request";
   if (role === "qa-tester") return "Tester join request";
   if (role === "finance") return "Finance join request";
+  if (role === "security") return "Security join request";
   if (role === "employee") return "Employee join request";
   return "Others join request";
 }
@@ -66,6 +74,8 @@ export async function POST(request: Request) {
         { financeJoinCode: withoutHrSuffix },
         { employeeJoinCode: withoutHrSuffix },
         { otherJoinCode: withoutHrSuffix },
+        { securityJoinCode: withoutHrSuffix },
+        { juniorSecurityJoinCode: withoutHrSuffix },
         { adminJoinCode: withoutHrSuffix },
       ]
     })
@@ -74,8 +84,13 @@ export async function POST(request: Request) {
   if (!company) return jsonError("Invalid company code.", 404);
   const codeRole = roleForCompanyCode(company, rawCode, baseCode);
   if (!codeRole) return jsonError("Invalid company code.", 404);
-  if (String(user.role) !== codeRole) {
+  const codeIsSeniorSecurity = codeRole === "security" && isSeniorSecurityCode(company, rawCode, baseCode);
+  if (codeRole !== "security" && String(user.role) !== codeRole) {
     return jsonError(`This company code is for ${joinTitleForRole(codeRole).replace(" join request", "")} role users.`, 403);
+  }
+  if (codeRole === "security" && String(user.role) !== "security") {
+    user.role = "security";
+    user.isSeniorSecurity = codeIsSeniorSecurity;
   }
   const isAlreadyMember = company.members?.some((memberId: { toString: () => string }) => String(memberId) === userId);
   if (isAlreadyMember || (String(user.company ?? "") === String(company._id) && user.companyStatus === "approved")) {
@@ -93,9 +108,10 @@ export async function POST(request: Request) {
       ? await findApprovedHrUserIdByInviteSuffix(company._id, hrSuffix)
       : null;
   const approverId = invitedHrId ?? (await resolveCompanyJoinApproverId(company, codeRole));
-  const approvalNotifier: "hr" | "admin" =
+  const approvalNotifier: "hr" | "admin" | "security" =
     codeRole === "admin" ? "admin" :
-    approverId === String(company.owner) ? "admin" : "hr";
+    approverId === String(company.owner) ? "admin" :
+    codeRole === "security" ? "security" : "hr";
   const enrollingHrId =
     invitedHrId ?? (codeRole !== "admin" && approvalNotifier === "hr" ? approverId : null);
 
