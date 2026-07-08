@@ -140,6 +140,10 @@ const UserSchema = new Schema(
     phone: { type: String, default: "", trim: true, maxlength: 20 },
     dob: { type: Date, default: null },
     address: { type: String, default: "", trim: true, maxlength: 500 },
+    regionLabel: { type: String, default: "", trim: true },
+    emergencyContact: { type: String, default: "", trim: true, maxlength: 20 },
+    bloodGroup: { type: String, default: "", trim: true, maxlength: 5 },
+    maskPhone: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

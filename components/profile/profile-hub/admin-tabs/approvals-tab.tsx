@@ -1,7 +1,14 @@
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { apiFetch } from "@/lib/client-utils";
 import { ActionButton, AnyRecord, displayNested, EmptyState, SectionHeader } from "../shared";
 import { Modal } from "../modal";
+import dynamic from "next/dynamic";
+
+const IdCardModal = dynamic(
+  () => import("../id-card-modal").then((mod) => mod.IdCardModal),
+  { ssr: false },
+);
 
 function requestIdOf(request: AnyRecord) {
   const value = request.id ?? request._id;
@@ -78,6 +85,8 @@ export function ApprovalsTab({
   const [rejectionReason, setRejectionReason] = useState("");
   const [viewingLetter, setViewingLetter] = useState<AnyRecord | null>(null);
   const [letterContentDraft, setLetterContentDraft] = useState("");
+  const [idCardPreviewRequest, setIdCardPreviewRequest] = useState<AnyRecord | null>(null);
+  const { data: session } = useSession();
 
   function currencySymbol(cur: string) {
     return cur === "USD" ? "$" : cur === "EUR" ? "€" : cur === "GBP" ? "£" : cur === "JPY" ? "¥" : "₹";
@@ -121,6 +130,28 @@ export function ApprovalsTab({
     }
   }
 
+  async function approveWithSign(id: string) {
+    if (!id) return;
+    setDecidingIds((current) => ({ ...current, [id]: true }));
+    try {
+      await apiFetch(`/api/approvals/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "approved", signed: true }),
+      });
+      setClearedIds((current) => ({ ...current, [id]: true }));
+      setIdCardPreviewRequest(null);
+      showToast("ID Card approved and signed.");
+      await refresh(true);
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Could not approve ID card request.",
+        "error",
+      );
+    } finally {
+      setDecidingIds((current) => ({ ...current, [id]: false }));
+    }
+  }
+
   const visibleApprovals = approvals.filter(
     (request) => !clearedIds[requestIdOf(request)],
   );
@@ -156,7 +187,11 @@ export function ApprovalsTab({
                               ? `requested salary update for ${metadata.targetUserName || "a member"}`
                               : request.kind === "document-letter"
                                 ? `requested a ${String((request.metadata as AnyRecord)?.letterType ?? "document").replace(/-/g, " ")} letter`
-                                : "requested to join"}{" "}
+                                : request.kind === "region-address"
+                                  ? `submitted a new office address "${String((request.metadata as AnyRecord)?.label ?? "")}"`
+                                  : request.kind === "id-card"
+                                    ? "requested an ID card"
+                                    : "requested to join"}{" "}
                   {String(request.kind) === "identity-code"
                     ? displayNested(request.company, "name", "company")
                     : String(request.kind) === "salary-increment"
@@ -200,6 +235,13 @@ export function ApprovalsTab({
                     Replacement: {displayNested(request.replacementUser, "name", "Member")}
                   </p>
                 ) : null}
+                {request.kind === "region-address" ? (
+                  <div className="mt-1 space-y-0.5 text-xs text-slate-500">
+                    <p>Region: {String((request.metadata as AnyRecord)?.label ?? "")}</p>
+                    <p>Address: {String((request.metadata as AnyRecord)?.line1 ?? "")}, {String((request.metadata as AnyRecord)?.city ?? "")}, {String((request.metadata as AnyRecord)?.state ?? "")} {String((request.metadata as AnyRecord)?.zip ?? "")}</p>
+                    <p>Country: {String((request.metadata as AnyRecord)?.country ?? "")}</p>
+                  </div>
+                ) : null}
               </div>
               <div className="flex gap-2">
                 {String(request.kind) === "document-letter" ? (
@@ -213,9 +255,16 @@ export function ApprovalsTab({
                     Preview & Edit
                   </ActionButton>
                 ) : null}
+                {request.kind === "id-card" ? (
+                  <ActionButton variant="secondary" className="px-3" disabled={isDeciding}
+                    onClick={() => setIdCardPreviewRequest(request)}
+                  >
+                    Preview ID Card
+                  </ActionButton>
+                ) : null}
                 <ActionButton variant="danger" className="px-3" disabled={isDeciding}
                   onClick={() => {
-                    if (String(request.kind ?? "") === "document-letter") {
+                    if (String(request.kind ?? "") === "document-letter" || request.kind === "id-card") {
                       setRejectModalId(requestId);
                       setRejectionReason("");
                     } else {
@@ -302,7 +351,7 @@ export function ApprovalsTab({
       </div>
 
       <Modal open={!!rejectModalId} onClose={() => setRejectModalId(null)} title="Rejection Reason"
-        description="Provide a reason for declining this letter request." maxWidth="max-w-md"
+        description="Provide a reason for declining this request." maxWidth="max-w-md"
         footer={
           <>
             <ActionButton variant="secondary" onClick={() => setRejectModalId(null)}>Cancel</ActionButton>
@@ -348,6 +397,30 @@ export function ApprovalsTab({
           placeholder="Draft empty or not provided."
         />
       </Modal>
+
+      {idCardPreviewRequest ? (
+        <IdCardModal
+          open={!!idCardPreviewRequest}
+          onClose={() => setIdCardPreviewRequest(null)}
+          profile={{
+            ...((idCardPreviewRequest.metadata as AnyRecord) ?? {}),
+            phone: (idCardPreviewRequest.metadata as AnyRecord)?.userPhone,
+            email: (idCardPreviewRequest.metadata as AnyRecord)?.userEmail,
+            avatarUrl: (idCardPreviewRequest.metadata as AnyRecord)?.userAvatar,
+            bloodGroup: (idCardPreviewRequest.metadata as AnyRecord)?.userBloodGroup,
+            emergencyContact: (idCardPreviewRequest.metadata as AnyRecord)?.userEmergencyContact,
+            regionLabel: (idCardPreviewRequest.metadata as AnyRecord)?.userRegionLabel,
+            companyIdentityCode: (idCardPreviewRequest.metadata as AnyRecord)?.userIdentityCode,
+          }}
+          company={idCardPreviewRequest.company as AnyRecord}
+          avatarUrl={String((idCardPreviewRequest.metadata as AnyRecord)?.userAvatar ?? "")}
+          displayName={String((idCardPreviewRequest.metadata as AnyRecord)?.userName ?? (idCardPreviewRequest.requester as AnyRecord)?.name ?? "")}
+          displayRole={String((idCardPreviewRequest.metadata as AnyRecord)?.userRole ?? (idCardPreviewRequest.requester as AnyRecord)?.role ?? "")}
+          onSign={() => approveWithSign(requestIdOf(idCardPreviewRequest))}
+          signerName={session?.user?.name ?? ""}
+          signerRole={session?.user?.role ?? ""}
+        />
+      ) : null}
     </section>
   );
 }

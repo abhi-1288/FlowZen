@@ -6,6 +6,8 @@ import { apiFetch } from "@/lib/client-utils";
 
 type VerifyData = {
   verified: boolean;
+  reason?: string;
+  message?: string;
   name: string;
   role: string;
   companyIdentityCode: string;
@@ -47,11 +49,31 @@ function darkenColor(hex: string): string {
   return `#${[r, g, b].map((n) => clamp(n * factor).toString(16).padStart(2, "0")).join("")}`;
 }
 
+function getErrorData(reason: string, message: string) {
+  if (reason === "revoked") {
+    return {
+      title: "ID Card Revoked",
+      description: message,
+      borderColor: "border-amber-200",
+      badgeBg: "bg-amber-100",
+      iconColor: "text-amber-600",
+    };
+  }
+  return {
+    title: "Invalid ID Card",
+    description: message || "Employee not found.",
+    borderColor: "border-red-200",
+    badgeBg: "bg-red-100",
+    iconColor: "text-red-600",
+  };
+}
+
 export default function VerifyPage() {
   const params = useParams();
   const identityCode = params?.identityCode as string | undefined;
   const [data, setData] = useState<VerifyData | null>(null);
   const [error, setError] = useState("");
+  const [errorData, setErrorData] = useState<{ title: string; description: string; borderColor: string; badgeBg: string; iconColor: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -63,13 +85,23 @@ export default function VerifyPage() {
     apiFetch<VerifyData>(`/api/public/verify/${encodeURIComponent(identityCode)}`)
       .then((res) => {
         if (!res.verified) {
-          setError("Invalid ID Card — employee not found.");
+          const errData = getErrorData(res.reason || "", res.message || "");
+          setErrorData(errData);
+          setError(errData.description);
           return;
         }
         setData(res);
       })
       .catch((err: Error) => {
-        setError(err.message || "Failed to verify ID card.");
+        const msg = err.message || "Failed to verify ID card.";
+        setErrorData({
+          title: "Invalid ID Card",
+          description: msg,
+          borderColor: "border-red-200",
+          badgeBg: "bg-red-100",
+          iconColor: "text-red-600",
+        });
+        setError(msg);
       })
       .finally(() => setLoading(false));
   }, [identityCode]);
@@ -94,15 +126,15 @@ export default function VerifyPage() {
           </div>
         )}
 
-        {error && !data && (
-          <div className="rounded-2xl border border-red-200 bg-white p-8 text-center shadow-sm">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        {error && !data && errorData && (
+          <div className={`rounded-2xl border ${errorData.borderColor} bg-white p-8 text-center shadow-sm`}>
+            <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${errorData.badgeBg}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" className={`h-8 w-8 ${errorData.iconColor}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </div>
-            <h2 className="mt-4 text-lg font-semibold text-red-700">Invalid ID Card</h2>
-            <p className="mt-2 text-sm text-slate-600">{error}</p>
+            <h2 className="mt-4 text-lg font-semibold text-slate-800">{errorData.title}</h2>
+            <p className="mt-2 text-sm text-slate-600">{errorData.description}</p>
             <p className="mt-4 text-xs text-slate-400">
               If you believe this is an error, please contact the issuing company&apos;s HR department.
             </p>

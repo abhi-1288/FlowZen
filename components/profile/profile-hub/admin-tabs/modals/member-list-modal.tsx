@@ -1,9 +1,10 @@
-import { useMemo } from "react";
-import { X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { X, Building2 } from "lucide-react";
 import { ActionButton, AnyRecord, formatRole, formatRoleWithCustom } from "../../shared";
 import type { MeetingDuration } from "../types";
 import { MEETING_DURATION_OPTIONS } from "../types";
 import { currencySymbol } from "../helpers";
+import { apiFetch } from "@/lib/client-utils";
 
 export function MemberListModal({
   modalRole,
@@ -30,6 +31,10 @@ export function MemberListModal({
   onSearchInputChange,
   onSearch,
   onSelectedOtherRoleChange,
+  showToast,
+  onRefresh,
+  regionOptions = [],
+  onOpenRegionModal,
 }: {
   modalRole: string | null;
   members: AnyRecord[];
@@ -55,6 +60,10 @@ export function MemberListModal({
   onSearchInputChange: (value: string) => void;
   onSearch: () => void;
   onSelectedOtherRoleChange: (role: string) => void;
+  showToast: (text: string, type?: "success" | "error") => void;
+  onRefresh?: (silent?: boolean) => Promise<void>;
+  regionOptions?: string[];
+  onOpenRegionModal?: (member: AnyRecord) => void;
 }) {
   const modalMembers = useMemo(() => {
     if (!modalRole) return [];
@@ -66,6 +75,24 @@ export function MemberListModal({
       return true;
     });
   }, [modalRole, members, selectedOtherRole]);
+
+  const [revokingIdCardFor, setRevokingIdCardFor] = useState<string | null>(null);
+
+  async function revokeIdCard(memberId: string) {
+    setRevokingIdCardFor(memberId);
+    try {
+      await apiFetch("/api/hr/revoke-id-card", {
+        method: "POST",
+        body: JSON.stringify({ memberId }),
+      });
+      showToast("ID card revoked.");
+      if (onRefresh) await onRefresh(true);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Could not revoke ID card.", "error");
+    } finally {
+      setRevokingIdCardFor(null);
+    }
+  }
 
   if (!modalRole) return null;
 
@@ -199,6 +226,14 @@ export function MemberListModal({
                           <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenPfEsicModal(member)}>PF & ESIC</ActionButton>
                           <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenTdsModal(member)}>TDS</ActionButton>
                           <ActionButton variant="secondary" className="px-3" type="button" onClick={() => void onOpenDocModal(member)}>Documents</ActionButton>
+                          {onOpenRegionModal ? (
+                            <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenRegionModal(member)}>
+                              <Building2 className="mr-1 inline-block h-3.5 w-3.5" />Region
+                            </ActionButton>
+                          ) : null}
+                          <ActionButton variant="danger" className="px-3" type="button" disabled={revokingIdCardFor === memberId} onClick={() => revokeIdCard(memberId)}>
+                            {revokingIdCardFor === memberId ? "Revoking..." : "Revoke ID Card"}
+                          </ActionButton>
                           {canEditOthersRole && !isSelf && String(member.role ?? "") === "others" ? (
                             <>
                               <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenCustomRoleModal(member)}>Change Custom Role</ActionButton>

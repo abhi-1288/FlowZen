@@ -21,6 +21,10 @@ export function CompanyTeamSection({
   onRequestIdentity: () => Promise<void>;
 }) {
   const joinedBy = (insights?.joinedBy as AnyRecord | undefined) ?? null;
+  const regionLabel = profile?.regionLabel ? String(profile.regionLabel) : "";
+  const regionAddress = regionLabel && Array.isArray(company?.addresses)
+    ? (company.addresses as AnyRecord[]).find((a) => String(a.label ?? "") === regionLabel)
+    : null;
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
       <SectionHeader title="Company & Team" description="Organizational structure" accent="emerald" />
@@ -32,6 +36,11 @@ export function CompanyTeamSection({
         <Row label="Company Start Date" value={company?.startDate || company?.createdAt ? new Date((company.startDate || company.createdAt) as string | Date).toLocaleDateString() : undefined} />
         <Row label="Company Joined" value={profile?.company && profile?.companyJoined ? new Date(profile.companyJoined as string | Date).toLocaleDateString() : undefined} />
         <Row label="Team Joined" value={profile?.team && profile?.teamJoined ? new Date(profile.teamJoined as string | Date).toLocaleDateString() : undefined} />
+        <Row label="Region" value={regionLabel
+          ? regionAddress
+            ? `${regionLabel} — ${[String(regionAddress.line1 ?? ""), String(regionAddress.city ?? ""), String(regionAddress.state ?? "")].filter(Boolean).join(", ")}`
+            : regionLabel
+          : undefined} />
         {inApprovedCompany && !["human-resource", "admin"].includes(role) ? (
           <Row label={joinedBy?.viaHr ? "Joined By HR" : "Company approved by"} value={joinedBy?.name ? String(joinedBy.name) : undefined} />
         ) : null}

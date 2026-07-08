@@ -60,7 +60,7 @@ export async function GET() {
     if (String(actor.role) === "admin" && actor.company) {
       const companyPendingRequests = await JoinRequest.find({
         company: actor.company,
-        kind: { $in: ["company", "identity-code", "quit-company", "quit-company-board-transfer", "role-transfer"] },
+        kind: { $in: ["company", "identity-code", "quit-company", "quit-company-board-transfer", "role-transfer", "region-address"] },
         status: "pending",
       })
         .sort({ createdAt: -1 })
@@ -209,7 +209,7 @@ export async function GET() {
 
     const [users, companies, teams] = await Promise.all([
       User.find({ _id: { $in: [...userIds] } }).select("name email role").lean(),
-      Company.find({ _id: { $in: [...companyIds] } }).select("name joinCode noticePeriodDays").lean(),
+      Company.find({ _id: { $in: [...companyIds] } }).select("name joinCode noticePeriodDays primaryColor icon status supportEmail website").lean(),
       Team.find({ _id: { $in: [...teamIds] } }).select("name joinCode").lean(),
     ]);
 

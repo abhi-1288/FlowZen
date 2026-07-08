@@ -6,6 +6,7 @@ export type ParsedResume = {
   phone: string;
   dob: string;
   address: string;
+  bloodGroup: string;
 };
 
 function extractName(text: string): string {
@@ -41,6 +42,21 @@ function extractDOB(text: string): string {
   return "";
 }
 
+function extractBloodGroup(text: string): string {
+  const patterns = [
+    /blood\s*(?:group|type)\s*:?\s*([A-Za-z]+[+\-]?)/i,
+    /blood\s*:?\s*([A-Za-z]+[+\-]?)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const bg = match[1].toUpperCase();
+      if (/^(A|B|O|AB)[+-]$/.test(bg)) return bg;
+    }
+  }
+  return "";
+}
+
 function extractAddress(text: string): string {
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
   const addressKeywords = /address|current\s*address|permanent\s*address|residence/i;
@@ -72,5 +88,6 @@ export async function parseResume(
     phone: extractPhone(text),
     dob: extractDOB(text),
     address: extractAddress(text),
+    bloodGroup: extractBloodGroup(text),
   };
 }

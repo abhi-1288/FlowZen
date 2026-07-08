@@ -32,7 +32,7 @@ import { useNotificationToast } from "@/lib/toast-context";
 import { ProfileSkeleton, NavButton } from "./profile-hub/chrome";
 import { AttendanceTab } from "./profile-hub/attendance-tab";
 import { DashboardTab } from "./profile-hub/dashboard-tab";
-import { ApprovalsTab, MembersTab, MessagesTab, NotificationsTab } from "./profile-hub/admin-tabs";
+import { ApprovalsTab, MembersTab, MessagesTab, NotificationsTab, VisitorsTab } from "./profile-hub/admin-tabs";
 import { FinanceTab } from "./profile-hub/finance-tab";
 import { ProfileTab } from "./profile-hub/profile-tabs";
 import { TimelineTab } from "./profile-hub/timeline-tab";
@@ -74,9 +74,10 @@ export type Tab =
   | "attendance"
   | "documents"
   | "careers"
-  | "calendar";
+  | "calendar"
+  | "visitors";
 
-const VALID_TABS = new Set<string>(["dashboard", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers", "calendar"]);
+const VALID_TABS = new Set<string>(["dashboard", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers", "calendar", "visitors"]);
 
 
 export function ProfileHub() {
@@ -191,6 +192,7 @@ export function ProfileHub() {
     profile?.company && profile?.companyStatus === "approved",
   );
   const canViewMembersTab = hasCompany && ["human-resource", "admin", "finance"].includes(String(role));
+  const canViewVisitorsTab = hasCompany && ["human-resource", "admin"].includes(String(role));
   const canViewFinanceTab = hasCompany;
   const canViewCompanyTabs = hasCompany;
   const mobileTabs: Tab[] = [
@@ -199,6 +201,7 @@ export function ProfileHub() {
     "timeline",
     "onboarding",
     ...(canViewMembersTab ? (["members"] as Tab[]) : []),
+    ...(canViewVisitorsTab ? (["visitors"] as Tab[]) : []),
     "careers",
     ...(canViewCompanyTabs ? (["documents"] as Tab[]) : []),
     ...(canViewCompanyTabs ? (["messages"] as Tab[]) : []),
@@ -688,6 +691,14 @@ export function ProfileHub() {
               onClick={() => setTab("members")}
             />
           ) : null}
+          {canViewVisitorsTab ? (
+            <NavButton
+              active={tab === "visitors"}
+              icon={<User size={16} />}
+              label="Visitors"
+              onClick={() => setTab("visitors")}
+            />
+          ) : null}
           {canViewCompanyTabs && ["admin", "human-resource", "project-manager", "qa-tester", "finance"].includes(String(role)) ? (
             <NavButton
               active={pathname?.startsWith("/recruitment") ?? false}
@@ -963,6 +974,13 @@ export function ProfileHub() {
                   actorRole={String(role)}
                   showToast={showToast}
                   refresh={load}
+                  regionOptions={
+                    company?.multiOffice && Array.isArray(company?.addresses)
+                      ? (company.addresses as AnyRecord[]).map((a: AnyRecord) => String(a.label ?? "")).filter(Boolean)
+                      : company?.address
+                        ? ["Main Office"]
+                        : []
+                  }
                 />
               ) : null}
 
@@ -1012,6 +1030,10 @@ export function ProfileHub() {
 
               {tab === "calendar" && canViewCompanyTabs ? (
                 <CompanyCalendarTab />
+              ) : null}
+
+              {tab === "visitors" && canViewVisitorsTab ? (
+                <VisitorsTab showToast={showToast} />
               ) : null}
             </>}
           </>

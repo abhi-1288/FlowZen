@@ -358,8 +358,8 @@ export async function PATCH(request: Request) {
   const newRole = String(body.role ?? "");
   const newPassword = String(body.newPassword ?? "");
 
-  // Update personal info fields (name, phone, dob, address — email is NOT allowed)
-  const personalFields: (keyof typeof body)[] = ["name", "phone", "dob", "address"];
+  // Update personal info fields (name, phone, dob, address, regionLabel — email is NOT allowed)
+  const personalFields: (keyof typeof body)[] = ["name", "phone", "dob", "address", "regionLabel", "emergencyContact", "bloodGroup", "maskPhone"];
   let personalUpdated = false;
   for (const field of personalFields) {
     if (body[field] !== undefined) {
