@@ -11,6 +11,19 @@ export default function EditJobPage() {
   const router = useRouter();
   const { activeJob, fetchJob, updateJob } = useRecruitmentStore();
 
+  const [title, setTitle] = useState("");
+  const [department, setDepartment] = useState("");
+  const [location, setLocation] = useState("");
+  const [employmentType, setEmploymentType] = useState("full-time");
+  const [salaryRangeMin, setSalaryRangeMin] = useState("0");
+  const [salaryRangeMax, setSalaryRangeMax] = useState("0");
+  const [currency, setCurrency] = useState("INR");
+  const [openings, setOpenings] = useState("1");
+  const [autoCloseDate, setAutoCloseDate] = useState("");
+  const [description, setDescription] = useState("");
+  const [requiredSkills, setRequiredSkills] = useState("");
+  const [status, setStatus] = useState("draft");
+
   useEffect(() => { void fetchJob(id); }, [id, fetchJob]);
   useEffect(() => {
     if (activeJob) {
@@ -28,19 +41,6 @@ export default function EditJobPage() {
       setStatus(activeJob.status);
     }
   }, [activeJob]);
-
-  const [title, setTitle] = useState("");
-  const [department, setDepartment] = useState("");
-  const [location, setLocation] = useState("");
-  const [employmentType, setEmploymentType] = useState("full-time");
-  const [salaryRangeMin, setSalaryRangeMin] = useState("0");
-  const [salaryRangeMax, setSalaryRangeMax] = useState("0");
-  const [currency, setCurrency] = useState("INR");
-  const [openings, setOpenings] = useState("1");
-  const [autoCloseDate, setAutoCloseDate] = useState("");
-  const [description, setDescription] = useState("");
-  const [requiredSkills, setRequiredSkills] = useState("");
-  const [status, setStatus] = useState("draft");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

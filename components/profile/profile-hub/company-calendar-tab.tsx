@@ -63,7 +63,6 @@ export function CompanyCalendarTab() {
           apiFetch<AnyRecord>(`/api/company/meetings?year=${year}&month=${month}`).catch(() => null),
         ]);
 
-        const memberRes = (profileData as any)?.user ?? null;
         const allEvents: CalendarEvent[] = [];
         const holidayList: AnyRecord[] = (holidaysRes as any)?.holidays ?? [];
         const leaveList: AnyRecord[] = (leaveRes as any)?.requests ?? [];

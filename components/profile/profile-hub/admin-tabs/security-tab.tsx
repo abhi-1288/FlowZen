@@ -90,6 +90,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [cameraUnavailable, setCameraUnavailable] = useState(false);
   const [cameraStarting, setCameraStarting] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
 
   // ── Visitors ──
@@ -171,6 +172,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
     if (activeSection !== "scan") {
       try { scannerRef.current?.stop(); } catch { /* ignore */ }
       scannerRef.current = null;
+      setCameraReady(false);
       setShowManualEntry(false);
       setCameraUnavailable(false);
       setCameraStarting(false);
@@ -218,6 +220,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
         () => {},
       );
       scannerRef.current = scanner;
+      setCameraReady(true);
       setCameraStarting(false);
     } catch {
       setCameraUnavailable(true);
@@ -611,7 +614,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                   id="qr-reader"
                   className="min-h-[180px] rounded-xl border border-slate-200"
                 />
-                {!scannerRef.current ? (
+                {!cameraReady ? (
                   <div
                     className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-xl bg-white"
                     onClick={cameraStarting ? undefined : handleStartCamera}
