@@ -70,6 +70,8 @@ export function DashboardTab({
   const [activeDocTab, setActiveDocTab] = useState<"other" | "my">("other");
   const [viewingRejected, setViewingRejected] = useState<AnyRecord | null>(null);
   const [missingDocs, setMissingDocs] = useState<{ name: string }[]>([]);
+  const [lostCardTickets, setLostCardTickets] = useState<AnyRecord[]>([]);
+  const [loadingTickets, setLoadingTickets] = useState(false);
   const currentUserId = String(profile?._id ?? "");
 
   function generateFallbackLetter(request: AnyRecord) {
@@ -135,6 +137,15 @@ export function DashboardTab({
     if (["human-resource", "admin"].includes(role)) {
       refreshOtherDocuments();
     }
+  }, [role, currentUserId]);
+
+  // Fetch lost card tickets for dashboard
+  useEffect(() => {
+    setLoadingTickets(true);
+    apiFetch<{ reports: AnyRecord[] }>("/api/hr/security/lost-cards?scope=tickets")
+      .then((res) => setLostCardTickets(res.reports ?? []))
+      .catch(() => {})
+      .finally(() => setLoadingTickets(false));
   }, [role, currentUserId]);
 
   const attendanceRate = useMemo(() => {
@@ -566,6 +577,56 @@ export function DashboardTab({
             })}
           </div>
         </div>
+      ) : null}
+
+      {/* Lost Card Tickets */}
+      {lostCardTickets.length > 0 ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
+            <FileText size={16} className="text-slate-500" />
+            Lost Card Tickets
+          </h2>
+          <div className="space-y-2">
+            {lostCardTickets.map((t) => {
+              const employeeName = String((t.user as any)?.name ?? "Unknown");
+              const status = String(t.status ?? "");
+              const hasJunior = Boolean(t.assignedJuniorSecurity);
+              const juniorName = String((t.assignedJuniorSecurity as any)?.name ?? "");
+              const isCompleted = Boolean(t.juniorCompletedAt);
+              return (
+                <div key={String(t._id ?? t.id)} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-slate-900 capitalize">{employeeName}</p>
+                    <p className="text-xs text-slate-500">
+                      {String(t.reason ?? "")} · {t.createdAt ? new Date(String(t.createdAt)).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : ""}
+                      <span className={`ml-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${isCompleted ? "bg-emerald-100 text-emerald-700" : hasJunior ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
+                        {isCompleted ? "Completed" : hasJunior ? "In Progress" : "Open"}
+                      </span>
+                    </p>
+                    {t.assignedJuniorSecurity ? (
+                      <p className="text-[10px] text-slate-400">Assigned to: {juniorName}</p>
+                    ) : role === "security" ? (
+                      <p className="text-[10px] text-slate-400">Available to accept</p>
+                    ) : null}
+                    {(t.followUpNotes as any[])?.length > 0 ? (
+                      <p className="mt-1 text-[10px] text-slate-500">Latest: {(t.followUpNotes as any[]).slice(-1)[0]?.note ?? ""}</p>
+                    ) : null}
+                  </div>
+                  <div className="flex gap-2">
+                    <Link
+                      href="/profile/security"
+                      className="shrink-0 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+                    >
+                      View Details
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : loadingTickets ? (
+        <p className="text-center text-sm text-slate-500">Loading tickets...</p>
       ) : null}
 
       {/* Role-specific sections */}

@@ -33,14 +33,64 @@ type EntryLogRecord = {
   recordedBy: AnyRecord | null;
 };
 
+type TimelineEntry = {
+  action: string;
+  actor: string;
+  actorName: string;
+  timestamp: string;
+  notes: string;
+};
+
 type LostCardRecord = {
   id: string;
   user: AnyRecord | null;
+  reportedBy: AnyRecord | null;
+  reportedByEmployee: boolean;
   status: string;
-  reportedAt: string;
-  replacementRequestedAt: string | null;
-  replacementIssuedAt: string | null;
+  reason: string;
+  lastLocation: string;
+  lostDateTime: string | null;
+  policeComplaintNumber: string;
+  isEmergency: boolean;
   notes: string;
+  verifiedBy: AnyRecord | null;
+  verifiedAt: string | null;
+  verificationNotes: string;
+  approvedBy: AnyRecord | null;
+  approvedAt: string | null;
+  cardDisabledBy: AnyRecord | null;
+  cardDisabledAt: string | null;
+  disabledZones: string[];
+  hrApprovedBy: AnyRecord | null;
+  hrApprovedAt: string | null;
+  newCardNumber: string;
+  newRfidUid: string;
+  issueDate: string | null;
+  expiryDate: string | null;
+  printedBy: AnyRecord | null;
+  printedAt: string | null;
+  collectedAt: string | null;
+  collectedBy: AnyRecord | null;
+  collectionVerificationMethod: string;
+  assignedSecurity: AnyRecord | null;
+  expectedCompletion: string | null;
+  oldCardFound: boolean;
+  replacementAlreadyIssued: boolean;
+  oldCardDestroyed: boolean;
+  rejectionReason: string;
+  rejectedBy: AnyRecord | null;
+  rejectedAt: string | null;
+  assignedSeniorSecurity: AnyRecord | null;
+  assignedHR: AnyRecord | null;
+  seniorTicketOpened: boolean;
+  seniorTicketOpenedBy: AnyRecord | null;
+  seniorTicketOpenedAt: string | null;
+  assignedJuniorSecurity: AnyRecord | null;
+  juniorAcceptedAt: string | null;
+  followUpNotes: { note: string; addedBy: AnyRecord | null; addedByName: string; addedAt: string }[];
+  juniorCompletedAt: string | null;
+  timeline: TimelineEntry[];
+  reportedAt: string;
 };
 
 type PassRecord = {
@@ -110,11 +160,18 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
   // ── Lost Cards ──
   const [lostCards, setLostCards] = useState<LostCardRecord[]>([]);
   const [lostCardFilter, setLostCardFilter] = useState("");
-  const [showReportLost, setShowReportLost] = useState(false);
-  const [reportUserId, setReportUserId] = useState("");
-  const [reportNotes, setReportNotes] = useState("");
-  const [reporting, setReporting] = useState(false);
   const [updatingCard, setUpdatingCard] = useState<string | null>(null);
+  const [foundPopup, setFoundPopup] = useState<{ id: string; show: boolean }>({ id: "", show: false });
+  const [disableAccessPopup, setDisableAccessPopup] = useState<{ id: string; show: boolean }>({ id: "", show: false });
+  const [expandedTimeline, setExpandedTimeline] = useState<string | null>(null);
+  const [completeTicketPopup, setCompleteTicketPopup] = useState<{ id: string; show: boolean }>({ id: "", show: false });
+  const [completeTicketNote, setCompleteTicketNote] = useState("");
+  const [printCardPopup, setPrintCardPopup] = useState<{ id: string; show: boolean }>({ id: "", show: false });
+  const [printCardNumber, setPrintCardNumber] = useState("");
+  const [printRfidUid, setPrintRfidUid] = useState("");
+  const [printExpiryDate, setPrintExpiryDate] = useState("");
+  const [rejectPopup, setRejectPopup] = useState<{ id: string; show: boolean }>({ id: "", show: false });
+  const [rejectReason, setRejectReason] = useState("");
 
   // ── Emergency Contacts ──
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
@@ -301,38 +358,95 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
     }
   }
 
-  async function handleReportLost(e: React.FormEvent) {
-    e.preventDefault();
-    if (!reportUserId) return;
-    setReporting(true);
-    try {
-      await apiFetch("/api/hr/security/lost-cards", {
-        method: "POST",
-        body: JSON.stringify({ userId: reportUserId, notes: reportNotes }),
-      });
-      showToast("Lost card reported.");
-      setShowReportLost(false);
-      setReportUserId("");
-      setReportNotes("");
-      await loadLostCards();
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to report.", "error");
-    } finally {
-      setReporting(false);
-    }
-  }
-
-  async function updateCardStatus(id: string, status: string) {
+  async function updateCardStatus(id: string, status: string, extra: Record<string, unknown> = {}) {
     setUpdatingCard(id);
     try {
       await apiFetch(`/api/hr/security/lost-cards/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, ...extra }),
       });
       showToast(`Status updated to "${status}".`);
       await loadLostCards();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Update failed.", "error");
+    } finally {
+      setUpdatingCard(null);
+    }
+  }
+
+  async function handleDisableAccess(id: string, zones: string[]) {
+    setUpdatingCard(id);
+    try {
+      await apiFetch(`/api/hr/security/lost-cards/${id}/disable-access`, {
+        method: "POST",
+        body: JSON.stringify({ zones }),
+      });
+      showToast("Building access disabled.");
+      setDisableAccessPopup({ id: "", show: false });
+      await loadLostCards();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to disable access.", "error");
+    } finally {
+      setUpdatingCard(null);
+    }
+  }
+
+  async function handleFoundCard(id: string, replacementAlreadyIssued: boolean) {
+    setUpdatingCard(id);
+    try {
+      await apiFetch(`/api/hr/security/lost-cards/${id}/found`, {
+        method: "POST",
+        body: JSON.stringify({ replacementAlreadyIssued }),
+      });
+      showToast("Card marked as found.");
+      setFoundPopup({ id: "", show: false });
+      await loadLostCards();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed.", "error");
+    } finally {
+      setUpdatingCard(null);
+    }
+  }
+
+  async function handleOpenTicket(id: string) {
+    setUpdatingCard(id);
+    try {
+      await apiFetch(`/api/hr/security/lost-cards/${id}/open-ticket`, { method: "POST" });
+      showToast("Ticket opened.");
+      await loadLostCards();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to open ticket.", "error");
+    } finally {
+      setUpdatingCard(null);
+    }
+  }
+
+  async function handleAcceptTicket(id: string) {
+    setUpdatingCard(id);
+    try {
+      await apiFetch(`/api/hr/security/lost-cards/${id}/accept-ticket`, { method: "POST" });
+      showToast("Ticket accepted.");
+      await loadLostCards();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to accept ticket.", "error");
+    } finally {
+      setUpdatingCard(null);
+    }
+  }
+
+  async function handleCompleteTicket(id: string) {
+    setUpdatingCard(id);
+    try {
+      await apiFetch(`/api/hr/security/lost-cards/${id}/complete-ticket`, {
+        method: "POST",
+        body: JSON.stringify({ note: completeTicketNote }),
+      });
+      showToast("Ticket completed.");
+      setCompleteTicketPopup({ id: "", show: false });
+      setCompleteTicketNote("");
+      await loadLostCards();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to complete ticket.", "error");
     } finally {
       setUpdatingCard(null);
     }
@@ -396,11 +510,18 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
   const statusBadge = (status: string) => {
     const colors: Record<string, string> = {
       reported: "bg-amber-100 text-amber-700",
-      "replacement-requested": "bg-blue-100 text-blue-700",
-      replaced: "bg-emerald-100 text-emerald-700",
-      found: "bg-slate-100 text-slate-700",
+      "under-verification": "bg-blue-100 text-blue-700",
+      "replacement-approved": "bg-indigo-100 text-indigo-700",
+      "card-disabled": "bg-rose-100 text-rose-700",
+      "hr-approved": "bg-purple-100 text-purple-700",
+      printing: "bg-cyan-100 text-cyan-700",
+      "ready-for-pickup": "bg-emerald-100 text-emerald-700",
+      completed: "bg-slate-100 text-slate-600",
+      rejected: "bg-red-100 text-red-700",
+      found: "bg-teal-100 text-teal-700",
+      "found-after-replacement": "bg-orange-100 text-orange-700",
     };
-    return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${colors[status] ?? "bg-slate-100 text-slate-500"}`}>{status}</span>;
+    return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${colors[status] ?? "bg-slate-100 text-slate-500"}`}>{status.replace("-", " ")}</span>;
   };
 
   function sectionLabel(s: (typeof SECTIONS)[number]) {
@@ -806,96 +927,396 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
       {/* ═══════════════ LOST CARDS ═══════════════ */}
       {activeSection === "lost-cards" ? (
         <div>
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-800">Lost / Replacement Card Reports</h3>
-            <ActionButton variant="primary" onClick={() => setShowReportLost(true)}>
-              + Report Lost Card
-            </ActionButton>
-          </div>
+          <h3 className="mb-4 text-sm font-semibold text-slate-800">Lost / Replacement Card Reports</h3>
 
-          <div className="mb-4 flex gap-2">
-              {["", "reported", "replacement-requested", "replaced", "found"].map((f) => (
-                <button
-                  key={f}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    lostCardFilter === f ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-                  onClick={() => setLostCardFilter(f)}
-                  type="button"
-                >
-                  {f ? f.replace("-", " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "All"}{(f === "reported" || f === "found") && cardCounts[f] ? ` (${cardCounts[f]})` : ""}
-                </button>
-              ))}
+          <div className="mb-4 flex flex-wrap gap-2">
+            {[
+              { key: "", label: "All" },
+              { key: "reported", label: "Reported" },
+              { key: "under-verification", label: "Under Verification" },
+              { key: "replacement-approved", label: "Approved" },
+              { key: "card-disabled", label: "Access Disabled" },
+              { key: "hr-approved", label: "HR Approved" },
+              { key: "printing", label: "Printing" },
+              { key: "ready-for-pickup", label: "Ready for Pickup" },
+              { key: "completed", label: "Completed" },
+              { key: "found", label: "Found" },
+              { key: "rejected", label: "Rejected" },
+            ].map(({ key, label }) => (
+              <button
+                key={key}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  lostCardFilter === key ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+                onClick={() => setLostCardFilter(key)}
+                type="button"
+              >
+                {label}{key ? (cardCounts[key] ? ` (${cardCounts[key]})` : " (0)") : ` (${lostCards.length})`}
+              </button>
+            ))}
           </div>
 
           {lostCards.length === 0 ? (
             <p className="py-4 text-center text-sm text-slate-500">No reports found.</p>
           ) : (
             <div className="space-y-3">
-              {lostCards.map((card) => (
-                <div key={card.id} className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-slate-900">
-                        {(card.user as any)?.name ? String((card.user as any).name) : "Unknown"}
-                      </p>
-                      <p className="text-xs text-slate-500">{(card.user as any)?.email ? String((card.user as any).email) : ""}</p>
-                      <div className="mt-1 flex items-center gap-2">
-                        {statusBadge(card.status)}
-                        <span className="text-[10px] text-slate-400">
-                          Reported: {new Date(card.reportedAt).toLocaleDateString("en-IN")}
-                        </span>
+              {lostCards.map((card) => {
+                const isHr = role === "human-resource" || role === "admin";
+                const isSecurity = role === "security" || role === "admin";
+                const isAdmin = role === "admin";
+                const userName = (card.user as any)?.name ?? "Unknown";
+                const userEmail = (card.user as any)?.email ?? "";
+                const userIdCode = (card.user as any)?.companyIdentityCode ?? "";
+
+                const canAction = (status: string) => {
+                  if (updatingCard === card.id) return true;
+                  const map: Record<string, string[]> = {
+                    "under-verification": ["admin", "human-resource", "security"],
+                    rejected: ["admin", "human-resource", "security"],
+                    "replacement-approved": ["admin", "human-resource", "security"],
+                    "card-disabled": ["admin", "security"],
+                    "hr-approved": ["admin", "human-resource"],
+                    printing: ["admin"],
+                    "ready-for-pickup": ["admin"],
+                    completed: ["admin", "security"],
+                  };
+                  return (map[status] ?? []).includes(role);
+                };
+
+                return (
+                  <div key={card.id} className={`rounded-xl border p-4 ${card.isEmergency ? "border-red-300 bg-red-50/50" : "border-slate-200 bg-slate-50/50"}`}>
+                    {/* Emergency badge */}
+                    {card.isEmergency ? (
+                      <div className="mb-2 flex items-center gap-1.5">
+                        <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700">Emergency</span>
                       </div>
-                      {card.notes ? <p className="mt-1 text-xs text-slate-400">Notes: {card.notes}</p> : null}
-                    </div>
-                    <div className="flex shrink-0 flex-col gap-1.5">
-                      {card.status === "reported" ? (
-                        <ActionButton variant="secondary" className="px-3 py-1 text-xs" disabled={updatingCard === card.id} onClick={() => updateCardStatus(card.id, "replacement-requested")}>
-                          {updatingCard === card.id ? "..." : "Request Replacement"}
-                        </ActionButton>
-                      ) : null}
-                      {card.status === "replacement-requested" ? (
-                        <ActionButton variant="approve" className="px-3 py-1 text-xs" disabled={updatingCard === card.id} onClick={() => updateCardStatus(card.id, "replaced")}>
-                          {updatingCard === card.id ? "..." : "Mark Replaced"}
-                        </ActionButton>
-                      ) : null}
-                      {card.status === "reported" || card.status === "replacement-requested" ? (
-                        <ActionButton variant="secondary" className="px-3 py-1 text-xs" disabled={updatingCard === card.id} onClick={() => updateCardStatus(card.id, "found")}>
-                          {updatingCard === card.id ? "..." : "Mark Found"}
-                        </ActionButton>
-                      ) : null}
+                    ) : null}
+
+                    {/* Main row */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        {/* Employee info */}
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-slate-900">{userName}</p>
+                          {userIdCode ? <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-mono text-slate-600">ID: {userIdCode}</span> : null}
+                        </div>
+                        <p className="text-xs text-slate-500">{userEmail}</p>
+
+                        {/* Status + Reason + Priority */}
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                          {statusBadge(card.status)}
+                          <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] text-slate-600 capitalize">{card.reason}</span>
+                          {card.lastLocation ? <span className="text-[10px] text-slate-400">Location: {card.lastLocation}</span> : null}
+                        </div>
+
+                        {/* Assigned security + expected completion */}
+                        {card.assignedSecurity ? (
+                          <p className="mt-1 text-[10px] text-slate-400">
+                            Assigned: {String((card.assignedSecurity as any).name ?? "")}
+                            {card.expectedCompletion ? ` · Expected: ${new Date(card.expectedCompletion).toLocaleString("en-IN")}` : ""}
+                          </p>
+                        ) : null}
+
+                        {/* Notes */}
+                        {card.notes ? <p className="mt-1 text-xs text-slate-400">Notes: {card.notes}</p> : null}
+
+                        {/* Disabled zones */}
+                        {card.disabledZones && card.disabledZones.length > 0 ? (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {card.disabledZones.map((z: string) => (
+                              <span key={z} className="rounded bg-rose-100 px-1.5 py-0.5 text-[10px] text-rose-700">{z}</span>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        {/* New card info */}
+                        {card.newCardNumber ? (
+                          <p className="mt-1 text-[10px] font-mono text-slate-500">
+                            New Card: {card.newCardNumber}{card.newRfidUid ? ` | RFID: ${card.newRfidUid}` : ""}
+                            {card.expiryDate ? ` | Expires: ${new Date(card.expiryDate).toLocaleDateString("en-IN")}` : ""}
+                          </p>
+                        ) : null}
+
+                        {/* Ticket / assignment info */}
+                        {card.assignedSeniorSecurity ? (
+                          <p className="mt-1 text-[10px] text-slate-400">
+                            Senior Security: {String((card.assignedSeniorSecurity as any).name ?? "")}
+                            {card.assignedHR ? ` | HR: ${String((card.assignedHR as any).name ?? "")}` : ""}
+                            {card.seniorTicketOpened ? " | Ticket: Opened" : " | Ticket: Pending"}
+                            {card.assignedJuniorSecurity ? (
+                              <> | Assigned to: {String((card.assignedJuniorSecurity as any).name ?? "")}{card.juniorCompletedAt ? " ✓ Completed" : " (in progress)"}</>
+                            ) : null}
+                          </p>
+                        ) : null}
+
+                        {/* Follow-up notes */}
+                        {card.followUpNotes && card.followUpNotes.length > 0 ? (
+                          <div className="mt-2 space-y-1">
+                            {card.followUpNotes.map((fn, i) => (
+                              <p key={i} className="text-[10px] text-slate-500">
+                                <span className="font-medium">{fn.addedByName}</span>: {fn.note}
+                                {fn.addedAt ? ` · ${new Date(fn.addedAt).toLocaleString("en-IN")}` : ""}
+                              </p>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        {/* Timeline toggle */}
+                        {card.timeline && card.timeline.length > 0 ? (
+                          <div className="mt-2">
+                            <button
+                              className="text-[10px] font-medium text-indigo-600 hover:underline"
+                              onClick={() => setExpandedTimeline(expandedTimeline === card.id ? null : card.id)}
+                              type="button"
+                            >
+                              {expandedTimeline === card.id ? "Hide Timeline" : "Show Timeline"}
+                            </button>
+                            {expandedTimeline === card.id ? (
+                              <div className="mt-2 border-l-2 border-slate-200 pl-3">
+                                {card.timeline.map((t, i) => (
+                                  <div key={i} className="relative pb-2 last:pb-0">
+                                    <div className="absolute -left-[17px] top-1 h-2 w-2 rounded-full bg-indigo-400" />
+                                    <p className="text-[10px] font-medium text-slate-700">{t.action || t.action}</p>
+                                    <p className="text-[9px] text-slate-400">
+                                      {t.actorName} · {new Date(t.timestamp).toLocaleString("en-IN")}
+                                    </p>
+                                    {t.notes ? <p className="text-[9px] text-slate-400">{t.notes}</p> : null}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex shrink-0 flex-col gap-1.5">
+                        {/* Open Ticket (senior security — ticket not yet opened) */}
+                        {card.status === "reported" && !card.seniorTicketOpened && (role === "admin" || role === "human-resource" || (role === "security" && isSenior)) ? (
+                          <ActionButton variant="primary" className="px-3 py-1 text-xs" disabled={updatingCard === card.id} onClick={() => handleOpenTicket(card.id)}>
+                            {updatingCard === card.id ? "..." : "Open Ticket"}
+                          </ActionButton>
+                        ) : null}
+
+                        {/* Accept Ticket (junior security — ticket opened, not yet accepted) */}
+                        {card.seniorTicketOpened && !card.assignedJuniorSecurity && role === "security" && !isSenior ? (
+                          <ActionButton variant="approve" className="px-3 py-1 text-xs" disabled={updatingCard === card.id} onClick={() => handleAcceptTicket(card.id)}>
+                            {updatingCard === card.id ? "..." : "Accept Ticket"}
+                          </ActionButton>
+                        ) : null}
+
+                        {/* Complete Ticket (assigned junior security — accepted, not yet completed) */}
+                        {card.assignedJuniorSecurity && !card.juniorCompletedAt ? (
+                          <ActionButton variant="primary" className="px-3 py-1 text-xs" disabled={updatingCard === card.id} onClick={() => { setCompleteTicketPopup({ id: card.id, show: true }); setCompleteTicketNote(""); }}>
+                            {updatingCard === card.id ? "..." : "Complete with Follow-up"}
+                          </ActionButton>
+                        ) : null}
+
+                        {/* reported → under-verification */}
+                        {card.status === "reported" && canAction("under-verification") ? (
+                          <ActionButton variant="secondary" className="px-3 py-1 text-xs" disabled={updatingCard === card.id} onClick={() => updateCardStatus(card.id, "under-verification", { notes: "Verified by security" })}>
+                            {updatingCard === card.id ? "..." : "Verify"}
+                          </ActionButton>
+                        ) : null}
+
+                        {/* under-verification → replacement-approved */}
+                        {card.status === "under-verification" && canAction("replacement-approved") ? (
+                          <ActionButton variant="approve" className="px-3 py-1 text-xs" disabled={updatingCard === card.id} onClick={() => updateCardStatus(card.id, "replacement-approved")}>
+                            {updatingCard === card.id ? "..." : "Approve Replacement"}
+                          </ActionButton>
+                        ) : null}
+
+                        {/* replacement-approved → card-disabled */}
+                        {card.status === "replacement-approved" && canAction("card-disabled") ? (
+                          <ActionButton variant="secondary" className="px-3 py-1 text-xs" disabled={updatingCard === card.id} onClick={() => setDisableAccessPopup({ id: card.id, show: true })}>
+                            {updatingCard === card.id ? "..." : "Disable Access"}
+                          </ActionButton>
+                        ) : null}
+
+                        {/* card-disabled → hr-approved */}
+                        {card.status === "card-disabled" && canAction("hr-approved") ? (
+                          <ActionButton variant="approve" className="px-3 py-1 text-xs" disabled={updatingCard === card.id} onClick={() => updateCardStatus(card.id, "hr-approved")}>
+                            {updatingCard === card.id ? "..." : "HR Approve"}
+                          </ActionButton>
+                        ) : null}
+
+                        {/* hr-approved → printing */}
+                        {card.status === "hr-approved" && canAction("printing") ? (
+                          <ActionButton variant="primary" className="px-3 py-1 text-xs" disabled={updatingCard === card.id} onClick={() => {
+                            setPrintCardPopup({ id: card.id, show: true });
+                            setPrintCardNumber("");
+                            setPrintRfidUid("");
+                            setPrintExpiryDate("");
+                          }}>
+                            {updatingCard === card.id ? "..." : "Print Card"}
+                          </ActionButton>
+                        ) : null}
+
+                        {/* printing → ready-for-pickup */}
+                        {card.status === "printing" && canAction("ready-for-pickup") ? (
+                          <ActionButton variant="approve" className="px-3 py-1 text-xs" disabled={updatingCard === card.id} onClick={() => updateCardStatus(card.id, "ready-for-pickup")}>
+                            {updatingCard === card.id ? "..." : "Ready for Pickup"}
+                          </ActionButton>
+                        ) : null}
+
+                        {/* ready-for-pickup → completed */}
+                        {card.status === "ready-for-pickup" && canAction("completed") ? (
+                          <ActionButton variant="primary" className="px-3 py-1 text-xs" disabled={updatingCard === card.id} onClick={() => updateCardStatus(card.id, "completed", { notes: "ID verified at collection" })}>
+                            {updatingCard === card.id ? "..." : "Mark Collected"}
+                          </ActionButton>
+                        ) : null}
+
+                        {/* Reject (reported / under-verification / card-disabled) */}
+                        {(card.status === "reported" || card.status === "under-verification" || card.status === "card-disabled") && canAction("rejected") ? (
+                          <ActionButton variant="danger" className="px-3 py-1 text-xs" disabled={updatingCard === card.id} onClick={() => {
+                            setRejectPopup({ id: card.id, show: true });
+                            setRejectReason("");
+                          }}>
+                            {updatingCard === card.id ? "..." : "Reject"}
+                          </ActionButton>
+                        ) : null}
+
+                        {/* Mark Found (reported / under-verification) */}
+                        {(card.status === "reported" || card.status === "under-verification") && canAction("replacement-approved") ? (
+                          <ActionButton variant="secondary" className="px-3 py-1 text-xs" disabled={updatingCard === card.id} onClick={() => setFoundPopup({ id: card.id, show: true })}>
+                            {updatingCard === card.id ? "..." : "Mark Found"}
+                          </ActionButton>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
-          {/* Report Lost Card Modal */}
-          {showReportLost ? (
+          {/* Disable Access Popup */}
+          {disableAccessPopup.show ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3">
-              <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg">
-                <h3 className="mb-4 text-sm font-semibold text-slate-800">Report Lost / Request Replacement</h3>
-                <form onSubmit={handleReportLost} className="space-y-3">
+              <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+                <h3 className="mb-3 text-sm font-semibold text-slate-800">Disable Building Access</h3>
+                <p className="mb-3 text-xs text-slate-500">Select zones to disable for the lost card:</p>
+                {(["office-entry", "parking", "cafeteria", "printer", "server-room", "attendance-card"] as const).map((z) => (
+                  <label key={z} className="flex items-center gap-2 py-1 text-xs text-slate-700">
+                    <input type="checkbox" defaultChecked className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      data-zone={z}
+                    />
+                    {z.replace("-", " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                  </label>
+                ))}
+                <div className="mt-4 flex justify-end gap-2">
+                  <ActionButton variant="secondary" onClick={() => setDisableAccessPopup({ id: "", show: false })}>Cancel</ActionButton>
+                  <ActionButton variant="primary" onClick={() => {
+                    const checked = document.querySelectorAll<HTMLInputElement>("[data-zone]:checked");
+                    const zones = Array.from(checked).map((el) => el.dataset.zone ?? "");
+                    handleDisableAccess(disableAccessPopup.id, zones);
+                  }}>Disable</ActionButton>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Found Card Popup */}
+          {foundPopup.show ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3">
+              <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+                <h3 className="mb-3 text-sm font-semibold text-slate-800">Card Found</h3>
+                <p className="mb-3 text-xs text-slate-500">Was a replacement already issued for this card?</p>
+                <div className="flex gap-2">
+                  <ActionButton variant="secondary" onClick={() => handleFoundCard(foundPopup.id, true)} disabled={updatingCard === foundPopup.id}>
+                    {updatingCard === foundPopup.id ? "..." : "Yes — Destroy Old Card"}
+                  </ActionButton>
+                  <ActionButton variant="primary" onClick={() => handleFoundCard(foundPopup.id, false)} disabled={updatingCard === foundPopup.id}>
+                    {updatingCard === foundPopup.id ? "..." : "No — Reactivate"}
+                  </ActionButton>
+                </div>
+                <div className="mt-3 text-center">
+                  <button className="text-xs text-slate-500 hover:underline" onClick={() => setFoundPopup({ id: "", show: false })} type="button">Cancel</button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Complete Ticket Popup */}
+          {completeTicketPopup.show ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3">
+              <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+                <h3 className="mb-3 text-sm font-semibold text-slate-800">Complete Ticket</h3>
+                <p className="mb-3 text-xs text-slate-500">Add a follow-up note before completing this ticket:</p>
+                <textarea className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  rows={3} value={completeTicketNote} onChange={(e) => setCompleteTicketNote(e.target.value)} placeholder="Describe what was done..."
+                />
+                <div className="mt-4 flex justify-end gap-2">
+                  <ActionButton variant="secondary" onClick={() => setCompleteTicketPopup({ id: "", show: false })}>Cancel</ActionButton>
+                  <ActionButton variant="primary" disabled={!completeTicketNote.trim() || updatingCard === completeTicketPopup.id} onClick={() => handleCompleteTicket(completeTicketPopup.id)}>
+                    {updatingCard === completeTicketPopup.id ? "..." : "Complete Ticket"}
+                  </ActionButton>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Print Card Popup */}
+          {printCardPopup.show ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3">
+              <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+                <h3 className="mb-4 text-sm font-semibold text-slate-800">Print New Card</h3>
+                <div className="space-y-3">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-600">Employee ID *</label>
+                    <label className="mb-1 block text-xs font-medium text-slate-600">Card Number *</label>
                     <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                      value={reportUserId} onChange={(e) => setReportUserId(e.target.value)} placeholder="Enter user ID" required
+                      value={printCardNumber} onChange={(e) => setPrintCardNumber(e.target.value)} placeholder="e.g. CARD-2026-0042"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-600">Notes</label>
-                    <textarea className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                      rows={3} value={reportNotes} onChange={(e) => setReportNotes(e.target.value)}
+                    <label className="mb-1 block text-xs font-medium text-slate-600">RFID UID (optional)</label>
+                    <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                      value={printRfidUid} onChange={(e) => setPrintRfidUid(e.target.value)} placeholder="e.g. 04A3B2C1"
                     />
                   </div>
-                  <div className="flex justify-end gap-2 pt-2">
-                    <ActionButton variant="secondary" type="button" onClick={() => setShowReportLost(false)}>Cancel</ActionButton>
-                    <ActionButton variant="primary" type="submit" disabled={reporting}>
-                      {reporting ? "Submitting..." : "Submit Report"}
-                    </ActionButton>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-600">Expiry Date (optional)</label>
+                    <input type="date" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                      value={printExpiryDate} onChange={(e) => setPrintExpiryDate(e.target.value)}
+                    />
                   </div>
-                </form>
+                </div>
+                <div className="mt-4 flex justify-end gap-2">
+                  <ActionButton variant="secondary" onClick={() => setPrintCardPopup({ id: "", show: false })}>Cancel</ActionButton>
+                  <ActionButton variant="primary" disabled={!printCardNumber.trim() || updatingCard === printCardPopup.id} onClick={() => {
+                    updateCardStatus(printCardPopup.id, "printing", {
+                      cardNumber: printCardNumber,
+                      rfidUid: printRfidUid,
+                      issueDate: new Date().toISOString(),
+                      expiryDate: printExpiryDate || "",
+                    });
+                    setPrintCardPopup({ id: "", show: false });
+                  }}>
+                    {updatingCard === printCardPopup.id ? "..." : "Confirm Print"}
+                  </ActionButton>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Reject Popup */}
+          {rejectPopup.show ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3">
+              <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+                <h3 className="mb-3 text-sm font-semibold text-slate-800">Reject Report</h3>
+                <p className="mb-3 text-xs text-slate-500">Provide a reason for rejection:</p>
+                <textarea className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  rows={3} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Enter rejection reason..."
+                />
+                <div className="mt-4 flex justify-end gap-2">
+                  <ActionButton variant="secondary" onClick={() => setRejectPopup({ id: "", show: false })}>Cancel</ActionButton>
+                  <ActionButton variant="danger" disabled={!rejectReason.trim() || updatingCard === rejectPopup.id} onClick={() => {
+                    updateCardStatus(rejectPopup.id, "rejected", { notes: rejectReason });
+                    setRejectPopup({ id: "", show: false });
+                  }}>
+                    {updatingCard === rejectPopup.id ? "..." : "Confirm Reject"}
+                  </ActionButton>
+                </div>
               </div>
             </div>
           ) : null}

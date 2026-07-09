@@ -76,6 +76,14 @@ export function ProfileTab({
   const [idCardRequestStatus, setIdCardRequestStatus] = useState<string | null>(null);
   const [idCardSignature, setIdCardSignature] = useState<{ name: string; role: string; signedAt: string } | null>(null);
   const [idCardIssueDate, setIdCardIssueDate] = useState<string | null>(null);
+  const [showLostCardModal, setShowLostCardModal] = useState(false);
+  const [lcReason, setLcReason] = useState("lost");
+  const [lcLastLocation, setLcLastLocation] = useState("");
+  const [lcLostDateTime, setLcLostDateTime] = useState("");
+  const [lcPoliceComplaint, setLcPoliceComplaint] = useState("");
+  const [lcIsEmergency, setLcIsEmergency] = useState(false);
+  const [lcNotes, setLcNotes] = useState("");
+  const [lcSubmitting, setLcSubmitting] = useState(false);
 
   const company = typeof profile?.company === "object" && profile.company ? (profile.company as AnyRecord) : null;
   const team = typeof profile?.team === "object" && profile.team ? (profile.team as AnyRecord) : null;
@@ -121,6 +129,36 @@ export function ProfileTab({
       await refresh();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Unable to send join request.", "error");
+    }
+  }
+
+  async function handleReportLostCard(e: FormEvent) {
+    e.preventDefault();
+    setLcSubmitting(true);
+    try {
+      await apiFetch("/api/hr/security/lost-cards", {
+        method: "POST",
+        body: JSON.stringify({
+          reason: lcReason,
+          lastLocation: lcLastLocation,
+          lostDateTime: lcLostDateTime || null,
+          policeComplaintNumber: lcPoliceComplaint,
+          isEmergency: lcIsEmergency,
+          notes: lcNotes,
+        }),
+      });
+      showToast("Lost card report submitted.");
+      setShowLostCardModal(false);
+      setLcReason("lost");
+      setLcLastLocation("");
+      setLcLostDateTime("");
+      setLcPoliceComplaint("");
+      setLcIsEmergency(false);
+      setLcNotes("");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to submit report.", "error");
+    } finally {
+      setLcSubmitting(false);
     }
   }
 
@@ -294,6 +332,22 @@ export function ProfileTab({
         </div>
       ) : null}
 
+      {inApprovedCompany ? (
+        <div className="mb-5 flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)]">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">Lost / Damaged ID Card</p>
+            <p className="text-xs text-slate-500">Report a lost, stolen, or damaged identity card and request a replacement</p>
+          </div>
+          <button
+            className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+            onClick={() => setShowLostCardModal(true)}
+            type="button"
+          >
+            Report Lost Card
+          </button>
+        </div>
+      ) : null}
+
       <div className="grid gap-5 xl:grid-cols-2">
         <PersonalInfoSection profile={profile} session={session as { user?: { name?: string; email?: string } } | null} avatarUrl={avatarUrl} displayName={displayName}
           uploading={uploading} onAvatarDelete={() => setAvatarDeleteModal(true)}
@@ -445,6 +499,74 @@ export function ProfileTab({
           signature={idCardSignature}
           issueDate={idCardIssueDate}
         />
+      ) : null}
+
+      {showLostCardModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-lg" style={{ maxHeight: "90vh", overflowY: "auto" }}>
+            <h3 className="mb-4 text-sm font-semibold text-slate-800">Report Lost / Damaged ID Card</h3>
+            <form onSubmit={handleReportLostCard} className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Reason</label>
+                <select className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  value={lcReason} onChange={(e) => setLcReason(e.target.value)}
+                >
+                  <option value="lost">Lost</option>
+                  <option value="stolen">Stolen</option>
+                  <option value="damaged">Damaged</option>
+                  <option value="not-working">Not Working</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Last Location Seen</label>
+                <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  value={lcLastLocation} onChange={(e) => setLcLastLocation(e.target.value)} placeholder="e.g. Main Gate, Floor 3"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Date & Time Lost</label>
+                <input type="datetime-local" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  value={lcLostDateTime} onChange={(e) => setLcLostDateTime(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Police Complaint Number (optional)</label>
+                <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  value={lcPoliceComplaint} onChange={(e) => setLcPoliceComplaint(e.target.value)} placeholder="e.g. FIR-2026-0042"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Emergency?</label>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    checked={lcIsEmergency} onChange={(e) => setLcIsEmergency(e.target.checked)}
+                  />
+                  <span className="text-xs text-slate-500">Mark as emergency (card was stolen or security risk)</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Notes</label>
+                <textarea className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  rows={3} value={lcNotes} onChange={(e) => setLcNotes(e.target.value)}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                  type="button" onClick={() => setShowLostCardModal(false)}>Cancel</button>
+                <button className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                  type="submit" disabled={lcSubmitting}>
+                  {lcSubmitting ? "Submitting..." : "Submit Report"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       ) : null}
     </>
   );
