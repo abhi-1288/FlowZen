@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
+import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 import { VisitorPass } from "@/models/VisitorPass";
+import { Notification } from "@/models/Notification";
+import { emitNotification } from "@/lib/realtime";
 
 export async function GET() {
   const userId = await requireUserId();
@@ -65,20 +68,38 @@ export async function POST(request: Request) {
   const timeIn = body.timeIn ? new Date(String(body.timeIn)) : null;
   const timeOut = body.timeOut ? new Date(String(body.timeOut)) : null;
 
+  const companyDoc = await Company.findById(actor.company).select("name").lean() as Record<string, unknown> | null;
+  const companyName = companyDoc?.name ? String(companyDoc.name) : "";
+
   const pass = await VisitorPass.create({
     createdBy: userId,
     company: actor.company,
     visitorName: String(body.visitorName ?? "").trim(),
     visitorEmail: String(body.visitorEmail ?? "").trim().toLowerCase(),
     visitorPhone: String(body.visitorPhone ?? "").trim(),
-    visitorCompany: String(body.visitorCompany ?? "").trim(),
+    visitorCompany: companyName,
+    hostName: actor.name ?? "",
     region: String(body.region ?? "").trim(),
     purpose: String(body.purpose ?? "").trim(),
-    identityCode: null,
     timeIn,
     timeOut,
     status: "pending",
   });
+
+  // Notify all admin/HR users in the company to review the pending pass
+  const approvers = await User.find({ company: actor.company, role: { $in: ["admin", "human-resource"] } }).select("_id").lean();
+  for (const approver of approvers) {
+    const notif = await Notification.create({
+      user: approver._id,
+      company: actor.company,
+      type: "approval",
+      title: "Visitor Pass Pending Approval",
+      message: `${actor.name ?? "Someone"} requested a visitor pass for ${pass.visitorName}.`,
+      body: `Visitor: ${pass.visitorName}\nEmail: ${pass.visitorEmail}\nRegion: ${pass.region || "N/A"}\nTime In: ${timeIn ? timeIn.toLocaleString("en-IN") : "N/A"}\nTime Out: ${timeOut ? timeOut.toLocaleString("en-IN") : "N/A"}\nPurpose: ${pass.purpose || "N/A"}`,
+      link: "/profile/visitors",
+    });
+    emitNotification(String(approver._id));
+  }
 
   return NextResponse.json({ pass: { ...pass.toObject(), id: String(pass._id) } });
 }

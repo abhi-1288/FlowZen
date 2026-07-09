@@ -19,10 +19,17 @@ async function generateIdentityCode({
   generatorName: string;
 }): Promise<string> {
   const company = await Company.findById(companyId).select("name").lean() as Record<string, unknown> | null;
-  const companyName = company?.name ? String(company.name) : "unknown";
-  const regionSlug = region ? region.replace(/\s+/g, "-").toLowerCase() : "na";
-  const rand4 = String(Math.floor(1000 + Math.random() * 9000));
-  return `${companyName}-${regionSlug}-${rand4}-${generatorName}`;
+  const companySlug = (company?.name ? String(company.name) : "unknown").replace(/\s+/g, "_").toLowerCase();
+  const regionSlug = region ? region.replace(/\s+/g, "_").toLowerCase() : "na";
+  const nameSlug = generatorName.replace(/\s+/g, "_").toLowerCase();
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const rand4 = String(Math.floor(1000 + Math.random() * 9000));
+    const code = `${companySlug}-${regionSlug}-${rand4}-${nameSlug}`;
+    const existing = await VisitorPass.findOne({ identityCode: code }).lean();
+    if (!existing) return code;
+  }
+  const rand8 = String(Math.floor(10000000 + Math.random() * 90000000));
+  return `${companySlug}-${regionSlug}-${rand8}-${nameSlug}`;
 }
 
 export async function GET(
@@ -133,29 +140,142 @@ export async function PATCH(
 
     // Send email to visitor with temporary ID card
     if (pass.visitorEmail) {
-      const timeInStr = pass.timeIn ? new Date(pass.timeIn).toLocaleString("en-IN") : "N/A";
-      const timeOutStr = pass.timeOut ? new Date(pass.timeOut).toLocaleString("en-IN") : "N/A";
+      const validFromStr = pass.validFrom ? new Date(pass.validFrom).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "N/A";
+      const validUntilStr = pass.validUntil ? new Date(pass.validUntil).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "N/A";
+      const hostName = pass.hostName ? String(pass.hostName) : "—";
+      const visitorCompany = pass.visitorCompany ? String(pass.visitorCompany) : "—";
+      const region = pass.region ? String(pass.region) : "Main Office";
+      const purpose = pass.purpose ? String(pass.purpose) : "—";
+
+      // Signature info
+      const signedBy = pass.signedBy ? String(pass.signedBy) : null;
+      const signedRole = pass.signedRole ? String(pass.signedRole) : null;
+      const signedAt = pass.signedAt ? new Date(pass.signedAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : null;
+
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const verifyUrl = `${baseUrl}/verify-visitor/${pass.identityCode}`;
+      const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(verifyUrl)}`;
 
       sendMail({
         to: pass.visitorEmail,
         subject: `Your Temporary ID Card – ${companyName}`,
-        text: `Your temporary visitor pass for ${companyName} has been approved.\n\nPass ID: ${pass.identityCode}\nRegion: ${pass.region || "N/A"}\nTime In: ${timeInStr}\nTime Out: ${timeOutStr}\n\nPlease present this Pass ID at the security gate upon arrival.\n\nThank you,\n${companyName} Security Team`,
-        html: `<!DOCTYPE html><html><body style="font-family:sans-serif;background:#f5f5f5;padding:20px">
-          <div style="max-width:480px;margin:auto;background:white;border-radius:12px;padding:24px;border:1px solid #e0e0e0">
-            <h2 style="margin:0 0 4px;color:#1e293b">Temporary ID Card</h2>
-            <p style="margin:0 0 16px;color:#64748b;font-size:13px">${companyName}</p>
-            <div style="background:#f8fafc;border-radius:8px;padding:16px;margin-bottom:16px">
-              <p style="margin:0 0 4px;font-size:13px;color:#64748b">Visitor</p>
-              <p style="margin:0 0 12px;font-size:15px;font-weight:600;color:#1e293b">${pass.visitorName}</p>
-              <table style="width:100%;font-size:13px">
-                <tr><td style="color:#64748b;padding:2px 0">Pass ID</td><td style="font-weight:600;text-align:right;font-family:monospace">${pass.identityCode}</td></tr>
-                <tr><td style="color:#64748b;padding:2px 0">Region</td><td style="text-align:right">${pass.region || "N/A"}</td></tr>
-                <tr><td style="color:#64748b;padding:2px 0">Time In</td><td style="text-align:right">${timeInStr}</td></tr>
-                <tr><td style="color:#64748b;padding:2px 0">Time Out</td><td style="text-align:right">${timeOutStr}</td></tr>
-              </table>
-            </div>
-            <p style="font-size:12px;color:#94a3b8;text-align:center">Present this Pass ID at the security gate upon arrival.</p>
-          </div></body></html>`,
+        text: `Your temporary visitor pass for ${companyName} has been approved.\n\nPass ID: ${pass.identityCode}\nRegion: ${region}\nValid From: ${validFromStr}\nValid Until: ${validUntilStr}\nHost: ${hostName}\n\nPlease present this QR code or Pass ID at the security gate upon arrival.\n\nThank you,\n${companyName} Security Team`,
+        html: `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    .email-card { max-width:500px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+    .card-header { background:#1e293b;padding:20px 24px;text-align:center; }
+    .card-header h2 { margin:0;font-size:18px;font-weight:700;color:#ffffff; }
+    .card-header p { margin:4px 0 0;font-size:12px;color:#94a3b8;letter-spacing:1px;text-transform:uppercase; }
+    .visitor-badge { display:inline-block;margin-top:-12px;margin-bottom:12px;background:#d97706;color:#ffffff;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:4px 16px;border-radius:0 0 6px 6px; }
+    .detail-section { padding:8px 24px; }
+    .detail-row { display:flex;align-items:center;padding:6px 0;border-bottom:1px solid #f1f5f9; }
+    .detail-label { width:110px;font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;flex-shrink:0; }
+    .detail-value { font-size:13px;color:#0f172a;font-weight:600; }
+    .qr-section { text-align:center;padding:16px 24px; }
+    .qr-section img { display:block;margin:0 auto;border-radius:8px;border:1px solid #e2e8f0; }
+    .footer-note { padding:0 24px 12px;text-align:center;font-size:11px;color:#94a3b8;line-height:1.5; }
+    .card-footer { background:#f8fafc;padding:14px 24px;text-align:center;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8; }
+    .back-section { border-top:2px dashed #e2e8f0;margin:16px 24px 0;padding:16px 0; }
+    .back-row { display:flex;padding:5px 0; }
+    .back-label { font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;width:110px;flex-shrink:0; }
+    .back-value { font-size:12px;color:#334155;font-weight:500; }
+    .signature-block { border-top:1px solid #e2e8f0;margin:12px 24px 0;padding:12px 24px 16px;text-align:center; }
+    .signature-name { font-size:16px;font-weight:700;color:#1e293b;font-family:'Georgia',serif;margin:0; }
+    .signature-role { font-size:11px;color:#64748b;margin:2px 0 0; }
+    .signature-date { font-size:10px;color:#94a3b8;margin:2px 0 0; }
+    .valid-row { display:flex;gap:12px;padding:8px 24px; }
+    .valid-box { flex:1;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;padding:10px 14px;text-align:center; }
+    .valid-label { font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 2px; }
+    .valid-value { font-size:12px;font-weight:600;color:#0f172a;margin:0; }
+  </style>
+</head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 12px">
+    <tr>
+      <td align="center">
+        <table class="email-card" cellpadding="0" cellspacing="0">
+
+          <!-- ═══ FRONT CARD ═══ -->
+          <tr>
+            <td class="card-header">
+              <h2>${companyName}</h2>
+              <p>Visitor ID Card</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="text-align:center;padding:0">
+              <span class="visitor-badge">Visitor</span>
+            </td>
+          </tr>
+
+          <!-- Details -->
+          <tr><td class="detail-section">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr><td class="detail-row"><span class="detail-label">Pass ID</span><span class="detail-value" style="font-family:monospace">${pass.identityCode}</span></td></tr>
+              <tr><td class="detail-row"><span class="detail-label">Name</span><span class="detail-value">${pass.visitorName}</span></td></tr>
+              <tr><td class="detail-row"><span class="detail-label">Phone</span><span class="detail-value">${pass.visitorPhone || "—"}</span></td></tr>
+              <tr><td class="detail-row"><span class="detail-label">Email</span><span class="detail-value">${pass.visitorEmail}</span></td></tr>
+              <tr><td class="detail-row"><span class="detail-label">Region</span><span class="detail-value">${region}</span></td></tr>
+            </table>
+          </td></tr>
+
+          <!-- Valid from / until -->
+          <tr><td>
+            <table width="100%" cellpadding="0" cellspacing="0" class="valid-row">
+              <tr>
+                <td class="valid-box"><p class="valid-label">Valid From (±15 min)</p><p class="valid-value">${validFromStr}</p></td>
+                <td class="valid-box" style="margin-left:12px"><p class="valid-label">Valid Until (±15 min)</p><p class="valid-value" style="color:#d97706">${validUntilStr}</p></td>
+              </tr>
+            </table>
+          </td></tr>
+
+          <!-- QR -->
+          <tr><td class="qr-section">
+            <img src="${qrSrc}" alt="QR Code" width="140" />
+            <p style="margin:4px 0 0;font-size:10px;color:#94a3b8">Scan to Verify</p>
+          </td></tr>
+
+          <!-- Signature -->
+          ${signedBy ? `
+          <tr><td class="signature-block">
+            <p class="signature-name">${signedBy}</p>
+            <p class="signature-role">${signedRole}</p>
+            <p class="signature-date">Signed on ${signedAt}</p>
+          </td></tr>
+          ` : `
+          <tr><td class="signature-block">
+            <p class="signature-name" style="color:#cbd5e1">Authorised</p>
+            <p class="signature-role" style="color:#cbd5e1">Authorised Signature</p>
+          </td></tr>
+          `}
+
+          <!-- ═══ BACK CARD ═══ -->
+          <tr><td class="back-section">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr><td class="back-row"><span class="back-label">Purpose</span><span class="back-value">${purpose}</span></td></tr>
+              <tr><td class="back-row"><span class="back-label">Host</span><span class="back-value">${hostName}</span></td></tr>
+              <tr><td class="back-row"><span class="back-label">Company</span><span class="back-value">${visitorCompany}</span></td></tr>
+              <tr><td class="back-row"><span class="back-label">Visiting Office</span><span class="back-value">${region}</span></td></tr>
+            </table>
+          </td></tr>
+
+          <!-- Footer note -->
+          <tr><td class="footer-note">
+            Please present this QR code or Pass ID at the security gate upon arrival.<br>
+            Entry may be permitted 15 minutes before or after the scheduled time.
+          </td></tr>
+
+          <tr><td class="card-footer">${companyName} · Security Team</td></tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
       }).catch(() => { /* email failure is non-critical */ });
     }
   } else if (body.status === "rejected") {

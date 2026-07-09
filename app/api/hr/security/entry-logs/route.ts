@@ -88,16 +88,18 @@ export async function POST(request: Request) {
   if (!["admin", "human-resource", "security"].includes(String(actor.role))) return jsonError("Forbidden.", 403);
 
   const body = await request.json();
-  const code = String(body.code ?? "").trim().toUpperCase();
+  const rawCode = String(body.code ?? "").trim();
   const type = String(body.type ?? "").trim();
 
-  if (!code) return jsonError("Identity code is required.", 400);
+  if (!rawCode) return jsonError("Identity code is required.", 400);
   if (type !== "entry" && type !== "exit") return jsonError("Type must be 'entry' or 'exit'.", 400);
+
+  const codeRegex = new RegExp(`^${rawCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
 
   // Try to find employee
   const employee = await User.findOne({
     company: actor.company,
-    companyIdentityCode: code,
+    companyIdentityCode: { $regex: codeRegex },
   }).select("_id name");
 
   if (employee) {
@@ -114,7 +116,7 @@ export async function POST(request: Request) {
   // Try to find visitor pass
   const pass = await VisitorPass.findOne({
     company: actor.company,
-    identityCode: code,
+    identityCode: { $regex: codeRegex },
   }).select("_id visitorName status");
 
   if (pass) {

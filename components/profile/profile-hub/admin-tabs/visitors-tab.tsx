@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { apiFetch } from "@/lib/client-utils";
 import { ActionButton, AnyRecord, EmptyState, SectionHeader } from "../shared";
@@ -91,6 +91,7 @@ export function VisitorsTab({
   const [genDate, setGenDate] = useState("");
   const [genTimeInTime, setGenTimeInTime] = useState("");
   const [genDuration, setGenDuration] = useState("4");
+  const [genPurpose, setGenPurpose] = useState("");
   const [genRegion, setGenRegion] = useState("");
   const [generating, setGenerating] = useState(false);
 
@@ -184,9 +185,9 @@ export function VisitorsTab({
       let timeOut: string | null = null;
       if (genDate && genTimeInTime) {
         timeIn = new Date(`${genDate}T${genTimeInTime}`).toISOString();
-        const dur = parseInt(genDuration, 10);
+        const dur = parseFloat(genDuration);
         const ti = new Date(`${genDate}T${genTimeInTime}`);
-        ti.setHours(ti.getHours() + dur);
+        ti.setMinutes(ti.getMinutes() + dur * 60);
         timeOut = ti.toISOString();
       }
       await apiFetch("/api/hr/visitor/passes", {
@@ -195,6 +196,7 @@ export function VisitorsTab({
           visitorName: genName,
           visitorEmail: genEmail,
           visitorPhone: genPhone,
+          purpose: genPurpose,
           timeIn,
           timeOut,
           region: genRegion,
@@ -205,6 +207,7 @@ export function VisitorsTab({
       setGenName("");
       setGenEmail("");
       setGenPhone("");
+      setGenPurpose("");
       setGenDate("");
       setGenTimeInTime("");
       setGenDuration("4");
@@ -217,18 +220,20 @@ export function VisitorsTab({
     }
   }
 
-  async function handleConfirmPass(pass: PassRecord) {
-    const passId = pass.id || pass._id;
+  async function handleSignAndApprove() {
+    if (!previewPass) return;
+    const passId = previewPass.id || previewPass._id;
     setSigning(true);
     try {
       await apiFetch(`/api/hr/visitor/passes/${passId}`, {
         method: "PATCH",
-        body: JSON.stringify({ status: "approved" }),
+        body: JSON.stringify({ status: "approved", signed: true }),
       });
-      showToast("Visitor pass confirmed and identity code generated.");
+      showToast("Visitor pass approved and signed.");
+      setPreviewPass(null);
       await loadPasses();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Confirmation failed.", "error");
+      showToast(err instanceof Error ? err.message : "Approval failed.", "error");
     } finally {
       setSigning(false);
     }
@@ -270,6 +275,14 @@ export function VisitorsTab({
   }
 
   const filteredPasses = passes.filter((p) => passFilter === "all" || p.status === passFilter);
+
+  const countsByStatus = useMemo(() => {
+    const counts: Record<string, number> = { pending: 0, approved: 0, expired: 0, rejected: 0 };
+    for (const p of passes) {
+      if (counts[p.status] !== undefined) counts[p.status]++;
+    }
+    return counts;
+  }, [passes]);
 
   const ambarAccent = { hex: "#d97706", dark: "#b45309", light: "#fef3c7" };
 
@@ -337,7 +350,7 @@ export function VisitorsTab({
 
       {/* Filter tabs */}
       <div className="mb-4 flex gap-2">
-        {["pending", "approved", "expired", "rejected", "all"].map((f) => (
+        {(["pending", "approved", "expired", "rejected", "all"] as const).map((f) => (
           <button
             key={f}
             className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
@@ -349,112 +362,135 @@ export function VisitorsTab({
             type="button"
           >
             {f.charAt(0).toUpperCase() + f.slice(1)}
+            {f !== "all" && countsByStatus[f] !== undefined ? ` (${countsByStatus[f]})` : ""}
           </button>
         ))}
       </div>
 
-      {/* ═══ Generate Pass Section ═══ */}
-      {showGenerate ? (
-        <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-          <h3 className="mb-3 text-sm font-semibold text-slate-800">Generate Temporary Visitor Pass</h3>
-          <form onSubmit={handleGeneratePass} className="space-y-3">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Visitor Name *</label>
-                <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                  value={genName} onChange={(e) => setGenName(e.target.value)} required
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Email *</label>
-                <input type="email" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                  value={genEmail} onChange={(e) => setGenEmail(e.target.value)} required
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Phone</label>
-                <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                  value={genPhone} onChange={(e) => setGenPhone(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Office Region</label>
-                <select className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                  value={genRegion} onChange={(e) => setGenRegion(e.target.value)}
-                >
-                  <option value="">Select region</option>
-                  {regionOpts.length > 0 ? regionOpts.map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  )) : (
-                    <option value="Main Office">Main Office</option>
-                  )}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Date</label>
-                <input type="date" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                  value={genDate} onChange={(e) => setGenDate(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Time In</label>
-                <input type="time" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                  value={genTimeInTime} onChange={(e) => setGenTimeInTime(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Duration</label>
-                <select className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                  value={genDuration} onChange={(e) => setGenDuration(e.target.value)}
-                >
-                  <option value="1">1 hour</option>
-                  <option value="2">2 hours</option>
-                  <option value="3">3 hours</option>
-                  <option value="4">4 hours</option>
-                  <option value="5">5 hours</option>
-                  <option value="6">6 hours</option>
-                  <option value="8">8 hours</option>
-                  <option value="10">10 hours</option>
-                  <option value="12">12 hours</option>
-                </select>
-              </div>
-              {genDate && genTimeInTime ? (
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">Time Out</label>
-                  <div className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-600">
-                    {(() => {
-                      const ti = new Date(`${genDate}T${genTimeInTime}`);
-                      ti.setHours(ti.getHours() + parseInt(genDuration, 10));
-                      return ti.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
-                    })()}
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-400">Time Out</label>
-                  <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400">
-                    —
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="flex justify-end gap-2">
-              <ActionButton variant="secondary" type="button" onClick={() => { setShowGenerate(false); setGenName(""); setGenEmail(""); setGenPhone(""); setGenDate(""); setGenTimeInTime(""); setGenDuration("4"); setGenRegion(""); }}>
-                Cancel
-              </ActionButton>
-              <ActionButton variant="primary" type="submit" disabled={generating}>
-                {generating ? "Generating..." : "Generate Pass"}
-              </ActionButton>
-            </div>
-          </form>
-        </div>
-      ) : canGenerate ? (
+      {canGenerate ? (
         <div className="mb-4">
           <ActionButton variant="primary" onClick={() => setShowGenerate(true)}>
             + Generate Temporary Pass
           </ActionButton>
         </div>
       ) : null}
+
+      {/* ═══ Generate Pass Modal ═══ */}
+      <Modal open={showGenerate} onClose={() => { setShowGenerate(false); setGenName(""); setGenEmail(""); setGenPhone(""); setGenPurpose(""); setGenDate(""); setGenTimeInTime(""); setGenDuration("4"); setGenRegion(""); }}>
+        <form onSubmit={handleGeneratePass} className="space-y-4">
+          <h3 className="text-base font-semibold text-slate-900">Generate Temporary Visitor Pass</h3>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Visitor Name *</label>
+              <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                value={genName} onChange={(e) => setGenName(e.target.value)} required
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Email *</label>
+              <input type="email" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                value={genEmail} onChange={(e) => setGenEmail(e.target.value)} required
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Phone</label>
+              <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                value={genPhone} onChange={(e) => setGenPhone(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Office Region</label>
+              <select className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                value={genRegion} onChange={(e) => setGenRegion(e.target.value)}
+              >
+                <option value="">Select region</option>
+                {regionOpts.length > 0 ? regionOpts.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                )) : (
+                  <option value="Main Office">Main Office</option>
+                )}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Purpose</label>
+              <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                value={genPurpose} onChange={(e) => setGenPurpose(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Date</label>
+              <input type="date" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                value={genDate} onChange={(e) => setGenDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Time In (±15 min)</label>
+              <input type="time" step="900" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                value={genTimeInTime} onChange={(e) => setGenTimeInTime(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Duration</label>
+              <select className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                value={genDuration} onChange={(e) => setGenDuration(e.target.value)}
+              >
+                <option value="0.5">30 min</option>
+                <option value="1">1 hr</option>
+                <option value="1.5">1 hr 30 min</option>
+                <option value="2">2 hr</option>
+                <option value="2.5">2 hr 30 min</option>
+                <option value="3">3 hr</option>
+                <option value="3.5">3 hr 30 min</option>
+                <option value="4">4 hr</option>
+                <option value="4.5">4 hr 30 min</option>
+                <option value="5">5 hr</option>
+                <option value="5.5">5 hr 30 min</option>
+                <option value="6">6 hr</option>
+                <option value="6.5">6 hr 30 min</option>
+                <option value="7">7 hr</option>
+                <option value="7.5">7 hr 30 min</option>
+                <option value="8">8 hr</option>
+                <option value="8.5">8 hr 30 min</option>
+                <option value="9">9 hr</option>
+                <option value="9.5">9 hr 30 min</option>
+                <option value="10">10 hr</option>
+                <option value="10.5">10 hr 30 min</option>
+                <option value="11">11 hr</option>
+                <option value="11.5">11 hr 30 min</option>
+                <option value="12">12 hr</option>
+                <option value="12.5">12 hr 30 min</option>
+              </select>
+            </div>
+            {genDate && genTimeInTime ? (
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Time Out</label>
+                <div className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-600">
+                  {(() => {
+                    const ti = new Date(`${genDate}T${genTimeInTime}`);
+                    ti.setMinutes(ti.getMinutes() + parseFloat(genDuration) * 60);
+                    return ti.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
+                  })()}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-400">Time Out</label>
+                <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400">
+                  —
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <ActionButton variant="secondary" type="button" onClick={() => { setShowGenerate(false); setGenName(""); setGenEmail(""); setGenPhone(""); setGenPurpose(""); setGenDate(""); setGenTimeInTime(""); setGenDuration("4"); setGenRegion(""); }}>
+              Cancel
+            </ActionButton>
+            <ActionButton variant="primary" type="submit" disabled={generating}>
+              {generating ? "Generating..." : "Generate Pass"}
+            </ActionButton>
+          </div>
+        </form>
+      </Modal>
 
       {filteredPasses.length === 0 ? (
         <EmptyState message="No visitor passes match this filter." />
@@ -504,8 +540,8 @@ export function VisitorsTab({
                   <div className="flex shrink-0 flex-col gap-1.5">
                     {isPending && isAdminHr ? (
                       <>
-                        <ActionButton variant="approve" className="px-3 py-1 text-xs" disabled={signing} onClick={() => handleConfirmPass(pass)}>
-                          {signing ? "..." : "Confirm & Generate ID"}
+                        <ActionButton variant="approve" className="px-3 py-1 text-xs" onClick={() => setPreviewPass(pass)}>
+                          Preview & Sign
                         </ActionButton>
                         <ActionButton variant="danger" className="px-3 py-1 text-xs" onClick={() => setDeclineTarget(pass)}>
                           Decline
@@ -633,6 +669,7 @@ export function VisitorsTab({
             purpose: previewPass.purpose,
             hostName: previewPass.hostName,
             idDocumentUrl: previewPass.idDocumentUrl,
+            region: previewPass.region || "",
             visitAddress: previewPass.visitAddress || "",
             validFrom: previewPass.validFrom,
             validUntil: previewPass.validUntil,
@@ -643,7 +680,7 @@ export function VisitorsTab({
           displayRole="Visitor"
           signature={previewPass.isSigned ? { name: previewPass.signedBy, role: previewPass.signedRole, signedAt: previewPass.signedAt ?? "" } : null}
           issueDate={previewPass.validFrom ?? null}
-          onSign={undefined}
+          onSign={previewPass?.status === "pending" ? handleSignAndApprove : undefined}
           signerName={session?.user?.name ?? ""}
           signerRole={session?.user?.role ?? ""}
           variant="visitor"

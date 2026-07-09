@@ -28,7 +28,7 @@ const VisitorPassSchema = new Schema(
     signedRole: { type: String, default: "" },
     signedAt: { type: Date, default: null },
     rejectionReason: { type: String, default: "" },
-    identityCode: { type: String, default: "", unique: true, sparse: true, index: true },
+    identityCode: { type: String, default: "", index: true },
     acceptedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     timeIn: { type: Date, default: null },
     timeOut: { type: Date, default: null },

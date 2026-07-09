@@ -23,18 +23,44 @@ export async function POST(request: Request) {
   if (!["admin", "human-resource", "security"].includes(String(actor.role))) return jsonError("Forbidden.", 403);
 
   const body = await request.json();
-  const code = String(body.code ?? "").trim().toUpperCase();
-  if (!code) return jsonError("Identity code is required.", 400);
+  const rawCode = String(body.code ?? "").trim();
+  if (!rawCode) return jsonError("Identity code is required.", 400);
+
+  // Case-insensitive search
+  const codeRegex = new RegExp(`^${rawCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
 
   // Try to find an employee with this identity code
   const employee = await User.findOne({
     company: actor.company,
-    companyIdentityCode: code,
+    companyIdentityCode: { $regex: codeRegex },
   }).select("name email role companyStatus avatarUrl phone emergencyContact bloodGroup regionLabel").lean() as Record<string, unknown> | null;
 
   if (employee) {
+    // Check if there's an active entry today (entry without exit after it)
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(todayStart.getTime() + 86400000);
+    const lastEntryToday = await EntryLog.findOne({
+      user: employee._id,
+      company: actor.company,
+      type: "entry",
+      timestamp: { $gte: todayStart, $lt: todayEnd },
+    }).sort({ timestamp: -1 }).lean() as Record<string, unknown> | null;
+
+    let hasActiveEntry = false;
+    if (lastEntryToday) {
+      const exitAfter = await EntryLog.findOne({
+        user: employee._id,
+        company: actor.company,
+        type: "exit",
+        timestamp: { $gt: lastEntryToday.timestamp, $lt: todayEnd },
+      }).lean() as Record<string, unknown> | null;
+      hasActiveEntry = !exitAfter;
+    }
+
     return NextResponse.json({
       type: "employee",
+      hasActiveEntry,
       data: {
         id: String(employee._id),
         name: employee.name,
@@ -53,7 +79,7 @@ export async function POST(request: Request) {
   // Try to find a visitor pass with this identity code
   const pass = await VisitorPass.findOne({
     company: actor.company,
-    identityCode: code,
+    identityCode: { $regex: codeRegex },
   }).lean() as Record<string, unknown> | null;
 
   if (pass) {
@@ -64,8 +90,33 @@ export async function POST(request: Request) {
       status = "expired";
     }
 
+    // Check if there's an active entry today (entry without exit after it)
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(todayStart.getTime() + 86400000);
+    const lastEntryToday = await EntryLog.findOne({
+      visitorPass: pass._id,
+      company: actor.company,
+      type: "entry",
+      timestamp: { $gte: todayStart, $lt: todayEnd },
+    }).sort({ timestamp: -1 }).lean() as Record<string, unknown> | null;
+
+    let hasActiveEntry = false;
+    if (lastEntryToday) {
+      const exitAfter = await EntryLog.findOne({
+        visitorPass: pass._id,
+        company: actor.company,
+        type: "exit",
+        timestamp: { $gt: lastEntryToday.timestamp, $lt: todayEnd },
+      }).lean() as Record<string, unknown> | null;
+      hasActiveEntry = !exitAfter;
+    }
+
+    const isProcessed = status === "completed" || status === "expired";
+
     return NextResponse.json({
       type: "visitor",
+      hasActiveEntry,
+      isProcessed,
       data: {
         id: String(pass._id),
         visitorName: pass.visitorName,

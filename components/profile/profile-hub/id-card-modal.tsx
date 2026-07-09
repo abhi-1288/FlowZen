@@ -790,7 +790,7 @@ export function IdCardModal({
                       </div>
                       <div>
                         <p className="idc-back-info-label">Visiting Office</p>
-                        <p className="idc-back-info-value">{profile?.visitAddress ? String(profile.visitAddress) : "—"}</p>
+                        <p className="idc-back-info-value">{profile?.region ? String(profile.region) : profile?.visitAddress ? String(profile.visitAddress) : "—"}</p>
                       </div>
                     </div>
                   </>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Html5Qrcode } from "html5-qrcode";
 import { apiFetch } from "@/lib/client-utils";
@@ -19,6 +19,8 @@ const SECTIONS: { key: ActiveSection; label: string }[] = [
 
 type ScanResult = {
   type: "employee" | "visitor" | "not-found";
+  hasActiveEntry?: boolean;
+  isProcessed?: boolean;
   data: AnyRecord | null;
 };
 
@@ -73,7 +75,6 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
   const { data: session } = useSession();
   const isSenior = session?.user?.role === "admin" || session?.user?.role === "human-resource" || Boolean((session?.user as any)?.isSeniorSecurity);
   const role = String(session?.user?.role ?? "");
-  const canIssuePass = role !== "employee" && (role !== "security" || isSenior);
 
   const [activeSection, setActiveSection] = useState<ActiveSection>("verify");
 
@@ -96,22 +97,14 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
   // ── Visitors ──
   const [passes, setPasses] = useState<PassRecord[]>([]);
   const [passFilter, setPassFilter] = useState("approved");
-  const [showIssuePass, setShowIssuePass] = useState(false);
-  const [issueName, setIssueName] = useState("");
-  const [issueEmail, setIssueEmail] = useState("");
-  const [issuePhone, setIssuePhone] = useState("");
-  const [issueCompany, setIssueCompany] = useState(String(company?.name ?? ""));
-  const [issueRegion, setIssueRegion] = useState("");
-  const [issuePurpose, setIssuePurpose] = useState("");
-  const [issueTimeIn, setIssueTimeIn] = useState("");
-  const [issueTimeOut, setIssueTimeOut] = useState("");
-  const [issuing, setIssuing] = useState(false);
 
   // ── Entry Logs ──
   const [entryLogs, setEntryLogs] = useState<EntryLogRecord[]>([]);
   const [logPage, setLogPage] = useState(1);
   const [logTotalPages, setLogTotalPages] = useState(1);
   const [logType, setLogType] = useState("");
+  const [logFrom, setLogFrom] = useState("");
+  const [logTo, setLogTo] = useState("");
   const [loadingLogs, setLoadingLogs] = useState(false);
 
   // ── Lost Cards ──
@@ -145,6 +138,14 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
   }
 
   // ── Scan QR ──
+  function resetScan() {
+    setScanResult(null);
+    setShowManualEntry(false);
+    setCameraUnavailable(false);
+    setScanCode("");
+    if (activeSection === "scan") handleStartCamera();
+  }
+
   async function handleScanWithCode(code: string) {
     if (!code) return;
     setScanning(true);
@@ -155,7 +156,15 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
         body: JSON.stringify({ code }),
       });
       setScanResult(res);
-      if (res.type === "not-found") showToast("No match found for this code.", "error");
+      if (res.type === "not-found") {
+        showToast("No match found for this code.", "error");
+      } else if (res.isProcessed) {
+        showToast("This pass has already been used.", "error");
+      } else if (res.hasActiveEntry) {
+        showToast("Already logged in — logging exit.");
+        await logEntryWithCode(code, "exit");
+        resetScan();
+      }
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Scan failed.", "error");
     } finally {
@@ -229,18 +238,20 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
     }
   }
 
+  async function logEntryWithCode(code: string, type: "entry" | "exit") {
+    await apiFetch("/api/hr/security/entry-logs", {
+      method: "POST",
+      body: JSON.stringify({ code, type }),
+    });
+  }
+
   async function logEntry(type: "entry" | "exit") {
     if (!scanResult?.data) return;
     setLoggingEntry(true);
     try {
-      await apiFetch("/api/hr/security/entry-logs", {
-        method: "POST",
-        body: JSON.stringify({
-          code: scanCode.trim().toUpperCase(),
-          type,
-        }),
-      });
+      await logEntryWithCode(scanCode.trim().toUpperCase(), type);
       showToast(`${type === "entry" ? "Entry" : "Exit"} logged.`);
+      resetScan();
     } catch (err) {
       showToast(err instanceof Error ? err.message : `Failed to log ${type}.`, "error");
     } finally {
@@ -258,48 +269,14 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
     }
   }
 
-  async function handleIssuePass(e: React.FormEvent) {
-    e.preventDefault();
-    if (!issueName || !issueEmail) return;
-    setIssuing(true);
-    try {
-      await apiFetch("/api/hr/visitor/passes", {
-        method: "POST",
-        body: JSON.stringify({
-          visitorName: issueName,
-          visitorEmail: issueEmail,
-          visitorPhone: issuePhone,
-          visitorCompany: issueCompany,
-          region: issueRegion,
-          purpose: issuePurpose,
-          timeIn: issueTimeIn ? new Date(issueTimeIn).toISOString() : null,
-          timeOut: issueTimeOut ? new Date(issueTimeOut).toISOString() : null,
-        }),
-      });
-      showToast("Visitor pass issued.");
-      setShowIssuePass(false);
-      setIssueName("");
-      setIssueEmail("");
-      setIssuePhone("");
-      setIssueCompany(String(company?.name ?? ""));
-      setIssueRegion("");
-      setIssuePurpose("");
-      setIssueTimeIn("");
-      setIssueTimeOut("");
-      await loadPasses();
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to issue pass.", "error");
-    } finally {
-      setIssuing(false);
-    }
-  }
-
   // ── Entry Logs ──
   async function loadEntryLogs() {
     setLoadingLogs(true);
     try {
       const params = new URLSearchParams({ page: String(logPage), limit: "10" });
       if (logType) params.set("type", logType);
+      if (logFrom) params.set("from", new Date(logFrom).toISOString());
+      if (logTo) params.set("to", new Date(logTo + "T23:59:59").toISOString());
       const res = await apiFetch<{ logs: EntryLogRecord[]; pagination: { page: number; totalPages: number } }>(
         `/api/hr/security/entry-logs?${params.toString()}`
       );
@@ -392,6 +369,30 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
 
   const filteredPasses = passes.filter((p) => passFilter === "all" || p.status === passFilter);
 
+  const passCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const p of passes) {
+      counts[p.status] = (counts[p.status] ?? 0) + 1;
+    }
+    return counts;
+  }, [passes]);
+
+  const logCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const log of entryLogs) {
+      counts[log.type] = (counts[log.type] ?? 0) + 1;
+    }
+    return counts;
+  }, [entryLogs]);
+
+  const cardCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const card of lostCards) {
+      counts[card.status] = (counts[card.status] ?? 0) + 1;
+    }
+    return counts;
+  }, [lostCards]);
+
   const statusBadge = (status: string) => {
     const colors: Record<string, string> = {
       reported: "bg-amber-100 text-amber-700",
@@ -401,6 +402,14 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
     };
     return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${colors[status] ?? "bg-slate-100 text-slate-500"}`}>{status}</span>;
   };
+
+  function sectionLabel(s: (typeof SECTIONS)[number]) {
+    let count: number | null = null;
+    if (s.key === "visitors" && passes.length) count = passes.length;
+    else if (s.key === "entry-logs" && entryLogs.length) count = entryLogs.length;
+    else if (s.key === "lost-cards" && lostCards.length) count = lostCards.length;
+    return count ? `${s.label} (${count})` : s.label;
+  }
 
   const sectionNav = (
     <div className="mb-6 flex flex-wrap gap-2">
@@ -413,7 +422,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
           onClick={() => setActiveSection(s.key)}
           type="button"
         >
-          {s.label}
+          {sectionLabel(s)}
         </button>
       ))}
     </div>
@@ -550,9 +559,11 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                             </span>
                           ) : null}
                         </div>
-                        <p className="mt-1 text-xs text-slate-400">Host: {String(scanResult.data.hostName ?? "N/A")}</p>
+                        <p className="mt-1 text-xs text-slate-400">Host: {String(scanResult.data.hostName || "N/A")}</p>
                       </div>
-                      {String(scanResult.data.status) === "approved" ? (
+                      {scanResult.isProcessed ? (
+                        <p className="mt-3 text-xs text-amber-600">This pass has already been used.</p>
+                      ) : String(scanResult.data.status) === "approved" || String(scanResult.data.status) === "active" ? (
                         <div className="mt-4 flex gap-2">
                           <ActionButton variant="approve" className="px-4" disabled={loggingEntry} onClick={() => logEntry("entry")}>
                             Log Entry
@@ -567,7 +578,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                     </div>
                   )}
                   <div className="mt-4">
-                    <ActionButton variant="secondary" onClick={() => { setScanResult(null); setShowManualEntry(false); setCameraUnavailable(false); }}>
+                    <ActionButton variant="secondary" onClick={resetScan}>
                       Scan Another
                     </ActionButton>
                   </div>
@@ -575,7 +586,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
               ) : (
                 <div>
                   <p className="mb-3 text-sm text-slate-500">No match found for this code.</p>
-                  <ActionButton variant="secondary" onClick={() => { setScanResult(null); setShowManualEntry(false); setCameraUnavailable(false); }}>
+                  <ActionButton variant="secondary" onClick={resetScan}>
                     Try Again
                   </ActionButton>
                 </div>
@@ -645,28 +656,21 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
       {/* ═══════════════ VISITOR MANAGEMENT ═══════════════ */}
       {activeSection === "visitors" ? (
         <div>
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-800">Today&apos;s Visitors</h3>
-            {canIssuePass ? (
-              <ActionButton variant="primary" onClick={() => setShowIssuePass(true)}>
-                + Issue Pass
-              </ActionButton>
-            ) : null}
-          </div>
+          <h3 className="mb-4 text-sm font-semibold text-slate-800">Today&apos;s Visitors</h3>
 
           <div className="mb-4 flex gap-2">
-            {["approved", "pending", "expired", "rejected", "all"].map((f) => (
-              <button
-                key={f}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  passFilter === f ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-                onClick={() => setPassFilter(f)}
-                type="button"
-              >
-                {f.charAt(0).toUpperCase() + f.slice(1)}
-              </button>
-            ))}
+              {["approved", "pending", "expired", "rejected", "all"].map((f) => (
+                <button
+                  key={f}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    passFilter === f ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                  onClick={() => setPassFilter(f)}
+                  type="button"
+                >
+                  {f.charAt(0).toUpperCase() + f.slice(1)}{f !== "all" && passCounts[f] ? ` (${passCounts[f]})` : ""}
+                </button>
+              ))}
           </div>
 
           {filteredPasses.length === 0 ? (
@@ -705,90 +709,6 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
             </div>
           )}
 
-          {/* Issue Pass Modal */}
-          {showIssuePass ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3">
-              <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg">
-                <h3 className="mb-4 text-sm font-semibold text-slate-800">Issue Visitor Pass</h3>
-                <form onSubmit={handleIssuePass} className="space-y-3">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-600">Visitor Name *</label>
-                    <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                      value={issueName} onChange={(e) => setIssueName(e.target.value)} required
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-600">Email *</label>
-                    <input type="email" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                      value={issueEmail} onChange={(e) => setIssueEmail(e.target.value)} required
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-600">Phone</label>
-                    <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                      value={issuePhone} onChange={(e) => setIssuePhone(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-600">Company</label>
-                    <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                      {issueCompany || "—"}
-                    </p>
-                  </div>
-                  {(() => {
-                    const multiOffice = company?.multiOffice ? Boolean(company.multiOffice) : false;
-                    const regionOpts = multiOffice && Array.isArray(company?.addresses)
-                      ? (company.addresses as AnyRecord[]).map((a: AnyRecord) => String(a.label ?? "")).filter(Boolean)
-                      : company?.address
-                        ? ["Main Office"]
-                        : [];
-                    return regionOpts.length > 0 ? (
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">Region</label>
-                        <select className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                          value={issueRegion} onChange={(e) => setIssueRegion(e.target.value)}
-                        >
-                          <option value="">Select region...</option>
-                          {regionOpts.map((r) => (
-                            <option key={r} value={r}>{r}</option>
-                          ))}
-                        </select>
-                      </div>
-                    ) : null;
-                  })()}
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-600">Purpose</label>
-                    <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                      value={issuePurpose} onChange={(e) => setIssuePurpose(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-600">Time In (±30 min)</label>
-                    <input type="datetime-local"
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                      value={issueTimeIn}
-                      onChange={(e) => setIssueTimeIn(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-600">Time Out (±30 min)</label>
-                    <input type="datetime-local"
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                      value={issueTimeOut}
-                      onChange={(e) => setIssueTimeOut(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2 pt-2">
-                    <ActionButton variant="secondary" type="button" onClick={() => setShowIssuePass(false)}>Cancel</ActionButton>
-                    <ActionButton variant="primary" type="submit" disabled={issuing}>
-                      {issuing ? "Issuing..." : "Issue Pass"}
-                    </ActionButton>
-                  </div>
-                </form>
-              </div>
-            </div>
-          ) : null}
-
         </div>
       ) : null}
 
@@ -807,10 +727,18 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                   onClick={() => { setLogType(t); setLogPage(1); }}
                   type="button"
                 >
-                  {t ? `${t.charAt(0).toUpperCase() + t.slice(1)}s` : "All"}
+                  {t ? `${t.charAt(0).toUpperCase() + t.slice(1)}s` : "All"}{t && logCounts[t] ? ` (${logCounts[t]})` : ""}
                 </button>
               ))}
             </div>
+            <input type="date" value={logFrom} onChange={(e) => { setLogFrom(e.target.value); setLogPage(1); }}
+              className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              title="From date"
+            />
+            <input type="date" value={logTo} onChange={(e) => { setLogTo(e.target.value); setLogPage(1); }}
+              className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              title="To date"
+            />
             <ActionButton variant="secondary" className="px-3 py-1.5 text-xs" disabled={loadingLogs} onClick={loadEntryLogs}>
               {loadingLogs ? "Loading..." : "Refresh"}
             </ActionButton>
@@ -886,18 +814,18 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
           </div>
 
           <div className="mb-4 flex gap-2">
-            {["", "reported", "replacement-requested", "replaced", "found"].map((f) => (
-              <button
-                key={f}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  lostCardFilter === f ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-                onClick={() => setLostCardFilter(f)}
-                type="button"
-              >
-                {f ? f.replace("-", " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "All"}
-              </button>
-            ))}
+              {["", "reported", "replacement-requested", "replaced", "found"].map((f) => (
+                <button
+                  key={f}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    lostCardFilter === f ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                  onClick={() => setLostCardFilter(f)}
+                  type="button"
+                >
+                  {f ? f.replace("-", " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "All"}{(f === "reported" || f === "found") && cardCounts[f] ? ` (${cardCounts[f]})` : ""}
+                </button>
+              ))}
           </div>
 
           {lostCards.length === 0 ? (

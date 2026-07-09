@@ -54,6 +54,8 @@ type ProfileHubCache = {
   checkOutRequestCount: number;
   jobsCount: number;
   recruitmentCount: number;
+  visitorPendingCount: number;
+  lostCardReportedCount: number;
   messagesCount: number;
   fetchedAt: number;
 };
@@ -145,6 +147,8 @@ export function ProfileHub() {
   const [checkOutRequestCount, setCheckOutRequestCount] = useState(0);
   const [jobsCount, setJobsCount] = useState(0);
   const [recruitmentCount, setRecruitmentCount] = useState(0);
+  const [visitorPendingCount, setVisitorPendingCount] = useState(0);
+  const [lostCardReportedCount, setLostCardReportedCount] = useState(0);
   const [messagesCount, setMessagesCount] = useState(0);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
@@ -165,6 +169,8 @@ export function ProfileHub() {
     setCheckOutRequestCount(profileHubCache.checkOutRequestCount);
     setJobsCount(profileHubCache.jobsCount);
     setRecruitmentCount(profileHubCache.recruitmentCount);
+    setVisitorPendingCount(profileHubCache.visitorPendingCount);
+    setLostCardReportedCount(profileHubCache.lostCardReportedCount);
     setMessagesCount(profileHubCache.messagesCount ?? 0);
     setLoading(false);
   }, []);
@@ -337,6 +343,24 @@ export function ProfileHub() {
         }
       }
 
+      let nextVisitorPendingCount = visitorPendingCount;
+      if (canCreatePass && actualHasCompany) {
+        const passesRes = await apiFetch<{ passes: AnyRecord[] }>("/api/hr/visitor/passes").catch(() => null);
+        if (passesRes) {
+          nextVisitorPendingCount = passesRes.passes.filter((p: any) => String(p.status) === "pending").length;
+          setVisitorPendingCount(nextVisitorPendingCount);
+        }
+      }
+
+      let nextLostCardReportedCount = lostCardReportedCount;
+      if (canViewSecurityTab && actualHasCompany) {
+        const lostRes = await apiFetch<{ reports: AnyRecord[] }>("/api/hr/security/lost-cards").catch(() => null);
+        if (lostRes) {
+          nextLostCardReportedCount = lostRes.reports.filter((r: any) => String(r.status) === "reported").length;
+          setLostCardReportedCount(nextLostCardReportedCount);
+        }
+      }
+
       let nextMessagesCount = messagesCount;
       if (actualHasCompany) {
         const msgRes = await apiFetch<{ unreadCount: number }>("/api/messages/unread-count").catch(() => null);
@@ -358,6 +382,8 @@ export function ProfileHub() {
         checkOutRequestCount: nextCheckOutRequestCount,
         jobsCount: nextJobsCount,
         recruitmentCount: nextRecruitmentCount,
+        visitorPendingCount: nextVisitorPendingCount,
+        lostCardReportedCount: nextLostCardReportedCount,
         messagesCount: nextMessagesCount,
         fetchedAt: Date.now(),
       };
@@ -700,7 +726,7 @@ export function ProfileHub() {
             <NavButton
               active={tab === "visitors"}
               icon={<User size={16} />}
-              label="Visitors"
+              label={`Visitors${visitorPendingCount ? ` (${visitorPendingCount})` : ""}`}
               onClick={() => setTab("visitors")}
             />
           ) : null}
@@ -708,7 +734,7 @@ export function ProfileHub() {
             <NavButton
               active={tab === "security"}
               icon={<ShieldCheck size={16} />}
-              label="Security"
+              label={`Security${lostCardReportedCount ? ` (${lostCardReportedCount})` : ""}`}
               onClick={() => setTab("security")}
             />
           ) : null}
@@ -858,7 +884,11 @@ export function ProfileHub() {
                   ? `Attendance (${pendingAttendanceCount})`
                   : item === "members" && checkOutRequestCount > 0
                     ? `Members (${checkOutRequestCount})`
-                    : item === "finance" && financeCount > 0
+                    : item === "visitors" && visitorPendingCount > 0
+                      ? `Visitors (${visitorPendingCount})`
+                      : item === "security" && lostCardReportedCount > 0
+                        ? `Security (${lostCardReportedCount})`
+                        : item === "finance" && financeCount > 0
                       ? `Finance (${financeCount})`
                       : item === "approvals" && approvals.length > 0
                         ? `Approvals (${approvals.length})`
