@@ -4,6 +4,7 @@ import { connectDb } from "@/lib/db";
 import { databaseUnavailable, jsonError } from "@/lib/api";
 import { createMagicLinkToken } from "@/lib/codes";
 import { sendMail } from "@/lib/mailer";
+import { passwordResetEmailContent } from "@/lib/email-templates";
 import { User } from "@/models/User";
 
 export async function POST(request: Request) {
@@ -37,11 +38,12 @@ export async function POST(request: Request) {
   const magicLink = `${origin}/reset-password?token=${encodeURIComponent(token)}`;
 
   try {
+    const emailContent = passwordResetEmailContent(magicLink);
     await sendMail({
       to: email,
-      subject: "Your FlowZen password reset link",
-      text: `Use this secure link to sign in and update your password: ${magicLink}\n\nThis link expires in 15 minutes. If you did not request it, you can ignore this email.`,
-      html: `<p>Use this secure link to sign in and update your password:</p><p><a href="${magicLink}">Sign in to update password</a></p><p>This link expires in 15 minutes. If you did not request it, you can ignore this email.</p>`
+      subject: emailContent.subject,
+      text: emailContent.text,
+      html: emailContent.html,
     });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Unable to send password reset email.", 500);

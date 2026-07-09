@@ -14,6 +14,7 @@ import { companyCodePrefix } from "@/lib/company-identity";
 import { emitToUser } from "@/lib/socket-emit";
 import { createMagicLinkToken } from "@/lib/codes";
 import { sendMail } from "@/lib/mailer";
+import { applicationReceivedContent } from "@/lib/email-templates";
 import { autoCloseOverdueJobs } from "@/lib/recruitment-utils";
 import { parseResume } from "@/lib/resume-parser";
 
@@ -178,11 +179,12 @@ export async function POST(
   const portalLink = `${origin}/candidate-portal?token=${encodeURIComponent(token)}`;
 
   try {
+    const emailContent = applicationReceivedContent(firstName, job.title, portalLink);
     await sendMail({
       to: email,
-      subject: `Application received for ${job.title}`,
-      text: `Hi ${firstName},\n\nThank you for applying to ${job.title}.\n\nTrack your application status here: ${portalLink}\n\nBest regards,\nThe Recruitment Team`,
-      html: `<p>Hi <strong>${firstName}</strong>,</p><p>Thank you for applying to <strong>${job.title}</strong>.</p><p><a href="${portalLink}" style="display:inline-block;padding:12px 24px;background:#4f46e5;color:#fff;border-radius:8px;text-decoration:none;font-weight:600">Track Your Application</a></p><p>Or copy this link: <a href="${portalLink}">${portalLink}</a></p><p>Best regards,<br/>The Recruitment Team</p>`,
+      subject: emailContent.subject,
+      text: emailContent.text,
+      html: emailContent.html,
     });
   } catch {
     // email is best-effort

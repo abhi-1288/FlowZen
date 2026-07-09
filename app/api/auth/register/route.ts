@@ -4,6 +4,7 @@ import { connectDb } from "@/lib/db";
 import { User } from "@/models/User";
 import { databaseUnavailable, jsonError } from "@/lib/api";
 import { sendMail } from "@/lib/mailer";
+import { otpEmailContent } from "@/lib/email-templates";
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -76,23 +77,12 @@ export async function POST(request: Request) {
       });
 
   try {
+    const emailContent = otpEmailContent(otp, "registration", name);
     await sendMail({
       to: email,
-      subject: "Your FlowZen OTP",
-      text: ` FlowZen Verification
-      
-      Hello,
-
-    Use the verification code below to continue signing in to FlowZen:
-
-    ${otp}
-
-    This code will expire in 10 minutes.
-
-    If you didn’t request this code, you can safely ignore this email.
-
-    — Team FlowZen`,
-      html: `<div style="background:linear-gradient(135deg,#10b981,#059669); padding:32px; text-align:center;"> <h1 style="margin:0; color:white; font-size:28px;">🌿 FlowZen</h1> <p style="margin-top:8px; color:#d1fae5; font-size:14px;"> Secure Verification Code </p> </div> <div style="padding:36px 32px;"> <p style="font-size:16px; margin-bottom:18px;"> Hello, </p> <p style="font-size:15px; line-height:1.7; color:#4b5563;"> Use the verification code below to continue your FlowZen login. </p> <div style=" margin:32px 0; text-align:center; background:#ecfdf5; border:2px dashed #10b981; border-radius:14px; padding:22px; "> <div style=" font-size:36px; font-weight:700; letter-spacing:8px; color:#059669; "> ${otp} </div> </div> <p style="font-size:14px; color:#6b7280; line-height:1.6;"> ⏳ This code expires in <strong>10 minutes</strong>. </p> <p style="font-size:14px; color:#6b7280; line-height:1.6;"> If you didn’t request this verification code, you can safely ignore this email. </p> </div> <div style=" background:#f9fafb; padding:18px; text-align:center; font-size:12px; color:#9ca3af; border-top:1px solid #e5e7eb; "> © 2026 FlowZen • Secure Authentication System </div>`,
+      subject: emailContent.subject,
+      text: emailContent.text,
+      html: emailContent.html,
     });
   } catch (error) {
     return jsonError(

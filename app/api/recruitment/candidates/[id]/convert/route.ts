@@ -14,6 +14,7 @@ import { Company } from "@/models/Company";
 import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
 import { sendMail } from "@/lib/mailer";
+import { employeeAccountContent } from "@/lib/email-templates";
 
 type Params = { params: Promise<{ id: string }> };
 const HR_ROLES = ["admin", "human-resource"];
@@ -70,38 +71,18 @@ export async function POST(request: Request, { params }: Params) {
   const loginUrl = `${process.env.NODE_ENV === "development" ? request.headers.get("origin") || (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000") : process.env.NEXT_PUBLIC_APP_URL}/login`;
 
   try {
+    const emailContent = employeeAccountContent({
+      firstName: candidate.firstName,
+      companyName,
+      email: candidate.email,
+      password,
+      loginUrl,
+    });
     await sendMail({
       to: candidate.email,
-      subject: `Your Employee Account at ${companyName}`,
-      text: `Dear ${candidate.firstName},\n\nWe are pleased to inform you that your employee account at ${companyName} has been created successfully.\n\nPlease find your login credentials below:\n\n  Email:    ${candidate.email}\n  Password: ${password}\n\nSign in here: ${loginUrl}\n\nFor security reasons, we recommend changing your password after your first login.\n\nBest regards,\nHR Team\n${companyName}`,
-      html: `
-        <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 520px; margin: 0 auto; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
-          <div style="background: #1e293b; padding: 28px 32px; text-align: center;">
-            <h1 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: 600;">Welcome to ${companyName}</h1>
-          </div>
-          <div style="padding: 32px;">
-            <p style="color: #374151; font-size: 15px; line-height: 1.6; margin: 0 0 20px;">Dear ${candidate.firstName},</p>
-            <p style="color: #374151; font-size: 15px; line-height: 1.6; margin: 0 0 20px;">We are pleased to inform you that your employee account at <strong>${companyName}</strong> has been created successfully. You can now access the platform using the credentials provided below.</p>
-            <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 0 0 24px;">
-              <table style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td style="padding: 6px 12px 6px 0; color: #6b7280; font-size: 14px; white-space: nowrap; vertical-align: top;">Email Address</td>
-                  <td style="padding: 6px 0; color: #111827; font-size: 14px; font-weight: 600;">${candidate.email}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 6px 12px 6px 0; color: #6b7280; font-size: 14px; white-space: nowrap; vertical-align: top;">Password</td>
-                  <td style="padding: 6px 0; color: #111827; font-size: 14px; font-weight: 600; font-family: 'Courier New', monospace;">${password}</td>
-                </tr>
-              </table>
-            </div>
-            <a href="${loginUrl}" style="display: block; text-align: center; background: #1e293b; color: #ffffff; padding: 14px 0; border-radius: 8px; text-decoration: none; font-size: 15px; font-weight: 600; margin: 0 0 24px;">Sign In to Your Account</a>
-            <p style="color: #6b7280; font-size: 13px; line-height: 1.5; margin: 0 0 4px; font-style: italic;">For security reasons, we recommend changing your password after your first login.</p>
-          </div>
-          <div style="background: #f9fafb; border-top: 1px solid #e5e7eb; padding: 16px 32px; text-align: center;">
-            <p style="color: #9ca3af; font-size: 12px; margin: 0;">&copy; ${new Date().getFullYear()} ${companyName}. All rights reserved.</p>
-          </div>
-        </div>
-      `,
+      subject: emailContent.subject,
+      text: emailContent.text,
+      html: emailContent.html,
     });
   } catch (emailError) {
     console.error("Welcome email failed:", emailError);
