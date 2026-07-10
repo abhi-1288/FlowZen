@@ -172,6 +172,8 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
   const [printExpiryDate, setPrintExpiryDate] = useState("");
   const [rejectPopup, setRejectPopup] = useState<{ id: string; show: boolean }>({ id: "", show: false });
   const [rejectReason, setRejectReason] = useState("");
+  const [verifyPopup, setVerifyPopup] = useState<{ id: string; show: boolean }>({ id: "", show: false });
+  const [highlightedCard, setHighlightedCard] = useState<string | null>(null);
 
   // ── Emergency Contacts ──
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
@@ -366,6 +368,8 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
         body: JSON.stringify({ status, ...extra }),
       });
       showToast(`Status updated to "${status}".`);
+      setHighlightedCard(id);
+      setTimeout(() => setHighlightedCard(null), 1500);
       await loadLostCards();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Update failed.", "error");
@@ -523,6 +527,66 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
     };
     return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${colors[status] ?? "bg-slate-100 text-slate-500"}`}>{status.replace("-", " ")}</span>;
   };
+
+  const REPLACEMENT_STEPS = [
+    { status: "reported", label: "Reported" },
+    { status: "under-verification", label: "Verified" },
+    { status: "replacement-approved", label: "Approved" },
+    { status: "card-disabled", label: "Access Off" },
+    { status: "hr-approved", label: "HR OK" },
+    { status: "printing", label: "Printing" },
+    { status: "ready-for-pickup", label: "Ready" },
+    { status: "completed", label: "Done" },
+  ];
+
+  function nextActionHint(card: AnyRecord): string {
+    const status = String(card.status ?? "");
+    const terminal = ["rejected", "found", "found-after-replacement", "completed"];
+    if (terminal.includes(status)) return "Workflow complete.";
+
+    if (status === "reported" && !card.seniorTicketOpened) {
+      if (role === "security" && !isSenior) return "Ask a senior security member or HR to open a ticket for this report.";
+      return "Open a ticket to assign a junior security investigator, then verify the report.";
+    }
+    if (card.seniorTicketOpened && !card.assignedJuniorSecurity) {
+      if (role === "security" && !isSenior) return "Accept this ticket to begin your investigation.";
+      return "Waiting for a junior security member to accept the ticket.";
+    }
+    if (card.assignedJuniorSecurity && !card.juniorCompletedAt) {
+      if (role === "security" && !isSenior) return "Complete your investigation with a follow-up note above.";
+      return "Junior security is investigating. You can verify the report when ready.";
+    }
+
+    const hintsByRole: Record<string, Record<string, string>> = {
+      reported: {
+        "security": "Verify the report to proceed with replacement.",
+        default: "Verify the report to proceed with replacement. Or mark as Found if card recovered.",
+      },
+      "under-verification": {
+        default: "Approve the replacement card issuance. Or reject if not valid.",
+      },
+      "replacement-approved": {
+        "security": "Disable building access zones for the old card.",
+        default: "Disable building access zones for the old card.",
+      },
+      "card-disabled": {
+        "human-resource": "Approve the replacement before printing.",
+        default: "HR approval required before printing new card.",
+      },
+      "hr-approved": {
+        default: "Print the new card with RFID details.",
+      },
+      printing: {
+        default: "Mark as ready for pickup once card is at the security desk.",
+      },
+      "ready-for-pickup": {
+        default: "Mark as collected after employee picks up the card.",
+      },
+    };
+    const roleHints = hintsByRole[status];
+    if (!roleHints) return "";
+    return roleHints[role] ?? roleHints.default ?? "";
+  }
 
   function sectionLabel(s: (typeof SECTIONS)[number]) {
     let count: number | null = null;
@@ -984,7 +1048,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                 };
 
                 return (
-                  <div key={card.id} className={`rounded-xl border p-4 ${card.isEmergency ? "border-red-300 bg-red-50/50" : "border-slate-200 bg-slate-50/50"}`}>
+                  <div key={card.id} className={`rounded-xl border p-4 transition-all duration-300 ${highlightedCard === card.id ? "ring-2 ring-emerald-400 bg-emerald-50/50" : card.isEmergency ? "border-red-300 bg-red-50/50" : "border-slate-200 bg-slate-50/50"}`}>
                     {/* Emergency badge */}
                     {card.isEmergency ? (
                       <div className="mb-2 flex items-center gap-1.5">
@@ -1039,14 +1103,17 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
 
                         {/* Ticket / assignment info */}
                         {card.assignedSeniorSecurity ? (
-                          <p className="mt-1 text-[10px] text-slate-400">
-                            Senior Security: {String((card.assignedSeniorSecurity as any).name ?? "")}
-                            {card.assignedHR ? ` | HR: ${String((card.assignedHR as any).name ?? "")}` : ""}
-                            {card.seniorTicketOpened ? " | Ticket: Opened" : " | Ticket: Pending"}
-                            {card.assignedJuniorSecurity ? (
-                              <> | Assigned to: {String((card.assignedJuniorSecurity as any).name ?? "")}{card.juniorCompletedAt ? " ✓ Completed" : " (in progress)"}</>
-                            ) : null}
-                          </p>
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400">
+                            <span>Senior Security: {String((card.assignedSeniorSecurity as any).name ?? "")}</span>
+                            {card.assignedHR ? <span>· HR: {String((card.assignedHR as any).name ?? "")}</span> : null}
+                            {card.seniorTicketOpened ? (
+                              <span className={`inline-block rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase ${card.juniorCompletedAt ? "bg-emerald-100 text-emerald-700" : card.assignedJuniorSecurity ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
+                                Ticket: {card.juniorCompletedAt ? "Completed" : card.assignedJuniorSecurity ? "In Progress" : "Awaiting Junior"}
+                              </span>
+                            ) : (
+                              <span className="inline-block rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-slate-500">Ticket: Pending</span>
+                            )}
+                          </div>
                         ) : null}
 
                         {/* Follow-up notes */}
@@ -1087,6 +1154,32 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                             ) : null}
                           </div>
                         ) : null}
+
+                        {/* Progress Stepper */}
+                        <div className="mt-3">
+                          <div className="flex items-center gap-1">
+                            {REPLACEMENT_STEPS.map((step, i) => {
+                              const isTerminal = ["rejected", "found", "found-after-replacement"].includes(card.status);
+                              const currentIdx = isTerminal ? -1 : REPLACEMENT_STEPS.findIndex((s) => s.status === card.status);
+                              const isDone = currentIdx >= 0 && i < currentIdx;
+                              const isCurrent = currentIdx >= 0 && card.status === step.status;
+                              return (
+                                <div key={step.status} className="flex items-center">
+                                  <div
+                                    className={`h-2 w-2 rounded-full ${isDone ? "bg-emerald-500" : isCurrent ? "bg-indigo-500 ring-2 ring-indigo-200" : "bg-slate-200"}`}
+                                    title={step.label}
+                                  />
+                                  {i < REPLACEMENT_STEPS.length - 1 ? (
+                                    <div className={`h-0.5 w-3 ${isDone ? "bg-emerald-300" : "bg-slate-200"}`} />
+                                  ) : null}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <p className="mt-1.5 text-[10px] italic text-slate-400">
+                            {nextActionHint(card)}
+                          </p>
+                        </div>
                       </div>
 
                       {/* Action buttons */}
@@ -1114,7 +1207,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
 
                         {/* reported → under-verification */}
                         {card.status === "reported" && canAction("under-verification") ? (
-                          <ActionButton variant="secondary" className="px-3 py-1 text-xs" disabled={updatingCard === card.id} onClick={() => updateCardStatus(card.id, "under-verification", { notes: "Verified by security" })}>
+                          <ActionButton variant="secondary" className="px-3 py-1 text-xs" disabled={updatingCard === card.id} onClick={() => setVerifyPopup({ id: card.id, show: true })}>
                             {updatingCard === card.id ? "..." : "Verify"}
                           </ActionButton>
                         ) : null}
@@ -1293,6 +1386,27 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                     setPrintCardPopup({ id: "", show: false });
                   }}>
                     {updatingCard === printCardPopup.id ? "..." : "Confirm Print"}
+                  </ActionButton>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Verify Popup */}
+          {verifyPopup.show ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3">
+              <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+                <h3 className="mb-3 text-sm font-semibold text-slate-800">Verify Lost Card Report</h3>
+                <p className="text-xs text-slate-500">
+                  This marks the report as <span className="font-medium text-slate-700">Under Verification</span> and notifies HR that the investigation is in progress.
+                </p>
+                <div className="mt-4 flex justify-end gap-2">
+                  <ActionButton variant="secondary" onClick={() => setVerifyPopup({ id: "", show: false })}>Cancel</ActionButton>
+                  <ActionButton variant="primary" disabled={updatingCard === verifyPopup.id} onClick={() => {
+                    updateCardStatus(verifyPopup.id, "under-verification", { notes: "Verified by security" });
+                    setVerifyPopup({ id: "", show: false });
+                  }}>
+                    {updatingCard === verifyPopup.id ? "..." : "Confirm Verify"}
                   </ActionButton>
                 </div>
               </div>

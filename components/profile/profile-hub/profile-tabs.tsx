@@ -83,6 +83,10 @@ export function ProfileTab({
   const [lcPoliceComplaint, setLcPoliceComplaint] = useState("");
   const [lcIsEmergency, setLcIsEmergency] = useState(false);
   const [lcNotes, setLcNotes] = useState("");
+  const [lcSeniorSecurityId, setLcSeniorSecurityId] = useState("");
+  const [lcHrId, setLcHrId] = useState("");
+  const [lcSeniorSecurityList, setLcSeniorSecurityList] = useState<{ _id: string; name: string; email: string }[]>([]);
+  const [lcHrList, setLcHrList] = useState<{ _id: string; name: string; email: string }[]>([]);
   const [lcSubmitting, setLcSubmitting] = useState(false);
 
   const company = typeof profile?.company === "object" && profile.company ? (profile.company as AnyRecord) : null;
@@ -111,6 +115,16 @@ export function ProfileTab({
   const wfh = useWfh(company, refresh, showToast);
   const policy = usePolicySettings(company, refresh, showToast);
   const setup = useSetupWizard(profile, showToast, refresh);
+
+  useEffect(() => {
+    if (!showLostCardModal) return;
+    apiFetch<{ users: { _id: string; name: string; email: string }[] }>("/api/users?role=security&isSeniorSecurity=true")
+      .then((res) => setLcSeniorSecurityList(res.users ?? []))
+      .catch(() => {});
+    apiFetch<{ users: { _id: string; name: string; email: string }[] }>("/api/users?role=human-resource")
+      .then((res) => setLcHrList(res.users ?? []))
+      .catch(() => {});
+  }, [showLostCardModal]);
 
   async function updatePassword(event: FormEvent) {
     event.preventDefault();
@@ -145,6 +159,8 @@ export function ProfileTab({
           policeComplaintNumber: lcPoliceComplaint,
           isEmergency: lcIsEmergency,
           notes: lcNotes,
+          assignedSeniorSecurityId: lcSeniorSecurityId || undefined,
+          assignedHRId: lcHrId || undefined,
         }),
       });
       showToast("Lost card report submitted.");
@@ -155,6 +171,8 @@ export function ProfileTab({
       setLcPoliceComplaint("");
       setLcIsEmergency(false);
       setLcNotes("");
+      setLcSeniorSecurityId("");
+      setLcHrId("");
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Failed to submit report.", "error");
     } finally {
@@ -537,6 +555,44 @@ export function ProfileTab({
                 <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                   value={lcPoliceComplaint} onChange={(e) => setLcPoliceComplaint(e.target.value)} placeholder="e.g. FIR-2026-0042"
                 />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Assign to Senior Security</label>
+                <select className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  value={lcSeniorSecurityId} onChange={(e) => setLcSeniorSecurityId(e.target.value)}
+                >
+                  <option value="">Auto-assign</option>
+                  {lcSeniorSecurityList.map((u) => (
+                    <option key={u._id} value={u._id}>{u.name} ({u.email})</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-slate-400">
+                  {lcSeniorSecurityList.length === 0
+                    ? "No senior security members found. Will be auto-assigned."
+                    : lcSeniorSecurityList.length > 1
+                      ? "Select a specific senior security member or leave as auto-assign."
+                      : ""}
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Assign to HR</label>
+                <select className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  value={lcHrId} onChange={(e) => setLcHrId(e.target.value)}
+                >
+                  <option value="">Auto-assign</option>
+                  {lcHrList.map((u) => (
+                    <option key={u._id} value={u._id}>{u.name} ({u.email})</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-slate-400">
+                  {lcHrList.length === 0
+                    ? "No HR members found. Will be auto-assigned."
+                    : lcHrList.length > 1
+                      ? "Select a specific HR member or leave as auto-assign."
+                      : ""}
+                </p>
               </div>
 
               <div>

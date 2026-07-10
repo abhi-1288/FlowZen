@@ -184,16 +184,43 @@ export async function POST(request: Request) {
     reportedByEmployee = true;
   }
 
-  // Auto-assign senior security and HR
-  const seniorSecurity = await User.findOne({
-    company: actor.company,
-    role: "security",
-    isSeniorSecurity: true,
-  }).select("_id name");
-  const hrMember = await User.findOne({
-    company: actor.company,
-    role: "human-resource",
-  }).select("_id name");
+  // Auto-assign senior security and HR (allow manual override)
+  let seniorSecurityId: string | null = null;
+  let hrId: string | null = null;
+
+  if (body.assignedSeniorSecurityId) {
+    const overrideSS = await User.findOne({
+      _id: body.assignedSeniorSecurityId,
+      company: actor.company,
+      role: "security",
+      isSeniorSecurity: true,
+    }).select("_id");
+    if (overrideSS) seniorSecurityId = String(overrideSS._id);
+  }
+  if (!seniorSecurityId) {
+    const seniorSecurity = await User.findOne({
+      company: actor.company,
+      role: "security",
+      isSeniorSecurity: true,
+    }).select("_id");
+    seniorSecurityId = seniorSecurity ? String(seniorSecurity._id) : null;
+  }
+
+  if (body.assignedHRId) {
+    const overrideHr = await User.findOne({
+      _id: body.assignedHRId,
+      company: actor.company,
+      role: "human-resource",
+    }).select("_id");
+    if (overrideHr) hrId = String(overrideHr._id);
+  }
+  if (!hrId) {
+    const hrMember = await User.findOne({
+      company: actor.company,
+      role: "human-resource",
+    }).select("_id");
+    hrId = hrMember ? String(hrMember._id) : null;
+  }
 
   const report = await LostCardReport.create({
     user: targetUserId,
@@ -207,8 +234,8 @@ export async function POST(request: Request) {
     policeComplaintNumber: String(body.policeComplaintNumber ?? "").trim(),
     isEmergency: Boolean(body.isEmergency),
     notes: String(body.notes ?? "").trim(),
-    assignedSeniorSecurity: seniorSecurity?._id ?? null,
-    assignedHR: hrMember?._id ?? null,
+    assignedSeniorSecurity: seniorSecurityId,
+    assignedHR: hrId,
     timeline: [{
       action: "reported",
       actor: userId,
