@@ -194,7 +194,7 @@ export default function ApplyDocsPage() {
             </table>
 
             <h4 style={{ fontSize: "0.875rem", fontWeight: 600, marginTop: 16 }}>Example (cURL)</h4>
-            <div className="docs-code">{"curl -X POST http://localhost:3000/api/public/jobs/JOB_ID/apply \\\n  -F \"firstName=John\" \\\n  -F \"lastName=Doe\" \\\n  -F \"email=john@example.com\" \\\n  -F \"phone=+1234567890\" \\\n  -F \"resume=@resume.pdf\" \\\n  -F \"referralId=ACME-001\""}</div>
+            <div className="docs-code">{"curl -X POST https://flowzen-azure.vercel.app/api/public/jobs/JOB_ID/apply \\\n  -F \"firstName=John\" \\\n  -F \"lastName=Doe\" \\\n  -F \"email=john@example.com\" \\\n  -F \"phone=+1234567890\" \\\n  -F \"resume=@resume.pdf\" \\\n  -F \"referralId=ACME-001\""}</div>
           </div>
         </section>
       </main>

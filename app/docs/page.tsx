@@ -63,9 +63,9 @@ export default function DocsPage() {
 
         <section className="docs-section">
           <h2>Base URL</h2>
-          <div className="docs-code">http://localhost:3000/api</div>
+          <div className="docs-code">https://flowzen-azure.vercel.app/api</div>
           <h2>For using the api, use</h2>
-          <div className="docs-code">http://localhost:3000</div>
+          <div className="docs-code">https://flowzen-azure.vercel.app</div>
         </section>
 
         <section className="docs-section">

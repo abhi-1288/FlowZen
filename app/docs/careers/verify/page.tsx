@@ -137,7 +137,7 @@ export default function VerifyDocsPage() {
             </table>
 
             <h4 style={{ fontSize: "0.875rem", fontWeight: 600, marginTop: 16 }}>Example</h4>
-            <div className="docs-code">{"GET http://localhost:3000/api/public/verify/ACME-001"}</div>
+            <div className="docs-code">{"GET https://flowzen-azure.vercel.app/api/public/verify/ACME-001"}</div>
           </div>
         </section>
 
@@ -200,7 +200,7 @@ export default function VerifyDocsPage() {
             </table>
 
             <h4 style={{ fontSize: "0.875rem", fontWeight: 600, marginTop: 16 }}>Example</h4>
-            <div className="docs-code">{"GET http://localhost:3000/api/public/verify-visitor/VIS789"}</div>
+            <div className="docs-code">{"GET https://flowzen-azure.vercel.app/api/public/verify-visitor/VIS789"}</div>
           </div>
         </section>
       </main>

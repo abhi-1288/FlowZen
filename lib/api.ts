@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { headers } from "next/headers";
 import { Types } from "mongoose";
 import { authOptions } from "@/lib/auth";
+import { verifyMobileToken } from "@/lib/mobile-auth";
 
 export function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -27,6 +29,13 @@ export function isObjectId(id: string | undefined) {
 }
 
 export async function requireUserId() {
+  const headerStore = await headers();
+  const auth = headerStore.get("authorization");
+  if (auth?.startsWith("Bearer ")) {
+    const payload = verifyMobileToken(auth.slice(7));
+    if (payload?.sub) return payload.sub;
+  }
+
   const session = await getServerSession(authOptions);
   return session?.user?.id ?? null;
 }
