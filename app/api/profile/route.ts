@@ -214,17 +214,23 @@ export async function GET() {
 
   if (["human-resource", "finance", "admin", "security"].includes(safeRole) && user.company && user.companyStatus === "approved") {
     const companyId = typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
-    const [members, teams, companyPolicy] = await Promise.all([
+    const [members, teams, companyPolicy, companyDoc] = await Promise.all([
       User.find({ company: companyId, companyStatus: "approved" })
-        .select("name email role customRole isSeniorSecurity team teamStatus activeTeams membershipHistory companyJoined createdAt baseSalary companyIdentityCode pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted")
+        .select("name email role customRole isSeniorSecurity team teamStatus activeTeams membershipHistory companyJoined createdAt baseSalary salaryCurrency companyIdentityCode regionLabel phone dob address emergencyContact bloodGroup pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted")
         .populate("membershipHistory.inviter", "name role")
         .sort({ role: 1, name: 1 }),
       Team.find({ company: companyId }).select("name manager employees"),
       CompanyPolicy.findOne({ company: companyId }).select("pfPercentage esicPercentage tdsPercentage"),
+      Company.findById(companyId).select("addresses multiOffice"),
     ]);
     const companyPfPct = Number(companyPolicy?.pfPercentage ?? 12);
     const companyEsicPct = Number(companyPolicy?.esicPercentage ?? 0.75);
     const companyTdsPct = Number(companyPolicy?.tdsPercentage ?? 0);
+
+    const multiOffice = Boolean(companyDoc?.multiOffice);
+    const companyAddresses: any[] = multiOffice && Array.isArray(companyDoc?.addresses)
+      ? companyDoc.addresses
+      : [];
 
     const teamNamesByMember = new Map<string, string[]>();
     teams.forEach((team: any) => {
@@ -256,6 +262,9 @@ export async function GET() {
                 role: String((lastJoin.inviter as any).role ?? ""),
               }
             : null;
+        const lastDeparture = [...history].reverse().find(
+          (entry: any) => String(entry?.action ?? "") === "removed-company" || String(entry?.action ?? "") === "left-company",
+        );
         return {
           id: String(member._id),
           name: member.name ?? "",
@@ -271,6 +280,13 @@ export async function GET() {
           joinedBy: inviter,
           createdAt: member.createdAt,
           companyJoined: member.companyJoined,
+          leavingDate: lastDeparture?.at ?? null,
+          regionLabel: String(member.regionLabel ?? "") || (companyAddresses.length > 0 ? String(companyAddresses[0].label ?? "") : ""),
+          phone: String(member.phone ?? ""),
+          dob: member.dob ?? null,
+          address: String(member.address ?? ""),
+          emergencyContact: String(member.emergencyContact ?? ""),
+          bloodGroup: String(member.bloodGroup ?? ""),
           tdsDeductionAmount: Math.max(0, Number(member.tdsDeductionAmount ?? 0)),
           companyIdentityCode: String(member.companyIdentityCode ?? ""),
           pfNumber: String(member.pfNumber ?? ""),

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { X, Building2 } from "lucide-react";
+import { X, Building2, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 import { ActionButton, AnyRecord, formatRole, formatRoleWithCustom } from "../../shared";
 import { currencySymbol } from "../helpers";
 import { apiFetch } from "@/lib/client-utils";
@@ -88,6 +89,50 @@ export function MemberListModal({
     }
   }
 
+  function exportToExcel() {
+    const fmtDate = (val: unknown): string => {
+      if (!val) return "";
+      try { return new Date(String(val)).toLocaleDateString("en-IN"); } catch { return String(val); }
+    };
+    const header = [
+      "Name", "Email", "Role", "Unique Code", "Region/Office",
+      "Team(s)", "Base Salary", "Joining Date", "Leaving Date",
+      "Phone", "Date of Birth", "Address", "Emergency Contact", "Blood Group",
+    ];
+    const rows = modalMembers.map((m) => {
+      const teams = Array.isArray(m.teams) ? m.teams.map(String).join(", ") : "";
+      const salary = Number(m.baseSalary ?? 0);
+      const cur = String(m.salaryCurrency ?? "INR");
+      const salaryDisplay = salary > 0 ? `${currencySymbol(cur)} ${salary.toLocaleString("en-IN")}` : "";
+      return [
+        String(m.name ?? ""),
+        String(m.email ?? ""),
+        formatRoleWithCustom(String(m.role ?? "employee"), m.customRole, Boolean(m.isSeniorSecurity)),
+        String(m.companyIdentityCode ?? ""),
+        String(m.regionLabel ?? ""),
+        teams,
+        salaryDisplay,
+        fmtDate(m.companyJoined),
+        fmtDate(m.leavingDate),
+        String(m.phone ?? ""),
+        fmtDate(m.dob),
+        String(m.address ?? ""),
+        String(m.emergencyContact ?? ""),
+        String(m.bloodGroup ?? ""),
+      ];
+    });
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    ws["!cols"] = [
+      { wch: 25 }, { wch: 30 }, { wch: 18 }, { wch: 15 }, { wch: 20 },
+      { wch: 20 }, { wch: 15 }, { wch: 14 }, { wch: 14 },
+      { wch: 15 }, { wch: 14 }, { wch: 35 }, { wch: 15 }, { wch: 12 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Members");
+    XLSX.writeFile(wb, `members-export-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    showToast("Excel file exported.", "success");
+  }
+
   if (!modalRole) return null;
 
   return (
@@ -110,6 +155,14 @@ export function MemberListModal({
             </p>
           </div>
           <div className="flex items-start gap-3">
+            <button
+              type="button"
+              onClick={exportToExcel}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-800"
+            >
+              <Download size={14} />
+              Export Excel
+            </button>
             <button
               aria-label="Close"
               className="inline-flex items-center justify-center gap-2 rounded-lg p-2 text-sm font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 text-slate-500 hover:text-slate-700 hover:bg-slate-50"

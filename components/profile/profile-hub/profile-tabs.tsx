@@ -381,7 +381,7 @@ export function ProfileTab({
         <CompensationSection inApprovedCompany={inApprovedCompany} effectiveBaseSalary={effectiveBaseSalary}
           insights={insights} role={role} salaryRequesting={salaryRequesting} onRequestSalary={requestSalary} />
 
-        {role === "human-resource" && profile?.companyStatus === "approved" ? (
+        {(role === "human-resource" || canUseEmptyCompanyControls) && profile?.companyStatus === "approved" ? (
           <PolicyConfigSection
             noticePeriodDays={policy.noticePeriodDays}
             onNoticePeriodChange={policy.setNoticePeriodDays}
@@ -411,6 +411,27 @@ export function ProfileTab({
             onMinWorkHoursChange={policy.setMinWorkHours}
             savingDayHour={policy.savingDayHour}
             onSaveDayHour={policy.saveDayHourOnly}
+            identityCodeDigits={policy.identityCodeDigits}
+            onIdentityCodeDigitsChange={policy.setIdentityCodeDigits}
+            identityCodeStartRange={policy.identityCodeStartRange}
+            onIdentityCodeStartRangeChange={policy.setIdentityCodeStartRange}
+            identityCodeEndRange={policy.identityCodeEndRange}
+            onIdentityCodeEndRangeChange={policy.setIdentityCodeEndRange}
+            identityCodeNextNumber={policy.identityCodeNextNumber}
+            onIdentityCodeNextNumberChange={policy.setIdentityCodeNextNumber}
+            identityCodeRemaining={policy.identityCodeRemaining}
+            identityCodeLoaded={policy.identityCodeLoaded}
+            savingIdentityCode={policy.savingIdentityCode}
+            onSaveIdentityCode={policy.saveIdentityCodeSettings}
+            bulkImportFile={policy.bulkImportFile}
+            onBulkImportFileChange={policy.setBulkImportFile}
+            bulkPreview={policy.bulkPreview}
+            onBulkPreviewClear={() => policy.setBulkPreview(null)}
+            bulkImportLoading={policy.bulkImportLoading}
+            bulkApplying={policy.bulkApplying}
+            bulkResult={policy.bulkResult}
+            onPreviewBulkImport={policy.previewBulkImport}
+            onApplyBulkImport={policy.applyBulkImport}
           />
         ) : null}
 

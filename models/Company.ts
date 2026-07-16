@@ -59,7 +59,11 @@ const CompanySchema = new Schema(
       mandatory: { type: Boolean, default: false },
       acceptedFileTypes: [{ type: String }],
       fields: [{ label: { type: String, required: true }, type: { type: String, default: "text" } }]
-    }]
+    }],
+    identityCodeDigits: { type: Number, default: null },
+    identityCodeStartRange: { type: Number, default: null },
+    identityCodeEndRange: { type: Number, default: null },
+    identityCodeNextNumber: { type: Number, default: null }
   },
   { timestamps: true }
 );

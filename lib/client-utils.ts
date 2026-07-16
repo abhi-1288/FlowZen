@@ -6,12 +6,13 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export async function apiFetch<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
+  const isFormData = init?.body instanceof FormData;
   const response = await fetch(input, {
     ...init,
     cache: "no-store",
     headers: {
-      "Content-Type": "application/json",
-      ...init?.headers
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
+      ...init?.headers,
     }
   });
 

@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { Bell, CheckSquare, Users, Wallet, Clock, User, Building2, ExternalLink, FileText, TrendingUp, BarChart3, DollarSign, Briefcase, UserPlus, CalendarCheck, Activity } from "lucide-react";
+import { Bell, CheckSquare, Users, Wallet, Clock, User, Building2, ExternalLink, FileText, TrendingUp, BarChart3, DollarSign, Briefcase, UserPlus, CalendarCheck, Activity, AlertTriangle } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import type { AnyRecord } from "./shared";
+import { RangeExhaustionModal } from "./modals/range-exhaustion-modal";
 
 const LETTER_LABELS: Record<string, string> = {
   experience: "Experience Certificate",
@@ -75,6 +76,10 @@ export function DashboardTab({
   const [viewingLostCard, setViewingLostCard] = useState<AnyRecord | null>(null);
   const [expandedTimeline, setExpandedTimeline] = useState<string | null>(null);
   const currentUserId = String(profile?._id ?? "");
+  const [identityCodeRemaining, setIdentityCodeRemaining] = useState<number | null>(null);
+  const [identityCodeEndRange, setIdentityCodeEndRange] = useState<number | null>(null);
+  const [identityCodeNextNumber, setIdentityCodeNextNumber] = useState<number | null>(null);
+  const [rangeModalOpen, setRangeModalOpen] = useState(false);
 
   function generateFallbackLetter(request: AnyRecord) {
     const metadata = (request.metadata as any) ?? {};
@@ -149,6 +154,17 @@ export function DashboardTab({
       .catch(() => {})
       .finally(() => setLoadingTickets(false));
   }, [role, currentUserId]);
+
+  useEffect(() => {
+    if (!["human-resource", "admin"].includes(role)) return;
+    apiFetch<{ remaining: number | null; endRange: number | null; nextNumber: number | null }>("/api/hr/identity-code-settings")
+      .then((data) => {
+        setIdentityCodeRemaining(data.remaining);
+        setIdentityCodeEndRange(data.endRange);
+        setIdentityCodeNextNumber(data.nextNumber);
+      })
+      .catch(() => {});
+  }, [role]);
 
   const attendanceRate = useMemo(() => {
     if (!attendanceHistory?.length) return "--";
@@ -237,6 +253,32 @@ export function DashboardTab({
                 <Link href="/profile/documents" className="underline hover:text-amber-900">Documents</Link>.
               </p>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Identity Code Range Warning */}
+      {["human-resource", "admin"].includes(role) && identityCodeRemaining != null && identityCodeRemaining <= 50 ? (
+        <div className={`rounded-xl border p-4 shadow-sm ${identityCodeRemaining === 0 ? "border-red-200 bg-red-50" : "border-amber-200 bg-amber-50"}`}>
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={20} className={`mt-0.5 shrink-0 ${identityCodeRemaining === 0 ? "text-red-600" : "text-amber-600"}`} />
+            <div className="flex-1">
+              <p className={`text-sm font-semibold ${identityCodeRemaining === 0 ? "text-red-800" : "text-amber-800"}`}>
+                {identityCodeRemaining === 0 ? "Identity code range exhausted" : "Identity code range running low"}
+              </p>
+              <p className={`mt-1 text-sm ${identityCodeRemaining === 0 ? "text-red-700" : "text-amber-700"}`}>
+                {identityCodeRemaining === 0
+                  ? "No more identity codes can be generated. New employees will not receive a code until you increase the range."
+                  : `Only ${identityCodeRemaining} identity code${identityCodeRemaining === 1 ? "" : "s"} remaining. Consider increasing the range.`}
+              </p>
+            </div>
+            <button
+              type="button"
+              className={`shrink-0 rounded-lg px-4 py-2 text-sm font-medium text-white ${identityCodeRemaining === 0 ? "bg-red-600 hover:bg-red-700" : "bg-amber-600 hover:bg-amber-700"}`}
+              onClick={() => setRangeModalOpen(true)}
+            >
+              Increase Range
+            </button>
           </div>
         </div>
       ) : null}
@@ -979,6 +1021,23 @@ export function DashboardTab({
           </div>
         );
       })() : null}
+
+      <RangeExhaustionModal
+        open={rangeModalOpen}
+        onClose={() => setRangeModalOpen(false)}
+        onSuccess={() => {
+          apiFetch<{ remaining: number | null; endRange: number | null; nextNumber: number | null }>("/api/hr/identity-code-settings")
+            .then((data) => {
+              setIdentityCodeRemaining(data.remaining);
+              setIdentityCodeEndRange(data.endRange);
+              setIdentityCodeNextNumber(data.nextNumber);
+            })
+            .catch(() => {});
+        }}
+        showToast={showToast}
+        currentEndRange={identityCodeEndRange}
+        currentNextNumber={identityCodeNextNumber}
+      />
     </div>
   );
 }

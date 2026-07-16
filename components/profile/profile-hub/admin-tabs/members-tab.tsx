@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
+import { Download } from "lucide-react";
+import * as XLSX from "xlsx";
 import { apiFetch } from "@/lib/client-utils";
-import { AnyRecord, formatRole, SectionHeader, ActionButton } from "../shared";
+import { AnyRecord, formatRole, formatRoleWithCustom, SectionHeader, ActionButton } from "../shared";
 import { FinanceMembersView } from "../finance-members-tab";
 import { HR_MEMBER_ROLE_KEYS } from "./types";
 import { FireModal } from "./modals/fire-modal";
@@ -11,6 +13,7 @@ import { CustomRoleModal } from "./modals/custom-role-modal";
 import { PfEsicModal, type PfEsicFormData } from "./modals/pf-esic-modal";
 import { DocumentsModal } from "./modals/documents-modal";
 import { MemberListModal } from "./modals/member-list-modal";
+import { currencySymbol } from "./helpers";
 
 export function MembersTab({
   insights,
@@ -285,6 +288,50 @@ export function MembersTab({
     setFireConfirmMember(member);
   }
 
+  function exportAllToExcel() {
+    const fmtDate = (val: unknown): string => {
+      if (!val) return "";
+      try { return new Date(String(val)).toLocaleDateString("en-IN"); } catch { return String(val); }
+    };
+    const header = [
+      "Name", "Email", "Role", "Unique Code", "Region/Office",
+      "Team(s)", "Base Salary", "Joining Date", "Leaving Date",
+      "Phone", "Date of Birth", "Address", "Emergency Contact", "Blood Group",
+    ];
+    const rows = members.map((m) => {
+      const teams = Array.isArray(m.teams) ? m.teams.map(String).join(", ") : "";
+      const salary = Number(m.baseSalary ?? 0);
+      const cur = String(m.salaryCurrency ?? "INR");
+      const salaryDisplay = salary > 0 ? `${currencySymbol(cur)} ${salary.toLocaleString("en-IN")}` : "";
+      return [
+        String(m.name ?? ""),
+        String(m.email ?? ""),
+        formatRoleWithCustom(String(m.role ?? "employee"), m.customRole, Boolean(m.isSeniorSecurity)),
+        String(m.companyIdentityCode ?? ""),
+        String(m.regionLabel ?? ""),
+        teams,
+        salaryDisplay,
+        fmtDate(m.companyJoined),
+        fmtDate(m.leavingDate),
+        String(m.phone ?? ""),
+        fmtDate(m.dob),
+        String(m.address ?? ""),
+        String(m.emergencyContact ?? ""),
+        String(m.bloodGroup ?? ""),
+      ];
+    });
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    ws["!cols"] = [
+      { wch: 25 }, { wch: 30 }, { wch: 18 }, { wch: 15 }, { wch: 20 },
+      { wch: 20 }, { wch: 15 }, { wch: 14 }, { wch: 14 },
+      { wch: 15 }, { wch: 14 }, { wch: 35 }, { wch: 15 }, { wch: 12 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Members");
+    XLSX.writeFile(wb, `members-export-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    showToast("Excel file exported.", "success");
+  }
+
   async function confirmFire() {
     const member = fireConfirmMember;
     const memberId = String(member?.id ?? "");
@@ -318,6 +365,16 @@ export function MembersTab({
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Total members</p>
           <p className="mt-0.5 text-2xl font-bold text-slate-900">{Number(hr?.totalMembers ?? members.length)}</p>
         </div>
+        {members.length > 0 ? (
+          <button
+            type="button"
+            onClick={exportAllToExcel}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-800 ring-1 ring-slate-100"
+          >
+            <Download size={15} />
+            Export Excel
+          </button>
+        ) : null}
       </div>
 
       <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
