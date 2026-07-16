@@ -1,4 +1,4 @@
-import type { AnyRecord } from "../shared";
+﻿import type { AnyRecord } from "../shared";
 import { Row, SectionHeader } from "../shared";
 
 export function CompanyTeamSection({
@@ -32,7 +32,7 @@ export function CompanyTeamSection({
     ? companyAddresses.find((a) => String(a.label ?? "") === regionLabel)
     : null;
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+    <section className="rounded-xl border border-slate-200 bg-white p-5 dark:bg-[#000000] dark:border-zinc-800">
       <SectionHeader title="Company & Team" description="Organizational structure" accent="emerald" />
       <dl className="mt-4 space-y-3 text-sm">
         <Row label="Company" value={company?.name ? String(company.name) : undefined} />
@@ -52,10 +52,10 @@ export function CompanyTeamSection({
         ) : null}
       </dl>
       {profile?.companyStatus === "approved" && !profile?.companyIdentityCode ? (
-        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm font-medium text-amber-800">No unique company identity code has been issued yet.</p>
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:bg-amber-950">
+          <p className="text-xs font-medium text-amber-700 dark:text-amber-400">No unique company identity code has been issued yet.</p>
           <button
-            className="mt-3 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-2 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
             disabled={identityRequesting || Boolean(insights?.pendingIdentityCodeRequest)}
             onClick={onRequestIdentity}
             type="button"

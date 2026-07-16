@@ -290,7 +290,7 @@ export function FinanceTab({
   }, [data?.members]);
 
   if (!data) {
-    return <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)]">Loading finance...</section>;
+    return <section className="rounded-xl border border-slate-200 bg-white p-5">Loading finance...</section>;
   }
 
   const isFinanceOrAdmin = actorRole === "finance" || actorRole === "admin";

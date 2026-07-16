@@ -24,7 +24,14 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var p=localStorage.getItem('flowzen_theme');if(p!=='light'&&p!=='dark'&&p!=='system')p=localStorage.getItem('flowzen_darkMode')==='true'?'dark':'system';var d=p==='dark'||(p==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);document.documentElement.style.colorScheme=d?'dark':'light'}catch(e){}`,
+          }}
+        />
+      </head>
       <body className={inter.className}>
         <SessionProvider>
           <ThemeProvider>

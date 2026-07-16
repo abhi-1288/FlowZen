@@ -5,7 +5,7 @@ import type { AnyRecord } from "../../shared";
 import type { SalaryBreakdown } from "../types";
 
 const overlayClass = "fixed inset-0 z-50 grid place-items-center bg-black/40";
-const modalClass = "flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-2xl";
+const modalClass = "flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-xl";
 
 export function SalaryDetailModal({
   salaryId,

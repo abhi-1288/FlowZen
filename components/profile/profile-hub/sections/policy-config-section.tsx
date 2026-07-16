@@ -124,7 +124,7 @@ export function PolicyConfigSection({
   const cardBase = "rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:shadow-md hover:border-slate-300";
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+    <section className="rounded-xl border border-slate-200 bg-white p-5">
       <div className="mb-5 border-l-4 border-emerald-500 pl-4">
         <h3 className="text-base font-semibold text-slate-900">Policy</h3>
         <p className="mt-0.5 text-sm text-slate-500">Configure company-wide policies</p>
@@ -508,7 +508,7 @@ export function PolicyConfigSection({
 
           {bulkImportFile && !bulkPreview && !bulkResult ? (
             <button
-              className="mt-2 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+              className="mt-2 rounded-full bg-slate-950 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
               disabled={bulkImportLoading}
               type="button"
               onClick={onPreviewBulkImport}
@@ -576,7 +576,7 @@ export function PolicyConfigSection({
               <div className="mt-2 flex gap-2">
                 {bulkPreview.summary.ready > 0 ? (
                   <button
-                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                    className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
                     disabled={bulkApplying}
                     type="button"
                     onClick={onApplyBulkImport}

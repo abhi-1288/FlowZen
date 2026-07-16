@@ -60,7 +60,7 @@ export function TaskCard({ job, onAction }: { job: ATSJob; onAction: () => void 
               <button suppressHydrationWarning
                 onClick={() => handleAction("accept")}
                 disabled={busy}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
               >
                 <Check size={14} /> Accept
               </button>
@@ -133,7 +133,7 @@ export function TaskCard({ job, onAction }: { job: ATSJob; onAction: () => void 
             <button suppressHydrationWarning
               onClick={() => handleAction("publish")}
               disabled={busy}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
             >
               <Globe size={14} /> Publish
             </button>

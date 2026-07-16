@@ -342,7 +342,7 @@ export function IdCardModal({
   return createPortal(
     <>
       <style>{`
-        .idc-modal-overlay { position:fixed;inset:0;z-index:50;display:flex;align-items:flex-start;justify-content:center;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);padding:32px 16px;overflow-y:auto; }
+        .idc-modal-overlay { position:fixed;inset:0;z-index:50;display:flex;align-items:flex-start;justify-content:center;background:rgba(0,0,0,.10);backdrop-filter:blur(4px);padding:32px 16px;overflow-y:auto; }
         .idc-modal-box { width:100%;max-width:940px;margin:auto;animation:idc-fadeIn .25s ease-out; }
         @keyframes idc-fadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
 

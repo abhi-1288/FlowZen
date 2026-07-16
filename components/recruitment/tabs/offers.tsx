@@ -154,7 +154,7 @@ export function OffersTab() {
                               {offer.status === "draft" && offer.isSigned && (
                                 <button suppressHydrationWarning
                                   onClick={async () => { await updateOffer(offer.id, { status: "sent" }); }}
-                                  className="inline-flex items-center gap-1 rounded-lg bg-slate-950 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800"
+                                  className="inline-flex items-center gap-1 rounded-full bg-slate-950 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800"
                                 >
                                   <Send size={12} /> Send
                                 </button>

@@ -106,7 +106,7 @@ export function InterviewsTab() {
                       <>
                         <button suppressHydrationWarning
                           onClick={(e) => { e.stopPropagation(); setModal({ type: "add-feedback", interviewId: interview.id }); }}
-                          className="rounded-lg bg-slate-950 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800"
+                          className="rounded-full bg-slate-950 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800"
                         >
                           Feedback
                         </button>

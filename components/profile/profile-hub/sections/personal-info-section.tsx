@@ -1,4 +1,4 @@
-import { Camera, ChevronDown, Info, Mail, Pencil, Trash2, X } from "lucide-react";
+﻿import { Camera, ChevronDown, Info, Mail, Pencil, Trash2, X } from "lucide-react";
 import { FormEvent, useRef, useState } from "react";
 import { apiFetch } from "@/lib/client-utils";
 import type { AnyRecord } from "../shared";
@@ -244,24 +244,24 @@ export function PersonalInfoSection({
   }
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+    <section className="rounded-xl border border-slate-200 bg-white p-5 dark:bg-[#000000] dark:border-zinc-800">
       <SectionHeader title="Personal Info" description="Basic details and identity" accent="indigo" />
-      <div className="flex items-center gap-4 rounded-xl border border-slate-100 bg-slate-50/50 p-4">
-        <AvatarBadge avatarUrl={avatarUrl} name={displayName} size="lg" />
+      <div className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3 dark:bg-zinc-700 dark:border-zinc-800/50">
+        <AvatarBadge avatarUrl={avatarUrl} name={displayName} size="md" />
         {avatarUrl ? (
           <button
             aria-label="Delete avatar"
-            className="inline-flex h-9 p-4 items-center justify-center rounded-lg border border-rose-200 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-rose-200 px-2.5 text-xs font-medium text-rose-500 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950"
             onClick={onAvatarDelete}
             title="Delete avatar"
             type="button"
           >
-            <Trash2 size={16} />
-            <p className="text-sm font-medium ml-2 text-slate-700">Delete Profile Image</p>
+            <Trash2 size={13} />
+            Delete Profile Image
           </button>
         ) : (
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-            <Camera size={16} />
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700">
+            <Camera size={13} />
             {uploading ? "Uploading..." : "Upload avatar"}
             <input
               accept="image/png,image/jpeg,image/webp"
@@ -278,19 +278,19 @@ export function PersonalInfoSection({
         )}
         <button
           aria-label="Avatar upload restrictions"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600 dark:border-zinc-800 dark:text-zinc-500 dark:hover:bg-zinc-700 dark:hover:text-zinc-400"
           title="PNG, JPG, or WEBP only. Max size: 2MB."
           type="button"
         >
-          <Info size={16} />
+          <Info size={14} />
         </button>
       </div>
       <button
-        className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+        className="mt-3 inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-700 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
         onClick={openModal}
         type="button"
       >
-        <Pencil size={13} />
+        <Pencil size={12} />
         Edit
       </button>
       <dl className="mt-3 space-y-3 text-sm">
@@ -312,16 +312,16 @@ export function PersonalInfoSection({
         <Row label="Unique Identity" value={profile?.companyIdentityCode ? String(profile.companyIdentityCode) : undefined} />
       </dl>
       {Array.isArray(profile?.roleHistory) && profile.roleHistory.length > 0 ? (
-        <div className="mt-5 border-t border-slate-100 pt-4">
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Role History</p>
-          <div className="space-y-2">
+        <div className="mt-4 border-t border-slate-100 pt-3 dark:border-zinc-800/50">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Role History</p>
+          <div className="space-y-1.5">
             {(profile.roleHistory as { oldRole: string; newRole: string; changedBy: string; changedAt: string }[]).map((entry, i) => (
-              <div key={i} className="flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                <span className="font-medium text-slate-900">{entry.oldRole}</span>
-                <span className="text-slate-400">→</span>
-                <span className="font-medium text-emerald-700">{entry.newRole}</span>
-                <span className="ml-auto whitespace-nowrap text-slate-400">{new Date(entry.changedAt).toLocaleDateString()}</span>
-                <span className="text-slate-400">by {entry.changedBy}</span>
+              <div key={i} className="flex items-center gap-2 rounded-md bg-slate-50 px-2.5 py-1.5 text-[11px] text-slate-500 dark:bg-zinc-700 dark:text-zinc-400">
+                <span className="font-medium text-slate-700 dark:text-zinc-300">{entry.oldRole}</span>
+                <span className="text-slate-300 dark:text-zinc-600">→</span>
+                <span className="font-medium text-emerald-600">{entry.newRole}</span>
+                <span className="ml-auto whitespace-nowrap text-slate-400 dark:text-zinc-500">{new Date(entry.changedAt).toLocaleDateString()}</span>
+                <span className="text-slate-400 dark:text-zinc-500">by {entry.changedBy}</span>
               </div>
             ))}
           </div>
@@ -330,22 +330,22 @@ export function PersonalInfoSection({
 
       {/* Edit modal */}
       {open && !confirming ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm p-4 pt-8 pb-8 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl my-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-slate-900">Edit Personal Info</h2>
-              <button className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600" onClick={() => setOpen(false)} type="button">
-                <X size={18} />
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 p-4 pt-8 pb-8 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl my-auto dark:bg-[#000000]">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Edit Personal Info</h2>
+              <button className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-zinc-500 dark:hover:bg-zinc-700 dark:hover:text-zinc-400" onClick={() => setOpen(false)} type="button">
+                <X size={16} />
               </button>
             </div>
-            <form className="space-y-4 max-h-[60vh] overflow-y-auto pr-1" onSubmit={handleRequestSave}>
+            <form className="space-y-3 max-h-[60vh] overflow-y-auto pr-1" onSubmit={handleRequestSave}>
               <EditField label="Name" value={editName} onChange={setEditName} placeholder={oldName || "Your name"} required />
               <div>
                 <label className="mb-1 block text-xs font-medium text-slate-500">Phone</label>
                 <div className="flex gap-2">
                   <div className="relative">
                     <select
-                      className="appearance-none rounded-lg border border-slate-200 bg-white py-2 pl-2.5 pr-7 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                      className="appearance-none rounded-lg border border-slate-200 bg-white py-2 pl-2.5 pr-7 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-100"
                       value={editCountryCode}
                       onChange={(e) => setEditCountryCode(e.target.value)}
                     >
@@ -355,10 +355,10 @@ export function PersonalInfoSection({
                         </option>
                       ))}
                     </select>
-                    <ChevronDown size={13} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <ChevronDown size={13} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
                   </div>
                   <input
-                    className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                    className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-zinc-800 dark:text-zinc-100 dark:bg-transparent"
                     type="tel"
                     value={editPhone}
                     placeholder={stripCountryCode(oldPhone) || "Phone number"}
@@ -373,7 +373,7 @@ export function PersonalInfoSection({
                 <div className="flex gap-2">
                   <div className="relative">
                     <select
-                      className="appearance-none rounded-lg border border-slate-200 bg-white py-2 pl-2.5 pr-7 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                      className="appearance-none rounded-lg border border-slate-200 bg-white py-2 pl-2.5 pr-7 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-100"
                       value={editEmergencyCountryCode}
                       onChange={(e) => setEditEmergencyCountryCode(e.target.value)}
                     >
@@ -383,10 +383,10 @@ export function PersonalInfoSection({
                         </option>
                       ))}
                     </select>
-                    <ChevronDown size={13} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <ChevronDown size={13} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
                   </div>
                   <input
-                    className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                    className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-zinc-800 dark:text-zinc-100 dark:bg-transparent"
                     type="tel"
                     value={editEmergencyPhone}
                     placeholder={stripCountryCode(oldEmergencyContact) || "Emergency contact number"}
@@ -395,9 +395,9 @@ export function PersonalInfoSection({
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-500">Blood Group</label>
+                <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-zinc-400">Blood Group</label>
                 <select
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-zinc-800 dark:text-zinc-100 dark:bg-[#000000]"
                   value={editBloodGroup}
                   onChange={(e) => setEditBloodGroup(e.target.value)}
                 >
@@ -412,9 +412,9 @@ export function PersonalInfoSection({
                   <option value="AB-">AB-</option>
                 </select>
               </div>
-              <div className={`flex items-center justify-between rounded-lg border p-3 ${editPhone && editEmergencyPhone ? "border-slate-200" : "border-slate-100 bg-slate-50"}`}>
+              <div className={`flex items-center justify-between rounded-lg border p-3 ${editPhone && editEmergencyPhone ? "border-slate-200 dark:border-zinc-800" : "border-slate-100 bg-slate-50 dark:border-zinc-800/50 dark:bg-zinc-700"}`}>
                 <div>
-                  <span className={`text-sm font-medium ${editPhone && editEmergencyPhone ? "text-slate-700" : "text-slate-400"}`}>Mask personal number on ID card</span>
+                  <span className={`text-sm font-medium ${editPhone && editEmergencyPhone ? "text-slate-700 dark:text-zinc-300" : "text-slate-400 dark:text-zinc-500"}`}>Mask personal number on ID card</span>
                   <p className="text-xs text-slate-400">
                     {editPhone && editEmergencyPhone ? "Hides your phone number with asterisks" : "Add both phone and emergency contact to enable"}
                   </p>
@@ -430,13 +430,13 @@ export function PersonalInfoSection({
               </div>
               <div className="flex items-center gap-2 pt-2">
                 <button
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"
                   type="submit"
                 >
                   Save
                 </button>
                 <button
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
                   onClick={() => setOpen(false)}
                   type="button"
                 >
@@ -450,11 +450,11 @@ export function PersonalInfoSection({
 
       {/* Confirm modal */}
       {open && confirming ? (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 backdrop-blur-sm p-4 pt-8 pb-8 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) { setConfirming(false); } }}>
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl my-auto">
-            <h2 className="text-lg font-semibold text-slate-900">Is your data correct?</h2>
-            <p className="mt-1 text-sm text-slate-500">Please review before saving.</p>
-            <div className="mt-4 space-y-2 rounded-xl bg-slate-50 p-4 text-sm">
+        <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/30 p-4 pt-8 pb-8 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) { setConfirming(false); } }}>
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl my-auto dark:bg-[#000000]">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Is your data correct?</h2>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-zinc-400">Please review before saving.</p>
+            <div className="mt-3 space-y-1.5 rounded-lg bg-slate-50 p-3 text-xs dark:bg-zinc-700">
               <ConfirmRow label="Name" value={editName} />
               <ConfirmRow label="Phone" value={editCountryCode && editPhone ? `${editCountryCode} ${editPhone}` : editPhone || editCountryCode} />
               <ConfirmRow label="Date of Birth" value={editDob} />
@@ -463,16 +463,16 @@ export function PersonalInfoSection({
               {editBloodGroup ? <ConfirmRow label="Blood Group" value={editBloodGroup} /> : null}
               <ConfirmRow label="Mask Phone" value={editMaskPhone ? "Yes" : "No"} />
             </div>
-            <div className="mt-5 flex justify-end gap-3">
+            <div className="mt-4 flex justify-end gap-2">
               <button
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
                 onClick={() => setConfirming(false)}
                 type="button"
               >
                 Go Back
               </button>
               <button
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
                 disabled={saving}
                 onClick={handleConfirmSave}
               >
@@ -485,30 +485,30 @@ export function PersonalInfoSection({
 
       {/* Email change modal */}
       {emailModalOpen ? (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={(e) => { if (e.target === e.currentTarget) closeEmailModal(); }}>
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-slate-900">Change Email</h2>
-              <button className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600" onClick={closeEmailModal} type="button">
-                <X size={18} />
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/30 p-4" onClick={(e) => { if (e.target === e.currentTarget) closeEmailModal(); }}>
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl dark:bg-[#000000]">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Change Email</h2>
+              <button className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-zinc-500 dark:hover:bg-zinc-700 dark:hover:text-zinc-400" onClick={closeEmailModal} type="button">
+                <X size={16} />
               </button>
             </div>
 
             {emailStep === "credentials" ? (
-              <form className="space-y-4" onSubmit={handleSendOtp}>
+              <form className="space-y-3" onSubmit={handleSendOtp}>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-500">Current Email</label>
+                  <label className="mb-0.5 block text-[11px] font-medium text-slate-500">Current Email</label>
                   <input
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 outline-none"
+                    className="w-full rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-500 outline-none"
                     type="email"
                     value={currentEmail}
                     disabled
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-500">Current Password</label>
+                  <label className="mb-0.5 block text-[11px] font-medium text-slate-500">Current Password</label>
                   <input
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                    className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                     type="password"
                     value={currentPassword}
                     required
@@ -517,9 +517,9 @@ export function PersonalInfoSection({
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-500">New Email</label>
+                  <label className="mb-0.5 block text-[11px] font-medium text-slate-500">New Email</label>
                   <input
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                    className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                     type="email"
                     value={newEmail}
                     required
@@ -528,7 +528,7 @@ export function PersonalInfoSection({
                   />
                 </div>
                 <button
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
                   disabled={emailSending}
                   type="submit"
                 >
@@ -537,16 +537,16 @@ export function PersonalInfoSection({
                 </button>
               </form>
             ) : (
-              <form className="space-y-4" onSubmit={handleVerifyOtp}>
-                <p className="text-sm text-slate-600">
+              <form className="space-y-3" onSubmit={handleVerifyOtp}>
+                <p className="text-xs text-slate-600">
                   Enter the 6-digit code sent to <strong className="text-slate-900">{newEmail}</strong>
                 </p>
-                <div className="flex justify-center gap-2">
+                <div className="flex justify-center gap-1.5">
                   {otpDigits.map((digit, i) => (
                     <input
                       key={i}
                       ref={(el) => { otpRefs.current[i] = el; }}
-                      className="h-12 w-10 rounded-lg border border-slate-200 text-center text-lg font-semibold outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                      className="h-10 w-8 rounded-md border border-slate-200 text-center text-sm font-semibold outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                       type="text"
                       inputMode="numeric"
                       maxLength={1}
@@ -560,7 +560,7 @@ export function PersonalInfoSection({
                   <p className="text-center text-sm text-rose-600">{otpError}</p>
                 ) : null}
                 <button
-                  className="w-full rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                  className="w-full rounded-full bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
                   disabled={emailSending || otpDigits.join("").length !== 6}
                   type="submit"
                 >

@@ -325,7 +325,7 @@ function CandidateModal({ jobId }: { jobId: string }) {
               </select>
             </label>
           </div>
-          <button type="submit" className="w-full rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800">
+          <button type="submit" className="w-full rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800">
             Add Candidate
           </button>
         </form>

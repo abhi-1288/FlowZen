@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
@@ -32,6 +32,12 @@ export function BoardShell({ boardId }: { boardId?: string }) {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   const { showNotificationToast } = useNotificationToast();
+
+  useEffect(() => {
+    // Keep the cross-area navigation payload warm while the board is open.
+    router.prefetch("/profile");
+    router.prefetch("/recruitment/candidates");
+  }, [router]);
 
   const [filter, setFilter] = useState<"all" | "self" | "assigned" | "invited">("all");
   const [boardSearchQuery, setBoardSearchQuery] = useState("");
@@ -186,8 +192,8 @@ export function BoardShell({ boardId }: { boardId?: string }) {
   );
 
   return (
-    <div className="flex min-h-screen bg-[#f7f8fb] text-slate-950">
-      <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white md:flex md:flex-col">
+    <div className="flex min-h-screen bg-[#f7f8fb] text-slate-950 dark:bg-[#1a1a1a] dark:text-zinc-100">
+      <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white md:flex md:flex-col dark:border-zinc-800 dark:bg-[#000000]">
         <div className="border-b border-slate-200 p-5">
           <div className="flex items-center justify-between">
             <div>
@@ -324,7 +330,7 @@ export function BoardShell({ boardId }: { boardId?: string }) {
         ) : null}
         {boardId && activeBoard ? <BoardCanvas boardId={boardId} /> : null}
         {loading && !activeBoard ? (
-          <div className="flex h-screen flex-col animate-pulse bg-[#f7f8fb]">
+      <div className="flex h-screen flex-col animate-pulse bg-[#f7f8fb] dark:bg-[#1a1a1a]">
             <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>

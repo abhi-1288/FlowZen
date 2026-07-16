@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { CSSProperties } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
@@ -27,7 +27,7 @@ export function ColumnPanel({ boardId, column, tasks, canEdit }: { boardId: stri
   return (
     <section
       className={cn(
-        "flex max-h-full w-72 shrink-0 flex-col rounded-lg border border-slate-200 bg-slate-100/80",
+        "flex max-h-full w-72 shrink-0 flex-col rounded-lg border border-slate-200 bg-slate-100/80 dark:border-zinc-800 dark:bg-[#000000]",
         isDragging && "opacity-40",
         isOver && "ring-2 ring-emerald-400"
       )}
@@ -50,8 +50,8 @@ export function ColumnPanel({ boardId, column, tasks, canEdit }: { boardId: stri
               <GripVertical size={16} />
             </span>
           )}
-          <h3 className="truncate text-sm font-semibold text-slate-800">{column.title}</h3>
-          <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-500">{tasks.length}</span>
+          <h3 className="truncate text-sm font-semibold text-slate-800 dark:text-zinc-200">{column.title}</h3>
+          <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-zinc-700 dark:text-zinc-300">{tasks.length}</span>
         </div>
         {canEdit ? (
           <button
@@ -70,7 +70,7 @@ export function ColumnPanel({ boardId, column, tasks, canEdit }: { boardId: stri
           <TaskCard key={task.id} task={task} canEdit={canEdit} />
         ))}
         {tasks.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-4 text-center text-sm text-slate-500">
+          <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-4 text-center text-sm text-slate-500 dark:border-zinc-700 dark:bg-zinc-700/70 dark:text-zinc-400">
             Drop tasks here
           </div>
         ) : null}

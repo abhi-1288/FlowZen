@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { DashboardTab } from "@/components/recruitment/tabs/dashboard";
 import { JobsTab } from "@/components/recruitment/tabs/jobs";
 import { CandidatesTab } from "@/components/recruitment/tabs/candidates";
@@ -20,7 +20,20 @@ const TABS = [
 ] as const;
 
 export function RecruitmentHub() {
-  const pathname = usePathname() ?? "";
+  const [pathname, setPathname] = useState(() =>
+    typeof window === "undefined" ? "/recruitment/dashboard" : window.location.pathname,
+  );
+
+  useEffect(() => {
+    const sync = () => setPathname(window.location.pathname);
+    window.addEventListener("popstate", sync);
+    window.addEventListener("flowzen:recruitment-navigation", sync);
+    return () => {
+      window.removeEventListener("popstate", sync);
+      window.removeEventListener("flowzen:recruitment-navigation", sync);
+    };
+  }, []);
+
   const currentTab = pathname.replace("/recruitment/", "").replace(/\/$/, "") || "dashboard";
 
   const tab = TABS.find((t) => t.key === currentTab);

@@ -274,11 +274,11 @@ export function MessagesTab({
   };
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md">
+    <section className="rounded-xl border border-slate-200 bg-white p-5">
       <SectionHeader title="Messages" description="Real-time company chat and announcements." accent="sky" />
 
       {/* Main chat window split grid */}
-      <div className="mt-6 grid grid-cols-1 overflow-hidden rounded-2xl border border-slate-200 lg:grid-cols-12" style={{ height: "650px" }}>
+      <div className="mt-6 grid grid-cols-1 overflow-hidden rounded-xl border border-slate-200 lg:grid-cols-12" style={{ height: "650px" }}>
         
         {/* Left Side Pane (Members / Channels) */}
         <div className="flex flex-col border-r border-slate-200 bg-slate-50 lg:col-span-4">
@@ -333,12 +333,12 @@ export function MessagesTab({
                   onKeyDown={(e) => {
                     if (e.key === "Enter") setSearchQuery(searchInput);
                   }}
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-3 py-2 text-xs outline-none transition focus:border-slate-400 focus:bg-white"
+                  className="w-full rounded-md border border-slate-200 bg-slate-50 pl-8 pr-3 py-1.5 text-[11px] outline-none transition focus:border-slate-400 focus:bg-white"
                 />
               </div>
               <button
                 onClick={() => setSearchQuery(searchInput)}
-                className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                className="rounded-md bg-slate-900 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-slate-800"
               >
                 Go
               </button>
@@ -374,7 +374,7 @@ export function MessagesTab({
                     className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition-all ${
                       isSelected
                         ? mode === "bulk" || mode === "meeting"
-                          ? "bg-slate-900 text-white"
+                          ? "bg-slate-100 text-slate-900"
                           : "bg-white text-slate-950 shadow-sm ring-1 ring-slate-100"
                         : "hover:bg-slate-100 text-slate-700"
                     }`}
@@ -406,7 +406,7 @@ export function MessagesTab({
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
-                        <p className={`truncate text-xs font-semibold ${isSelected && (mode === "bulk" || mode === "meeting") ? "text-white" : "text-slate-900"}`}>
+                        <p className={`truncate text-xs font-semibold ${isSelected && (mode === "bulk" || mode === "meeting") ? "text-slate-900" : "text-slate-900"}`}>
                           {name}
                         </p>
                         {/* Unread badge count next to username */}
@@ -416,7 +416,7 @@ export function MessagesTab({
                           </span>
                         )}
                       </div>
-                      <p className={`truncate text-[10px] ${isSelected && (mode === "bulk" || mode === "meeting") ? "text-slate-300" : "text-slate-400"}`}>
+                      <p className={`truncate text-[10px] ${isSelected && (mode === "bulk" || mode === "meeting") ? "text-slate-500" : "text-slate-400"}`}>
                         {role}
                       </p>
                       {/* Last message preview */}
@@ -481,7 +481,7 @@ export function MessagesTab({
                   <input
                     value={meetingTitle}
                     onChange={(e) => setMeetingTitle(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                    className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-950"
                     placeholder="Meeting title"
                   />
                 </div>
@@ -520,7 +520,7 @@ export function MessagesTab({
                     <input
                       value={meetingLink}
                       onChange={(e) => setMeetingLink(e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                      className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-950"
                       placeholder="https://meet.google.com/... or Zoom/Teams link"
                     />
                   </div>
@@ -530,7 +530,7 @@ export function MessagesTab({
                     <input
                       value={meetingLocation}
                       onChange={(e) => setMeetingLocation(e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                      className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-950"
                       placeholder="Room 301, Conference Hall, etc."
                     />
                   </div>
@@ -545,7 +545,7 @@ export function MessagesTab({
                       type="date"
                       value={meetingDate}
                       onChange={(e) => setMeetingDate(e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                      className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-950"
                     />
                   </div>
                   <div>
@@ -556,7 +556,7 @@ export function MessagesTab({
                       type="time"
                       value={meetingTime}
                       onChange={(e) => setMeetingTime(e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                      className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-950"
                     />
                   </div>
                 </div>
@@ -566,7 +566,7 @@ export function MessagesTab({
                   <select
                     value={meetingDuration}
                     onChange={(e) => setMeetingDuration(Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                    className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-950"
                   >
                     <option value={15}>15 minutes</option>
                     <option value={30}>30 minutes</option>
@@ -583,7 +583,7 @@ export function MessagesTab({
                     value={meetingDescription}
                     onChange={(e) => setMeetingDescription(e.target.value)}
                     rows={2}
-                    className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-950"
+                    className="w-full resize-none rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-950"
                     placeholder="Any additional details..."
                   />
                 </div>
@@ -632,7 +632,7 @@ export function MessagesTab({
                   placeholder="Type here your bulk messages..."
                   value={bulkMessage}
                   onChange={(e) => setBulkMessage(e.target.value)}
-                  className="mt-4 h-48 w-full rounded-xl border border-slate-200 p-3 text-xs outline-none focus:border-slate-400 resize-none"
+                  className="mt-4 h-48 w-full rounded-xl border border-slate-200 p-3 text-[11px] outline-none focus:border-slate-400 resize-none"
                 />
               </div>
 
@@ -720,7 +720,7 @@ export function MessagesTab({
                           {/* Message Bubble Container */}
                           <div className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                             <div
-                              className={`max-w-[70%] rounded-2xl px-4 py-2.5 shadow-sm text-xs ${
+                              className={`max-w-[70%] rounded-xl px-4 py-2.5 shadow-sm text-[11px] ${
                                 isMe
                                   ? "bg-slate-950 text-white rounded-tr-none"
                                   : "bg-white border border-slate-100 text-slate-800 rounded-tl-none"
@@ -766,7 +766,7 @@ export function MessagesTab({
                     placeholder="Type here your messages..."
                     value={chatMessage}
                     onChange={(e) => setChatMessage(e.target.value)}
-                    className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-xs outline-none focus:border-slate-400 focus:ring-0"
+                    className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-[11px] outline-none focus:border-slate-400 focus:ring-0"
                   />
                   <button
                     type="submit"
@@ -794,9 +794,9 @@ export function MessagesTab({
 
           {/* User Info Modal */}
           {showInfoModal && selectedMember && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowInfoModal(false)}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowInfoModal(false)}>
               <div
-                className="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"
+                className="relative w-full max-w-sm rounded-xl bg-white p-5 shadow-xl"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button

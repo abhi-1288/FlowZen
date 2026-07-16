@@ -24,7 +24,7 @@ export function CodePanel({
   const codes = [code ? { code, label } : null, ...secondaryCodes].filter(Boolean) as { code: string; label: string }[];
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)]">
+    <section className="rounded-xl border border-slate-200 bg-white p-5">
       <div className="mb-4 flex items-center gap-2">
         <Building2 size={18} />
         <h3 className="text-lg font-semibold uppercase tracking-wide text-slate-700">{title}</h3>

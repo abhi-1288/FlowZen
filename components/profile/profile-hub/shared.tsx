@@ -1,58 +1,54 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+﻿import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 export type AnyRecord = Record<string, unknown>;
 
-// ── Reusable Card ──
+// ── Card ──
 
 export function Card({
   children,
-  hover = true,
+  hover = false,
   padding = "md",
   className = "",
 }: {
   children: ReactNode;
   hover?: boolean;
-  padding?: "sm" | "md";
+  padding?: "sm" | "md" | "none";
   className?: string;
 }) {
-  const pad = padding === "sm" ? "p-4" : "p-6";
+  const pad = padding === "sm" ? "p-3" : padding === "md" ? "p-5" : "";
   return (
     <section
-      className={`rounded-2xl border border-slate-200 bg-white ${pad} shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] ${hover ? "transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]" : ""} ${className}`}
+      className={`rounded-card border border-border bg-surface ${pad} ${
+        hover ? "transition-default hover:bg-surface-secondary hover:shadow-card-hover" : ""
+      } ${className}`}
     >
       {children}
     </section>
   );
 }
 
-// ── Section Header with accent bar ──
-
-const accentMap: Record<string, string> = {
-  indigo: "border-indigo-500",
-  emerald: "border-emerald-500",
-  rose: "border-rose-500",
-  amber: "border-amber-500",
-  sky: "border-sky-500",
-  violet: "border-violet-500",
-  slate: "border-slate-400",
-  cyan: "border-cyan-500",
-  teal: "border-teal-500",
-};
+// ── Section Header ──
 
 export function SectionHeader({
   title,
   description,
-  accent = "slate",
+  accent,
+  action,
 }: {
   title: ReactNode;
   description?: string;
   accent?: string;
+  action?: ReactNode;
 }) {
-  const border = accentMap[accent] ?? "border-slate-400";
   return (
-    <div className={`mb-5 border-l-4 ${border} pl-4`}>
-      <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-      {description ? <p className="mt-0.5 text-sm text-slate-500">{description}</p> : null}
+    <div className="flex items-start justify-between gap-4">
+      <div>
+        <h3 className="text-title text-ink">{title}</h3>
+        {description ? (
+          <p className="mt-0.5 text-body text-muted">{description}</p>
+        ) : null}
+      </div>
+      {action ? <div className="shrink-0">{action}</div> : null}
     </div>
   );
 }
@@ -67,23 +63,21 @@ export function EmptyState({
   icon?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center gap-2 py-8 text-center">
-      {icon ? <span className="text-slate-300">{icon}</span> : null}
-      <p className="rounded-lg bg-slate-50 px-4 py-2 text-sm text-slate-500">
-        {message}
-      </p>
+    <div className="flex flex-col items-center gap-1.5 py-6 text-center">
+      {icon ? <span className="text-neutral-300">{icon}</span> : null}
+      <p className="text-body text-muted">{message}</p>
     </div>
   );
 }
 
-// ── Unified Action Button ──
+// ── Action Button ──
 
 const buttonVariants: Record<string, string> = {
-  primary: "bg-slate-950 text-white hover:bg-slate-800",
-  secondary: "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-  approve: "bg-emerald-600 text-white hover:bg-emerald-700",
-  danger: "border border-rose-200 text-rose-600 hover:bg-rose-50",
-  ghost: "text-slate-500 hover:text-slate-700 hover:bg-slate-50",
+  primary: "bg-slate-900 text-white hover:bg-slate-800 active:bg-slate-950",
+  secondary: "border border-border bg-surface text-ink hover:bg-surface-secondary active:bg-slate-100",
+  approve: "bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800",
+  danger: "border border-red-200 text-red-600 hover:bg-red-50 active:bg-red-100",
+  ghost: "text-muted hover:text-ink hover:bg-surface-secondary",
 };
 
 export function ActionButton({
@@ -96,7 +90,7 @@ export function ActionButton({
 }) {
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${buttonVariants[variant] ?? buttonVariants.secondary} ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${buttonVariants[variant] ?? buttonVariants.secondary} ${className}`}
       {...props}
     >
       {children}
@@ -104,18 +98,20 @@ export function ActionButton({
   );
 }
 
+// ── Row ──
+
 export function Row({ label, value }: { label: string; value?: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg px-3 py-2 transition-colors hover:bg-slate-50/80">
-      <dt className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-        {label}
-      </dt>
-      <dd className="text-right text-sm font-medium capitalize text-slate-900">
-        {value ?? <span className="text-slate-300">Not set</span>}
+    <div className="flex items-center justify-between gap-4 rounded-btn px-2.5 py-1.5 transition-default hover:bg-surface-secondary">
+      <dt className="text-overline uppercase text-muted">{label}</dt>
+      <dd className="text-right text-body font-medium text-ink">
+        {value ?? <span className="text-neutral-300">Not set</span>}
       </dd>
     </div>
   );
 }
+
+// ── Badge ──
 
 export function Badge({
   children,
@@ -125,21 +121,23 @@ export function Badge({
   variant?: "default" | "admin" | "hr" | "finance" | "success" | "warning";
 }) {
   const styles: Record<string, string> = {
-    default: "bg-slate-100 text-slate-700",
-    admin: "bg-gradient-to-r from-indigo-500 to-purple-600 text-white",
-    hr: "bg-gradient-to-r from-emerald-500 to-teal-600 text-white",
-    finance: "bg-gradient-to-r from-amber-500 to-orange-600 text-white",
-    success: "bg-emerald-100 text-emerald-700",
-    warning: "bg-amber-100 text-amber-700",
+    default: "bg-neutral-100 text-neutral-700 dark:bg-zinc-700 dark:text-zinc-300",
+    admin: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
+    hr: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400",
+    finance: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400",
+    success: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400",
+    warning: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400",
   };
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold tracking-wide shadow-sm ${styles[variant]}`}
+      className={`inline-flex items-center rounded-badge px-2 py-0.5 text-caption font-medium ${styles[variant]}`}
     >
       {children}
     </span>
   );
 }
+
+// ── Utilities ──
 
 export function displayNested(value: unknown, key: string, fallback: string) {
   if (!value || typeof value !== "object") return fallback;
@@ -171,6 +169,8 @@ export function formatRoleWithCustom(role: string, customRole: unknown, isSenior
   return baseRole;
 }
 
+// ── Avatar ──
+
 export function AvatarBadge({
   avatarUrl,
   name,
@@ -190,14 +190,14 @@ export function AvatarBadge({
       .map((word) => word[0]?.toUpperCase() ?? "")
       .join("") || "U";
 
-  const base = size === "lg" ? "h-14 w-14 text-base" : "h-10 w-10 text-sm";
-  const ring = showRing ? "ring-2 ring-emerald-400 ring-offset-2 ring-offset-slate-950" : "";
+  const base = size === "lg" ? "h-12 w-12 text-sm" : "h-8 w-8 text-xs";
+  const ring = showRing ? "ring-2 ring-emerald-400 ring-offset-2 ring-offset-white dark:ring-offset-[#0a0a0a]" : "";
 
   if (avatarUrl) {
     return (
       <img
         alt={`${name} avatar`}
-        className={`${base} rounded-full border border-slate-200 object-cover ${ring}`}
+        className={`${base} rounded-full border border-border object-cover ${ring}`}
         src={avatarUrl}
       />
     );
@@ -205,12 +205,14 @@ export function AvatarBadge({
 
   return (
     <div
-      className={`${base} grid place-items-center rounded-full bg-gradient-to-br from-emerald-500 to-emerald-700 font-semibold text-white shadow-sm ${ring}`}
+      className={`${base} grid place-items-center rounded-full bg-neutral-100 font-medium text-neutral-600 dark:bg-zinc-700 dark:text-zinc-300 ${ring}`}
     >
       {initials}
     </div>
   );
 }
+
+// ── History Card ──
 
 export function HistoryCard({
   title,
@@ -223,18 +225,18 @@ export function HistoryCard({
 }) {
   return (
     <Card>
-      <SectionHeader title={title} description={hint || undefined} accent="slate" />
-      <div className="mt-4 space-y-2">
+      <SectionHeader title={title} description={hint || undefined} />
+      <div className="mt-3 space-y-1">
         {rows.length === 0 ? (
           <EmptyState message="No history yet." />
         ) : (
           rows.map((row, index) => (
             <div
-              className="flex justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-sm"
+              className="flex justify-between gap-3 rounded-btn px-2.5 py-1.5 text-body hover:bg-surface-secondary"
               key={`${row.label}-${index}`}
             >
-              <span className="text-slate-600">{row.label}</span>
-              <span className="font-medium text-slate-900">{row.value}</span>
+              <span className="text-muted">{row.label}</span>
+              <span className="font-medium text-ink">{row.value}</span>
             </div>
           ))
         )}
@@ -242,6 +244,8 @@ export function HistoryCard({
     </Card>
   );
 }
+
+// ── History Row Helpers ──
 
 export function toEmployeeHistoryRows(insights: AnyRecord | null) {
   const employee = insights?.employee as AnyRecord | undefined;

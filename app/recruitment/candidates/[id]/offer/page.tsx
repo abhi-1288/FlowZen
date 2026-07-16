@@ -91,7 +91,7 @@ export default function CandidateOfferLetterPage() {
             "bg-rose-50 text-rose-700"
           }`}>{offer.status}</span>
           <button
-            className="rounded-lg bg-slate-950 px-5 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            className="rounded-full bg-slate-950 px-5 py-2 text-sm font-medium text-white hover:bg-slate-800"
             onClick={() => window.print()}
           >
             Download PDF

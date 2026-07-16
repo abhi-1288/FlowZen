@@ -1,7 +1,7 @@
 import { ActionButton } from "../../shared";
 
-const overlayClass = "fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4";
-const modalClass = "w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl";
+const overlayClass = "fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4";
+const modalClass = "w-full max-w-md rounded-xl bg-white p-5 shadow-xl";
 
 export function RoleModal({
   member,
@@ -27,12 +27,12 @@ export function RoleModal({
   return (
     <div className={overlayClass}>
       <div className={modalClass}>
-        <h3 className="text-lg font-semibold text-slate-900">Change role</h3>
-        <p className="mt-1 text-sm text-slate-500">
+        <h3 className="text-sm font-semibold text-slate-900">Change role</h3>
+        <p className="mt-1 text-xs text-slate-500">
           Change role for <strong>{String(member.name ?? "")}</strong>.
         </p>
         <select
-          className="mt-4 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm"
+          className="mt-4 w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs"
           value={newRoleValue}
           onChange={(e) => onRoleChange(e.target.value)}
         >

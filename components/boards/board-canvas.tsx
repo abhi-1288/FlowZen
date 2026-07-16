@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
@@ -110,7 +110,7 @@ export function BoardCanvas({ boardId }: { boardId: string }) {
 
   return (
     <section className="flex h-screen flex-col">
-      <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
+      <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6 dark:border-zinc-800 dark:bg-[#000000]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-3">
@@ -227,7 +227,7 @@ export function BoardCanvas({ boardId }: { boardId: string }) {
         </div>
       </header>
 
-      <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-2 text-xs text-slate-500 sm:px-6">
+      <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-2 text-xs text-slate-500 sm:px-6 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-400">
         <CalendarDays size={14} />
         <span>{loading ? "Syncing..." : `${tasks.length} tasks tracked`}</span>
       </div>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/client-utils";
@@ -73,10 +73,10 @@ export function CompanyThemeSection({
   };
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+    <section className="rounded-xl border border-slate-200 bg-white p-5 dark:bg-[#000000] dark:border-zinc-800">
       <div className="mb-5 border-l-4 pl-4" style={{ borderColor: previewTokens.primary }}>
-        <h3 className="text-base font-semibold text-slate-900">Company Theme</h3>
-        <p className="mt-0.5 text-sm text-slate-500">
+        <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">Company Theme</h3>
+        <p className="mt-0.5 text-sm text-slate-500 dark:text-zinc-400">
           Choose an accent colour and contact info.
         </p>
       </div>
@@ -127,18 +127,18 @@ export function CompanyThemeSection({
       </div>
 
       {/* Contact section */}
-      <div className="mt-6 space-y-5 border-t border-slate-100 pt-5">
+      <div className="mt-6 space-y-5 border-t border-slate-100 pt-5 dark:border-zinc-800/50">
         <div className="flex items-center gap-2">
-          <h4 className="text-sm font-semibold text-slate-700">Contact</h4>
+          <h4 className="text-sm font-semibold text-slate-700 dark:text-zinc-300">Contact</h4>
         </div>
 
         <div>
-          <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
             <Mail size={14} /> Support Email
           </label>
           <input
             type="email"
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-zinc-800 dark:text-zinc-100 dark:bg-transparent"
             placeholder="support@company.com"
             value={supportEmail}
             onChange={(e) => setSupportEmail(e.target.value)}
@@ -146,12 +146,12 @@ export function CompanyThemeSection({
         </div>
 
         <div>
-          <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
             <Globe size={14} /> Website
           </label>
           <input
             type="text"
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-zinc-800 dark:text-zinc-100 dark:bg-transparent"
             placeholder="www.company.com"
             value={website}
             onChange={(e) => setWebsite(e.target.value)}
@@ -160,12 +160,12 @@ export function CompanyThemeSection({
       </div>
 
       {/* Save / Reset */}
-      <div className="mt-5 flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
+      <div className="mt-5 flex items-center justify-end gap-3 border-t border-slate-100 pt-4 dark:border-zinc-800/50">
         {colorChanged && (
           <button
             type="button"
             onClick={() => setSelected(currentColor)}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition-all hover:bg-slate-50"
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition-all hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
           >
             Reset Color
           </button>

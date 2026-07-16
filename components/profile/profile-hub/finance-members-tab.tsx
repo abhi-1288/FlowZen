@@ -259,7 +259,7 @@ export function FinanceMembersView({
   }
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+    <section className="rounded-xl border border-slate-200 bg-white p-5">
       <div className="mb-5 border-l-4 border-amber-500 pl-4">
         <h3 className="text-base font-semibold text-slate-900">Members</h3>
         <p className="mt-0.5 text-sm text-slate-500">View employee attendance, check-ins, leaves, holidays, and salary.</p>
@@ -340,7 +340,7 @@ export function FinanceMembersView({
       {/* Main Modal (Attendance or Salary) */}
       {modalType && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm transition-all" onClick={(e) => { if (e.target === e.currentTarget) { setModalType(null); setSelectedMemberId(null); } }}>
-          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-start justify-between mb-6">
               <div>
                 <h4 className="text-2xl font-bold text-slate-900">
@@ -546,7 +546,7 @@ export function FinanceMembersView({
       {/* Day detail modal */}
       {dayModal && (
         <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setDayModal(null); }}>
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between mb-5">
               <h4 className="text-xl font-bold text-slate-900">{new Date(dayModal.date).toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</h4>
               <button className="text-slate-400 hover:text-slate-800 bg-slate-100 rounded-full p-1.5" onClick={() => setDayModal(null)}><X size={20} /></button>
@@ -723,7 +723,7 @@ export function FinanceMembersView({
 
       {policyModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setPolicyModal(false); }}>
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-start justify-between mb-6">
               <div>
                 <h4 className="text-2xl font-bold text-slate-900">Company Policies</h4>
@@ -828,7 +828,7 @@ export function FinanceMembersView({
       {/* Check-Out Request Modal */}
       {checkOutModalRequest ? (
         <div className="fixed inset-0 z-[70] grid place-items-center bg-black/50 p-4 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setCheckOutModalRequest(null); }}>
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-lg font-bold text-slate-900">Check-Out Request</h4>
               <ActionButton variant="ghost" className="p-1" onClick={() => setCheckOutModalRequest(null)} aria-label="Close">

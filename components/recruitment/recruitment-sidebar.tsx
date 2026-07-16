@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
@@ -52,6 +52,12 @@ export function RecruitmentSidebar() {
   const [counts, setCounts] = useState<SidebarCounts | null>(null);
   const { showNotificationToast } = useNotificationToast();
   const sseRef = useRef<EventSource | null>(null);
+
+  const navigateToTab = (href: string) => {
+    if (window.location.pathname === href) return;
+    window.history.pushState(null, "", href);
+    window.dispatchEvent(new Event("flowzen:recruitment-navigation"));
+  };
 
   useEffect(() => {
     async function fetchNotificationCount() {
@@ -108,16 +114,16 @@ export function RecruitmentSidebar() {
   }, [session?.user?.id, showNotificationToast]);
 
   return (
-    <aside className="sticky top-0 hidden h-screen w-60 shrink-0 self-start overflow-y-auto border-r border-slate-800/60 bg-slate-950/95 text-white backdrop-blur-xl md:flex md:flex-col">
-      <div className="border-b border-slate-800/60 p-4">
+    <aside className="sticky top-0 hidden h-screen w-60 shrink-0 self-start overflow-y-auto border-r border-slate-200 bg-white dark:border-zinc-800 dark:bg-[#000000] md:flex md:flex-col">
+      <div className="border-b border-slate-200 p-4 dark:border-zinc-800">
         <div className="flex items-center gap-2">
-          <div className="relative h-8 w-8 overflow-hidden rounded-lg shadow-sm shadow-indigo-500/20">
+          <div className="relative h-8 w-8 overflow-hidden rounded-lg">
             <Image src="/Logos/logo.jpg" alt="FlowZen Logo" fill className="object-cover" />
           </div>
           <div>
-            <h1 className="text-sm font-bold tracking-tight">Recruitment</h1>
-            <p className="text-xs text-slate-400 capitalize">{session?.user?.company || "—"}</p>
-            <p className="text-xs text-slate-500 capitalize">{session?.user?.name} &middot; {session?.user?.role}</p>
+            <h1 className="text-sm font-bold tracking-tight text-slate-900 dark:text-zinc-100">Recruitment</h1>
+            <p className="text-xs text-slate-500 capitalize dark:text-zinc-400">{session?.user?.company || "—"}</p>
+            <p className="text-xs text-slate-400 capitalize dark:text-zinc-500">{session?.user?.name} &middot; {session?.user?.role}</p>
           </div>
         </div>
       </div>
@@ -140,8 +146,8 @@ export function RecruitmentSidebar() {
           const chips = (() => {
             const items: React.ReactNode[] = [];
             if (chip) {
-              items.push(<span key="o" className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-400" title={`${chip.open} open`}>{chip.open}</span>);
-              items.push(<span key="c" className="rounded bg-rose-500/20 px-1.5 py-0.5 text-[11px] font-semibold text-rose-400" title={`${chip.closed} closed`}>{chip.closed}</span>);
+              items.push(<span key="o" className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:bg-emerald-950" title={`${chip.open} open`}>{chip.open}</span>);
+              items.push(<span key="c" className="rounded bg-rose-50 px-1.5 py-0.5 text-[11px] font-semibold text-rose-600 dark:bg-rose-950" title={`${chip.closed} closed`}>{chip.closed}</span>);
             }
 
             return items.length > 0 ? <span className="flex items-center gap-1.5">{items}</span> : undefined;
@@ -152,14 +158,14 @@ export function RecruitmentSidebar() {
               active={isActive}
               icon={<item.icon size={16} />}
               label={item.label}
-              onClick={() => router.push(item.href)}
+              onClick={() => navigateToTab(item.href)}
               after={chips}
             />
           );
         })}
       </nav>
 
-      <div className="border-t border-slate-800/60 p-3">
+      <div className="border-t border-slate-200 p-3 dark:border-zinc-800">
         <NavButton
           active={pathname?.startsWith("/profile") ?? false}
           label={`Profile Center${unreadNotifications ? ` (${unreadNotifications})` : ""}`}
@@ -168,7 +174,7 @@ export function RecruitmentSidebar() {
         <button
           suppressHydrationWarning
           onClick={() => signOut({ callbackUrl: "/login" })}
-          className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-rose-400 transition-all hover:bg-white/10 hover:text-rose-300"
+          className="mt-1 flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-slate-500 transition-all hover:bg-slate-50 hover:text-slate-700 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
         >
           <LogOut size={16} />
           Sign out

@@ -12,7 +12,7 @@ export function DashboardCards({ dashboard }: { dashboard: FinanceDashboard }) {
 
 function Card({ label, value }: { label: string; value: string }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)]">
+    <section className="rounded-xl border border-slate-200 bg-white p-5">
       <p className="text-sm text-slate-500">{label}</p>
       <p className="mt-2 text-2xl font-semibold text-slate-950">{value}</p>
     </section>

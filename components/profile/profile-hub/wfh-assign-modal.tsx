@@ -59,7 +59,7 @@ export function WfhAssignModal({
 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
         <h3 className="text-xl font-bold text-slate-900">Assign Work From Home</h3>
         <p className="mt-1 text-sm text-slate-500">
           Assign Work From Home (WFH) dates for the company.
@@ -123,7 +123,7 @@ export function WfhAssignModal({
             <button
               type="submit"
               disabled={loading || !formData.startDate || !formData.reason}
-              className="flex-1 rounded-xl bg-slate-950 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition disabled:opacity-50"
+              className="flex-1 rounded-full bg-slate-950 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition disabled:opacity-50"
             >
               {loading ? "Assigning..." : "Assign WFH"}
             </button>

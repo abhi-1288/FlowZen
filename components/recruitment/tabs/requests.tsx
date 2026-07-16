@@ -46,15 +46,15 @@ export function RequestsTab() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-semibold text-slate-900">Requests</h1>
-          <div className="flex rounded-lg border border-slate-200 p-0.5">
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-zinc-100">Requests</h1>
+          <div className="flex rounded-lg border border-slate-200 p-0.5 dark:border-zinc-800">
             {tabs.map((t) => (
               <button
                 suppressHydrationWarning
                 key={t.key}
                 onClick={() => setSubTab(t.key)}
                 className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                  subTab === t.key ? "bg-slate-950 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"
+                  subTab === t.key ? "bg-slate-950 text-white shadow-sm" : "text-slate-600 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-100"
                 }`}
               >
                 {t.label}
@@ -64,7 +64,7 @@ export function RequestsTab() {
         </div>
         <button suppressHydrationWarning
           onClick={() => setShowRequestModal(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+          className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
         >
           <Plus size={16} />
           Request Job
@@ -78,7 +78,7 @@ export function RequestsTab() {
               <p className="text-slate-500">No requests yet.</p>
               <button suppressHydrationWarning
                 onClick={() => setShowRequestModal(true)}
-                className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
               >
                 <Plus size={16} />
                 Create your first request

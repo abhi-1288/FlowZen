@@ -614,7 +614,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
   );
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)]">
+    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <SectionHeader title="Security Dashboard" description="Verify identities, manage visitors, and monitor premises." accent="indigo" />
       {sectionNav}
 
@@ -624,7 +624,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
           <h3 className="mb-3 text-sm font-semibold text-slate-800">Verify Employee ID</h3>
           <div className="mb-4 flex gap-2">
             <input
-              className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              className="flex-1 rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
               placeholder="Search by name, email, or identity code..."
               value={verifyQuery}
               onChange={(e) => setVerifyQuery(e.target.value)}
@@ -917,11 +917,11 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
               ))}
             </div>
             <input type="date" value={logFrom} onChange={(e) => { setLogFrom(e.target.value); setLogPage(1); }}
-              className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              className="rounded-md border border-slate-200 px-2 py-1 text-[11px] outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
               title="From date"
             />
             <input type="date" value={logTo} onChange={(e) => { setLogTo(e.target.value); setLogPage(1); }}
-              className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              className="rounded-md border border-slate-200 px-2 py-1 text-[11px] outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
               title="To date"
             />
             <ActionButton variant="secondary" className="px-3 py-1.5 text-xs" disabled={loadingLogs} onClick={loadEntryLogs}>
@@ -1285,8 +1285,8 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
 
           {/* Disable Access Popup */}
           {disableAccessPopup.show ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3">
-              <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-3">
+              <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
                 <h3 className="mb-3 text-sm font-semibold text-slate-800">Disable Building Access</h3>
                 <p className="mb-3 text-xs text-slate-500">Select zones to disable for the lost card:</p>
                 {(["office-entry", "parking", "cafeteria", "printer", "server-room", "attendance-card"] as const).map((z) => (
@@ -1311,8 +1311,8 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
 
           {/* Found Card Popup */}
           {foundPopup.show ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3">
-              <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-3">
+              <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
                 <h3 className="mb-3 text-sm font-semibold text-slate-800">Card Found</h3>
                 <p className="mb-3 text-xs text-slate-500">Was a replacement already issued for this card?</p>
                 <div className="flex gap-2">
@@ -1332,11 +1332,11 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
 
           {/* Complete Ticket Popup */}
           {completeTicketPopup.show ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3">
-              <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-3">
+              <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
                 <h3 className="mb-3 text-sm font-semibold text-slate-800">Complete Ticket</h3>
                 <p className="mb-3 text-xs text-slate-500">Add a follow-up note before completing this ticket:</p>
-                <textarea className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                <textarea className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                   rows={3} value={completeTicketNote} onChange={(e) => setCompleteTicketNote(e.target.value)} placeholder="Describe what was done..."
                 />
                 <div className="mt-4 flex justify-end gap-2">
@@ -1351,25 +1351,25 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
 
           {/* Print Card Popup */}
           {printCardPopup.show ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3">
-              <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-3">
+              <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
                 <h3 className="mb-4 text-sm font-semibold text-slate-800">Print New Card</h3>
                 <div className="space-y-3">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">Card Number *</label>
-                    <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                    <input className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                       value={printCardNumber} onChange={(e) => setPrintCardNumber(e.target.value)} placeholder="e.g. CARD-2026-0042"
                     />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">RFID UID (optional)</label>
-                    <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                    <input className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                       value={printRfidUid} onChange={(e) => setPrintRfidUid(e.target.value)} placeholder="e.g. 04A3B2C1"
                     />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">Expiry Date (optional)</label>
-                    <input type="date" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                    <input type="date" className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                       value={printExpiryDate} onChange={(e) => setPrintExpiryDate(e.target.value)}
                     />
                   </div>
@@ -1394,8 +1394,8 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
 
           {/* Verify Popup */}
           {verifyPopup.show ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3">
-              <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-3">
+              <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
                 <h3 className="mb-3 text-sm font-semibold text-slate-800">Verify Lost Card Report</h3>
                 <p className="text-xs text-slate-500">
                   This marks the report as <span className="font-medium text-slate-700">Under Verification</span> and notifies HR that the investigation is in progress.
@@ -1415,11 +1415,11 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
 
           {/* Reject Popup */}
           {rejectPopup.show ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3">
-              <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-3">
+              <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
                 <h3 className="mb-3 text-sm font-semibold text-slate-800">Reject Report</h3>
                 <p className="mb-3 text-xs text-slate-500">Provide a reason for rejection:</p>
-                <textarea className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                <textarea className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                   rows={3} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Enter rejection reason..."
                 />
                 <div className="mt-4 flex justify-end gap-2">

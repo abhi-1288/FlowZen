@@ -241,7 +241,7 @@ export function KickModal({
   if (!data) return null;
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
+      <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl">
         <h3 className="text-xl font-semibold text-slate-900">Kick employee {data.employeeName}?</h3>
         <p className="mt-2 text-sm text-slate-600">This action cannot be undone.<br />Type <span className="font-semibold text-rose-600">KICK</span> to confirm.</p>
         <input className="mt-4 w-full rounded-lg border border-slate-300 px-3 py-2.5" placeholder="Type KICK" value={confirmText} onChange={(event) => onTextChange(event.target.value)} />
@@ -270,7 +270,7 @@ export function DeleteTeamModal({
   if (!data) return null;
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
+      <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl">
         <h3 className="text-xl font-semibold text-slate-900">Delete team {data.teamName}?</h3>
         <p className="mt-2 text-sm text-slate-600">All employees will be removed from this team immediately.<br />Type <span className="font-semibold text-rose-600">DELETE</span> to confirm.</p>
         <input className="mt-4 w-full rounded-lg border border-slate-300 px-3 py-2.5" placeholder="Type DELETE" value={confirmText} onChange={(event) => onTextChange(event.target.value)} />
@@ -310,7 +310,7 @@ export function CompanyIconSection({
 }) {
   return (
     <>
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+      <section className="rounded-xl border border-slate-200 bg-white p-5">
         <div className="mb-4 flex items-center gap-2">
           <Building2 size={18} />
           <h3 className="text-lg font-semibold uppercase tracking-wide text-slate-700">Company Settings</h3>
@@ -373,7 +373,7 @@ export function DeleteConfirmModal({
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
         <h4 className="text-lg font-semibold">{title}</h4>
         <p className="mt-2 text-sm text-slate-600">{description}</p>
         <div className="mt-5 flex justify-end gap-3">

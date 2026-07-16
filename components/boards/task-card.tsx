@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { CSSProperties } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
@@ -74,7 +74,7 @@ export function TaskCard({
   return (
     <article
       className={cn(
-        "rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition hover:shadow-md",
+        "rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition hover:shadow-md dark:border-zinc-800 dark:bg-[#000000]",
         isDoneColumn && "border-emerald-500 ring-1 ring-emerald-200",
         isDueSoon && !isDoneColumn && "animate-pulse border-amber-300",
         isDueToday && !isDoneColumn && "border-rose-500 ring-1 ring-rose-200",
@@ -106,11 +106,11 @@ export function TaskCard({
           }}
           type="button"
         >
-          <h4 className="break-words text-sm font-semibold leading-5 text-slate-900">
+          <h4 className="break-words text-sm font-semibold leading-5 text-slate-900 dark:text-zinc-100">
             {task.title}
           </h4>
           {task.description ? (
-            <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">
+            <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500 dark:text-zinc-400">
               {task.description}
             </p>
           ) : null}

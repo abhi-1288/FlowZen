@@ -91,7 +91,7 @@ export function ImageCropModal({
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
-      <div className="flex w-full max-w-lg flex-col rounded-2xl bg-white shadow-2xl">
+      <div className="flex w-full max-w-lg flex-col rounded-2xl bg-white shadow-xl">
         <div className="border-b border-slate-200 px-6 py-4">
           <h4 className="text-lg font-semibold text-slate-900">Crop Image</h4>
         </div>

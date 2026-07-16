@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
@@ -87,6 +87,13 @@ export function ProfileHub() {
   const { data: session } = useSession();
   const router = useRouter();
   const pathname = usePathname();
+
+  useEffect(() => {
+    // Warm the top-level destinations while the profile shell is open so
+    // leaving this hub does not wait for a cold RSC navigation.
+    router.prefetch("/recruitment/candidates");
+    router.prefetch("/board");
+  }, [router]);
 
   // Parse tab from window location directly (reliable, not dependent on router)
   const getTabFromPath = (): { tab: Tab | undefined; showInvalid: boolean } => {
@@ -640,44 +647,40 @@ export function ProfileHub() {
   }, [profile]);
 
   return (
-    <main className="min-h-screen bg-[#f7f8fb] text-slate-950">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 flex-col border-r border-slate-800/60 bg-slate-950/95 text-white backdrop-blur-xl lg:flex">
-        <div className="shrink-0 p-5">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-3">
-              <div className="relative h-10 w-10 overflow-hidden rounded-xl shadow-lg shadow-indigo-500/20">
-                <Image
-                  src="/Logos/logo.jpg"
-                  alt="FlowZen Logo"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-              <h1 className="text-xl font-bold tracking-tight text-white">
-                FlowZen
-              </h1>
-            </div>
-            <div className="flex items-center gap-3 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800/80 p-2.5 ring-1 ring-slate-700/50">
-              <AvatarBadge
-                avatarUrl={avatarUrl}
-                name={displayName}
-                size="md"
-                showRing
+    <main className="min-h-screen bg-[#f7f8fb] text-slate-950 dark:bg-[#1a1a1a]">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex dark:bg-[#000000] dark:border-zinc-800">
+        <div className="shrink-0 p-4">
+          <div className="flex items-center gap-2.5">
+            <div className="relative h-8 w-8 overflow-hidden rounded-lg">
+              <Image
+                src="/Logos/logo.jpg"
+                alt="FlowZen Logo"
+                fill
+                className="object-cover"
               />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-slate-100 capitalize">
-                  {displayName}
-                </p>
-                <p className="truncate text-xs text-slate-400 capitalize">
-                  {displayRole}
-                </p>
-              </div>
+            </div>
+            <h1 className="text-sm font-semibold tracking-tight text-slate-900 dark:text-zinc-100">
+              FlowZen
+            </h1>
+          </div>
+          <div className="mt-4 flex items-center gap-2.5 rounded-lg bg-slate-50 p-2.5 dark:bg-zinc-700">
+            <AvatarBadge
+              avatarUrl={avatarUrl}
+              name={displayName}
+              size="md"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-slate-900 capitalize dark:text-zinc-100">
+                {displayName}
+              </p>
+              <p className="truncate text-[11px] text-slate-500 capitalize dark:text-zinc-400">
+                {displayRole}
+              </p>
             </div>
           </div>
-          <div className="mt-6 h-px bg-gradient-to-r from-indigo-500/40 via-violet-500/20 to-transparent" />
         </div>
-        <nav className="flex-1 space-y-1 overflow-y-auto px-5 pb-5 sidebar-scrollbar">
-          <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Users</p>
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4 sidebar-scrollbar">
+          <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Users</p>
           <NavButton
             active={tab === "dashboard"}
             icon={<LayoutDashboard size={16} />}
@@ -710,8 +713,8 @@ export function ProfileHub() {
           />
           {canViewMembersTab || canViewCompanyTabs ? (
             <>
-              <div className="my-3 h-px bg-slate-800/40" />
-              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Admin</p>
+              <div className="my-2 h-px bg-slate-100 dark:bg-zinc-700" />
+              <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Admin</p>
             </>
           ) : null}
           {canViewMembersTab ? (
@@ -772,8 +775,8 @@ export function ProfileHub() {
           ) : null}
           {canViewFinanceTab ? (
             <>
-              <div className="my-3 h-px bg-slate-800/40" />
-              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Finance</p>
+              <div className="my-2 h-px bg-slate-100 dark:bg-zinc-700" />
+              <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Finance</p>
               <NavButton
                 active={tab === "finance"}
                 icon={<Wallet size={16} />}
@@ -805,79 +808,71 @@ export function ProfileHub() {
             onClick={() => setTab("notifications")}
           />
           <Link
-            className="mt-4 flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400 transition-all hover:bg-white/10 hover:text-white"
+            className="mt-3 flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 dark:text-zinc-500 dark:hover:bg-zinc-700 dark:hover:text-zinc-400"
             href="/board"
           >
-            <ChevronRight size={14} className="-ml-0.5" />
+            <ChevronRight size={13} className="-ml-0.5" />
             Back to boards
           </Link>
         </nav>
       </aside>
 
-      <section className="lg:pl-72">
-        {/* ── Cover Banner ── */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 px-6 pb-8 pt-6 sm:px-10 sm:pb-10 sm:pt-8">
-          {/* Decorative blobs */}
-          <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-violet-500/20 blur-3xl" />
-
-          <div className="relative z-10 flex flex-wrap items-start justify-between gap-4">
-            {/* Avatar + Name + Role */}
-            <div className="flex items-center gap-5">
+      <section className="lg:pl-64">
+        {/* ── Header ── */}
+        <div className="border-b border-slate-200 bg-white px-6 py-5 sm:px-8 dark:bg-[#000000] dark:border-zinc-800">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
               <div className="relative shrink-0">
                 <AvatarBadge avatarUrl={avatarUrl} name={displayName} size="lg" />
-                <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-400 shadow-sm" />
+                <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white dark:border-[#0a0a0a] bg-emerald-400" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold tracking-tight text-white">
+                <h1 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-zinc-100">
                   {displayName}
                 </h1>
-                <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-3 py-0.5 text-xs font-semibold text-white backdrop-blur-sm">
-                    <ShieldCheck size={12} />
+                <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-zinc-700 dark:text-zinc-400">
+                    <ShieldCheck size={11} />
                     {displayRole}
                   </span>
-                  <span className="text-sm text-indigo-200">
+                  <span className="text-xs text-slate-400 dark:text-zinc-500">
                     {String(profile?.email ?? session?.user?.email ?? "")}
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* Logout */}
-            <button
-              className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition-all hover:bg-white/20"
-              onClick={() => signOut({ callbackUrl: "/login" })}
-            >
-              <LogOut size={15} />
-              Log out
-            </button>
-          </div>
-
-          {/* Info chips */}
-          <div className="relative z-10 mt-5 flex flex-wrap items-center gap-2">
-            {company?.name ? (
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-indigo-100 backdrop-blur-sm">
-                <Building2 size={13} />
-                {String(company.name)}
-              </span>
-            ) : null}
-            {team?.name ? (
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-indigo-100 backdrop-blur-sm">
-                <Users size={13} />
-                {String(team.name)}
-              </span>
-            ) : null}
-            {profile?.companyJoined ? (
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-indigo-100 backdrop-blur-sm">
-                <Calendar size={13} />
-                Joined {new Date(profile.companyJoined as string | Date).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
-              </span>
-            ) : null}
+            <div className="flex items-center gap-3">
+              {company?.name ? (
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 px-2.5 py-1 text-xs text-slate-500 dark:bg-zinc-700 dark:text-zinc-400">
+                   <Building2 size={12} />
+                  {String(company.name)}
+                </span>
+              ) : null}
+              {team?.name ? (
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 px-2.5 py-1 text-xs text-slate-500 dark:bg-zinc-700 dark:text-zinc-400">
+                   <Users size={12} />
+                  {String(team.name)}
+                </span>
+              ) : null}
+              {profile?.companyJoined ? (
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 px-2.5 py-1 text-xs text-slate-500 dark:bg-zinc-700 dark:text-zinc-400">
+                   <Calendar size={12} />
+                  {new Date(profile.companyJoined as string | Date).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+                </span>
+              ) : null}
+              <button
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                onClick={() => signOut({ callbackUrl: "/login" })}
+              >
+                <LogOut size={13} />
+                Log out
+              </button>
+            </div>
           </div>
 
           {/* Mobile tabs */}
-          <div className="relative z-10 mt-6 flex gap-1.5 overflow-x-auto lg:hidden">
+          <div className="mt-4 flex gap-1 overflow-x-auto lg:hidden">
             {mobileTabs.map((item) => {
               const label =
                 item === "attendance" && pendingAttendanceCount > 0
@@ -902,10 +897,10 @@ export function ProfileHub() {
 
               return (
                 <button
-                  className={`shrink-0 whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-medium transition-all duration-200 ${
+                  className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors duration-100 ${
                     tab === item
-                      ? "bg-white text-indigo-700 shadow-md"
-                      : "bg-white/10 text-white/80 backdrop-blur-sm hover:bg-white/20"
+                      ? "bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700"
                   }`}
                   key={item}
                   onClick={() => setTab(item)}
@@ -917,7 +912,7 @@ export function ProfileHub() {
           </div>
         </div>
 
-        <div className="p-5 sm:p-8">
+        <div className="bg-[#fafafa] p-5 sm:p-6 dark:bg-[#1a1a1a]">
           {loading ? (
             <ProfileSkeleton />
           ) : (
@@ -927,9 +922,9 @@ export function ProfileHub() {
                   className={`fixed bottom-8 left-1/2 z-[100] -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4 duration-300`}
                 >
                   <div
-                    className={`flex items-center gap-3 rounded-2xl px-6 py-4 shadow-2xl ring-1 ring-slate-950/5 backdrop-blur-md ${toast.type === "success"
-                      ? "bg-emerald-600/90 text-white"
-                      : "bg-rose-600/90 text-white"
+                    className={`flex items-center gap-2.5 rounded-xl px-5 py-3 shadow-lg ${toast.type === "success"
+                      ? "bg-emerald-600 text-white"
+                      : "bg-rose-600 text-white"
                       }`}
                   >
                     {toast.type === "success" ? (
@@ -947,16 +942,16 @@ export function ProfileHub() {
               {showInvalidRoute ? (
                 <div className="grid min-h-[60vh] place-items-center px-4">
                   <div className="max-w-md text-center">
-                    <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-amber-100">
-                      <svg className="h-10 w-10 text-amber-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                    <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-950">
+                      <svg className="h-8 w-8 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
                       </svg>
                     </div>
-                    <h2 className="text-2xl font-bold text-slate-900">Page not found</h2>
-                    <p className="mt-2 text-sm text-slate-500">The route <span className="font-medium text-slate-700">/profile/{window.location.pathname.replace("/profile/", "")}</span> doesn't exist.</p>
+                    <h2 className="text-xl font-semibold text-slate-900 dark:text-zinc-100">Page not found</h2>
+                    <p className="mt-1.5 text-sm text-slate-500 dark:text-zinc-400">The route <span className="font-medium text-slate-700 dark:text-zinc-300">/profile/{window.location.pathname.replace("/profile/", "")}</span> doesn't exist.</p>
                     <button
                       onClick={() => { router.push("/profile"); setShowInvalidRoute(false); }}
-                      className="mt-8 rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+                      className="mt-6 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
                     >
                       Go to profile
                     </button>

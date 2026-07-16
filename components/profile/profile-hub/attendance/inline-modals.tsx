@@ -25,7 +25,7 @@ export function AskModal({
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-slate-900">Ask</h3>
           <ActionButton variant="ghost" className="p-1" onClick={onClose} aria-label="Close">
@@ -102,7 +102,7 @@ export function RequestsModal({
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-slate-900">Requests</h3>
           <ActionButton variant="ghost" className="p-1" onClick={onClose} aria-label="Close">

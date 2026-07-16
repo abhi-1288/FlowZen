@@ -1,7 +1,7 @@
 import { ActionButton } from "../../shared";
 
 const overlayClass = "fixed inset-0 z-50 grid place-items-center bg-black/40";
-const modalClass = "w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl";
+const modalClass = "w-full max-w-md rounded-2xl bg-white p-6 shadow-xl";
 
 export function DeleteSalaryModal({
   deleteSalaryId,

@@ -358,7 +358,7 @@ export function MembersTab({
   }
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <SectionHeader title="Company Members" description="Manage roles, salaries, and memberships." accent="indigo" />
       <div className="mb-5 flex items-center gap-2">
         <div className="rounded-xl bg-slate-50 px-5 py-3 ring-1 ring-slate-100">
@@ -507,13 +507,13 @@ export function MembersTab({
 
       {/* ── Region Modal ── */}
       {regionModalMember ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-3">
+          <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
             <h3 className="mb-3 text-sm font-semibold text-slate-800">
               Assign Region — {String(regionModalMember.name ?? "")}
             </h3>
             <select
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
               value={regionLabelValue}
               onChange={(e) => setRegionLabelValue(e.target.value)}
             >
@@ -525,7 +525,7 @@ export function MembersTab({
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
-                className="rounded-lg border border-slate-300 px-4 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+                className="rounded-md border border-slate-300 px-4 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
                 onClick={() => setRegionModalMember(null)}
               >
                 Cancel

@@ -13,10 +13,10 @@ export default async function RecruitmentLayout({ children }: { children: React.
   if (!["admin", "human-resource", "project-manager", "qa-tester", "finance"].includes(role) && !isSeniorSecurity) redirect("/profile");
 
   return (
-    <div className="flex min-h-screen bg-[#f7f8fb]">
+    <div className="flex min-h-screen bg-app text-base">
       <RecruitmentSSEListener />
       <RecruitmentSidebar />
-      <main className="min-w-0 flex-1 overflow-y-auto">
+      <main className="min-w-0 flex-1 overflow-y-auto bg-app">
         {children}
       </main>
     </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { apiFetch } from "@/lib/client-utils";
 
 export function RangeExhaustionModal({
@@ -59,20 +59,20 @@ export function RangeExhaustionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-        <h3 className="text-lg font-semibold text-slate-900">Increase Identity Code Range</h3>
-        <p className="mt-2 text-sm text-slate-600">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-[#000000]">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Increase Identity Code Range</h3>
+        <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
           Your identity code range is {currentEndRange != null && currentNextNumber != null && (currentEndRange - currentNextNumber) <= 0 ? "exhausted" : "running low"}.
           {currentNextNumber != null ? ` Current next number: ${currentNextNumber}.` : ""}
           {currentEndRange != null ? ` Current end range: ${currentEndRange}.` : ""}
         </p>
 
         <div className="mt-4">
-          <label className="text-xs font-semibold uppercase text-slate-500" htmlFor="new-end-range">New end range</label>
+          <label className="text-xs font-semibold uppercase text-slate-500 dark:text-zinc-400" htmlFor="new-end-range">New end range</label>
           <input
             id="new-end-range"
             type="number"
-            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm"
+            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-800 dark:bg-[#000000]"
             placeholder={`e.g. ${suggestedEnd ?? 700000}`}
             value={newEndRange ?? ""}
             onChange={(e) => {
@@ -86,28 +86,28 @@ export function RangeExhaustionModal({
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-700"
               onClick={() => handleQuickIncrease(100)}
             >
               +100
             </button>
             <button
               type="button"
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-700"
               onClick={() => handleQuickIncrease(500)}
             >
               +500
             </button>
             <button
               type="button"
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-700"
               onClick={() => handleQuickIncrease(1000)}
             >
               +1000
             </button>
             <button
               type="button"
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-700"
               onClick={() => handleQuickIncrease(5000)}
             >
               +5000
@@ -116,11 +116,11 @@ export function RangeExhaustionModal({
         ) : null}
 
         <div className="mt-5 flex justify-end gap-3">
-          <button className="rounded-lg border border-slate-200 px-4 py-2 text-sm" onClick={onClose}>
+          <button className="rounded-full border border-slate-200 px-4 py-2 text-sm dark:border-zinc-800" onClick={onClose}>
             Cancel
           </button>
           <button
-            className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-full bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!newEndRange || loading}
             onClick={() => void handleSave()}
           >

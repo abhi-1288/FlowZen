@@ -39,7 +39,7 @@ export function HolidayModal({
 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
         <h3 className="text-xl font-bold text-slate-900">Add Holiday</h3>
         <p className="mt-1 text-sm text-slate-500">
           Create a future holiday for the organization.
@@ -119,7 +119,7 @@ export function HolidayModal({
             <button
               disabled={loading}
               type="submit"
-              className="rounded-lg bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+              className="rounded-full bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
             >
               {loading ? "Saving..." : "Save Holiday"}
             </button>
@@ -189,7 +189,7 @@ export function EditHolidayModal({
 
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200 relative">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200 relative">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-xl font-bold text-slate-900">Edit Holiday</h3>
@@ -287,7 +287,7 @@ export function EditHolidayModal({
               <button
                 disabled={loading}
                 type="submit"
-                className="rounded-lg bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                className="rounded-full bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
               >
                 {loading ? "Saving..." : "Save Changes"}
               </button>
@@ -298,7 +298,7 @@ export function EditHolidayModal({
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-[90] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
             <h3 className="text-xl font-bold text-slate-900">Confirm Delete</h3>
             <p className="mt-2 text-sm text-slate-500">
               Delete holiday "{String(holiday.title ?? "")}"? This action cannot
@@ -345,7 +345,7 @@ export function AdminLeaveHistoryModal({
 }) {
   return (
     <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/40 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-5xl rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200 overflow-hidden">
+      <div className="w-full max-w-5xl rounded-2xl bg-white shadow-xl ring-1 ring-slate-200 overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-100 p-6">
           <div>
             <h3 className="text-xl font-bold text-slate-900">
@@ -358,7 +358,7 @@ export function AdminLeaveHistoryModal({
           <div className="flex gap-2">
             <button
               onClick={onAddHoliday}
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition"
+              className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition"
             >
               Add Holiday
             </button>
@@ -372,7 +372,7 @@ export function AdminLeaveHistoryModal({
         </div>
 
         <div className="max-h-[70vh] overflow-y-auto p-6">
-          <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-slate-50">
+          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50">
             <table className="min-w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-slate-100">

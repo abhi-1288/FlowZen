@@ -47,16 +47,16 @@ export function NotificationsTab({
   const groupOrder = ["Today", "Yesterday", "This Week", "Earlier"];
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <SectionHeader title="Notifications" description="Join requests, project updates, and deadline notices." accent="violet" />
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <label className="text-xs font-medium text-slate-500">From</label>
-          <input type="date" className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" value={fromDate} onChange={(e) => onDateFilterChange(e.target.value, toDate)} />
+          <input type="date" className="rounded-md border border-slate-200 px-2 py-1 text-[11px]" value={fromDate} onChange={(e) => onDateFilterChange(e.target.value, toDate)} />
         </div>
         <div className="flex items-center gap-2">
           <label className="text-xs font-medium text-slate-500">To</label>
-          <input type="date" className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" value={toDate} onChange={(e) => onDateFilterChange(fromDate, e.target.value)} />
+          <input type="date" className="rounded-md border border-slate-200 px-2 py-1 text-[11px]" value={toDate} onChange={(e) => onDateFilterChange(fromDate, e.target.value)} />
         </div>
         {(fromDate || toDate) ? (
           <ActionButton variant="secondary" className="px-3 text-xs" onClick={() => onDateFilterChange("", "")}><X size={14} /> Clear</ActionButton>
@@ -78,7 +78,7 @@ export function NotificationsTab({
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">{group}</p>
                 <div className="space-y-3">
                   {items.map((item) => (
-                    <div className={`rounded-xl border p-4 transition-all duration-200 hover:shadow-sm ${item.readAt ? "border-slate-200 bg-slate-50 text-slate-500" : "border-emerald-200 bg-white shadow-sm hover:shadow-md"}`} key={String(item.id)}>
+                    <div className={`rounded-xl border p-4 hover:shadow-sm ${item.readAt ? "border-slate-200 bg-slate-50 text-slate-500" : "border-emerald-200 bg-white shadow-sm hover:shadow-md"}`} key={String(item.id)}>
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div className="flex gap-3">
                           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-700"><Bell size={18} /></div>
@@ -90,7 +90,7 @@ export function NotificationsTab({
                         </div>
                         <div className="flex shrink-0 gap-2 sm:flex-col">
                           {item.link ? (
-                            <a href={String(item.link)} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100" target="_blank" rel="noopener noreferrer">
+                            <a href={String(item.link)} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-100" target="_blank" rel="noopener noreferrer">
                               <ExternalLink size={14} /> View
                             </a>
                           ) : null}

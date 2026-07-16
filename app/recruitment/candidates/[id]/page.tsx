@@ -556,7 +556,7 @@ export default function CandidateProfilePage() {
                 onClick={() =>
                   setModal({ type: "schedule-interview", candidateId: id })
                 }
-                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                className="inline-flex items-center gap-1.5 rounded-full bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
               >
                 <Calendar size={14} /> Schedule Interview
               </button>
@@ -577,17 +577,17 @@ export default function CandidateProfilePage() {
               {activeCandidate.stage === "joined" && (
                 <button
                   onClick={() => setShowConvertModal(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700"
-                >
-                  <Briefcase size={14} /> Convert To Employee
+                className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700"
+              >
+                <Briefcase size={14} /> Convert To Employee
                 </button>
               )}
               {isSeniorSecurity && activeCandidate.stage === "joined" && (
                 <button
                   onClick={() => setShowConvertModal(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700"
-                >
-                  <Briefcase size={14} /> Convert To Junior Security
+                className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700"
+              >
+                <Briefcase size={14} /> Convert To Junior Security
                 </button>
               )}
               {activeCandidate.stage === "rejected" && (
@@ -697,7 +697,7 @@ export default function CandidateProfilePage() {
               </label>
               <button
                 onClick={handleAssign}
-                className="rounded-lg bg-slate-950 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                className="rounded-full bg-slate-950 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800"
               >
                 Assign
               </button>
@@ -898,7 +898,7 @@ export default function CandidateProfilePage() {
                                 interviewId: interview.id,
                               })
                             }
-                            className="rounded-lg bg-slate-950 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800"
+                            className="rounded-full bg-slate-950 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800"
                           >
                             Add Feedback
                           </button>
@@ -982,7 +982,7 @@ export default function CandidateProfilePage() {
                 <button
                   onClick={handleSaveNote}
                   disabled={!noteText.trim()}
-                  className="self-end rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                  className="self-end rounded-full bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
                 >
                   Save
                 </button>

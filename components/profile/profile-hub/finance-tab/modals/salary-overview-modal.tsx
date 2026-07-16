@@ -5,7 +5,7 @@ import type { SalaryModalTab } from "../types";
 import { getSalaryRole } from "../helpers";
 
 const overlayClass = "fixed inset-0 z-50 grid place-items-center bg-black/40";
-const modalClass = "flex max-h-[80vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl";
+const modalClass = "flex max-h-[80vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-xl";
 
 export function SalaryOverviewModal({
   show,
@@ -39,13 +39,13 @@ export function SalaryOverviewModal({
         </div>
         <div className="flex gap-2 border-b border-slate-200 px-6 py-3">
           <button
-            className={`rounded-lg px-4 py-1.5 text-xs font-medium transition-all ${salaryModalTab === "unpaid" ? "bg-rose-600 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
+            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${salaryModalTab === "unpaid" ? "bg-rose-600 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
             onClick={() => onTabChange("unpaid")}
           >
             Unpaid
           </button>
           <button
-            className={`rounded-lg px-4 py-1.5 text-xs font-medium transition-all ${salaryModalTab === "paid" ? "bg-emerald-600 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
+            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${salaryModalTab === "paid" ? "bg-emerald-600 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
             onClick={() => onTabChange("paid")}
           >
             Paid

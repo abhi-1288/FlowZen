@@ -77,7 +77,7 @@ function TextArea({ label, value, onChange, disabled = false }: { label: string;
 
 function Submit({ label, disabled, loading }: { label: string; disabled?: boolean; loading?: boolean }) {
   return (
-    <button className="flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50" type="submit" disabled={disabled || loading}>
+    <button className="flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50" type="submit" disabled={disabled || loading}>
       {loading && <span className="inline-block size-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />}
       {label}
     </button>

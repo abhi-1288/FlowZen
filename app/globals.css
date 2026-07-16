@@ -2,18 +2,77 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================
+   Semantic color tokens — flip in .dark
+   ============================================ */
 :root {
-  color-scheme: light;
+  --c-bg: #fafafa;
+  --c-bg-card: #ffffff;
+  --c-bg-elevated: #ffffff;
+  --c-bg-input: #ffffff;
+  --c-bg-hover: #f5f5f5;
+  --c-bg-muted: #f1f5f9;
+  --c-bg-code: #f1f5f9;
+  --c-bg-overlay: rgba(0, 0, 0, 0.4);
+
+  --c-text: #0f172a;
+  --c-text-secondary: #475569;
+  --c-text-muted: #94a3b8;
+  --c-text-inverse: #ffffff;
+
+  --c-border: #e2e8f0;
+  --c-border-light: #f1f5f9;
+  --c-border-strong: #cbd5e1;
+
+  --c-skeleton: #e2e8f0;
+  --c-skeleton-muted: #f1f5f9;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-dropdown: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --shadow-modal: 0 8px 30px rgba(0, 0, 0, 0.12);
 }
 
+.dark {
+  --c-bg: #1a1a1a;
+  --c-bg-card: #000000;
+  --c-bg-elevated: #242424;
+  --c-bg-input: #242424;
+  --c-bg-hover: #2a2a2a;
+  --c-bg-muted: #0f0f0f;
+  --c-bg-code: #0f0f0f;
+  --c-bg-overlay: rgba(0, 0, 0, 0.7);
+
+  --c-text: #e4e4e7;
+  --c-text-secondary: #a1a1aa;
+  --c-text-muted: #52525b;
+  --c-text-inverse: #1a1a1a;
+
+  --c-border: #2a2a2a;
+  --c-border-light: #222222;
+  --c-border-strong: #3f3f46;
+
+  --c-skeleton: #2a2a2a;
+  --c-skeleton-muted: #0f0f0f;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-dropdown: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-modal: 0 8px 30px rgba(0, 0, 0, 0.6);
+}
+
+/* ============================================
+   Base resets
+   ============================================ */
 * {
   box-sizing: border-box;
 }
 
 body {
   min-height: 100vh;
-  background: #f7f8fb;
-  color: #111827;
+  background: var(--c-bg);
+  color: var(--c-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 button,
@@ -23,44 +82,128 @@ select {
   font: inherit;
 }
 
+/* ============================================
+   Focus ring
+   ============================================ */
+*:focus-visible {
+  outline: 2px solid var(--color-primary, #2563eb);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ============================================
+   Selection
+   ============================================ */
+::selection {
+  background: var(--color-primary-bg, #eff6ff);
+}
+
+.dark ::selection {
+  background: rgba(99, 102, 241, 0.3);
+}
+
+/* Keep legacy Tailwind light utilities readable when the app is in OLED mode.
+   This provides a consistent baseline for older tabs that predate the semantic
+   surface classes below. Explicit dark:* utilities still take precedence. */
+@layer utilities {
+  .dark .bg-white { background-color: var(--c-bg-card) !important; }
+  .dark .bg-slate-50 { background-color: var(--c-bg) !important; }
+  .dark .bg-slate-100 { background-color: var(--c-bg-muted) !important; }
+  .dark .bg-slate-200 { background-color: var(--c-bg-hover) !important; }
+  .dark .bg-gray-50 { background-color: var(--c-bg) !important; }
+  .dark .bg-gray-100 { background-color: var(--c-bg-muted) !important; }
+  .dark .bg-gray-200 { background-color: var(--c-bg-hover) !important; }
+
+  .dark .text-slate-950,
+  .dark .text-slate-900,
+  .dark .text-gray-900 { color: var(--c-text) !important; }
+  .dark .text-slate-800,
+  .dark .text-slate-700,
+  .dark .text-gray-800,
+  .dark .text-gray-700 { color: var(--c-text-secondary) !important; }
+  .dark .text-slate-600,
+  .dark .text-slate-500,
+  .dark .text-gray-600,
+  .dark .text-gray-500 { color: var(--c-text-secondary) !important; }
+
+  .dark .border-slate-100,
+  .dark .border-slate-200,
+  .dark .border-gray-100,
+  .dark .border-gray-200 { border-color: var(--c-border) !important; }
+  .dark .placeholder\:text-slate-400::placeholder { color: var(--c-text-muted) !important; }
+}
+
+/* ============================================
+   Scrollbars
+   ============================================ */
 .task-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-color: var(--c-border) transparent;
 }
 
 .task-scrollbar::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 6px;
+  height: 6px;
 }
 
 .task-scrollbar::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--c-border);
   border-radius: 999px;
-  border: 3px solid transparent;
-  background-clip: content-box;
+}
+
+.task-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .sidebar-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+  scrollbar-color: var(--c-border) transparent;
 }
 
 .sidebar-scrollbar::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
 }
 
 .sidebar-scrollbar::-webkit-scrollbar-track {
   background: transparent;
-  margin: 4px 0;
 }
 
 .sidebar-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.25);
+  background: var(--c-border);
   border-radius: 999px;
   transition: background 0.2s ease;
 }
 
 .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.5);
+  background: var(--c-border-strong);
+}
+
+/* ============================================
+   Semantic Tailwind utilities
+   ============================================ */
+@layer utilities {
+  .transition-default {
+    @apply transition-colors duration-150 ease-out;
+  }
+
+  .bg-app       { background-color: var(--c-bg); }
+  .bg-card      { background-color: var(--c-bg-card); }
+  .bg-elevated  { background-color: var(--c-bg-elevated); }
+  .bg-input     { background-color: var(--c-bg-input); }
+  .bg-surface-hover { background-color: var(--c-bg-hover); }
+  .bg-muted     { background-color: var(--c-bg-muted); }
+  .bg-code      { background-color: var(--c-bg-code); }
+
+  .text-base    { color: var(--c-text); }
+  .text-sec     { color: var(--c-text-secondary); }
+  .text-dim     { color: var(--c-text-muted); }
+
+  .border-base  { border-color: var(--c-border); }
+  .border-lt    { border-color: var(--c-border-light); }
+  .border-str   { border-color: var(--c-border-strong); }
+
+  .shadow-card-v    { box-shadow: var(--shadow-card); }
+  .shadow-dropdown-v { box-shadow: var(--shadow-dropdown); }
+  .shadow-modal-v   { box-shadow: var(--shadow-modal); }
 }

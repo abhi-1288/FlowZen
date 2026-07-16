@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -55,12 +55,12 @@ export function JobsTab() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Job Openings</h1>
-          <p className="mt-1 text-sm text-slate-500">{totalJobs} jobs</p>
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-zinc-100">Job Openings</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">{totalJobs} jobs</p>
         </div>
         <button suppressHydrationWarning
           onClick={() => setModal({ type: "create-job" })}
-          className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+          className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
         >
           + New Job
         </button>
@@ -68,12 +68,12 @@ export function JobsTab() {
 
       <section>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-semibold text-slate-900">Published</h2>
+          <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100">Published</h2>
           <div className="flex items-center gap-3">
             <div className="relative max-w-xs flex-1">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
               <input
-                className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-slate-950"
+                className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-slate-950 dark:border-zinc-800"
                 placeholder="Search jobs..."
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
@@ -81,7 +81,7 @@ export function JobsTab() {
             </div>
             <select
               suppressHydrationWarning
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none"
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none dark:border-zinc-800"
               value={statusFilter}
               onChange={(e) => handleStatusChange(e.target.value)}
             >
@@ -96,31 +96,31 @@ export function JobsTab() {
         {loading && jobs.length === 0 ? (
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-40 animate-pulse rounded-xl bg-slate-200" />
+              <div key={i} className="h-40 animate-pulse rounded-xl bg-slate-200 dark:bg-zinc-700" />
             ))}
           </div>
         ) : jobs.length === 0 ? (
           <div className="mt-8 text-center">
-            <p className="text-slate-500">No published jobs found.</p>
+            <p className="text-slate-500 dark:text-zinc-400">No published jobs found.</p>
           </div>
         ) : (
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {jobs.map((job) => (
-              <div key={job.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
+              <div key={job.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-zinc-800 dark:bg-[#000000]">
                 <div className="flex items-start justify-between">
                   <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-base font-semibold text-slate-900">{job.title}</h3>
-                    <p className="text-sm text-slate-500">{job.department}</p>
+                    <h3 className="truncate text-base font-semibold text-slate-900 dark:text-zinc-100">{job.title}</h3>
+                    <p className="text-sm text-slate-500 dark:text-zinc-400">{job.department}</p>
                   </div>
                   <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    job.status === "open" ? "bg-emerald-50 text-emerald-700" :
-                    job.status === "draft" ? "bg-amber-50 text-amber-700" :
-                    "bg-slate-100 text-slate-600"
+                    job.status === "open" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" :
+                    job.status === "draft" ? "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400" :
+                    "bg-slate-100 text-slate-600 dark:bg-zinc-700 dark:text-zinc-400"
                   }`}>
                     {job.status}
                   </span>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-x-2 gap-y-1 text-xs text-slate-500">
+                <div className="mt-3 flex flex-wrap gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-zinc-400">
                   <span>{job.location || "Remote"}</span>
                   <span>&middot;</span>
                   <span>{job.employmentType}</span>
@@ -146,20 +146,20 @@ export function JobsTab() {
                 <div className="mt-4 flex items-center gap-2">
                   <button suppressHydrationWarning
                     onClick={() => router.push(`/recruitment/jobs/${job.id}`)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
                   >
                     <Eye size={14} /> View
                   </button>
                   <button suppressHydrationWarning
                     onClick={() => { setModal({ type: "edit-job", jobId: job.id }); }}
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
                   >
                     <Pencil size={14} /> Edit
                   </button>
                   {job.status === "draft" && isAdmin && (
                     <button suppressHydrationWarning
                       onClick={() => { void updateJob(job.id, { status: "open" as JobStatus }); }}
-                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50"
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50 dark:border-zinc-800 dark:hover:bg-emerald-950"
                     >
                       <Globe size={14} /> Publish
                     </button>
@@ -172,7 +172,7 @@ export function JobsTab() {
                         const url = slug ? `${window.location.origin}/careers/jobs/${slug}/${job.id}` : "";
                         if (url) navigator.clipboard.writeText(url).then(() => { setCopiedJobId(job.id); setTimeout(() => setCopiedJobId(null), 2000); });
                       }}
-                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:border-zinc-800 dark:hover:bg-indigo-950"
                     >
                       {copiedJobId === job.id ? <Check size={14} /> : <Share2 size={14} />} {copiedJobId === job.id ? "Copied" : "Share"}
                     </button>
@@ -180,7 +180,7 @@ export function JobsTab() {
                   {job.status === "open" && isAdmin && (
                     <button suppressHydrationWarning
                       onClick={() => { void updateJob(job.id, { status: "closed" as JobStatus }); }}
-                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50"
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:border-zinc-800 dark:hover:bg-rose-950"
                     >
                       <Globe size={14} /> Close
                     </button>
@@ -199,17 +199,17 @@ export function JobsTab() {
 
         {totalPages > 1 && (
           <div className="mt-6 flex items-center justify-center gap-2">
-            <button suppressHydrationWarning onClick={() => setPage(1)} disabled={page === 1} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed">
+            <button suppressHydrationWarning onClick={() => setPage(1)} disabled={page === 1} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700">
               <ChevronsLeft size={16} />
             </button>
-            <button suppressHydrationWarning onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed">
+            <button suppressHydrationWarning onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700">
               <ChevronLeft size={16} />
             </button>
-            <span className="px-3 text-sm text-slate-600">Page {page} of {totalPages}</span>
-            <button suppressHydrationWarning onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed">
+            <span className="px-3 text-sm text-slate-600 dark:text-zinc-400">Page {page} of {totalPages}</span>
+            <button suppressHydrationWarning onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700">
               <ChevronRight size={16} />
             </button>
-            <button suppressHydrationWarning onClick={() => setPage(totalPages)} disabled={page === totalPages} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed">
+            <button suppressHydrationWarning onClick={() => setPage(totalPages)} disabled={page === totalPages} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700">
               <ChevronsRight size={16} />
             </button>
           </div>
@@ -232,16 +232,16 @@ function JobModals() {
   if (modal.type === "delete-job" && deletingJob) {
     return (
       <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/35 px-4">
-        <div className="w-full max-w-sm rounded-lg bg-white shadow-soft">
+        <div className="w-full max-w-sm rounded-lg bg-white shadow-soft dark:bg-[#000000]">
           <div className="p-5">
-            <h2 className="text-base font-semibold text-slate-900">Delete Job</h2>
-            <p className="mt-2 text-sm text-slate-600">
+            <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100">Delete Job</h2>
+            <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
               Delete &ldquo;{deletingJob.title}&rdquo;? This will permanently delete the job and all associated candidates, interviews, offers, and uploaded resumes.
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <button suppressHydrationWarning
                 onClick={() => setModal(null)}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
               >
                 Cancel
               </button>
@@ -291,30 +291,30 @@ function JobModals() {
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/35 px-4">
-      <div className="w-full max-w-lg rounded-lg bg-white shadow-soft">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+      <div className="w-full max-w-lg rounded-lg bg-white shadow-soft dark:bg-[#000000]">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-zinc-800">
           <h2 className="text-base font-semibold">{isEdit ? "Edit Job" : "New Job"}</h2>
-          <button suppressHydrationWarning className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100" onClick={() => setModal(null)} type="button">
+          <button suppressHydrationWarning className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-zinc-700" onClick={() => setModal(null)} type="button">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
         </div>
         <form className="space-y-4 p-5 max-h-[80vh] overflow-y-auto" onSubmit={handleSubmit}>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block sm:col-span-2">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Title *</span>
-              <input name="title" defaultValue={editingJob?.title || ""} required className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+              <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Title *</span>
+              <input name="title" defaultValue={editingJob?.title || ""} required className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
             </label>
             <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Department *</span>
-              <input name="department" defaultValue={editingJob?.department || ""} required className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+              <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Department *</span>
+              <input name="department" defaultValue={editingJob?.department || ""} required className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
             </label>
             <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Location</span>
-              <input name="location" defaultValue={editingJob?.location || ""} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+              <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Location</span>
+              <input name="location" defaultValue={editingJob?.location || ""} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
             </label>
             <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Employment Type</span>
-              <select suppressHydrationWarning name="employmentType" defaultValue={editingJob?.employmentType || "full-time"} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none">
+              <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Employment Type</span>
+              <select suppressHydrationWarning name="employmentType" defaultValue={editingJob?.employmentType || "full-time"} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none dark:border-zinc-800">
                 <option value="full-time">Full Time</option>
                 <option value="part-time">Part Time</option>
                 <option value="contract">Contract</option>
@@ -322,16 +322,16 @@ function JobModals() {
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Min Salary</span>
-              <input name="salaryRangeMin" type="number" defaultValue={editingJob?.salaryRangeMin || 0} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+              <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Min Salary</span>
+              <input name="salaryRangeMin" type="number" defaultValue={editingJob?.salaryRangeMin || 0} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
             </label>
             <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Max Salary</span>
-              <input name="salaryRangeMax" type="number" defaultValue={editingJob?.salaryRangeMax || 0} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+              <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Max Salary</span>
+              <input name="salaryRangeMax" type="number" defaultValue={editingJob?.salaryRangeMax || 0} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
             </label>
             <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Currency</span>
-              <select suppressHydrationWarning name="currency" defaultValue={editingJob?.currency || "INR"} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none">
+              <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Currency</span>
+              <select suppressHydrationWarning name="currency" defaultValue={editingJob?.currency || "INR"} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none dark:border-zinc-800">
                 <option value="INR">₹ INR</option>
                 <option value="USD">$ USD</option>
                 <option value="EUR">€ EUR</option>
@@ -340,30 +340,30 @@ function JobModals() {
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Salary Type</span>
-              <select suppressHydrationWarning name="salaryType" defaultValue={editingJob?.salaryType || "per-annum"} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none">
+              <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Salary Type</span>
+              <select suppressHydrationWarning name="salaryType" defaultValue={editingJob?.salaryType || "per-annum"} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none dark:border-zinc-800">
                 <option value="per-annum">Per Annum</option>
                 <option value="per-month">Per Month</option>
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Openings</span>
-              <input name="openings" type="number" min="1" defaultValue={editingJob?.openings || 1} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+              <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Openings</span>
+              <input name="openings" type="number" min="1" defaultValue={editingJob?.openings || 1} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
             </label>
             <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Auto-Close Date</span>
-              <input name="autoCloseDate" type="date" defaultValue={editingJob?.autoCloseDate ? editingJob.autoCloseDate.split("T")[0] : ""} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+              <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Auto-Close Date</span>
+              <input name="autoCloseDate" type="date" defaultValue={editingJob?.autoCloseDate ? editingJob.autoCloseDate.split("T")[0] : ""} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
             </label>
           </div>
           <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">Required Skills (comma separated)</span>
-            <input name="requiredSkills" defaultValue={editingJob?.requiredSkills?.join(", ") || ""} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+            <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Required Skills (comma separated)</span>
+            <input name="requiredSkills" defaultValue={editingJob?.requiredSkills?.join(", ") || ""} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
           </label>
           <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">Description</span>
-            <textarea name="description" defaultValue={editingJob?.description || ""} rows={4} className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+            <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Description</span>
+            <textarea name="description" defaultValue={editingJob?.description || ""} rows={4} className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
           </label>
-          <button suppressHydrationWarning type="submit" disabled={saving} className="w-full rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50">
+          <button suppressHydrationWarning type="submit" disabled={saving} className="w-full rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50">
             {saving ? "Saving..." : isEdit ? "Save Changes" : "Create Job"}
           </button>
         </form>

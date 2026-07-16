@@ -82,8 +82,8 @@ export function PoliciesSection({
                   <p className="text-xs text-slate-500">Fixed deduction from salary</p>
                 </div>
                 <div className="flex gap-2">
-                  <button className={`rounded-lg px-3 py-1.5 text-xs font-medium ${foodOptedIn ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`} onClick={() => onToggleOptInOut("food", true)}>Active</button>
-                  <button className={`rounded-lg px-3 py-1.5 text-xs font-medium ${!foodOptedIn ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`} onClick={() => onToggleOptInOut("food", false)}>Opt Out</button>
+                  <button className={`rounded-full px-3 py-1.5 text-xs font-medium ${foodOptedIn ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`} onClick={() => onToggleOptInOut("food", true)}>Active</button>
+                  <button className={`rounded-full px-3 py-1.5 text-xs font-medium ${!foodOptedIn ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`} onClick={() => onToggleOptInOut("food", false)}>Opt Out</button>
                 </div>
               </div>
             ) : null}
@@ -94,8 +94,8 @@ export function PoliciesSection({
                   <p className="text-xs text-slate-500">Fixed deduction from salary</p>
                 </div>
                 <div className="flex gap-2">
-                  <button className={`rounded-lg px-3 py-1.5 text-xs font-medium ${travelOptedIn ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`} onClick={() => onToggleOptInOut("travel", true)}>Active</button>
-                  <button className={`rounded-lg px-3 py-1.5 text-xs font-medium ${!travelOptedIn ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`} onClick={() => onToggleOptInOut("travel", false)}>Opt Out</button>
+                  <button className={`rounded-full px-3 py-1.5 text-xs font-medium ${travelOptedIn ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`} onClick={() => onToggleOptInOut("travel", true)}>Active</button>
+                  <button className={`rounded-full px-3 py-1.5 text-xs font-medium ${!travelOptedIn ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`} onClick={() => onToggleOptInOut("travel", false)}>Opt Out</button>
                 </div>
               </div>
             ) : null}
@@ -119,7 +119,7 @@ export function PoliciesSection({
               </div>
             </div>
             <div className="flex justify-end">
-              <button className="rounded-lg bg-slate-950 text-white px-4 py-1.5 text-xs font-medium" onClick={onSavePercentages}>Save Percentages</button>
+              <button className="rounded-full bg-slate-950 text-white px-4 py-1.5 text-xs font-medium" onClick={onSavePercentages}>Save Percentages</button>
             </div>
           </div>
         ) : policyData ? (
@@ -139,13 +139,13 @@ export function PoliciesSection({
             {canConfigure ? (
               <div className="flex gap-2">
                 <button
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium ${policyData.advanceSalaryEnabled ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`}
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium ${policyData.advanceSalaryEnabled ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`}
                   onClick={() => onToggleAdvanceSalary?.(true)}
                 >
                   Enabled
                 </button>
                 <button
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium ${!policyData.advanceSalaryEnabled ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`}
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium ${!policyData.advanceSalaryEnabled ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`}
                   onClick={() => onToggleAdvanceSalary?.(false)}
                 >
                   Disabled

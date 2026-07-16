@@ -12,7 +12,7 @@ export function CheckOutRequestsListModal({
 }) {
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200">
+      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl ring-1 ring-slate-200">
         <div className="flex items-center justify-between border-b border-slate-100 p-6">
           <div>
             <h3 className="text-xl font-bold text-slate-900">Check-Out Requests</h3>
@@ -143,7 +143,7 @@ export function CheckOutRequestModal({
 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-slate-900">Request Check-Out</h3>
           <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:text-slate-600 transition">
@@ -206,7 +206,7 @@ export function CheckOutRequestModal({
           <button
             onClick={handleSubmit}
             disabled={loading || !selectedId}
-            className="rounded-lg bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+            className="rounded-full bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
           >
             {loading ? "Sending..." : "Request"}
           </button>

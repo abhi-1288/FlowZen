@@ -127,7 +127,7 @@ function ScheduleInterviewModal({
           </label>
           <button
             type="submit"
-            className="w-full rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+            className="w-full rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
           >
             Schedule
           </button>
@@ -237,7 +237,7 @@ function AddFeedbackModal({
           </label>
           <button
             type="submit"
-            className="w-full rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+            className="w-full rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
           >
             Submit Feedback
           </button>
@@ -332,7 +332,7 @@ function EditInterviewModal({
           </label>
           <button
             type="submit"
-            className="w-full rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+            className="w-full rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
           >
             Update
           </button>

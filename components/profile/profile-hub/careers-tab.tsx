@@ -43,7 +43,7 @@ export function CareersTab() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)]">
+      <div className="rounded-xl border border-slate-200 bg-white p-5">
         <h2 className="text-lg font-semibold text-slate-900">Career Openings</h2>
         <p className="mt-1 text-sm text-slate-500">
           {loading ? "Loading..." : `${jobs.length} open position${jobs.length !== 1 ? "s" : ""} in your company`}

@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+﻿import { Trash2 } from "lucide-react";
 import { FormEvent } from "react";
 import { ActionButton, SectionHeader } from "../shared";
 
@@ -20,17 +20,17 @@ export function SecuritySection({
   onDeleteAccount: () => void;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+    <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-zinc-800 dark:bg-[#000000]">
       <SectionHeader title="Security" description="Password &amp; account management" accent="rose" />
       {passwordResetRequired ? (
-        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
+        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-950 dark:text-amber-400">
           You signed in with a reset link. Create a new password to finish securing your account.
         </p>
       ) : null}
       <form className="mt-4 space-y-3" onSubmit={onUpdatePassword}>
         {!passwordResetRequired ? (
           <input
-            className="w-full rounded-lg border border-slate-200 px-3 py-2.5"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2.5 dark:border-zinc-800 dark:bg-[#000000]"
             placeholder="Current password"
             type="password"
             value={currentPassword}
@@ -38,7 +38,7 @@ export function SecuritySection({
           />
         ) : null}
         <input
-          className="w-full rounded-lg border border-slate-200 px-3 py-2.5"
+          className="w-full rounded-lg border border-slate-200 px-3 py-2.5 dark:border-zinc-800 dark:bg-[#000000]"
           placeholder="New password"
           type="password"
           value={newPassword}

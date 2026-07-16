@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import {
@@ -189,7 +189,7 @@ export function CompanyCalendarTab() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-[#000000]">
         <h2 className="mb-4 flex items-center gap-2 text-base font-bold text-slate-900">
           <Calendar size={18} className="text-indigo-600" />
           Company Calendar
@@ -202,11 +202,11 @@ export function CompanyCalendarTab() {
             <ActionButton onClick={prevMonth} variant="secondary" className="h-10 w-12">
               <ChevronLeft size={20} />
             </ActionButton>
-            <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 shadow-sm">
-              <div className="border-r border-slate-200 bg-slate-50 px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-600">
+            <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 shadow-sm dark:border-zinc-800">
+              <div className="border-r border-slate-200 bg-slate-50 px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-600 dark:border-zinc-800 dark:bg-zinc-700 dark:text-zinc-300">
                 {MONTHS[month]}
               </div>
-              <div className="bg-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-900">
+              <div className="bg-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-900 dark:bg-[#000000] dark:text-zinc-100">
                 {year}
               </div>
             </div>
@@ -217,15 +217,15 @@ export function CompanyCalendarTab() {
         </div>
 
         {/* ── Calendar Grid ── */}
-        <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4">
+        <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 dark:border-zinc-800 dark:bg-[#000000]">
           <div className="grid grid-cols-7 gap-3">
             {WEEKDAYS.map((wd, i) => (
               <div
                 key={wd}
                 className={`flex flex-col gap-3 rounded-2xl p-2 pb-6 transition-all ${
                   i === 0
-                    ? "bg-rose-50/50 text-rose-600 border border-rose-100/50"
-                    : "bg-emerald-50/50 text-emerald-600 border border-emerald-100/50"
+                    ? "bg-rose-50/50 text-rose-600 border border-rose-100/50 dark:bg-rose-950/30 dark:border-rose-900/50"
+                    : "bg-emerald-50/50 text-emerald-600 border border-emerald-100/50 dark:bg-emerald-950/30 dark:border-emerald-900/50"
                 }`}
               >
                 <span className="text-center text-[10px] font-black uppercase tracking-tighter sm:text-xs">
@@ -256,8 +256,8 @@ export function CompanyCalendarTab() {
                             ? primaryType
                               ? `${style?.bg} ${style?.text} ${style?.border} border shadow-sm`
                               : isToday
-                                ? "bg-white text-rose-600 border border-rose-200 shadow-sm"
-                                : "bg-white shadow-sm border border-slate-100 text-slate-700 hover:border-slate-300"
+                                ? "bg-white text-rose-600 border border-rose-200 shadow-sm dark:bg-zinc-700 dark:border-rose-900"
+                                : "bg-white shadow-sm border border-slate-100 text-slate-700 hover:border-slate-300 dark:bg-zinc-700 dark:border-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-600"
                             : "opacity-0"
                         } ${isToday && !primaryType ? "ring-2 ring-inset ring-rose-300" : ""} ${day ? "cursor-pointer" : "cursor-default"}`}
                       >
@@ -282,7 +282,7 @@ export function CompanyCalendarTab() {
         </div>
 
         {/* ── Legend ── */}
-        <div className="mt-6 flex flex-wrap justify-center gap-6 text-xs font-semibold text-slate-600 bg-slate-50 py-3 px-6 rounded-full w-fit mx-auto border border-slate-200">
+        <div className="mt-6 flex flex-wrap justify-center gap-6 text-xs font-semibold text-slate-600 bg-slate-50 py-3 px-6 rounded-full w-fit mx-auto border border-slate-200 dark:bg-[#000000] dark:border-zinc-800 dark:text-zinc-300">
           {Object.entries(EVENT_STYLES).filter(([key]) => (groupedEvents[key] ?? []).length > 0).map(([key, s]) => (
             <div key={key} className="flex items-center gap-2">
               <span className={`h-3.5 w-3.5 rounded-full ${s.bg} border ${s.border}`}></span>
@@ -301,7 +301,7 @@ export function CompanyCalendarTab() {
             <button
               key={key}
               onClick={() => setSelectedType(key)}
-              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:shadow-md hover:border-slate-300 text-left w-full"
+              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:shadow-md hover:border-slate-300 text-left w-full dark:border-zinc-800 dark:bg-[#000000] dark:hover:border-zinc-600"
             >
               <div className="flex items-center gap-3">
                 <div className={`rounded-lg ${s.bg} p-2.5`}>

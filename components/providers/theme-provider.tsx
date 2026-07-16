@@ -5,6 +5,25 @@ import { useEffect, useMemo } from "react";
 import { deriveThemeTokens } from "@/lib/theme";
 
 const LS_KEY = "flowzen_companyColor";
+export const THEME_KEY = "flowzen_theme";
+export type ThemePreference = "light" | "dark" | "system";
+
+export function getThemePreference(): ThemePreference {
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved === "light" || saved === "dark" || saved === "system") return saved;
+    // Migrate the old boolean preference.
+    if (localStorage.getItem("flowzen_darkMode") === "true") return "dark";
+  } catch {}
+  return "system";
+}
+
+export function applyTheme(preference: ThemePreference) {
+  const isDark = preference === "dark" ||
+    (preference === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.classList.toggle("dark", isDark);
+  document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+}
 
 function getPersistedColor(): string | null {
   try {
@@ -23,6 +42,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (!color) return null;
     return deriveThemeTokens(color);
   }, [session?.user?.companyColor]);
+
+  useEffect(() => {
+    const preference = getThemePreference();
+    applyTheme(preference);
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => { if (getThemePreference() === "system") applyTheme("system"); };
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     if (!tokens) return;

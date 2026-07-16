@@ -29,10 +29,10 @@ export function DayEventsModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-md">
-      <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-black/30 p-4">
+      <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl ring-1 ring-slate-200">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold flex items-center gap-2">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
             <Calendar size={18} className="text-indigo-600" />
             {date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
           </h3>

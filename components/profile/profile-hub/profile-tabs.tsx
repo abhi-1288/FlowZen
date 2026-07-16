@@ -24,6 +24,7 @@ import { AnyRecord, formatRoleWithCustom } from "./shared";
 import { WfhAdminSection, type WfhAdminState } from "./sections/wfh-admin-section";
 import { CompanyThemeSection } from "./sections/company-theme-section";
 import { CompanyAddressSection } from "./sections/company-address-section";
+import { AppearanceSection } from "./sections/appearance-section";
 import dynamic from "next/dynamic";
 
 const IdCardModal = dynamic(
@@ -100,7 +101,7 @@ export function ProfileTab({
   const effectiveBaseSalary = inApprovedCompany ? Math.max(Number(insights?.baseSalary ?? 0), 0) : 0;
   const joinedBy = (insights?.joinedBy as AnyRecord | undefined) ?? null;
   const passwordResetRequired = Boolean(profile?.passwordResetRequired);
-  const sectionClass = "rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]";
+  const sectionClass = "rounded-xl border border-slate-200 bg-white p-5";
   const avatarUrl = profile?.avatarUrl ? String(profile.avatarUrl) : "";
   const displayName = profile?.name ? String(profile.name) : session?.user?.name ? String(session.user.name) : "User";
   const managerTeams = Array.isArray((insights?.manager as AnyRecord | undefined)?.teams) ? ((insights?.manager as AnyRecord).teams as AnyRecord[]) : [];
@@ -366,7 +367,9 @@ export function ProfileTab({
         </div>
       ) : null}
 
-      <div className="grid gap-5 xl:grid-cols-2">
+      <AppearanceSection />
+
+      <div className="grid gap-4 xl:grid-cols-2">
         <PersonalInfoSection profile={profile} session={session as { user?: { name?: string; email?: string } } | null} avatarUrl={avatarUrl} displayName={displayName}
           uploading={uploading} onAvatarDelete={() => setAvatarDeleteModal(true)}
           onAvatarFileSelect={(file) => setAvatarCropFile(file)}
@@ -481,7 +484,7 @@ export function ProfileTab({
       </div>
 
       {(role === "admin" || role === "human-resource") && profile?.companyStatus === "approved" ? (
-        <div className="mt-5">
+        <div className="mt-4">
           <CompanyAddressSection company={company} role={role} userId={profileId} showToast={showToast} refresh={refresh} />
         </div>
       ) : null}
@@ -541,13 +544,13 @@ export function ProfileTab({
       ) : null}
 
       {showLostCardModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-lg" style={{ maxHeight: "90vh", overflowY: "auto" }}>
-            <h3 className="mb-4 text-sm font-semibold text-slate-800">Report Lost / Damaged ID Card</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-3">
+          <div className="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl" style={{ maxHeight: "90vh", overflowY: "auto" }}>
+            <h3 className="mb-3 text-sm font-semibold text-slate-900">Report Lost / Damaged ID Card</h3>
             <form onSubmit={handleReportLostCard} className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Reason</label>
-                <select className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                <label className="mb-0.5 block text-[11px] font-medium text-slate-500">Reason</label>
+                <select className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                   value={lcReason} onChange={(e) => setLcReason(e.target.value)}
                 >
                   <option value="lost">Lost</option>
@@ -558,29 +561,29 @@ export function ProfileTab({
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Last Location Seen</label>
-                <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                <label className="mb-0.5 block text-[11px] font-medium text-slate-500">Last Location Seen</label>
+                <input className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                   value={lcLastLocation} onChange={(e) => setLcLastLocation(e.target.value)} placeholder="e.g. Main Gate, Floor 3"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Date & Time Lost</label>
-                <input type="datetime-local" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                <label className="mb-0.5 block text-[11px] font-medium text-slate-500">Date & Time Lost</label>
+                <input type="datetime-local" className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                   value={lcLostDateTime} onChange={(e) => setLcLostDateTime(e.target.value)}
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Police Complaint Number (optional)</label>
-                <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                <label className="mb-0.5 block text-[11px] font-medium text-slate-500">Police Complaint Number (optional)</label>
+                <input className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                   value={lcPoliceComplaint} onChange={(e) => setLcPoliceComplaint(e.target.value)} placeholder="e.g. FIR-2026-0042"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Assign to Senior Security</label>
-                <select className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                <label className="mb-0.5 block text-[11px] font-medium text-slate-500">Assign to Senior Security</label>
+                <select className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                   value={lcSeniorSecurityId} onChange={(e) => setLcSeniorSecurityId(e.target.value)}
                 >
                   <option value="">Auto-assign</option>
@@ -588,7 +591,7 @@ export function ProfileTab({
                     <option key={u._id} value={u._id}>{u.name} ({u.email})</option>
                   ))}
                 </select>
-                <p className="mt-1 text-xs text-slate-400">
+                <p className="mt-0.5 text-[10px] text-slate-400">
                   {lcSeniorSecurityList.length === 0
                     ? "No senior security members found. Will be auto-assigned."
                     : lcSeniorSecurityList.length > 1
@@ -598,8 +601,8 @@ export function ProfileTab({
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Assign to HR</label>
-                <select className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                <label className="mb-0.5 block text-[11px] font-medium text-slate-500">Assign to HR</label>
+                <select className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                   value={lcHrId} onChange={(e) => setLcHrId(e.target.value)}
                 >
                   <option value="">Auto-assign</option>
@@ -607,7 +610,7 @@ export function ProfileTab({
                     <option key={u._id} value={u._id}>{u.name} ({u.email})</option>
                   ))}
                 </select>
-                <p className="mt-1 text-xs text-slate-400">
+                <p className="mt-0.5 text-[10px] text-slate-400">
                   {lcHrList.length === 0
                     ? "No HR members found. Will be auto-assigned."
                     : lcHrList.length > 1
@@ -617,26 +620,26 @@ export function ProfileTab({
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Emergency?</label>
+                <label className="mb-0.5 block text-[11px] font-medium text-slate-500">Emergency?</label>
                 <div className="flex items-center gap-2">
                   <input type="checkbox" className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                     checked={lcIsEmergency} onChange={(e) => setLcIsEmergency(e.target.checked)}
                   />
-                  <span className="text-xs text-slate-500">Mark as emergency (card was stolen or security risk)</span>
+                  <span className="text-[11px] text-slate-500">Mark as emergency (card was stolen or security risk)</span>
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Notes</label>
-                <textarea className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                <label className="mb-0.5 block text-[11px] font-medium text-slate-500">Notes</label>
+                <textarea className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                   rows={3} value={lcNotes} onChange={(e) => setLcNotes(e.target.value)}
                 />
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
-                <button className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
                   type="button" onClick={() => setShowLostCardModal(false)}>Cancel</button>
-                <button className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                <button className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
                   type="submit" disabled={lcSubmitting}>
                   {lcSubmitting ? "Submitting..." : "Submit Report"}
                 </button>

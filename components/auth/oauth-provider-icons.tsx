@@ -1,14 +1,11 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { FaApple, FaDiscord, FaGithub, FaGoogle, FaMicrosoft } from "react-icons/fa";
+import { FaGithub, FaGoogle } from "react-icons/fa";
 
 const providers = [
   { id: "google", label: "Google", icon: FaGoogle },
-  // { id: "azure-ad", label: "Microsoft", icon: FaMicrosoft },
-  // { id: "apple", label: "Apple", icon: FaApple },
   { id: "github", label: "GitHub", icon: FaGithub },
-  // { id: "discord", label: "Discord", icon: FaDiscord }
 ];
 
 export function OAuthProviderIcons({ callbackUrl = "/board" }: { callbackUrl?: string }) {
@@ -19,14 +16,15 @@ export function OAuthProviderIcons({ callbackUrl = "/board" }: { callbackUrl?: s
         return (
           <button
             aria-label={`Continue with ${provider.label}`}
-            className="grid h-11 w-11 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="flex h-12 flex-1 items-center justify-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm active:bg-slate-100"
             key={provider.id}
             onClick={() => signIn(provider.id, { callbackUrl })}
             title={`Continue with ${provider.label}`}
             suppressHydrationWarning
             type="button"
           >
-            <Icon aria-hidden="true" size={20} />
+            <Icon aria-hidden="true" size={18} />
+            {provider.label}
           </button>
         );
       })}

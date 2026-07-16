@@ -47,7 +47,7 @@ export function WfhRequestModal({
 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
         <h3 className="text-xl font-bold text-slate-900">Request WFH</h3>
         <p className="mt-1 text-sm text-slate-500">
           Submit a Work From Home request for approval.
@@ -114,7 +114,7 @@ export function WfhRequestModal({
             <button
               disabled={loading}
               type="submit"
-              className="rounded-lg bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+              className="rounded-full bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
             >
               {loading ? "Submitting..." : "Submit"}
             </button>
@@ -184,7 +184,7 @@ export function WfhRequestsListModal({
 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200">
+      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl ring-1 ring-slate-200">
         <div className="flex items-center justify-between border-b border-slate-100 p-6">
           <div>
             <h3 className="text-xl font-bold text-slate-900">WFH Requests</h3>
@@ -302,7 +302,7 @@ export function WfhDetailsModal({
 
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-md">
-      <div className="w-full max-w-lg animate-in zoom-in-95 fade-in duration-300 rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200 overflow-hidden">
+      <div className="w-full max-w-lg animate-in zoom-in-95 fade-in duration-300 rounded-2xl bg-white shadow-xl ring-1 ring-slate-200 overflow-hidden">
         <div className="relative h-32 bg-slate-900">
           <div className="absolute -bottom-8 left-6">
             <div className="h-16 w-16 rounded-2xl bg-emerald-600 shadow-xl shadow-emerald-600/20 grid place-items-center text-white">
@@ -385,7 +385,7 @@ export function WfhDetailsModal({
               </button>
               <button
                 onClick={onApprove}
-                className="flex-1 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/20"
+                className="flex-1 rounded-full bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/20"
               >
                 Approve
               </button>

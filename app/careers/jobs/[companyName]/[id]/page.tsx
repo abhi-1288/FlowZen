@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -128,20 +128,23 @@ export default function JobDetailPage() {
 
   if (loading) {
     return (
-      <main className="grid min-h-screen place-items-center bg-gradient-to-br from-slate-50 via-white to-indigo-50">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-indigo-600" />
+      <main className="grid min-h-screen place-items-center bg-[#fafafa] dark:bg-[#1a1a1a]">
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-900" />
       </main>
     );
   }
 
   if (notFound || !job) {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50">
-        <div className="mx-auto max-w-2xl px-4 py-20 text-center">
-          <Briefcase className="mx-auto h-12 w-12 text-slate-300" />
-          <h1 className="mt-4 text-2xl font-bold text-slate-900">Job not found</h1>
-          <p className="mt-2 text-sm text-slate-500">This position may have been filled or removed.</p>
-          <Link href="/careers" className="mt-6 inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-700">
+      <main className="min-h-screen bg-[#fafafa] dark:bg-[#1a1a1a]">
+        <div className="mx-auto max-w-2xl px-6 py-24 text-center">
+          <Briefcase className="mx-auto h-12 w-12 text-slate-300 dark:text-zinc-600" />
+          <h1 className="mt-5 text-xl font-bold text-slate-900 dark:text-zinc-100">Job not found</h1>
+          <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">This position may have been filled or removed.</p>
+          <Link
+            href="/careers"
+            className="mt-8 inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-slate-800"
+          >
             <ArrowLeft size={16} /> Browse all openings
           </Link>
         </div>
@@ -151,12 +154,18 @@ export default function JobDetailPage() {
 
   if (success) {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50">
-        <div className="mx-auto max-w-lg px-4 py-32 text-center">
+      <main className="min-h-screen bg-[#fafafa] dark:bg-[#1a1a1a]">
+        <div className="mx-auto max-w-lg px-6 py-32 text-center">
           <CheckCircle className="mx-auto h-14 w-14 text-emerald-500" />
-          <h1 className="mt-4 text-2xl font-bold text-slate-900">Application Submitted!</h1>
-          <p className="mt-2 text-sm text-slate-500">Your application for {job.title} at {job.company.name} has been received. The team will review it and get back to you.</p>
-          <Link href="/careers" className="mt-8 inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-700">
+          <h1 className="mt-5 text-xl font-bold text-slate-900 dark:text-zinc-100">Application Submitted!</h1>
+          <p className="mt-3 text-sm text-slate-500 dark:text-zinc-400 leading-relaxed">
+            Your application for <strong>{job.title}</strong> at <strong>{job.company.name}</strong> has been received.
+            The team will review it and get back to you.
+          </p>
+          <Link
+            href="/careers"
+            className="mt-10 inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-slate-800"
+          >
             <ArrowLeft size={16} /> Browse more jobs
           </Link>
         </div>
@@ -165,37 +174,38 @@ export default function JobDetailPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50">
-      <header className="border-b border-slate-200 bg-white/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4 sm:px-6">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">F</div>
-            <span className="text-lg font-bold text-slate-900">FlowZen</span>
-            <span className="hidden text-sm text-slate-400 sm:inline">· Careers</span>
+    <main className="min-h-screen bg-[#fafafa] dark:bg-[#1a1a1a]">
+      <header className="border-b border-slate-200 dark:border-zinc-800 bg-white/80 dark:bg-[#000000]/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4 sm:px-8">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white">F</div>
+            <span className="text-base font-semibold text-slate-900 dark:text-zinc-100">FlowZen</span>
+            <span className="hidden text-sm text-slate-400 dark:text-zinc-500 sm:inline">·</span>
+            <span className="hidden text-sm text-slate-500 dark:text-zinc-400 sm:inline">Careers</span>
           </div>
-          <Link href="/careers" className="text-sm font-medium text-indigo-600 hover:text-indigo-700">
-            <ArrowLeft size={16} className="inline" /> All jobs
+          <Link href="/careers" className="text-sm font-medium text-slate-900 dark:text-zinc-100 hover:text-slate-700 dark:hover:text-zinc-300">
+            <ArrowLeft size={16} className="inline mr-1.5" /> All jobs
           </Link>
         </div>
       </header>
 
-      <div className="mx-auto max-w-4xl px-4 pb-20 pt-10 sm:px-6">
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <div className="flex items-center gap-3">
+      <div className="mx-auto max-w-4xl px-6 pb-16 pt-10 sm:px-8">
+        <div className="rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] p-6 shadow-sm sm:p-8">
+          <div className="flex items-center gap-4">
             {job.company.icon ? (
-              <img src={job.company.icon} alt="" className="h-10 w-10 rounded-lg object-cover" />
+              <img src={job.company.icon} alt="" className="h-11 w-11 rounded-xl object-cover" />
             ) : (
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 dark:bg-zinc-700 text-slate-600 dark:text-zinc-400">
                 <Building2 size={20} />
               </div>
             )}
             <div>
-              <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">{job.title}</h1>
-              <p className="text-sm text-slate-500">{job.company.name} &middot; {job.department}</p>
+              <h1 className="text-xl font-bold text-slate-900 dark:text-zinc-100">{job.title}</h1>
+              <p className="mt-0.5 text-sm text-slate-500 dark:text-zinc-400">{job.company.name} · {job.department}</p>
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-500">
+          <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2.5 text-sm text-slate-500 dark:text-zinc-400">
             {job.location && (
               <span className="inline-flex items-center gap-1.5">
                 <MapPin size={14} /> {job.location}
@@ -217,160 +227,152 @@ export default function JobDetailPage() {
           </div>
 
           {job.requiredSkills.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-5 flex flex-wrap gap-2">
               {job.requiredSkills.map((skill) => (
-                <span key={skill} className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">{skill}</span>
+                <span key={skill} className="rounded-full bg-slate-100 dark:bg-zinc-700 px-3 py-1 text-sm font-medium text-slate-600 dark:text-zinc-400">{skill}</span>
               ))}
             </div>
           )}
 
           {job.description && (
-            <div className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{job.description}</div>
+            <div className="mt-5 whitespace-pre-wrap text-sm leading-relaxed text-slate-600 dark:text-zinc-400">{job.description}</div>
           )}
         </div>
 
-        <div className="mt-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <h2 className="text-lg font-semibold text-slate-900">Apply for this position</h2>
-          <span className="text-sm text-slate-500">All mandatory fields are being marked as <span className="text-red-500">*</span></span>
-          <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">First Name *</span>
-                <input value={firstName} onChange={(e) => setFirstName(e.target.value)} required className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">Last Name</span>
-                <input value={lastName} onChange={(e) => setLastName(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-              </label>
+        <div className="mt-6 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] p-6 shadow-sm sm:p-8">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-zinc-100">Apply for this position</h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">
+            Fields marked with <span className="text-rose-500">*</span> are required.
+          </p>
+          <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FieldInput label="First Name" value={firstName} onChange={setFirstName} required placeholder="John" />
+              <FieldInput label="Last Name" value={lastName} onChange={setLastName} placeholder="Doe" />
             </div>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Email *</span>
-              <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Phone</span>
-              <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">Current Company</span>
-                <input value={currentCompany} onChange={(e) => setCurrentCompany(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">Years of Experience</span>
-                <input value={experienceYears} onChange={(e) => setExperienceYears(e.target.value)} type="number" min="0" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">Notice Period (days)</span>
-                <input value={noticePeriod} onChange={(e) => setNoticePeriod(e.target.value)} type="number" min="0" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-              </label>
+            <FieldInput label="Email" value={email} onChange={setEmail} type="email" required placeholder="you@email.com" />
+            <FieldInput label="Phone" value={phone} onChange={setPhone} placeholder="+1 (555) 000-0000" />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FieldInput label="Current Company" value={currentCompany} onChange={setCurrentCompany} placeholder="Acme Inc." />
+              <FieldInput label="Years of Experience" value={experienceYears} onChange={setExperienceYears} type="number" min="0" placeholder="5" />
             </div>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Cover Letter / Notes</span>
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-            </label>
-            <div className="rounded-lg border border-slate-200 p-4">
-              <p className="mb-2 text-sm font-medium text-slate-700">Do you know anyone working at this company?</p>
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 text-sm text-slate-600">
+            <FieldInput label="Notice Period (days)" value={noticePeriod} onChange={setNoticePeriod} type="number" min="0" placeholder="30" />
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-zinc-300">Cover Letter / Notes</label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={4}
+                className="w-full resize-y rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] px-4 py-3 text-sm text-slate-900 dark:text-zinc-100 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
+                placeholder="Tell us about yourself..."
+              />
+            </div>
+
+            <div className="rounded-xl border border-slate-200 dark:border-zinc-800 p-5">
+              <p className="mb-3 text-sm font-medium text-slate-700 dark:text-zinc-300">Do you know anyone working at this company?</p>
+              <div className="flex items-center gap-5">
+                <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-zinc-400">
                   <input
                     type="radio"
                     name="knowEmployee"
                     checked={knowEmployee === true}
                     onChange={() => setKnowEmployee(true)}
-                    className="text-indigo-600"
+                    className="text-slate-900"
                   />
                   Yes
                 </label>
-                <label className="flex items-center gap-2 text-sm text-slate-600">
+                <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-zinc-400">
                   <input
                     type="radio"
                     name="knowEmployee"
                     checked={knowEmployee === false}
                     onChange={() => setKnowEmployee(false)}
-                    className="text-indigo-600"
+                    className="text-slate-900"
                   />
                   No
                 </label>
               </div>
               {knowEmployee && (
-                <label className="mt-3 block">
-                  <span className="mb-1 block text-sm font-medium text-slate-700">Employee Referral ID</span>
+                <div className="mt-4">
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-zinc-300">Employee Referral ID</label>
                   <div className="relative">
                     <input
                       value={referralId}
                       onChange={(e) => setReferralId(e.target.value)}
                       placeholder="HELLO-COMPANY-41279814"
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 pr-9 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] px-4 py-3 pr-12 text-sm text-slate-900 dark:text-zinc-100 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
                     />
                     {referralStatus === "verifying" && (
-                      <Loader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-slate-400" />
+                      <Loader2 size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 animate-spin text-slate-400" />
                     )}
                     {referralStatus === "verified" && (
-                      <CheckCircle size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500" />
+                      <CheckCircle size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-emerald-500" />
                     )}
                   </div>
                   {referralStatus === "verified" && (
-                    <p className="mt-1 text-xs text-emerald-600">
+                    <p className="mt-2 text-xs text-emerald-600">
                       Verified: {referralName} ({referralCompanyName})
                     </p>
                   )}
                   {referralStatus === "error" && (
-                    <p className="mt-1 text-xs text-rose-500">Referral employee not found. Please check the referral ID.</p>
+                    <p className="mt-2 text-xs text-rose-500">Referral employee not found. Please check the referral ID.</p>
                   )}
                   {referralStatus === "idle" && (
-                    <p className="mt-1 text-xs text-slate-400">Enter the referral ID provided by the employee.</p>
+                    <p className="mt-2 text-xs text-slate-400 dark:text-zinc-500">Enter the referral ID provided by the employee.</p>
                   )}
-                </label>
+                </div>
               )}
             </div>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Resume / CV *</span>
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-500 file:hidden">
-                  <Upload size={16} className="shrink-0 text-slate-400" />
-                    <input
-                      type="file"
-                      accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                      required
-                      onChange={(e) => {
-                        const file = e.target.files?.[0] ?? null;
-                        if (file && file.size > 2 * 1024 * 1024) {
-                          setError("File exceeds 2 MB limit.");
-                          e.target.value = "";
-                          return;
-                        }
-                        setError("");
-                        setResumeFile(file);
-                      }}
-                      className="w-full text-sm outline-none file:mr-2 file:cursor-pointer file:rounded file:border-0 file:bg-indigo-50 file:px-2 file:py-0.5 file:text-xs file:font-medium file:text-indigo-700 hover:file:bg-indigo-100"
-                    />
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-zinc-300">Resume / CV *</label>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-3 rounded-xl border border-slate-200 dark:border-zinc-800 px-4 py-3">
+                  <Upload size={16} className="shrink-0 text-slate-400 dark:text-zinc-500" />
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                    required
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] ?? null;
+                      if (file && file.size > 2 * 1024 * 1024) {
+                        setError("File exceeds 2 MB limit.");
+                        e.target.value = "";
+                        return;
+                      }
+                      setError("");
+                      setResumeFile(file);
+                    }}
+                    className="w-full text-sm text-slate-500 dark:text-zinc-400 outline-none file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-slate-100 file:px-3 file:py-1 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-slate-200"
+                  />
                 </div>
-                <p className="text-[10px] text-slate-400">Max file size: 2 MB</p>
-                {resumeFile && <p className="mt-1 text-xs text-slate-500">{resumeFile.name}</p>}
+                <p className="text-xs text-slate-400 dark:text-zinc-500">PDF, DOC, DOCX, PNG, or JPG — max 2 MB</p>
+                {resumeFile && <p className="text-xs text-slate-600 dark:text-zinc-400">{resumeFile.name}</p>}
               </div>
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">Portfolio URL</span>
-                <div className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2.5">
-                  <ExternalLink size={14} className="shrink-0 text-slate-400" />
-                  <input value={portfolioUrl} onChange={(e) => setPortfolioUrl(e.target.value)} placeholder="https://" className="w-full border-0 p-0 text-sm outline-none" />
-                </div>
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">LinkedIn URL</span>
-                <div className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2.5">
-                  <ExternalLink size={14} className="shrink-0 text-slate-400" />
-                  <input value={linkedInUrl} onChange={(e) => setLinkedInUrl(e.target.value)} placeholder="https://linkedin.com/in/" className="w-full border-0 p-0 text-sm outline-none" />
-                </div>
-              </label>
             </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FieldInput
+                label="Portfolio URL"
+                value={portfolioUrl}
+                onChange={setPortfolioUrl}
+                placeholder="https://"
+                icon={<ExternalLink size={14} />}
+              />
+              <FieldInput
+                label="LinkedIn URL"
+                value={linkedInUrl}
+                onChange={setLinkedInUrl}
+                placeholder="https://linkedin.com/in/"
+                icon={<ExternalLink size={14} />}
+              />
+            </div>
+
             {error && <p className="text-sm text-rose-600">{error}</p>}
+
             <button
               type="submit"
               disabled={submitting}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2.5 rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white transition-all duration-200 hover:bg-slate-800 active:bg-slate-950 disabled:opacity-50"
             >
               {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
               {submitting ? "Submitting..." : "Submit Application"}
@@ -379,5 +381,45 @@ export default function JobDetailPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+function FieldInput({
+  label,
+  value,
+  onChange,
+  type = "text",
+  required = false,
+  placeholder,
+  icon,
+  min,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+  required?: boolean;
+  placeholder?: string;
+  icon?: React.ReactNode;
+  min?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-zinc-300">{label}</span>
+      <div className="relative">
+        {icon && (
+          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500">{icon}</span>
+        )}
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          required={required}
+          placeholder={placeholder}
+          min={min}
+          className={`w-full rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] px-4 py-3 text-sm text-slate-900 dark:text-zinc-100 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 ${icon ? "pl-10" : ""}`}
+        />
+      </div>
+    </label>
   );
 }

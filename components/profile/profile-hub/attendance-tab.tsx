@@ -416,7 +416,7 @@ export function AttendanceTab({
   const weekDays = ["SUN.", "Mon.", "Tue.", "Wed.", "Thr.", "Fri.", "Sat."];
   if (!isAttendanceEnabled) {
     return (
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+      <section className="rounded-xl border border-slate-200 bg-white p-5">
         <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
           <p className="text-4xl font-extrabold tracking-tight text-slate-900">
             {todayDate.toLocaleDateString()}
@@ -431,7 +431,7 @@ export function AttendanceTab({
 }
   return (
     <>
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]">
+      <section className="rounded-xl border border-slate-200 bg-white p-5">
         <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
           <div>
             <h3 className="text-xl font-semibold">Attendance Tracker</h3>
@@ -639,7 +639,7 @@ export function AttendanceTab({
         )}
         {showDeleteHolidayConfirm && holidayToDelete && (
           <div className="fixed inset-0 z-[90] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
               <h3 className="text-xl font-bold text-slate-900">
                 Confirm Delete
               </h3>
@@ -689,7 +689,7 @@ export function AttendanceTab({
         )}
         {rejectingId && (
           <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/40 p-4 backdrop-blur-md">
-            <div className="w-full max-w-md animate-in zoom-in-95 fade-in duration-200 rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+            <div className="w-full max-w-md animate-in zoom-in-95 fade-in duration-200 rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
               <h3 className="text-xl font-bold text-slate-900">
                 Reject Request
               </h3>
@@ -762,7 +762,7 @@ export function AttendanceTab({
         )}
         {wfhRejectingId && (
           <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/40 p-4 backdrop-blur-md">
-            <div className="w-full max-w-md animate-in zoom-in-95 fade-in duration-200 rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+            <div className="w-full max-w-md animate-in zoom-in-95 fade-in duration-200 rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
               <h3 className="text-xl font-bold text-slate-900">
                 Reject WFH Request
               </h3>

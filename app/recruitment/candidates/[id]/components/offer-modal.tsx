@@ -236,7 +236,7 @@ export default function OfferModal({
               <button
                 type="submit"
                 disabled={saving}
-                className="mt-4 w-full rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                className="mt-4 w-full rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
               >
                 {saving ? "Generating..." : "Generate Offer"}
               </button>

@@ -102,7 +102,7 @@ export function JobRequestModal({ onClose }: { onClose: () => void }) {
             <button suppressHydrationWarning
               type="submit"
               disabled={saving || loadingHr}
-              className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+              className="rounded-full bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
             >
               {saving ? "Creating..." : "Create Request"}
             </button>

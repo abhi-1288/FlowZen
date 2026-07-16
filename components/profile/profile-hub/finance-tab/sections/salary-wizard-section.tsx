@@ -3,7 +3,7 @@ import { ActionButton, SectionHeader, formatRoleWithCustom } from "../../shared"
 import type { AnyRecord } from "../../shared";
 import type { SalaryBreakdown } from "../types";
 
-const sectionClass = "rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)] transition-all duration-200 hover:shadow-[0_4px_12px_0_rgb(0_0_0_/_0.05)]";
+const sectionClass = "rounded-xl border border-slate-200 bg-white p-5";
 
 export function SalaryWizardSection({
   actorRole,
