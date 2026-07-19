@@ -323,7 +323,7 @@ export default function AuthDocsPage() {
             <p>Send a 6-digit OTP to the user&apos;s email for verification. Requires authentication.</p>
 
             <h4 style={{ fontSize: "0.875rem", fontWeight: 600, marginTop: 16 }}>Response (200)</h4>
-            <div className="docs-code">"{\"message\": \"OTP sent to your email.\"}"}</div>
+            <div className="docs-code">{"{ \"message\": \"OTP sent to your email.\" }"}</div>
 
             <h4 style={{ fontSize: "0.875rem", fontWeight: 600, marginTop: 16 }}>Errors</h4>
             <table className="docs-table">
@@ -378,7 +378,7 @@ export default function AuthDocsPage() {
             </table>
 
             <h4 style={{ fontSize: "0.875rem", fontWeight: 600, marginTop: 16 }}>Response (200)</h4>
-            <div className="docs-code">"{\"ok\": true}"}</div>
+            <div className="docs-code">{"{ \"ok\": true }"}</div>
 
             <h4 style={{ fontSize: "0.875rem", fontWeight: 600, marginTop: 16 }}>Errors</h4>
             <table className="docs-table">
