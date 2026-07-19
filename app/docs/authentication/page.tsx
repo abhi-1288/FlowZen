@@ -119,7 +119,7 @@ export default function AuthDocsPage() {
                 </tr>
                 <tr>
                   <td><code>403</code></td>
-                  <td>Please verify your email with OTP</td>
+                  <td>Please verify your email with the OTP sent during signup before logging in.</td>
                 </tr>
               </tbody>
             </table>
@@ -136,7 +136,7 @@ export default function AuthDocsPage() {
               <span className="method-badge method-post">POST</span>
               <code className="endpoint-path">/api/auth/register</code>
             </div>
-            <p>Create a new user account.</p>
+            <p>Create a new user account. Sends a 6-digit OTP to the provided email for verification.</p>
 
             <h4 style={{ fontSize: "0.875rem", fontWeight: 600, marginTop: 16 }}>Request Body</h4>
             <table className="docs-table">
@@ -165,13 +165,43 @@ export default function AuthDocsPage() {
                   <td><code>password</code></td>
                   <td>string</td>
                   <td><span className="badge-required">Required</span></td>
-                  <td>Password (min 6 chars)</td>
+                  <td>Password (min 8 chars)</td>
+                </tr>
+                <tr>
+                  <td><code>role</code></td>
+                  <td>string</td>
+                  <td>Optional</td>
+                  <td>Role (employee, project-manager, qa-tester, human-resource, finance, admin, others). Default: employee</td>
                 </tr>
               </tbody>
             </table>
 
-            <h4 style={{ fontSize: "0.875rem", fontWeight: 600, marginTop: 16 }}>Response</h4>
-            <div className="docs-code">{"{\n  \"user\": {\n    \"id\": \"...\",\n    \"name\": \"John Doe\",\n    \"email\": \"john@example.com\"\n  }\n}"}</div>
+            <h4 style={{ fontSize: "0.875rem", fontWeight: 600, marginTop: 16 }}>Response (200)</h4>
+            <div className="docs-code">{"{\n  \"user\": {\n    \"id\": \"...\",\n    \"name\": \"John Doe\",\n    \"email\": \"john@example.com\",\n    \"role\": \"employee\"\n  },\n  \"message\": \"OTP sent to your email.\"\n}"}</div>
+
+            <h4 style={{ fontSize: "0.875rem", fontWeight: 600, marginTop: 16 }}>Errors</h4>
+            <table className="docs-table">
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Message</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>400</code></td>
+                  <td>Name, email, and an 8+ character password are required</td>
+                </tr>
+                <tr>
+                  <td><code>409</code></td>
+                  <td>An account with this email already exists</td>
+                </tr>
+                <tr>
+                  <td><code>500</code></td>
+                  <td>Unable to send OTP email</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </section>
 
@@ -182,7 +212,7 @@ export default function AuthDocsPage() {
               <span className="method-badge method-post">POST</span>
               <code className="endpoint-path">/api/auth/verify-otp</code>
             </div>
-            <p>Verify email with OTP code sent during registration.</p>
+            <p>Verify email with OTP code sent during registration. Returns a JWT token for mobile app authentication.</p>
 
             <table className="docs-table">
               <thead>
@@ -209,7 +239,11 @@ export default function AuthDocsPage() {
               </tbody>
             </table>
 
-            <div className="docs-code">{"{\n  \"success\": true\n}"}</div>
+            <h4 style={{ fontSize: "0.875rem", fontWeight: 600, marginTop: 16 }}>Response (200)</h4>
+            <div className="docs-code">{"{\n  \"ok\": true,\n  \"token\": \"eyJhbGciOiJIUzI1NiIs...\",\n  \"user\": {\n    \"id\": \"...\",\n    \"name\": \"John Doe\",\n    \"email\": \"john@example.com\",\n    \"role\": \"employee\",\n    \"avatarUrl\": \"...\",\n    \"company\": \"Acme Corp\",\n    \"companyColor\": \"#6366f1\",\n    \"team\": \"Engineering\"\n  }\n}"}</div>
+
+            <h4 style={{ fontSize: "0.875rem", fontWeight: 600, marginTop: 16 }}>Usage in Android</h4>
+            <div className="docs-code">{"// 1. Register\nval regResponse = httpClient.post(\"/api/auth/register\") {\n    setBody(mapOf(\n        \"name\" to \"John Doe\",\n        \"email\" to \"john@example.com\",\n        \"password\" to \"password123\"\n    ))\n}\n\n// 2. Verify OTP (returns token)\nval verifyResponse = httpClient.post(\"/api/auth/verify-otp\") {\n    setBody(mapOf(\n        \"email\" to \"john@example.com\",\n        \"otp\" to \"123456\"\n    ))\n}\nval token = verifyResponse.token\n\n// 3. Use token in subsequent requests\nhttpClient.get(\"/api/profile\") {\n    header(\"Authorization\", \"Bearer $token\")\n}"}</div>
           </div>
         </section>
 
@@ -274,6 +308,97 @@ export default function AuthDocsPage() {
             </table>
 
             <div className="docs-code">{"{\n  \"pending\": true\n}"}</div>
+          </div>
+        </section>
+
+        <section className="docs-section">
+          <h2>OAuth Email Verification</h2>
+          <p>For users who signed up via social login (Google, GitHub, etc.) with unverified emails. These endpoints require an authenticated session or Bearer token.</p>
+
+          <div className="docs-card">
+            <div className="docs-card-header">
+              <span className="method-badge method-post">POST</span>
+              <code className="endpoint-path">/api/auth/oauth/send-otp</code>
+            </div>
+            <p>Send a 6-digit OTP to the user&apos;s email for verification. Requires authentication.</p>
+
+            <h4 style={{ fontSize: "0.875rem", fontWeight: 600, marginTop: 16 }}>Response (200)</h4>
+            <div className="docs-code">"{\"message\": \"OTP sent to your email.\"}"}</div>
+
+            <h4 style={{ fontSize: "0.875rem", fontWeight: 600, marginTop: 16 }}>Errors</h4>
+            <table className="docs-table">
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Message</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>401</code></td>
+                  <td>Unauthorized</td>
+                </tr>
+                <tr>
+                  <td><code>400</code></td>
+                  <td>Credentials accounts already use email verification</td>
+                </tr>
+                <tr>
+                  <td><code>400</code></td>
+                  <td>Account is already verified</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="docs-card" style={{ marginTop: 16 }}>
+            <div className="docs-card-header">
+              <span className="method-badge method-post">POST</span>
+              <code className="endpoint-path">/api/auth/oauth/verify-otp</code>
+            </div>
+            <p>Verify the OTP sent to the user&apos;s email. Requires authentication.</p>
+
+            <h4 style={{ fontSize: "0.875rem", fontWeight: 600, marginTop: 16 }}>Request Body</h4>
+            <table className="docs-table">
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Type</th>
+                  <th>Required</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>otp</code></td>
+                  <td>string</td>
+                  <td><span className="badge-required">Required</span></td>
+                  <td>6-digit OTP code</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <h4 style={{ fontSize: "0.875rem", fontWeight: 600, marginTop: 16 }}>Response (200)</h4>
+            <div className="docs-code">"{\"ok\": true}"}</div>
+
+            <h4 style={{ fontSize: "0.875rem", fontWeight: 600, marginTop: 16 }}>Errors</h4>
+            <table className="docs-table">
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Message</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>401</code></td>
+                  <td>Invalid OTP</td>
+                </tr>
+                <tr>
+                  <td><code>410</code></td>
+                  <td>OTP expired. Request a new one.</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </section>
 

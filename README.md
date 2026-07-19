@@ -11,7 +11,7 @@ FlowZen is a full-stack team productivity platform built with Next.js App Router
 - **HR Management** — Member role changes, employee termination, company policy management (including food & travel accommodation amounts), HR messages/broadcasts, and meeting invites.
 - **Recruitment & Hiring** — Full recruitment lifecycle: job posting, candidate applications with magic-link portal, interview scheduling & feedback (with email notifications to candidate and interviewer), structured notes (author/timestamp/deletable), auto-close overdue jobs with candidate stats notifications, pipeline conversion funnel with drop-off analytics, resume PDF parsing (DOB/address extraction), offer letter generation (with CTC, perks, food/travel allowances), candidate portal for offer acceptance/rejection, and convert-to-employee with welcome email.
 - **Chat & Messaging** — Real-time messaging with read/delivery receipt ticks (single grey ✓ sent, double grey ✓✓ received, double green ✓✓ read). Online presence indicators (green dot, "Online" / "Last online" text) in chat header and member sidebar. Info modal with user personal details (name, role, email, phone, DOB, employee ID, team, join date).
-- **Role-Based Access** — 7 user roles (Employee, Project Manager, QA Tester, Human Resource, Finance, Admin, Others) with granular board-level permissions. Profile hub tabs gated by company status and role.
+- **Role-Based Access** — 8 user roles (Employee, Project Manager, QA Tester, Human Resource, Finance, Admin, Security, Others) with granular board-level permissions. Profile hub tabs gated by company status and role.
 - **Multi-Step Approval Workflows** — Join requests (HR → Admin), leave requests (HR → Manager), and quit requests with replacement tracking.
 - **Company & Team Management** — Company registration with identity codes, team creation with invite codes, freeze/takedown company, kick/quit team, and approval-based onboarding.
 - **Authentication** — Email/password with 6-digit OTP verification, magic-link password reset, and 5 social OAuth providers (Google, Azure AD / Microsoft, Apple, GitHub, Discord). "Remember me" session persistence control. Email change with current password verification + OTP to new email.
@@ -165,7 +165,7 @@ Run `npm run seed:demo` after setting `MONGODB_URI` to create or refresh these v
 10. **HR** converts `joined` candidates to employees by setting a password — a welcome email with credentials is sent automatically. Resume-extracted DOB/address is copied to the new employee profile.
 11. Throughout the process, the candidate portal provides a timeline of all events, interview history, and the latest offer status.
 
-## User Roles (7)
+## User Roles (8)
 
 | Role | Capabilities |
 |------|-------------|
@@ -174,6 +174,7 @@ Run `npm run seed:demo` after setting `MONGODB_URI` to create or refresh these v
 | **Project Manager** | Create/manage teams, create/manage boards, assign tasks, manage team members |
 | **Finance** | Manage salaries, expense requests & bills, client invoices, project budgets, resource requests |
 | **QA Tester** | Access boards as tester role, test and verify tasks |
+| **Security** | Scan identity codes for entry/exit, manage entry logs, emergency contacts, lost cards |
 | **Employee** | View assigned tasks, check-in/check-out, request leave, view attendance & finance data |
 | **Others** | Fallback role with basic board access |
 

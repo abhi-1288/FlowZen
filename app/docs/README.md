@@ -22,10 +22,15 @@ https://flowzen-azure.vercel.app
 
 FlowZen uses NextAuth.js for web authentication. For mobile/Android apps, use the Mobile Login endpoint which returns a JWT token.
 
-**Mobile Auth Flow:**
+**Mobile Auth Flow (Existing Users):**
 1. `POST /api/auth/mobile-login` → get JWT token
 2. Use token in all subsequent requests: `Authorization: Bearer <token>`
 3. Token is valid for 1 year.
+
+**Mobile Auth Flow (New Users):**
+1. `POST /api/auth/register` → creates account, sends OTP email
+2. `POST /api/auth/verify-otp` → returns JWT token
+3. Use token in all subsequent requests: `Authorization: Bearer <token>`
 
 ### POST /api/auth/mobile-login
 
@@ -59,7 +64,7 @@ Login with email and password. Returns a JWT token for mobile app authentication
 |--------|---------|
 | 401 | Invalid email or password |
 | 401 | This account uses social login |
-| 403 | Please verify your email with OTP |
+| 403 | Please verify your email with the OTP sent during signup before logging in |
 
 **Android Usage:**
 ```kotlin
@@ -80,29 +85,39 @@ httpClient.get("/api/profile") {
 
 ### POST /api/auth/register
 
-Create a new user account.
+Create a new user account. Sends a 6-digit OTP to the provided email for verification.
 
 **Request Body:**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | name | string | Required | Full name |
 | email | string | Required | Email address |
-| password | string | Required | Password (min 6 chars) |
+| password | string | Required | Password (min 8 chars) |
+| role | string | Optional | Role (employee, project-manager, qa-tester, human-resource, finance, admin, others). Default: employee |
 
-**Response:**
+**Response (200):**
 ```json
 {
   "user": {
     "id": "...",
     "name": "John Doe",
-    "email": "john@example.com"
-  }
+    "email": "john@example.com",
+    "role": "employee"
+  },
+  "message": "OTP sent to your email."
 }
 ```
 
+**Errors:**
+| Status | Message |
+|--------|---------|
+| 400 | Name, email, and an 8+ character password are required |
+| 409 | An account with this email already exists |
+| 500 | Unable to send OTP email |
+
 ### POST /api/auth/verify-otp
 
-Verify email with OTP code sent during registration.
+Verify email with OTP code sent during registration. Returns a JWT token for mobile app authentication.
 
 **Request Body:**
 | Field | Type | Required | Description |
@@ -110,7 +125,57 @@ Verify email with OTP code sent during registration.
 | email | string | Required | Email address |
 | otp | string | Required | 6-digit OTP code |
 
-**Response:** `{ "success": true }`
+**Response (200):**
+```json
+{
+  "ok": true,
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "user": {
+    "id": "...",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "role": "employee",
+    "avatarUrl": "...",
+    "company": "Acme Corp",
+    "companyColor": "#6366f1",
+    "team": "Engineering"
+  }
+}
+```
+
+**Errors:**
+| Status | Message |
+|--------|---------|
+| 400 | Email and a valid 6-digit OTP are required |
+| 401 | Invalid OTP |
+| 404 | Account not found |
+| 410 | OTP expired. Please sign up again |
+
+**Android Usage (Register → Verify OTP → Use Token):**
+```kotlin
+// 1. Register
+val regResponse = httpClient.post("/api/auth/register") {
+    setBody(mapOf(
+        "name" to "John Doe",
+        "email" to "john@example.com",
+        "password" to "password123"
+    ))
+}
+
+// 2. Verify OTP (returns token)
+val verifyResponse = httpClient.post("/api/auth/verify-otp") {
+    setBody(mapOf(
+        "email" to "john@example.com",
+        "otp" to "123456"
+    ))
+}
+val token = verifyResponse.token
+
+// 3. Use token in subsequent requests
+httpClient.get("/api/profile") {
+    header("Authorization", "Bearer $token")
+}
+```
 
 ### POST /api/auth/forgot-password
 

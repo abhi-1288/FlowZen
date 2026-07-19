@@ -79,9 +79,13 @@ export default function DocsPage() {
 
         <section className="docs-section">
           <h2>Mobile App Authentication</h2>
-          <p>For Android/iOS apps, use the mobile login endpoint to get a JWT token:</p>
+          <p>For Android/iOS apps, FlowZen provides two authentication flows:</p>
 
+          <h3 style={{ fontSize: "1rem", fontWeight: 600, marginTop: 16 }}>Existing Users — Mobile Login</h3>
           <div className="docs-code">{"// Step 1: Login\nPOST /api/auth/mobile-login\n{\n  \"email\": \"user@example.com\",\n  \"password\": \"your-password\"\n}\n\n// Response:\n{\n  \"token\": \"eyJhbGciOiJIUzI1NiIs...\",\n  \"user\": { ... }\n}\n\n// Step 2: Use token in all subsequent requests\nGET /api/profile\nAuthorization: Bearer eyJhbGciOiJIUzI1NiIs..."}</div>
+
+          <h3 style={{ fontSize: "1rem", fontWeight: 600, marginTop: 16 }}>New Users — Register + Verify OTP</h3>
+          <div className="docs-code">{"// Step 1: Register\nPOST /api/auth/register\n{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}\n\n// Step 2: Verify OTP (returns token)\nPOST /api/auth/verify-otp\n{\n  \"email\": \"john@example.com\",\n  \"otp\": \"123456\"\n}\n\n// Response:\n{\n  \"ok\": true,\n  \"token\": \"eyJhbGciOiJIUzI1NiIs...\",\n  \"user\": { ... }\n}\n\n// Step 3: Use token in all subsequent requests\nGET /api/profile\nAuthorization: Bearer eyJhbGciOiJIUzI1NiIs..."}</div>
 
           <div className="docs-info">
             <p><strong>Token Expiry:</strong> Tokens are valid for 1 year. Store securely on device.</p>
