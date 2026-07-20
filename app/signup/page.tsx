@@ -31,7 +31,9 @@ export default function SignupPage() {
       return;
     }
     setEmail(savedEmail);
-    apiFetch<{ pending: boolean }>(`/api/auth/check-pending?email=${encodeURIComponent(savedEmail)}`)
+    apiFetch<{ pending: boolean }>(
+      `/api/auth/check-pending?email=${encodeURIComponent(savedEmail)}`,
+    )
       .then((res) => {
         if (res?.pending) {
           setStep("otp");
@@ -64,7 +66,9 @@ export default function SignupPage() {
       method: "POST",
       body: JSON.stringify({ name, email, password, role }),
     }).catch((err) => {
-      setError(err instanceof Error ? err.message : "Unable to create account.");
+      setError(
+        err instanceof Error ? err.message : "Unable to create account.",
+      );
       return null;
     });
     setLoading(false);
@@ -93,11 +97,21 @@ export default function SignupPage() {
     }
 
     localStorage.removeItem(PENDING_EMAIL_KEY);
-    await signIn("credentials-login", { email: verifyEmail, password: verifyPassword, rememberMe: "true", redirect: false });
+    const signInResult = await signIn("credentials-login", {
+      email: verifyEmail,
+      password: verifyPassword,
+      rememberMe: "true",
+      redirect: false,
+    });
+    if (signInResult?.error) {
+      setError(signInResult.error);
+      setLoading(false);
+      return;
+    }
     await fetch("/api/auth/session-mode", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rememberMe: true })
+      body: JSON.stringify({ rememberMe: true }),
     });
     router.push("/profile");
     router.refresh();
@@ -107,7 +121,9 @@ export default function SignupPage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#fafafa] dark:bg-[#1a1a1a] px-5 py-12">
         <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] p-8 shadow-sm">
-          <p className="text-center text-sm text-slate-400 dark:text-zinc-500">Loading...</p>
+          <p className="text-center text-sm text-slate-400 dark:text-zinc-500">
+            Loading...
+          </p>
         </div>
       </main>
     );
@@ -124,7 +140,9 @@ export default function SignupPage() {
             Create your account
           </h1>
           <p className="mt-1.5 text-sm text-slate-500 dark:text-zinc-400">
-            {step === "details" ? "Get started with FlowZen in seconds." : "Verify your email with a 6-digit code."}
+            {step === "details"
+              ? "Get started with FlowZen in seconds."
+              : "Verify your email with a 6-digit code."}
           </p>
         </div>
 
@@ -132,15 +150,36 @@ export default function SignupPage() {
           {step === "details" ? (
             <>
               <form className="space-y-4" onSubmit={register}>
-                <Field label="Full name" value={name} onChange={setName} placeholder="John Doe" />
-                <Field label="Email" value={email} onChange={setEmail} type="email" placeholder="you@company.com" />
-                <Field label="Password" value={password} onChange={setPassword} type="password" placeholder="At least 8 characters" />
+                <Field
+                  label="Full name"
+                  value={name}
+                  onChange={setName}
+                  placeholder="John Doe"
+                />
+                <Field
+                  label="Email"
+                  value={email}
+                  onChange={setEmail}
+                  type="email"
+                  placeholder="you@company.com"
+                />
+                <Field
+                  label="Password"
+                  value={password}
+                  onChange={setPassword}
+                  type="password"
+                  placeholder="At least 8 characters"
+                />
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-zinc-300">Role</label>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-zinc-300">
+                    Role
+                  </label>
                   <select
                     className="w-full rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] px-4 py-3 text-sm text-slate-900 dark:text-zinc-100 outline-none transition-colors focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
                     value={role}
-                    onChange={(event) => setRole(event.target.value as UserRole)}
+                    onChange={(event) =>
+                      setRole(event.target.value as UserRole)
+                    }
                   >
                     <option value="employee">Employee</option>
                     <option value="project-manager">Project Manager</option>
@@ -157,14 +196,20 @@ export default function SignupPage() {
                   className="flex w-full items-center justify-center gap-2.5 rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800 active:bg-slate-950 disabled:opacity-60"
                   disabled={loading}
                 >
-                  {loading ? <Loader2 className="animate-spin" size={16} /> : <ShieldCheck size={16} />}
+                  {loading ? (
+                    <Loader2 className="animate-spin" size={16} />
+                  ) : (
+                    <ShieldCheck size={16} />
+                  )}
                   Continue
                 </button>
               </form>
 
               <div className="my-6 flex items-center gap-4">
                 <span className="h-px flex-1 bg-slate-100 dark:bg-zinc-700" />
-                <span className="text-xs text-slate-400 dark:text-zinc-500">or sign up with</span>
+                <span className="text-xs text-slate-400 dark:text-zinc-500">
+                  or sign up with
+                </span>
                 <span className="h-px flex-1 bg-slate-100 dark:bg-zinc-700" />
               </div>
               <OAuthProviderIcons />
@@ -172,7 +217,8 @@ export default function SignupPage() {
           ) : (
             <form className="space-y-5" onSubmit={verify}>
               <div className="rounded-xl bg-indigo-50 dark:bg-indigo-950 px-4 py-3 text-sm text-indigo-700 dark:text-indigo-300">
-                We sent a 6-digit code to <strong>{email}</strong>. Enter it below.
+                We sent a 6-digit code to <strong>{email}</strong>. Enter it
+                below.
               </div>
               <div className="flex items-center justify-between gap-2.5">
                 {otp.map((digit, index) => (
@@ -198,10 +244,16 @@ export default function SignupPage() {
                       }
                     }}
                     onPaste={(e) => {
-                      const paste = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+                      const paste = e.clipboardData
+                        .getData("text")
+                        .replace(/\D/g, "")
+                        .slice(0, 6);
                       if (paste.length === 6) {
                         setOtp(paste.split(""));
-                        setTimeout(() => document.getElementById("otp-5")?.focus(), 0);
+                        setTimeout(
+                          () => document.getElementById("otp-5")?.focus(),
+                          0,
+                        );
                       }
                       e.preventDefault();
                     }}
@@ -211,13 +263,23 @@ export default function SignupPage() {
                   />
                 ))}
               </div>
-              <Field label="Password (for sign in)" value={password} onChange={setPassword} type="password" placeholder="Enter password" />
+              <Field
+                label="Password (for sign in)"
+                value={password}
+                onChange={setPassword}
+                type="password"
+                placeholder="Enter password"
+              />
               <Notice error={error} notice={notice} />
               <button
                 className="flex w-full items-center justify-center gap-2.5 rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800 active:bg-slate-950 disabled:opacity-60"
                 disabled={loading}
               >
-                {loading ? <Loader2 className="animate-spin" size={16} /> : <ShieldCheck size={16} />}
+                {loading ? (
+                  <Loader2 className="animate-spin" size={16} />
+                ) : (
+                  <ShieldCheck size={16} />
+                )}
                 Verify & create account
               </button>
               <button
@@ -233,19 +295,38 @@ export default function SignupPage() {
 
         <div className="mt-5 text-center text-sm text-slate-500 dark:text-zinc-400">
           Already have an account?{" "}
-          <Link className="font-medium text-slate-900 dark:text-zinc-100 hover:underline" href="/login">Sign in</Link>
+          <Link
+            className="font-medium text-slate-900 dark:text-zinc-100 hover:underline"
+            href="/login"
+          >
+            Sign in
+          </Link>
         </div>
       </div>
     </main>
   );
 }
 
-function Field({ label, value, onChange, type = "text", placeholder }: { label: string; value: string; onChange: (value: string) => void; type?: string; placeholder?: string }) {
+function Field({
+  label,
+  value,
+  onChange,
+  type = "text",
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  placeholder?: string;
+}) {
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === "password";
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-zinc-300">{label}</label>
+      <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-zinc-300">
+        {label}
+      </label>
       <div className="relative">
         <input
           className={`w-full rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] px-4 py-3 text-sm text-slate-900 dark:text-zinc-100 outline-none transition-colors placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 ${isPassword ? "pr-12" : ""}`}
@@ -271,7 +352,17 @@ function Field({ label, value, onChange, type = "text", placeholder }: { label: 
 }
 
 function Notice({ error, notice }: { error: string; notice: string }) {
-  if (error) return <div className="rounded-xl bg-rose-50 dark:bg-rose-950 px-4 py-3 text-sm text-rose-600">{error}</div>;
-  if (notice) return <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950 px-4 py-3 text-sm text-emerald-600">{notice}</div>;
+  if (error)
+    return (
+      <div className="rounded-xl bg-rose-50 dark:bg-rose-950 px-4 py-3 text-sm text-rose-600">
+        {error}
+      </div>
+    );
+  if (notice)
+    return (
+      <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950 px-4 py-3 text-sm text-emerald-600">
+        {notice}
+      </div>
+    );
   return null;
 }

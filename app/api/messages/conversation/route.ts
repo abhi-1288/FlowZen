@@ -44,7 +44,10 @@ export async function GET(request: Request) {
       { sender: userId, recipient: recipientId },
       { sender: recipientId, recipient: userId }
     ]
-  }).sort({ createdAt: 1 });
+  })
+    .sort({ createdAt: 1 })
+    .populate({ path: "replyTo", select: "sender message", populate: { path: "sender", select: "name" } })
+    .populate({ path: "reactions.user", select: "name" });
 
   return NextResponse.json({ messages: serializeDocs(messages) });
 }

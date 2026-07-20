@@ -1,4 +1,4 @@
-import { Building2, Camera, Trash2, X } from "lucide-react";
+import { Building2, Camera, Clipboard, Trash2, Users, X } from "lucide-react";
 import { ImageCropModal } from "./image-crop-modal";
 import { AnyRecord, formatRole } from "./shared";
 
@@ -185,14 +185,20 @@ export function TeamEmployeesModal({
   onClose,
   onKick,
   onDeleteTeam,
+  showToast,
 }: {
   team: AnyRecord | null;
   selfId: string;
   onClose: () => void;
   onKick: (teamId: string, employeeId: string, employeeName: string, teamName: string) => void;
   onDeleteTeam: (teamId: string, teamName: string) => void;
+  showToast: (text: string, type?: "success" | "error") => void;
 }) {
   if (!team) return null;
+  const joinCode = String(team.joinCode ?? "");
+  const otherJoinCode = String(team.otherJoinCode ?? "");
+  const makeJoinUrl = (code: string) =>
+    typeof window !== "undefined" ? `${window.location.origin}/join?code=${code}` : code;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
@@ -205,7 +211,51 @@ export function TeamEmployeesModal({
             <button className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm" onClick={onClose}>Close</button>
           </div>
         </div>
-        <div className="mt-4 space-y-2">
+        {(joinCode || otherJoinCode) && (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {joinCode && (
+              <div>
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Team code</p>
+                  <div className="mt-1.5 flex items-center justify-between gap-2">
+                    <p className="min-w-0 truncate font-mono text-sm font-semibold text-indigo-700">{joinCode}</p>
+                    <button type="button" title="Copy code"
+                      className="shrink-0 grid h-7 w-7 place-items-center rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      onClick={() => { navigator.clipboard.writeText(joinCode); showToast("Team code copied."); }}>
+                      <Clipboard size={14} />
+                    </button>
+                  </div>
+                </div>
+                <button type="button"
+                  className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-sky-200 bg-sky-100 px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-sky-200"
+                  onClick={() => { navigator.clipboard.writeText(makeJoinUrl(joinCode)); showToast("Team join URL copied."); }}>
+                  <Users size={14} /> Copy Join URL
+                </button>
+              </div>
+            )}
+            {otherJoinCode && (
+              <div>
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Others code</p>
+                  <div className="mt-1.5 flex items-center justify-between gap-2">
+                    <p className="min-w-0 truncate font-mono text-sm font-semibold text-indigo-700">{otherJoinCode}</p>
+                    <button type="button" title="Copy code"
+                      className="shrink-0 grid h-7 w-7 place-items-center rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      onClick={() => { navigator.clipboard.writeText(otherJoinCode); showToast("Others code copied."); }}>
+                      <Clipboard size={14} />
+                    </button>
+                  </div>
+                </div>
+                <button type="button"
+                  className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-sky-200 bg-sky-100 px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-sky-200"
+                  onClick={() => { navigator.clipboard.writeText(makeJoinUrl(otherJoinCode)); showToast("Others join URL copied."); }}>
+                  <Users size={14} /> Copy Join URL
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        <div className="mt-4 border border-gray-200 rounded-lg p-2 overflow-y-auto max-h-80 space-y-2">
           {Array.isArray(team.employees) && team.employees.length > 0 ? (
             (team.employees as AnyRecord[]).map((emp) => (
               <div key={String(emp.id)} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">

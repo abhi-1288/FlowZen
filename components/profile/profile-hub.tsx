@@ -512,6 +512,24 @@ export function ProfileHub() {
           window.dispatchEvent(new CustomEvent("messages:refresh"));
         });
 
+        eventSource.addEventListener("message:reaction", (e: MessageEvent) => {
+          if (!mounted) return;
+          console.log("SSE: ProfileHub message:reaction received");
+          if (notificationSndRef.current) {
+            notificationSndRef.current.currentTime = 0;
+            notificationSndRef.current.play().catch(() => {});
+          } else {
+            new Audio("/sound/notification_sound.mp3").play().catch((err) => console.warn("Notification sound unavailable:", err));
+          }
+          try {
+            const data = JSON.parse(e.data);
+            showNotificationToast(`${data.reactorName} reacted ${data.emoji}`, "Reacted to a message");
+          } catch {
+            showNotificationToast("Reaction", "Someone reacted to a message");
+          }
+          window.dispatchEvent(new CustomEvent("messages:refresh"));
+        });
+
         eventSource.addEventListener("user:online", () => {
           if (!mounted) return;
           window.dispatchEvent(new CustomEvent("messages:refresh"));

@@ -3,6 +3,7 @@ import { connectDb } from "@/lib/db";
 import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { User } from "@/models/User";
 import { Message } from "@/models/Message";
+import { Team } from "@/models/Team";
 import { emitToUser, isUserOnline } from "@/lib/socket-emit";
 
 export async function GET() {
@@ -83,9 +84,12 @@ export async function POST(request: Request) {
 
   const body = await request.json();
   const recipientId = String(body.recipientId ?? "");
+  const groupId = String(body.groupId ?? "");
+  const replyToId = String(body.replyTo ?? "");
   const message = String(body.message ?? "").trim();
-  if (!recipientId || !message) return jsonError("Member and message are required.");
+  if (!message) return jsonError("Message is required.");
   if (message.length > 1000) return jsonError("Message must be 1000 characters or less.");
+  if (!recipientId && !groupId) return jsonError("recipientId or groupId is required.");
 
   try {
     await connectDb();
@@ -95,15 +99,58 @@ export async function POST(request: Request) {
     throw error;
   }
 
-  const [sender, recipient] = await Promise.all([
-    User.findById(userId),
-    User.findById(recipientId),
-  ]);
+  const sender = await User.findById(userId);
   if (!sender) return jsonError("Sender not found.", 404);
-  if (!recipient) return jsonError("Recipient not found.", 404);
   if (!sender.company || sender.companyStatus !== "approved") {
     return jsonError("Join a company before sending messages.", 403);
   }
+
+  if (groupId) {
+    const team = await Team.findById(groupId).select("company manager employees");
+    if (!team) return jsonError("Team not found.", 404);
+    if (String(team.company) !== String(sender.company)) {
+      return jsonError("Team does not belong to your company.", 403);
+    }
+    const isMember =
+      String(team.manager) === userId ||
+      team.employees.some((id: any) => String(id) === userId);
+    if (!isMember) return jsonError("You are not a member of this team.", 403);
+
+    const newMessage = await Message.create({
+      sender: sender._id,
+      recipient: null,
+      company: sender.company,
+      group: team._id,
+      message,
+      ...(replyToId ? { replyTo: replyToId } : {}),
+    });
+
+    const memberIds = [
+      String(team.manager),
+      ...team.employees.map((id: any) => String(id)),
+    ].filter((id) => id !== userId);
+
+    for (const memberId of memberIds) {
+      if (isUserOnline(memberId)) {
+        emitToUser(memberId, "message:new", {
+          senderId: String(sender._id),
+          senderName: sender.name,
+          message,
+          groupId: String(team._id),
+          groupName: team.name,
+          createdAt: newMessage.createdAt,
+          ...(replyToId ? { replyTo: replyToId } : {}),
+        });
+      }
+    }
+
+    return NextResponse.json({ ok: true });
+  }
+
+  const [recipient] = await Promise.all([
+    User.findById(recipientId),
+  ]);
+  if (!recipient) return jsonError("Recipient not found.", 404);
   if (String(recipient.company ?? "") !== String(sender.company) || recipient.companyStatus !== "approved") {
     return jsonError("You can only message approved members in your company.", 403);
   }
@@ -113,21 +160,21 @@ export async function POST(request: Request) {
     recipient: recipient._id,
     company: sender.company,
     message,
+    ...(replyToId ? { replyTo: replyToId } : {}),
   });
 
-  // If recipient is online, mark as received immediately
   if (isUserOnline(String(recipient._id))) {
     newMessage.receivedAt = new Date();
     await newMessage.save();
   }
 
-  // Emit real-time message event via SSE to recipient
   emitToUser(String(recipient._id), "message:new", {
     senderId: String(sender._id),
     senderName: sender.name,
     message,
     createdAt: newMessage.createdAt,
     receivedAt: newMessage.receivedAt,
+    ...(replyToId ? { replyTo: replyToId } : {}),
   });
 
   return NextResponse.json({ ok: true });

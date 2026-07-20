@@ -583,7 +583,8 @@ export function OnboardingTab({
 
       <TeamEmployeesModal team={teamModal} selfId={selfId} onClose={() => setTeamModal(null)}
         onKick={(tid, eid, ename, tname) => setKickModal({ teamId: tid, employeeId: eid, employeeName: ename, teamName: tname })}
-        onDeleteTeam={(tid, tname) => setDeleteTeamModal({ teamId: tid, teamName: tname })} />
+        onDeleteTeam={(tid, tname) => setDeleteTeamModal({ teamId: tid, teamName: tname })}
+        showToast={showToast} />
       <KickModal data={kickModal} confirmText={kickConfirmText} onTextChange={setKickConfirmText}
         onClose={() => { setKickModal(null); setKickConfirmText(""); }}
         onConfirm={() => void kickEmployee(kickModal!.teamId, kickModal!.employeeId)} />
