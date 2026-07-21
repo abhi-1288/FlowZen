@@ -54,10 +54,28 @@ const config: Config = {
             backgroundSize: "200% 200%",
             backgroundPosition: "right center"
           }
+        },
+        "aurora-drift": {
+          "0%": { transform: "translate(0, 0) scale(1)" },
+          "50%": { transform: "translate(80px, 40px) scale(1.1)" },
+          "100%": { transform: "translate(-40px, 80px) scale(0.95)" }
+        },
+        "float": {
+          "0%, 100%": { transform: "translate(0, 0)" },
+          "25%": { transform: "translate(30px, -20px)" },
+          "50%": { transform: "translate(-20px, 30px)" },
+          "75%": { transform: "translate(15px, 15px)" }
+        },
+        "marquee": {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-50%)" }
         }
       },
       animation: {
-        "gradient-x": "gradient-x 5s ease infinite"
+        "gradient-x": "gradient-x 5s ease infinite",
+        "aurora-drift": "aurora-drift 18s ease-in-out infinite alternate",
+        "float": "float 20s ease-in-out infinite",
+        "marquee": "marquee 30s linear infinite"
       }
     }
   },

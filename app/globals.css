@@ -207,3 +207,110 @@ select {
   .shadow-dropdown-v { box-shadow: var(--shadow-dropdown); }
   .shadow-modal-v   { box-shadow: var(--shadow-modal); }
 }
+
+/* ============================================
+   Aurora gradient orbs
+   ============================================ */
+.aurora-orb-1 {
+  background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%);
+  filter: blur(120px);
+  animation: aurora-drift-1 18s ease-in-out infinite alternate;
+}
+
+.aurora-orb-2 {
+  background: radial-gradient(circle, rgba(168,85,247,0.12) 0%, transparent 70%);
+  filter: blur(120px);
+  animation: aurora-drift-2 22s ease-in-out infinite alternate;
+}
+
+.aurora-orb-3 {
+  background: radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%);
+  filter: blur(120px);
+  animation: aurora-drift-3 25s ease-in-out infinite alternate;
+}
+
+@keyframes aurora-drift-1 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(80px, 40px) scale(1.1); }
+  100% { transform: translate(-40px, 80px) scale(0.95); }
+}
+
+@keyframes aurora-drift-2 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-60px, 60px) scale(1.05); }
+  100% { transform: translate(40px, -30px) scale(1.1); }
+}
+
+@keyframes aurora-drift-3 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(50px, -50px) scale(1.08); }
+  100% { transform: translate(-70px, 20px) scale(0.95); }
+}
+
+/* ============================================
+   Floating orbs
+   ============================================ */
+.floating-orb-1 {
+  animation: float-1 20s ease-in-out infinite;
+}
+
+.floating-orb-2 {
+  animation: float-2 25s ease-in-out infinite;
+}
+
+.floating-orb-3 {
+  animation: float-3 30s ease-in-out infinite;
+}
+
+@keyframes float-1 {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(30px, -20px); }
+  50% { transform: translate(-20px, 30px); }
+  75% { transform: translate(15px, 15px); }
+}
+
+@keyframes float-2 {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-25px, 15px); }
+  50% { transform: translate(20px, -25px); }
+  75% { transform: translate(-10px, -15px); }
+}
+
+@keyframes float-3 {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(20px, 25px); }
+  50% { transform: translate(-30px, -10px); }
+  75% { transform: translate(10px, -20px); }
+}
+
+/* ============================================
+   Logo marquee
+   ============================================ */
+.logo-marquee {
+  animation: marquee-scroll 30s linear infinite;
+  width: max-content;
+}
+
+.logo-marquee:hover {
+  animation-play-state: paused;
+}
+
+@keyframes marquee-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ============================================
+   Reduced motion
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  .aurora-orb-1,
+  .aurora-orb-2,
+  .aurora-orb-3,
+  .floating-orb-1,
+  .floating-orb-2,
+  .floating-orb-3,
+  .logo-marquee {
+    animation: none !important;
+  }
+}
