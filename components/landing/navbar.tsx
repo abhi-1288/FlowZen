@@ -58,19 +58,19 @@ export function Navbar({ scrolled }: NavbarProps) {
           >
             Careers
           </Link>
-          <Link
+          <a
             href="/login"
             className="hidden sm:inline text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
           >
             Log in
-          </Link>
+          </a>
           <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-            <Link
+            <a
               href="/signup"
               className="px-4 sm:px-5 py-2 rounded-lg bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm font-semibold hover:bg-gray-800 dark:hover:bg-white transition-colors whitespace-nowrap"
             >
               Sign up
-            </Link>
+            </a>
           </motion.div>
         </div>
       </div>

@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Html5Qrcode } from "html5-qrcode";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import { ActionButton, AnyRecord, SectionHeader } from "../shared";
 
@@ -150,12 +151,23 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
 
   // ── Entry Logs ──
   const [entryLogs, setEntryLogs] = useState<EntryLogRecord[]>([]);
-  const [logPage, setLogPage] = useState(1);
-  const [logTotalPages, setLogTotalPages] = useState(1);
   const [logType, setLogType] = useState("");
-  const [logFrom, setLogFrom] = useState("");
-  const [logTo, setLogTo] = useState("");
+  const [logDate, setLogDate] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  });
   const [loadingLogs, setLoadingLogs] = useState(false);
+
+  // ── Entry Logs Export ──
+  const [exportFromDate, setExportFromDate] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  });
+  const [exportToDate, setExportToDate] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  });
+  const [exporting, setExporting] = useState(false);
 
   // ── Lost Cards ──
   const [lostCards, setLostCards] = useState<LostCardRecord[]>([]);
@@ -332,19 +344,44 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
   async function loadEntryLogs() {
     setLoadingLogs(true);
     try {
-      const params = new URLSearchParams({ page: String(logPage), limit: "10" });
+      const params = new URLSearchParams();
       if (logType) params.set("type", logType);
-      if (logFrom) params.set("from", new Date(logFrom).toISOString());
-      if (logTo) params.set("to", new Date(logTo + "T23:59:59").toISOString());
-      const res = await apiFetch<{ logs: EntryLogRecord[]; pagination: { page: number; totalPages: number } }>(
+      if (logDate) params.set("date", logDate);
+      const res = await apiFetch<{ logs: EntryLogRecord[] }>(
         `/api/hr/security/entry-logs?${params.toString()}`
       );
       setEntryLogs(res.logs ?? []);
-      setLogTotalPages(res.pagination?.totalPages ?? 1);
     } catch {
       /* ignore */
     } finally {
       setLoadingLogs(false);
+    }
+  }
+
+  async function handleExportLogs() {
+    if (!exportFromDate || !exportToDate) return;
+    setExporting(true);
+    try {
+      const params = new URLSearchParams({ from: exportFromDate, to: exportToDate });
+      const res = await fetch(`/api/hr/security/entry-logs/export?${params.toString()}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error ?? "Export failed.");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `entry-exit-log-${exportFromDate}-to-${exportToDate}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showToast("Export downloaded.");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Export failed.", "error");
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -479,7 +516,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
 
   useEffect(() => {
     if (activeSection === "entry-logs") loadEntryLogs();
-  }, [logPage, logType]);
+  }, [logDate, logType]);
 
   useEffect(() => {
     if (activeSection === "lost-cards") loadLostCards();
@@ -909,81 +946,107 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                   className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
                     logType === t ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   }`}
-                  onClick={() => { setLogType(t); setLogPage(1); }}
+                  onClick={() => { setLogType(t); }}
                   type="button"
                 >
                   {t ? `${t.charAt(0).toUpperCase() + t.slice(1)}s` : "All"}{t && logCounts[t] ? ` (${logCounts[t]})` : ""}
                 </button>
               ))}
             </div>
-            <input type="date" value={logFrom} onChange={(e) => { setLogFrom(e.target.value); setLogPage(1); }}
-              className="rounded-md border border-slate-200 px-2 py-1 text-[11px] outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              title="From date"
-            />
-            <input type="date" value={logTo} onChange={(e) => { setLogTo(e.target.value); setLogPage(1); }}
-              className="rounded-md border border-slate-200 px-2 py-1 text-[11px] outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              title="To date"
-            />
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 transition-colors"
+                onClick={() => {
+                  const d = new Date(logDate + "T00:00:00");
+                  d.setDate(d.getDate() - 1);
+                  setLogDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+                }}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <input
+                type="date"
+                value={logDate}
+                onChange={(e) => setLogDate(e.target.value)}
+                className="rounded-md border border-slate-200 px-2 py-1 text-[11px] outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              />
+              <button
+                type="button"
+                className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 transition-colors"
+                onClick={() => {
+                  const d = new Date(logDate + "T00:00:00");
+                  d.setDate(d.getDate() + 1);
+                  setLogDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+                }}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
             <ActionButton variant="secondary" className="px-3 py-1.5 text-xs" disabled={loadingLogs} onClick={loadEntryLogs}>
               {loadingLogs ? "Loading..." : "Refresh"}
             </ActionButton>
           </div>
+
+          {isSenior && (
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+              <span className="text-xs font-semibold text-slate-600">Export to Excel:</span>
+              <input type="date" value={exportFromDate} onChange={(e) => setExportFromDate(e.target.value)}
+                className="rounded-md border border-slate-200 px-2 py-1 text-[11px] outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                title="From date"
+              />
+              <span className="text-xs text-slate-400">to</span>
+              <input type="date" value={exportToDate} onChange={(e) => setExportToDate(e.target.value)}
+                className="rounded-md border border-slate-200 px-2 py-1 text-[11px] outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                title="To date"
+              />
+              <ActionButton variant="secondary" className="px-3 py-1.5 text-xs" disabled={exporting} onClick={handleExportLogs}>
+                {exporting ? "Exporting..." : "Export"}
+              </ActionButton>
+            </div>
+          )}
 
           {loadingLogs ? (
             <p className="py-4 text-center text-sm text-slate-500">Loading logs...</p>
           ) : entryLogs.length === 0 ? (
             <p className="py-4 text-center text-sm text-slate-500">No logs found.</p>
           ) : (
-            <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-xs font-semibold uppercase text-slate-500">
-                      <th className="px-3 py-2">Person</th>
-                      <th className="px-3 py-2">Type</th>
-                      <th className="px-3 py-2">Method</th>
-                      <th className="px-3 py-2">Timestamp</th>
-                      <th className="px-3 py-2">Recorded By</th>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-xs font-semibold uppercase text-slate-500">
+                    <th className="px-3 py-2">Person</th>
+                    <th className="px-3 py-2">Type</th>
+                    <th className="px-3 py-2">Method</th>
+                    <th className="px-3 py-2">Timestamp</th>
+                    <th className="px-3 py-2">Recorded By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entryLogs.map((log) => (
+                    <tr key={log.id} className="border-b border-slate-100 text-slate-700">
+                      <td className="px-3 py-2.5">
+                        {(log.user as any)?.name ? String((log.user as any).name) : "Visitor"}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                          log.type === "entry" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
+                        }`}>
+                          {log.type}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-xs text-slate-500">{log.method}</td>
+                      <td className="px-3 py-2.5 text-xs text-slate-500">
+                        {log.timestamp ? new Date(log.timestamp).toLocaleString("en-IN") : "-"}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs text-slate-500">
+                        {(log.recordedBy as any)?.name ? String((log.recordedBy as any).name) : "-"}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {entryLogs.map((log) => (
-                      <tr key={log.id} className="border-b border-slate-100 text-slate-700">
-                        <td className="px-3 py-2.5">
-                          {(log.user as any)?.name ? String((log.user as any).name) : "Visitor"}
-                        </td>
-                        <td className="px-3 py-2.5">
-                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-                            log.type === "entry" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
-                          }`}>
-                            {log.type}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2.5 text-xs text-slate-500">{log.method}</td>
-                        <td className="px-3 py-2.5 text-xs text-slate-500">
-                          {log.timestamp ? new Date(log.timestamp).toLocaleString("en-IN") : "-"}
-                        </td>
-                        <td className="px-3 py-2.5 text-xs text-slate-500">
-                          {(log.recordedBy as any)?.name ? String((log.recordedBy as any).name) : "-"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {logTotalPages > 1 ? (
-                <div className="mt-4 flex items-center justify-center gap-2">
-                  <ActionButton variant="secondary" className="px-3 py-1 text-xs" disabled={logPage <= 1} onClick={() => setLogPage((p) => Math.max(1, p - 1))}>
-                    Prev
-                  </ActionButton>
-                  <span className="text-xs text-slate-500">Page {logPage} of {logTotalPages}</span>
-                  <ActionButton variant="secondary" className="px-3 py-1 text-xs" disabled={logPage >= logTotalPages} onClick={() => setLogPage((p) => p + 1)}>
-                    Next
-                  </ActionButton>
-                </div>
-              ) : null}
-            </>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       ) : null}

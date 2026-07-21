@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import { ArrowRight, Zap } from "lucide-react";
 
@@ -65,13 +64,13 @@ export function Hero({ isLoaded }: HeroProps) {
               className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto"
             >
               <div className="w-full mb-10 sm:w-auto">
-                <Link
+                <a
                   href="/signup"
                   className="px-8 py-4 rounded-lg bg-indigo-600 text-white font-semibold text-lg hover:bg-indigo-700 transition-colors flex items-center gap-3 group w-full sm:w-auto justify-center"
                 >
                   Get Started for Free
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </Link>
+                </a>
               </div>
             </motion.div>
           </motion.div>

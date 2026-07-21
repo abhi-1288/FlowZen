@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { motion } from "framer-motion";
 import { Shield, CreditCard, Clock } from "lucide-react";
 import { MagneticButton } from "./effects/magnetic-button";
@@ -33,12 +32,12 @@ export function Cta() {
             boards, attendance, finance, HR, and recruitment with FlowZen.
           </p>
           <MagneticButton strength={0.3}>
-            <Link
+            <a
               href="/signup"
               className="inline-flex px-10 py-5 rounded-lg bg-indigo-600 text-white font-bold text-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/25 dark:shadow-indigo-500/10"
             >
               Start your free trial today
-            </Link>
+            </a>
           </MagneticButton>
 
           {/* Trust signals */}
