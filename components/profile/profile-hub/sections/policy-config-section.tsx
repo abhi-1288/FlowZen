@@ -17,8 +17,6 @@ export function PolicyConfigSection({
   onSavePaidLeave,
   carryForwardLeaveDays,
   onCarryForwardLeaveChange,
-  savingCarryForwardLeave,
-  onSaveCarryForwardLeave,
   wfhDays,
   onWfhDaysChange,
   wfhPeriod,
@@ -27,8 +25,6 @@ export function PolicyConfigSection({
   onSaveWfhQuota,
   carryForwardWfhDays,
   onCarryForwardWfhChange,
-  savingCarryForwardWfh,
-  onSaveCarryForwardWfh,
   minWorkHours,
   onMinWorkHoursChange,
   savingDayHour,
@@ -58,31 +54,27 @@ export function PolicyConfigSection({
   noticePeriodDays: number;
   onNoticePeriodChange: (value: number) => void;
   savingNoticePeriod: boolean;
-  onSaveNoticePeriod: () => Promise<void>;
+  onSaveNoticePeriod: () => Promise<boolean>;
   paidLeaveDays: number;
   onPaidLeaveDaysChange: (value: number) => void;
   paidLeavePeriod: "monthly" | "yearly";
   onPaidLeavePeriodChange: (value: "monthly" | "yearly") => void;
   savingPaidLeave: boolean;
-  onSavePaidLeave: () => Promise<void>;
+  onSavePaidLeave: () => Promise<boolean>;
   carryForwardLeaveDays: boolean;
   onCarryForwardLeaveChange: (value: boolean) => void;
-  savingCarryForwardLeave: boolean;
-  onSaveCarryForwardLeave: () => Promise<void>;
   wfhDays: number;
   onWfhDaysChange: (value: number) => void;
   wfhPeriod: "monthly" | "yearly";
   onWfhPeriodChange: (value: "monthly" | "yearly") => void;
   wfhLoading: boolean;
-  onSaveWfhQuota: () => Promise<void>;
+  onSaveWfhQuota: () => Promise<boolean>;
   carryForwardWfhDays: boolean;
   onCarryForwardWfhChange: (value: boolean) => void;
-  savingCarryForwardWfh: boolean;
-  onSaveCarryForwardWfh: () => Promise<void>;
   minWorkHours: number;
   onMinWorkHoursChange: (value: number) => void;
   savingDayHour: boolean;
-  onSaveDayHour: () => Promise<void>;
+  onSaveDayHour: () => Promise<boolean>;
   identityCodeDigits: number | null;
   onIdentityCodeDigitsChange: (value: number | null) => void;
   identityCodeStartRange: number | null;
@@ -94,7 +86,7 @@ export function PolicyConfigSection({
   identityCodeRemaining: number | null;
   identityCodeLoaded: boolean;
   savingIdentityCode: boolean;
-  onSaveIdentityCode: () => Promise<void>;
+  onSaveIdentityCode: () => Promise<boolean>;
   bulkImportFile: File | null;
   onBulkImportFileChange: (file: File | null) => void;
   bulkPreview: {
@@ -299,32 +291,24 @@ export function PolicyConfigSection({
           </select>
         </div>
 
-        <div className="mt-3 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+        <div className="mt-3 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
           <span className="text-sm text-slate-700">Carry forward unused leave</span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className={`rounded-lg px-3 py-1 text-xs font-medium ${carryForwardLeaveDays ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`}
-              onClick={() => onCarryForwardLeaveChange(true)}
-            >On</button>
-            <button
-              type="button"
-              className={`rounded-lg px-3 py-1 text-xs font-medium ${!carryForwardLeaveDays ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`}
-              onClick={() => onCarryForwardLeaveChange(false)}
-            >Off</button>
-          </div>
-        </div>
-
-        {carryForwardLeaveDays ? (
           <button
-            className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-            disabled={savingCarryForwardLeave}
             type="button"
-            onClick={onSaveCarryForwardLeave}
+            role="switch"
+            aria-checked={carryForwardLeaveDays}
+            onClick={() => onCarryForwardLeaveChange(!carryForwardLeaveDays)}
+            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 ${
+              carryForwardLeaveDays ? "bg-emerald-500" : "bg-slate-300"
+            }`}
           >
-            {savingCarryForwardLeave ? "Saving..." : "Save carry-forward setting"}
+            <span
+              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out mt-0.5 ${
+                carryForwardLeaveDays ? "translate-x-4 ml-0.5" : "translate-x-0 ml-0.5"
+              }`}
+            />
           </button>
-        ) : null}
+        </div>
       </PolicyModal>
 
       {/* WFH Modal */}
@@ -336,51 +320,42 @@ export function PolicyConfigSection({
         onSave={onSaveWfhQuota}
         saving={wfhLoading}
       >
-        <div className="flex items-center gap-3">
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
           <input
             type="number"
-            min="0"
+            min={0}
             value={wfhDays}
             onChange={(e) => onWfhDaysChange(Math.max(0, Number(e.target.value)))}
-            className="w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
           />
-          <span className="text-sm text-slate-600">day(s) per</span>
           <select
             value={wfhPeriod}
             onChange={(e) => onWfhPeriodChange(e.target.value as "monthly" | "yearly")}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
           >
-            <option value="monthly">Month</option>
-            <option value="yearly">Year</option>
+            <option value="monthly">Per month</option>
+            <option value="yearly">Per year</option>
           </select>
         </div>
 
-        <div className="mt-3 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+        <div className="mt-3 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
           <span className="text-sm text-slate-700">Carry forward unused WFH</span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className={`rounded-lg px-3 py-1 text-xs font-medium ${carryForwardWfhDays ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`}
-              onClick={() => onCarryForwardWfhChange(true)}
-            >On</button>
-            <button
-              type="button"
-              className={`rounded-lg px-3 py-1 text-xs font-medium ${!carryForwardWfhDays ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`}
-              onClick={() => onCarryForwardWfhChange(false)}
-            >Off</button>
-          </div>
-        </div>
-
-        {carryForwardWfhDays ? (
           <button
-            className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-            disabled={savingCarryForwardWfh}
             type="button"
-            onClick={onSaveCarryForwardWfh}
+            role="switch"
+            aria-checked={carryForwardWfhDays}
+            onClick={() => onCarryForwardWfhChange(!carryForwardWfhDays)}
+            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 ${
+              carryForwardWfhDays ? "bg-emerald-500" : "bg-slate-300"
+            }`}
           >
-            {savingCarryForwardWfh ? "Saving..." : "Save carry-forward setting"}
+            <span
+              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out mt-0.5 ${
+                carryForwardWfhDays ? "translate-x-4 ml-0.5" : "translate-x-0 ml-0.5"
+              }`}
+            />
           </button>
-        ) : null}
+        </div>
       </PolicyModal>
 
       {/* Day-Hour Modal */}

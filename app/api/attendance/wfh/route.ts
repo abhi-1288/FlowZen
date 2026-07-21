@@ -168,18 +168,18 @@ export async function POST(req: Request) {
         // No manager, skip to HR step
         wfh.currentStep = "hr";
         await wfh.save();
-        if (hrApprover) {
+        if (hrApprover && String(hrApprover) !== String(userId)) {
           const assignedHr = await User.findById(hrApprover).select("_id name");
           if (assignedHr) {
             await Notification.create({ user: assignedHr._id, title: "WFH Request", body: `${body} (No manager assigned, assigned to you)`, link: "/profile?tab=attendance" });
             emitToUser(String(assignedHr._id), "notification:new", {});
           } else {
             const enrollingHr = await resolveEnrollingHr(user);
-            if (enrollingHr) {
+            if (enrollingHr && String(enrollingHr.id) !== String(userId)) {
               await Notification.create({ user: enrollingHr.id, title: "WFH Request", body: `${body} (No manager assigned)`, link: "/profile?tab=attendance" });
               emitToUser(enrollingHr.id, "notification:new", {});
             } else {
-              const hrId = await findApprovedHrUserId(companyId as any);
+              const hrId = await findApprovedHrUserId(companyId as any, String(userId));
               if (hrId) {
                 await Notification.create({ user: hrId, title: "WFH Request", body: `${body} (No manager assigned)`, link: "/profile?tab=attendance" });
                 emitToUser(hrId, "notification:new", {});
@@ -192,11 +192,11 @@ export async function POST(req: Request) {
           }
         } else {
           const enrollingHr = await resolveEnrollingHr(user);
-          if (enrollingHr) {
+          if (enrollingHr && String(enrollingHr.id) !== String(userId)) {
             await Notification.create({ user: enrollingHr.id, title: "WFH Request", body: `${body} (No manager assigned)`, link: "/profile?tab=attendance" });
             emitToUser(enrollingHr.id, "notification:new", {});
           } else {
-            const hrId = await findApprovedHrUserId(companyId as any);
+            const hrId = await findApprovedHrUserId(companyId as any, String(userId));
             if (hrId) {
               wfh.currentStep = "hr";
               await wfh.save();
@@ -213,7 +213,7 @@ export async function POST(req: Request) {
       }
     } else {
       // Manager/Tester/HR/Finance → HR approves → then Admin approves
-      if (hrApprover) {
+      if (hrApprover && String(hrApprover) !== String(userId)) {
         const assignedHr = await User.findById(hrApprover).select("_id name");
         if (assignedHr) {
           await Notification.create({ user: assignedHr._id, title: "WFH Request", body: `${body} (Assigned to you)`, link: "/profile?tab=attendance" });
@@ -221,11 +221,11 @@ export async function POST(req: Request) {
         } else {
           // Fall back if assigned HR not found
           const enrollingHr = await resolveEnrollingHr(user);
-          if (enrollingHr) {
+          if (enrollingHr && String(enrollingHr.id) !== String(userId)) {
             await Notification.create({ user: enrollingHr.id, title: "WFH Request", body, link: "/profile?tab=attendance" });
             emitToUser(enrollingHr.id, "notification:new", {});
           } else {
-            const hrId = await findApprovedHrUserId(companyId as any);
+            const hrId = await findApprovedHrUserId(companyId as any, String(userId));
             if (hrId) {
               await Notification.create({ user: hrId, title: "WFH Request", body, link: "/profile?tab=attendance" });
               emitToUser(hrId, "notification:new", {});
@@ -238,11 +238,11 @@ export async function POST(req: Request) {
         }
       } else {
         const enrollingHr = await resolveEnrollingHr(user);
-        if (enrollingHr) {
+        if (enrollingHr && String(enrollingHr.id) !== String(userId)) {
           await Notification.create({ user: enrollingHr.id, title: "WFH Request", body, link: "/profile?tab=attendance" });
           emitToUser(enrollingHr.id, "notification:new", {});
         } else {
-          const hrId = await findApprovedHrUserId(companyId as any);
+          const hrId = await findApprovedHrUserId(companyId as any, String(userId));
           if (hrId) {
             const hr = await User.findById(hrId).select("name");
             await Notification.create({ user: hrId, title: "WFH Request", body, link: "/profile?tab=attendance" });

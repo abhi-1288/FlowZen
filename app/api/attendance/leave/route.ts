@@ -142,14 +142,14 @@ export async function POST(req: Request) {
       status: "pending",
       currentStep: "hr"
     };
-    if (hrApprover) {
+    if (hrApprover && String(hrApprover) !== String(userId)) {
       leaveData.hrApprover = hrApprover;
     }
 
     const leave = await LeaveRequest.create(leaveData);
 
-    if (hrApprover) {
-      const assignedHr = await User.findById(hrApprover).select("_id");
+    if (leaveData.hrApprover) {
+      const assignedHr = await User.findById(leaveData.hrApprover).select("_id");
       if (assignedHr) {
         await Notification.create({
           user: assignedHr._id,

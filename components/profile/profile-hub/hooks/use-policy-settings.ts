@@ -126,7 +126,7 @@ export function usePolicySettings(
     }
   }
 
-  async function saveIdentityCodeSettings() {
+  async function saveIdentityCodeSettings(): Promise<boolean> {
     try {
       setSavingIdentityCode(true);
       const body: Record<string, unknown> = {};
@@ -151,17 +151,19 @@ export function usePolicySettings(
       setIdentityCodeNextNumber(data.nextNumber);
       setIdentityCodeRemaining(data.remaining);
       showToast("Identity code settings updated.", "success");
+      setSavingIdentityCode(false);
+      return true;
     } catch (err) {
+      setSavingIdentityCode(false);
       showToast(
         err instanceof Error ? err.message : "Unable to update identity code settings.",
         "error",
       );
-    } finally {
-      setSavingIdentityCode(false);
+      return false;
     }
   }
 
-  async function saveNoticePeriodOnly() {
+  async function saveNoticePeriodOnly(): Promise<boolean> {
     try {
       setSavingNoticePeriod(true);
       await apiFetch("/api/hr/policy", {
@@ -169,37 +171,41 @@ export function usePolicySettings(
         body: JSON.stringify({ noticePeriodDays }),
       });
       showToast("Notice period updated.", "success");
-      await refresh(true);
+      setSavingNoticePeriod(false);
+      void refresh(true);
+      return true;
     } catch (err) {
+      setSavingNoticePeriod(false);
       showToast(
         err instanceof Error ? err.message : "Unable to update notice period.",
         "error",
       );
-    } finally {
-      setSavingNoticePeriod(false);
+      return false;
     }
   }
 
-  async function savePaidLeaveOnly() {
+  async function savePaidLeaveOnly(): Promise<boolean> {
     try {
       setSavingPaidLeave(true);
       await apiFetch("/api/hr/policy", {
         method: "PATCH",
-        body: JSON.stringify({ paidLeaveDays, paidLeavePeriod }),
+        body: JSON.stringify({ paidLeaveDays, paidLeavePeriod, carryForwardLeaveDays }),
       });
       showToast("Paid leave policy updated.", "success");
-      await refresh(true);
+      setSavingPaidLeave(false);
+      void refresh(true);
+      return true;
     } catch (err) {
+      setSavingPaidLeave(false);
       showToast(
         err instanceof Error ? err.message : "Unable to update paid leave policy.",
         "error",
       );
-    } finally {
-      setSavingPaidLeave(false);
+      return false;
     }
   }
 
-  async function saveDayHourOnly() {
+  async function saveDayHourOnly(): Promise<boolean> {
     try {
       setSavingDayHour(true);
       await apiFetch("/api/hr/policy", {
@@ -207,18 +213,20 @@ export function usePolicySettings(
         body: JSON.stringify({ minWorkHours }),
       });
       showToast("Day-hour working policy updated.", "success");
-      await refresh(true);
+      setSavingDayHour(false);
+      void refresh(true);
+      return true;
     } catch (err) {
+      setSavingDayHour(false);
       showToast(
         err instanceof Error ? err.message : "Unable to update day-hour policy.",
         "error",
       );
-    } finally {
-      setSavingDayHour(false);
+      return false;
     }
   }
 
-  async function saveCarryForwardLeaveOnly() {
+  async function saveCarryForwardLeaveOnly(): Promise<boolean> {
     try {
       setSavingCarryForwardLeave(true);
       await apiFetch("/api/hr/policy", {
@@ -226,14 +234,16 @@ export function usePolicySettings(
         body: JSON.stringify({ carryForwardLeaveDays }),
       });
       showToast("Leave carry-forward policy updated.", "success");
-      await refresh(true);
+      setSavingCarryForwardLeave(false);
+      void refresh(true);
+      return true;
     } catch (err) {
+      setSavingCarryForwardLeave(false);
       showToast(
         err instanceof Error ? err.message : "Unable to update leave carry-forward policy.",
         "error",
       );
-    } finally {
-      setSavingCarryForwardLeave(false);
+      return false;
     }
   }
 

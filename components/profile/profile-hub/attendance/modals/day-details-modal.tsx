@@ -59,17 +59,17 @@ export function DayDetailsModal({
 
   return (
     <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-md">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
+      <div className="w-full max-w-lg rounded-2xl bg-white p-6 text-slate-900 shadow-xl ring-1 ring-slate-200 dark:bg-black dark:text-zinc-100 dark:ring-zinc-700">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-bold">{date.toLocaleDateString()}</h3>
-          <button onClick={onClose} className="text-sm text-slate-500 hover:text-slate-800 font-medium">
+          <button onClick={onClose} className="text-sm text-slate-500 hover:text-slate-800 font-medium dark:text-zinc-400 dark:hover:text-zinc-100">
             Close
           </button>
         </div>
 
         <div className="space-y-4">
           {approvedWfh && (
-            <div className="rounded-xl border border-[var(--color-primary-bg)] bg-[var(--color-primary-bg)]/50 p-4">
+            <div className="rounded-xl border border-[var(--color-primary-bg)] bg-[var(--color-primary-bg)]/50 p-4 dark:bg-[#00251b]">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-bold text-[var(--color-primary-dark)] flex items-center gap-1.5">
                   <Pen className="h-4 w-4 text-[var(--color-primary)]" /> Work From Home (Approved)
@@ -78,36 +78,36 @@ export function DayDetailsModal({
                   Approved
                 </span>
               </div>
-              <p className="mt-1 text-sm text-slate-700">
+              <p className="mt-1 text-sm text-slate-700 dark:text-zinc-300">
                 {String((approvedWfh as any).reason ?? "")}
               </p>
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-slate-500 dark:text-zinc-400">
                 Duration: {String((approvedWfh as any).duration ?? "")} day(s)
               </p>
             </div>
           )}
 
           {!approvedWfh && companyWfh && (
-            <div className="rounded-xl border border-teal-100 bg-teal-50/50 p-4">
+            <div className="rounded-xl border border-teal-100 bg-teal-50/50 p-4 dark:border-teal-900 dark:bg-[#00251f]">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-bold text-teal-800 flex items-center gap-1.5">
                   <Pen className="h-4 w-4 text-teal-600" /> Company WFH Day
                 </p>
-                <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs font-bold text-teal-700">
+                <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs font-bold text-teal-700 dark:bg-teal-950 dark:text-teal-400">
                   Company
                 </span>
               </div>
               {companyWfh.reason && (
-                <p className="mt-1 text-sm text-slate-700">{companyWfh.reason}</p>
+                <p className="mt-1 text-sm text-slate-700 dark:text-zinc-300">{companyWfh.reason}</p>
               )}
             </div>
           )}
 
           {attendance ? (
-            <div className="rounded-xl border border-slate-100 p-4">
+            <div className="rounded-xl border border-slate-100 p-4 dark:border-zinc-800">
               <div className="flex justify-between">
-                <p className="text-sm font-bold text-slate-900">Check-in</p>
-                <p className="text-sm text-slate-600">
+                <p className="text-sm font-bold text-slate-900 dark:text-zinc-100">Check-in</p>
+                <p className="text-sm text-slate-600 dark:text-zinc-400">
                   {new Date(String(attendance.checkIn)).toLocaleTimeString()}
                 </p>
               </div>
@@ -115,8 +115,8 @@ export function DayDetailsModal({
               <hr />
               <br />
               <div className="flex justify-between">
-                <p className="text-sm font-bold text-slate-900">Check-out</p>
-                <p className="text-sm text-slate-600">
+                <p className="text-sm font-bold text-slate-900 dark:text-zinc-100">Check-out</p>
+                <p className="text-sm text-slate-600 dark:text-zinc-400">
                   {attendance.checkOut ? new Date(String(attendance.checkOut)).toLocaleTimeString() : "--"}
                 </p>
               </div>
@@ -137,14 +137,14 @@ export function DayDetailsModal({
                     <hr />
                     <br />
                     <div className="flex justify-between">
-                      <p className="text-sm font-bold text-slate-900">Hours</p>
+                      <p className="text-sm font-bold text-slate-900 dark:text-zinc-100">Hours</p>
                       <p className="text-sm font-semibold text-emerald-600">{display}</p>
                     </div>
                     <br />
                     <hr />
                     <br />
                     <div className="flex justify-between items-center">
-                      <p className="text-sm font-bold text-slate-900">Status</p>
+                      <p className="text-sm font-bold text-slate-900 dark:text-zinc-100">Status</p>
                       <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${statusInfo.className}`}>{statusInfo.label}</span>
                     </div>
                   </>
@@ -152,49 +152,49 @@ export function DayDetailsModal({
               })()}
             </div>
           ) : (
-            <div className="rounded-xl border border-slate-100 p-4">
-              <p className="text-sm font-bold text-slate-900">No attendance recorded</p>
+            <div className="rounded-xl border border-slate-100 p-4 dark:border-zinc-800">
+              <p className="text-sm font-bold text-slate-900 dark:text-zinc-100">No attendance recorded</p>
             </div>
           )}
 
           {leave && (
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 dark:border-emerald-900 dark:bg-[#00251b]">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-bold text-emerald-800">Leave</p>
                 {Boolean((leave as any).halfDay) && (
-                  <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-700">
+                  <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-700 dark:bg-[#2a2300] dark:text-amber-500">
                     Half-day
                   </span>
                 )}
               </div>
-              <p className="mt-1 text-sm text-slate-700">
+              <p className="mt-1 text-sm text-slate-700 dark:text-zinc-300">
                 {String((leave as any).reason ?? "")}
               </p>
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-slate-500 dark:text-zinc-400">
                 Duration: {String((leave as any).duration ?? "")} day(s) \u2022
                 Status: {String((leave as any).status ?? "")}
               </p>
             </div>
           )}
           {holiday && (
-            <div className="rounded-xl border border-fuchsia-100 bg-fuchsia-50/50 p-4">
+            <div className="rounded-xl border border-fuchsia-100 bg-fuchsia-50/50 p-4 dark:border-pink-900 dark:bg-[#25000d]">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-bold text-fuchsia-800">Holiday</p>
-                  <p className="mt-1 text-base font-semibold text-slate-900">
+                  <p className="mt-1 text-base font-semibold text-slate-900 dark:text-zinc-100">
                     {String((holiday as any).title ?? "Company holiday")}
                   </p>
                 </div>
-                <span className="rounded-full bg-fuchsia-100 px-2 py-1 text-xs font-bold text-fuchsia-700">
+                <span className="rounded-full bg-fuchsia-100 px-2 py-1 text-xs font-bold text-fuchsia-700 dark:bg-pink-950 dark:text-pink-400">
                   Holiday
                 </span>
               </div>
               {((holiday as any).description ?? "") && (
-                <p className="mt-3 text-sm text-slate-700">
+                <p className="mt-3 text-sm text-slate-700 dark:text-zinc-300">
                   {String((holiday as any).description)}
                 </p>
               )}
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-slate-500 dark:text-zinc-400">
                 Duration: {String((holiday as any).duration ?? "")} day(s)
               </p>
             </div>

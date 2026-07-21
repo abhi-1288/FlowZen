@@ -6,25 +6,21 @@ import { FaGithub } from "react-icons/fa";
 import { FaXTwitter, FaLinkedin } from "react-icons/fa6";
 
 const productLinks = [
-  { label: "Kanban Boards", href: "#" },
-  { label: "Attendance", href: "#" },
-  { label: "Finance", href: "#" },
-  { label: "HR Module", href: "#" },
-  { label: "Recruitment", href: "#" },
-  { label: "Chat", href: "#" },
+  { label: "Kanban Boards", href: "/board" },
+  { label: "Attendance", href: "/profile" },
+  { label: "Finance", href: "/profile" },
+  { label: "HR Module", href: "/profile" },
+  { label: "Recruitment", href: "/recruitment" },
+  { label: "Chat", href: "/profile" },
 ];
 
 const resourceLinks = [
   { label: "Documentation", href: "/docs" },
-  { label: "Changelog", href: "#" },
-  { label: "Status", href: "#" },
 ];
 
 const companyLinks = [
-  { label: "About", href: "#" },
   { label: "Careers", href: "/careers" },
-  { label: "Contact", href: "#" },
-  { label: "Security", href: "#" },
+  { label: "GitHub", href: "https://github.com/abhi-1288/FlowZen" },
 ];
 
 const socialLinks = [

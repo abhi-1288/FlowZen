@@ -8,11 +8,15 @@ export function LeaveModal({
   onRefresh,
   showToast,
   leavePolicy,
+  currentUserId,
+  currentUserRole,
 }: {
   onClose: () => void;
   onRefresh: () => void;
   showToast: (text: string, type?: "success" | "error") => void;
   leavePolicy?: AnyRecord | null;
+  currentUserId?: string;
+  currentUserRole?: string;
 }) {
   const [formData, setFormData] = useState({
     startDate: "",
@@ -22,11 +26,20 @@ export function LeaveModal({
   });
   const [loading, setLoading] = useState(false);
   const [hrUsers, setHrUsers] = useState<{ _id: string; name: string }[]>([]);
+  const [adminUsers, setAdminUsers] = useState<{ _id: string; name: string }[]>([]);
   const [selectedHr, setSelectedHr] = useState("");
+
+  const isOnlyHr = currentUserRole === "human-resource" && hrUsers.length <= 1;
+  const dropdownUsers = isOnlyHr
+    ? adminUsers.filter((u) => u._id !== currentUserId)
+    : hrUsers.filter((u) => u._id !== currentUserId);
 
   useEffect(() => {
     apiFetch<{ users: { _id: string; name: string }[] }>("/api/users?role=human-resource")
       .then((res) => setHrUsers(res.users ?? []))
+      .catch(() => {});
+    apiFetch<{ users: { _id: string; name: string }[] }>("/api/users?role=admin")
+      .then((res) => setAdminUsers(res.users ?? []))
       .catch(() => {});
   }, []);
 
@@ -126,19 +139,19 @@ export function LeaveModal({
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
             />
           </div>
-          {hrUsers.length > 0 && (
+          {dropdownUsers.length > 0 && (
             <div className="space-y-1">
               <label className="text-xs font-bold uppercase text-slate-500">
-                Assign HR
+                {isOnlyHr ? "Assign Admin" : "Assign HR"}
               </label>
               <select
                 value={selectedHr}
                 onChange={(e) => setSelectedHr(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
               >
-                <option value="">Auto-assign any HR</option>
-                {hrUsers.map((hr) => (
-                  <option key={hr._id} value={hr._id}>{hr.name}</option>
+                <option value="">{isOnlyHr ? "Auto-assign any Admin" : "Auto-assign any HR"}</option>
+                {dropdownUsers.map((u) => (
+                  <option key={u._id} value={u._id}>{u.name}</option>
                 ))}
               </select>
             </div>

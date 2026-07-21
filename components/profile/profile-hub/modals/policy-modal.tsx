@@ -1,4 +1,5 @@
 ﻿import type { ReactNode } from "react";
+import { useState } from "react";
 
 export function PolicyModal({
   open,
@@ -6,7 +7,7 @@ export function PolicyModal({
   description,
   onClose,
   onSave,
-  saving,
+  saving: externalSaving,
   saveLabel,
   children,
 }: {
@@ -14,12 +15,27 @@ export function PolicyModal({
   title: string;
   description?: string;
   onClose: () => void;
-  onSave: () => void;
+  onSave: () => Promise<boolean>;
   saving: boolean;
   saveLabel?: string;
   children: ReactNode;
 }) {
+  const [internalSaving, setInternalSaving] = useState(false);
+  const saving = externalSaving || internalSaving;
+
   if (!open) return null;
+
+  async function handleSave() {
+    setInternalSaving(true);
+    try {
+      const ok = await onSave();
+      if (ok) onClose();
+    } catch {
+      // keep modal open
+    } finally {
+      setInternalSaving(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -53,7 +69,7 @@ export function PolicyModal({
           <button
             className="rounded-full bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
             disabled={saving}
-            onClick={onSave}
+            onClick={handleSave}
             type="button"
           >
             {saving ? "Saving..." : saveLabel ?? "Save"}

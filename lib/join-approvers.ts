@@ -82,12 +82,15 @@ export async function resolveSeniorSecurityApprover(
 
 export async function findApprovedHrUserId(
   companyId: Types.ObjectId | string,
+  excludeUserId?: string,
 ): Promise<string | null> {
-  const hr = await User.findOne({
+  const filter: Record<string, unknown> = {
     company: companyId,
     role: "human-resource",
     companyStatus: "approved",
-  })
+  };
+  if (excludeUserId) filter._id = { $ne: excludeUserId };
+  const hr = await User.findOne(filter)
     .select("_id")
     .sort({ createdAt: 1 });
 

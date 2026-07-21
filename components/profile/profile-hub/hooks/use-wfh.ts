@@ -50,23 +50,26 @@ export function useWfh(
     void loadWfh();
   }, [loadWfh]);
 
-  const saveWfhQuota = useCallback(async () => {
+  const saveWfhQuota = useCallback(async (): Promise<boolean> => {
     try {
       setWfhLoading(true);
       await apiFetch("/api/company/wfh", {
         method: "POST",
-        body: JSON.stringify({ wfhDays, wfhPeriod }),
+        body: JSON.stringify({ wfhDays, wfhPeriod, carryForwardWfhDays }),
       });
       showToast("WFH quota updated.", "success");
+      setWfhLoading(false);
+      void refresh(true);
+      return true;
     } catch (err) {
+      setWfhLoading(false);
       showToast(
         err instanceof Error ? err.message : "Failed to update WFH quota",
         "error",
       );
-    } finally {
-      setWfhLoading(false);
+      return false;
     }
-  }, [wfhDays, wfhPeriod, showToast]);
+  }, [wfhDays, wfhPeriod, carryForwardWfhDays, showToast, refresh]);
 
   const saveCarryForwardWfhOnly = useCallback(async () => {
     try {

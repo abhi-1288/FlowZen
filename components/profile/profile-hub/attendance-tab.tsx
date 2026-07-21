@@ -591,6 +591,8 @@ export function AttendanceTab({
             onRefresh={loadData}
             showToast={showToast}
             leavePolicy={leavePolicy}
+            currentUserId={session?.user?.id ? String(session.user.id) : undefined}
+            currentUserRole={String(profile?.role ?? "")}
           />
         )}
         {showHolidayModal && (
@@ -747,6 +749,8 @@ export function AttendanceTab({
             onClose={() => setShowWfhFormModal(false)}
             onRefresh={loadData}
             showToast={showToast}
+            currentUserId={session?.user?.id ? String(session.user.id) : undefined}
+            currentUserRole={String(profile?.role ?? "")}
           />
         )}
         {showWfhRequestsModal && (
@@ -806,11 +810,11 @@ export function AttendanceTab({
             <ActionButton onClick={prevMonth} variant="secondary" className="h-10 w-12" aria-label="Previous month">
               <ChevronLeft size={20} />
             </ActionButton>
-            <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 shadow-sm">
-              <div className="border-r border-slate-200 bg-slate-50 px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-600">
+            <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 shadow-sm dark:border-zinc-800">
+              <div className="border-r border-slate-200 bg-slate-50 px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
                 {monthNames[month]}
               </div>
-              <div className="bg-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-900">
+              <div className="bg-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-900 dark:bg-black dark:text-zinc-100">
                 {year}
               </div>
             </div>
@@ -819,14 +823,14 @@ export function AttendanceTab({
             </ActionButton>
           </div>
         </div>
-        <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4">
+        <div className="rounded-2xl border border-slate-100 bg-gradient-to-br from-rose-50 via-white to-emerald-50 p-4 dark:border-zinc-800 dark:from-[#180007] dark:via-black dark:to-[#00130e]">
           <div className="grid grid-cols-7 gap-3">
             {weekDays.map((wd, i) => (
               <div
                 key={wd}
                 className={`flex flex-col gap-3 rounded-2xl p-2 pb-6 transition-all ${i === 0
-                  ? "bg-rose-50/50 text-rose-600 border border-rose-100/50"
-                  : "bg-emerald-50/50 text-emerald-600 border border-emerald-100/50"
+                  ? "bg-rose-50/50 text-rose-600 border border-rose-100/50 dark:bg-[#180007] dark:text-pink-500 dark:border-pink-950"
+                  : "bg-emerald-50/50 text-emerald-600 border border-emerald-100/50 dark:bg-[#00130e] dark:text-emerald-500 dark:border-emerald-950"
                   }`}
               >
                 <span className="text-center text-[10px] font-black uppercase tracking-tighter sm:text-xs">
@@ -877,32 +881,32 @@ export function AttendanceTab({
                         tabIndex={day ? 0 : undefined}
                         className={`relative cursor-pointer grid h-10 w-full place-items-center rounded-xl text-xs font-bold sm:h-14 sm:text-sm transition-all ${day
                           ? beforeStart
-                            ? "bg-slate-100 text-slate-400 border border-slate-200 shadow-sm"
+                            ? "bg-slate-100 text-slate-400 border border-slate-200 shadow-sm dark:bg-zinc-900 dark:text-zinc-600 dark:border-zinc-800"
                             : pendingLeave
-                              ? "bg-amber-50 text-amber-900 border border-amber-200 shadow-sm"
+                              ? "bg-amber-50 text-amber-900 border border-amber-200 shadow-sm dark:bg-[#2a2300] dark:text-amber-500 dark:border-amber-700"
                               : holiday
-                                ? "bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 shadow-sm"
+                                ? "bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 shadow-sm dark:bg-[#25000d] dark:text-pink-500 dark:border-pink-900"
                                 : halfDayStatus
-                                  ? "bg-amber-100 text-amber-700 border border-amber-200 shadow-sm"
+                                  ? "bg-amber-100 text-amber-700 border border-amber-200 shadow-sm dark:bg-[#2a2300] dark:text-amber-500 dark:border-amber-700"
                                   : attAbsentStatus
-                                    ? "bg-rose-50 text-rose-600 border border-rose-200 shadow-sm"
+                                    ? "bg-rose-50 text-rose-600 border border-rose-200 shadow-sm dark:bg-[#25000d] dark:text-pink-500 dark:border-pink-900"
                                     : today
                                       ? checkedIn
-                                        ? "bg-sky-100 text-sky-700 border border-sky-200 shadow-inner"
-                                        : "bg-white text-rose-600 border border-rose-200 shadow-sm"
+                                        ? "bg-sky-100 text-sky-700 border border-sky-200 shadow-inner dark:bg-[#001b2a] dark:text-sky-400 dark:border-sky-800"
+                                        : "bg-white text-rose-600 border border-rose-200 shadow-sm dark:bg-black dark:text-pink-500 dark:border-pink-900"
                                       : checkedIn
-                                        ? "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm"
+                                        ? "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm dark:bg-[#00251b] dark:text-emerald-500 dark:border-emerald-800"
                                         : companyWfh
-                                          ? "bg-teal-100 text-teal-700 border border-teal-200 shadow-sm"
+                                          ? "bg-teal-100 text-teal-700 border border-teal-200 shadow-sm dark:bg-[#00251f] dark:text-teal-400 dark:border-teal-800"
                                           : wfh
                                             ? "bg-[var(--color-primary-bg)] text-[var(--color-primary-dark)] border border-[var(--color-primary-bg)] shadow-sm"
                                             : leave
-                                          ? "bg-pink-100 text-pink-700 border border-pink-200 shadow-sm"
+                                          ? "bg-pink-100 text-pink-700 border border-emerald-200 shadow-sm dark:bg-[#00251b] dark:text-emerald-400 dark:border-emerald-800"
                                           : weekend
-                                          ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm"
+                                          ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm dark:bg-zinc-900 dark:text-zinc-500 dark:border-zinc-800"
                                           : missed
-                                            ? "bg-white text-rose-600 border border-rose-200 shadow-sm"
-                                            : "bg-white shadow-sm border border-slate-100 text-slate-700"
+                                            ? "bg-white text-rose-600 border border-rose-200 shadow-sm dark:bg-black dark:text-pink-500 dark:border-pink-900"
+                                            : "bg-white shadow-sm border border-slate-100 text-slate-700 dark:bg-black dark:border-zinc-800 dark:text-zinc-300"
                           : "opacity-0"
                           }`}
                       >
@@ -949,13 +953,13 @@ export function AttendanceTab({
             ))}
           </div>
         </div>
-        <div className="mt-6 flex flex-wrap justify-center gap-6 text-xs font-semibold text-slate-600 bg-slate-50 py-3 px-6 rounded-full w-fit mx-auto border border-slate-200">
-          <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-emerald-100 border border-emerald-300"></span> Present</div>
-          <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-amber-100 border border-amber-300"></span> Half-Day</div>
+        <div className="mt-6 flex flex-wrap justify-center gap-6 text-xs font-semibold text-slate-600 bg-slate-50 py-3 px-6 rounded-full w-fit mx-auto border border-slate-200 dark:text-zinc-400 dark:bg-zinc-900 dark:border-zinc-800">
+          <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-emerald-100 border border-emerald-300 dark:bg-emerald-950/50 dark:border-emerald-700"></span> Present</div>
+          <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-amber-100 border border-amber-300 dark:bg-amber-950/50 dark:border-amber-700"></span> Half-Day</div>
           <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-[var(--color-primary-bg)] border border-[var(--color-primary-light)]"></span> WFH</div>
-          <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-pink-100 border border-pink-300"></span> Leave</div>
-          <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-rose-50 border border-rose-300"></span> Absent</div>
-          <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-fuchsia-100 border border-fuchsia-300"></span> Holiday</div>
+          <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-pink-100 border border-emerald-300 dark:bg-[#00251b] dark:border-emerald-700"></span> Leave</div>
+          <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-rose-50 border border-rose-300 dark:bg-rose-950/50 dark:border-rose-700"></span> Absent</div>
+          <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-fuchsia-100 border border-fuchsia-300 dark:bg-fuchsia-950/50 dark:border-fuchsia-700"></span> Holiday</div>
         </div>
       </section>
       {selectedDate && (

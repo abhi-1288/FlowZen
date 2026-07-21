@@ -10,6 +10,7 @@ import {
   Building2,
   Lock,
   MessageCircle,
+  Shield,
 } from "lucide-react";
 
 const features = [
@@ -52,7 +53,7 @@ const features = [
   {
     icon: Lock,
     title: "Role-based Access",
-    desc: "Seven user roles with granular board-level permissions: Admin, HR, Finance, PM, QA, Employee, and more.",
+    desc: "Eight user roles with granular board-level permissions: Admin, HR, Finance, PM, QA, Security, Employee, and more.",
     color: "cyan",
   },
   {
@@ -60,6 +61,12 @@ const features = [
     title: "Chat & Messaging",
     desc: "Real-time messaging with read/delivery receipts, online presence indicators, member sidebar, and info modals.",
     color: "teal",
+  },
+  {
+    icon: Shield,
+    title: "Security & Visitor Management",
+    desc: "Entry/exit scanning, QR-based visitor passes, lost card workflows, emergency contacts, and building access logs.",
+    color: "orange",
   },
 ] as const;
 
@@ -72,6 +79,7 @@ const featureStyles = {
   cyan: { icon: "bg-cyan-50 dark:bg-cyan-950/30 text-cyan-600 dark:text-cyan-400", border: "hover:border-cyan-300 dark:hover:border-cyan-700" },
   violet: { icon: "bg-violet-50 dark:bg-violet-950/30 text-violet-600 dark:text-violet-400", border: "hover:border-violet-300 dark:hover:border-violet-700" },
   teal: { icon: "bg-teal-50 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400", border: "hover:border-teal-300 dark:hover:border-teal-700" },
+  orange: { icon: "bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400", border: "hover:border-orange-300 dark:hover:border-orange-700" },
 } as const;
 
 export function Features() {

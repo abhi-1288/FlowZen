@@ -398,8 +398,6 @@ export function ProfileTab({
             onSavePaidLeave={policy.savePaidLeaveOnly}
             carryForwardLeaveDays={policy.carryForwardLeaveDays}
             onCarryForwardLeaveChange={policy.setCarryForwardLeaveDays}
-            savingCarryForwardLeave={policy.savingCarryForwardLeave}
-            onSaveCarryForwardLeave={policy.saveCarryForwardLeaveOnly}
             wfhDays={wfh.wfhDays}
             onWfhDaysChange={wfh.setWfhDays}
             wfhPeriod={wfh.wfhPeriod}
@@ -408,8 +406,6 @@ export function ProfileTab({
             onSaveWfhQuota={wfh.saveWfhQuota}
             carryForwardWfhDays={wfh.carryForwardWfhDays}
             onCarryForwardWfhChange={wfh.setCarryForwardWfhDays}
-            savingCarryForwardWfh={wfh.wfhLoading}
-            onSaveCarryForwardWfh={wfh.saveCarryForwardWfhOnly}
             minWorkHours={policy.minWorkHours}
             onMinWorkHoursChange={policy.setMinWorkHours}
             savingDayHour={policy.savingDayHour}

@@ -62,6 +62,14 @@ export async function PATCH(request: Request) {
   if (hasMinWorkHours) company.minWorkHours = Math.floor(minWorkHours);
   await company.save();
 
+  const resp = NextResponse.json({
+    ok: true,
+    noticePeriodDays: company.noticePeriodDays,
+    paidLeaveDays: company.paidLeaveDays,
+    paidLeavePeriod: company.paidLeavePeriod,
+    minWorkHours: company.minWorkHours,
+  });
+
   const targets = new Set<string>(
     (company.members ?? []).map((member: any) => String(member))
   );
@@ -70,7 +78,7 @@ export async function PATCH(request: Request) {
   if (hasPaidLeaveDays || hasPaidLeavePeriod) {
     const notifBody = `Paid leave policy updated: ${Math.floor(Number(company.paidLeaveDays ?? 0))} day(s) per ${String(company.paidLeavePeriod ?? "monthly")}`;
 
-    await Notification.insertMany(
+    void Notification.insertMany(
       Array.from(targets).map((targetUserId) => ({
         user: targetUserId,
         company: company._id,
@@ -78,14 +86,15 @@ export async function PATCH(request: Request) {
         title: "Paid Leave Policy Updated",
         body: notifBody,
       }))
-    );
-    Array.from(targets).forEach((target) => emitNotification(target));
+    ).then(() => {
+      Array.from(targets).forEach((target) => emitNotification(target));
+    });
   }
 
   if (hasMinWorkHours) {
     const notifBody = `Minimum work hours policy updated: ${Math.floor(Number(company.minWorkHours ?? 0))} hrs / day`;
 
-    await Notification.insertMany(
+    void Notification.insertMany(
       Array.from(targets).map((targetUserId) => ({
         user: targetUserId,
         company: company._id,
@@ -93,16 +102,11 @@ export async function PATCH(request: Request) {
         title: "Work Hours Policy Updated",
         body: notifBody,
       }))
-    );
-    Array.from(targets).forEach((target) => emitNotification(target));
+    ).then(() => {
+      Array.from(targets).forEach((target) => emitNotification(target));
+    });
   }
 
-  return NextResponse.json({
-    ok: true,
-    noticePeriodDays: company.noticePeriodDays,
-    paidLeaveDays: company.paidLeaveDays,
-    paidLeavePeriod: company.paidLeavePeriod,
-    minWorkHours: company.minWorkHours,
-  });
+  return resp;
 }
 
