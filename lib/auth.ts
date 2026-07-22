@@ -10,6 +10,7 @@ import { createHash } from "crypto";
 import { connectDb } from "@/lib/db";
 import { User } from "@/models/User";
 import { Team } from "@/models/Team";
+import { rateLimitLogin } from "@/lib/rate-limit";
 
 const oauthProviders = [
   ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
@@ -72,10 +73,21 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
         rememberMe: { label: "Remember Me", type: "text" }
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         const email = credentials?.email?.trim().toLowerCase();
         const password = credentials?.password ?? "";
         if (!email || !password) return null;
+
+        const headers = (req as any)?.headers as Record<string, string> | undefined;
+        const ip =
+          headers?.["x-forwarded-for"]?.split(",")[0]?.trim() ||
+          headers?.["x-real-ip"]?.trim() ||
+          "127.0.0.1";
+
+        const loginCheck = rateLimitLogin(ip, email);
+        if (!loginCheck.success) {
+          throw new Error("Too many login attempts. Please try again later.");
+        }
 
         await connectDb();
         const user = await User.findOne({ email }).select("+passwordHash");

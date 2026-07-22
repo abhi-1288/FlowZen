@@ -26,11 +26,14 @@ export default function LoginPage() {
     const result = await signIn("credentials-login", { email, password, rememberMe: String(rememberMe), redirect: false });
     setLoading(false);
     if (result?.error) {
-      setError(
-        result.error === "CredentialsSignin"
-          ? "Invalid email or password."
-          : result.error
-      );
+      const msg = decodeURIComponent(result.error);
+      if (msg.includes("Too many login attempts")) {
+        setError("Too many login attempts. Please try again later.");
+      } else if (msg === "CredentialsSignin") {
+        setError("Invalid email or password.");
+      } else {
+        setError(msg);
+      }
       return;
     }
 

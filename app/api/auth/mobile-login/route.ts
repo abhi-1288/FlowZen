@@ -4,6 +4,15 @@ import { connectDb } from "@/lib/db";
 import { User } from "@/models/User";
 import { databaseUnavailable, jsonError } from "@/lib/api";
 import { signMobileToken } from "@/lib/mobile-auth";
+import { rateLimitLogin } from "@/lib/rate-limit";
+
+function getClientIp(request: Request) {
+  const xff = request.headers.get("x-forwarded-for");
+  if (xff) return xff.split(",")[0].trim();
+  const xri = request.headers.get("x-real-ip");
+  if (xri) return xri.trim();
+  return "127.0.0.1";
+}
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -12,6 +21,23 @@ export async function POST(request: Request) {
 
   if (!email || !password) {
     return jsonError("Email and password are required.");
+  }
+
+  const ip = getClientIp(request);
+  const loginCheck = rateLimitLogin(ip, email);
+  if (!loginCheck.success) {
+    return NextResponse.json(
+      {
+        error: "Too many login attempts. Please try again later.",
+        retryAfter: loginCheck.retryAfter,
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(loginCheck.retryAfter),
+        },
+      }
+    );
   }
 
   try {
