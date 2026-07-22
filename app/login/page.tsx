@@ -128,7 +128,16 @@ export default function LoginPage() {
                     <span className="text-sm font-medium text-slate-700 dark:text-zinc-300">{role}</span>
                     <span className="ml-2 text-xs text-slate-400 dark:text-zinc-500">{mail}</span>
                   </div>
-                  <span className="ml-3 shrink-0 rounded-md bg-white dark:bg-zinc-700 px-2 py-0.5 font-mono text-xs text-slate-500 dark:text-zinc-400 ring-1 ring-slate-200 dark:ring-zinc-700">{pass}</span>
+                  <div className="ml-3 flex shrink-0 items-center gap-2">
+                    <span className="rounded-md bg-white dark:bg-zinc-700 px-2 py-0.5 font-mono text-xs text-slate-500 dark:text-zinc-400 ring-1 ring-slate-200 dark:ring-zinc-700">{pass}</span>
+                    <button
+                      type="button"
+                      onClick={() => { setEmail(String(mail)); setPassword(String(pass)); }}
+                      className="rounded-md bg-emerald-600 px-2.5 py-0.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700"
+                    >
+                      Use
+                    </button>
+                  </div>
                 </div>
               ))}
               <button

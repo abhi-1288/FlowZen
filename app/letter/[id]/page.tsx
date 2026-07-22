@@ -34,6 +34,7 @@ type LetterData = {
     role: string;
     companyIdentityCode?: string;
     companyJoined?: string;
+    baseSalary?: number;
     pfNumber?: string;
     pfDeductionAmount?: number;
     esicNumber?: string;
@@ -600,31 +601,11 @@ export default function LetterPage() {
         });
 
         if (found.metadata?.letterType === "salary-certificate") {
-          const currentMonth = new Date().toISOString().slice(0, 7);
+          const bs = Number(found.requester?.baseSalary ?? 0);
+          setSalary({ baseSalary: bs, netSalary: bs });
 
-          apiFetch<{ insights?: { baseSalary?: number }; user?: { baseSalary?: number } }>("/api/profile")
-            .then((profileRes) => {
-              const bs = profileRes?.user?.baseSalary ?? profileRes?.insights?.baseSalary ?? 0;
-              setSalary({ baseSalary: Number(bs), netSalary: Number(bs) });
-
-              apiFetch<PolicyInfo>("/api/finance/policy")
-                .then((policyRes) => setPolicy(policyRes))
-                .catch(() => {});
-
-              apiFetch<{ salaries?: { baseSalary: number; netSalary: number }[] }>(
-                `/api/finance?month=${currentMonth}`
-              )
-                .then((financeRes) => {
-                  const ownSalary = financeRes?.salaries?.[0];
-                  if (ownSalary) {
-                    setSalary((prev) => ({
-                      baseSalary: Number(ownSalary.baseSalary ?? prev?.baseSalary ?? bs),
-                      netSalary: Number(ownSalary.netSalary ?? ownSalary.baseSalary ?? prev?.baseSalary ?? bs),
-                    }));
-                  }
-                })
-                .catch(() => {});
-            })
+          apiFetch<PolicyInfo>("/api/finance/policy")
+            .then((policyRes) => setPolicy(policyRes))
             .catch(() => {});
         }
       })

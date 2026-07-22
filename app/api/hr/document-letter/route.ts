@@ -40,7 +40,7 @@ export async function GET(request: Request) {
 
     const requests = await JoinRequest.find(filter)
       .sort({ createdAt: -1 })
-      .populate("requester", "name email role companyIdentityCode companyJoined pfNumber pfDeductionAmount esicNumber esicDeductionAmount")
+      .populate("requester", "name email role companyIdentityCode companyJoined baseSalary pfNumber pfDeductionAmount esicNumber esicDeductionAmount pfExempted esicExempted tdsExempted")
       .populate("approver", "name role")
       .populate("company", "name icon")
       .lean();
