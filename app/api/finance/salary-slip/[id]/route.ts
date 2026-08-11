@@ -239,6 +239,24 @@ export async function GET(request: Request, { params }: Params) {
     const finalSalary = Math.max(0, Number(salary.netSalary ?? 0));
     const periodAdjusted = !!(companyJoined && companyJoined > startOfDay(periodStart) && companyJoined <= startOfDay(periodEnd));
 
+    let houseRentPercentage = 37.33;
+    let conveyancePercentage = 5.92;
+    let medicalPercentage = 4.63;
+    let specialAllowancePercentage = 74.33;
+    if (policy) {
+      if (typeof (policy as any).houseRentPercentage === "number") houseRentPercentage = (policy as any).houseRentPercentage;
+      if (typeof (policy as any).conveyancePercentage === "number") conveyancePercentage = (policy as any).conveyancePercentage;
+      if (typeof (policy as any).medicalPercentage === "number") medicalPercentage = (policy as any).medicalPercentage;
+      if (typeof (policy as any).specialAllowancePercentage === "number") specialAllowancePercentage = (policy as any).specialAllowancePercentage;
+    }
+
+    const SumOfPercentages = 1 + (houseRentPercentage + conveyancePercentage + medicalPercentage + specialAllowancePercentage) / 100;
+    const basicSalaryComponent = roundCurrency(grossSalary / SumOfPercentages);
+    const houseRentAmount = roundCurrency(basicSalaryComponent * houseRentPercentage / 100);
+    const conveyanceAmount = roundCurrency(basicSalaryComponent * conveyancePercentage / 100);
+    const medicalAmount = roundCurrency(basicSalaryComponent * medicalPercentage / 100);
+    const specialAllowanceAmount = Math.max(0, grossSalary - (basicSalaryComponent + houseRentAmount + conveyanceAmount + medicalAmount));
+
     return NextResponse.json({
       slip: {
         id: salary._id,
@@ -286,6 +304,15 @@ export async function GET(request: Request, { params }: Params) {
         periodStart: toDateKey(effectiveStart),
         periodEnd: toDateKey(effectiveEnd),
         periodAdjusted,
+        basicSalaryComponent,
+        houseRentAmount,
+        conveyanceAmount,
+        medicalAmount,
+        specialAllowanceAmount,
+        houseRentPercentage,
+        conveyancePercentage,
+        medicalPercentage,
+        specialAllowancePercentage,
       },
     });
   } catch (error) {

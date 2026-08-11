@@ -31,6 +31,10 @@ export type PolicyData = {
   pfPercentage: number;
   esicPercentage: number;
   tdsPercentage: number;
+  houseRentPercentage?: number;
+  conveyancePercentage?: number;
+  medicalPercentage?: number;
+  specialAllowancePercentage?: number;
 };
 
 export type PolicyApiResponse = PolicyData & { nowOptedOut: boolean };

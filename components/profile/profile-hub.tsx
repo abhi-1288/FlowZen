@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   CheckSquare,
   ChevronRight,
+  ClipboardList,
   Clock,
   FileText,
   History,
@@ -40,6 +41,8 @@ import { OnboardingTab } from "./profile-hub/onboarding-tab";
 import { DocumentsTab } from "./profile-hub/documents-tab";
 import { CareersTab } from "./profile-hub/careers-tab";
 import { CompanyCalendarTab } from "./profile-hub/company-calendar-tab";
+import { FinancePolicyTab } from "./profile-hub/finance-policy-tab";
+import { HrPolicyTab } from "./profile-hub/hr-policy-tab";
 import { AnyRecord, AvatarBadge, formatRoleWithCustom } from "./profile-hub/shared";
 
 type ProfileHubCache = {
@@ -78,9 +81,11 @@ export type Tab =
   | "careers"
   | "calendar"
   | "visitors"
-  | "security";
+  | "security"
+  | "finance-policy"
+  | "hr-policy";
 
-const VALID_TABS = new Set<string>(["dashboard", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers", "calendar", "visitors", "security"]);
+const VALID_TABS = new Set<string>(["dashboard", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers", "calendar", "visitors", "security", "finance-policy", "hr-policy"]);
 
 
 export function ProfileHub() {
@@ -224,6 +229,8 @@ export function ProfileHub() {
     ...(canViewCompanyTabs ? (["documents"] as Tab[]) : []),
     ...(canViewCompanyTabs ? (["messages"] as Tab[]) : []),
     ...(canViewFinanceTab ? (["finance"] as Tab[]) : []),
+    ...(canViewFinanceTab && ["finance", "admin"].includes(String(role)) ? (["finance-policy"] as Tab[]) : []),
+    ...(canViewCompanyTabs ? (["hr-policy"] as Tab[]) : []),
     ...(canViewCompanyTabs ? (["approvals"] as Tab[]) : []),
     "notifications",
     ...(canViewCompanyTabs ? (["attendance"] as Tab[]) : []),
@@ -743,6 +750,14 @@ export function ProfileHub() {
               onClick={() => setTab("members")}
             />
           ) : null}
+          {canViewCompanyTabs ? (
+            <NavButton
+              active={tab === "hr-policy"}
+              icon={<ClipboardList size={16} />}
+              label="HR Policy"
+              onClick={() => setTab("hr-policy")}
+            />
+          ) : null}
           {canViewVisitorsTab ? (
             <NavButton
               active={tab === "visitors"}
@@ -801,6 +816,14 @@ export function ProfileHub() {
                 label={`Finance${financeCount ? ` (${financeCount})` : ""}`}
                 onClick={() => setTab("finance")}
               />
+              {["finance", "admin"].includes(String(role)) ? (
+                <NavButton
+                  active={tab === "finance-policy"}
+                  icon={<ShieldCheck size={16} />}
+                  label="Finance Policy"
+                  onClick={() => setTab("finance-policy")}
+                />
+              ) : null}
             </>
           ) : null}
           {canViewCompanyTabs ? (
@@ -911,7 +934,11 @@ export function ProfileHub() {
                             ? `Careers (${jobsCount})`
                             : item === "messages" && messagesCount > 0
                               ? `Messages (${messagesCount})`
-                              : item.charAt(0).toUpperCase() + item.slice(1);
+                              : item === "finance-policy"
+                                ? "Finance Policy"
+                                : item === "hr-policy"
+                                  ? "HR Policy"
+                                  : item.charAt(0).toUpperCase() + item.slice(1);
 
               return (
                 <button
@@ -1078,6 +1105,14 @@ export function ProfileHub() {
 
               {tab === "finance" ? (
                 <FinanceTab actorRole={String(role)} profileId={String(profile?.id ?? session?.user?.id ?? "")} showToast={showToast} />
+              ) : null}
+
+              {tab === "finance-policy" && ["finance", "admin"].includes(String(role)) ? (
+                <FinancePolicyTab actorRole={String(role)} profileId={String(profile?.id ?? session?.user?.id ?? "")} showToast={showToast} />
+              ) : null}
+
+              {tab === "hr-policy" && canViewCompanyTabs ? (
+                <HrPolicyTab company={company} profile={profile} insights={insights} actorRole={String(role)} refresh={load} showToast={showToast} />
               ) : null}
 
               {tab === "attendance" && canViewCompanyTabs ? (

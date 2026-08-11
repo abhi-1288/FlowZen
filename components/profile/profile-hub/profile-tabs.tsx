@@ -5,13 +5,10 @@ import { CodePanel, JoinPanel } from "./admin-tabs";
 import { DocumentLetterModal } from "./document-letter-modal";
 import { ImageCropModal } from "./image-crop-modal";
 import { useWfh } from "./hooks/use-wfh";
-import { usePolicySettings } from "./hooks/use-policy-settings";
 import { useSetupWizard } from "./hooks/use-setup-wizard";
 import { PersonalInfoSection } from "./sections/personal-info-section";
 import { CompanyTeamSection } from "./sections/company-team-section";
-import { PolicyQuotasSection } from "./sections/policy-quotas-section";
 import { CompensationSection } from "./sections/compensation-section";
-import { PolicyConfigSection } from "./sections/policy-config-section";
 import { CompanyControlsSection } from "./sections/company-controls-section";
 import { TeamOnboardingCodesSection } from "./sections/team-onboarding-codes-section";
 import { DocumentLettersSection } from "./sections/document-letters-section";
@@ -54,17 +51,6 @@ export function ProfileTab({
   const [avatarCropFile, setAvatarCropFile] = useState<File | null>(null);
   const [deletingAvatar, setDeletingAvatar] = useState(false);
   const [salaryRequesting, setSalaryRequesting] = useState(false);
-  const [policyInfo, setPolicyInfo] = useState<{
-    foodAmount: number; travelAccommodationAmount: number;
-    foodOptedOutMembers?: AnyRecord[]; travelOptedOutMembers?: AnyRecord[];
-    advanceSalaryEnabled?: boolean;
-    pfPercentage?: number; esicPercentage?: number; tdsPercentage?: number;
-  } | null>(null);
-  const [salaryCycle, setSalaryCycle] = useState<{
-    salaryCycleDay: number;
-    salaryCycleStartDay: number | null;
-    salaryCycleEndDay: number | null;
-  } | null>(null);
   const [companyActionModal, setCompanyActionModal] = useState(false);
   const [companyActionType, setCompanyActionType] = useState<"hold" | "takedown" | null>(null);
   const [companyActionConfirm, setCompanyActionConfirm] = useState("");
@@ -114,7 +100,6 @@ export function ProfileTab({
   const canUseEmptyCompanyControls = role === "admin" && Boolean(company) && approvedMembersBesidesAdmin === 0;
 
   const wfh = useWfh(company, refresh, showToast);
-  const policy = usePolicySettings(company, refresh, showToast);
   const setup = useSetupWizard(profile, showToast, refresh);
 
   useEffect(() => {
@@ -278,14 +263,6 @@ export function ProfileTab({
   }
 
   useEffect(() => {
-    if (!inApprovedCompany) return;
-    apiFetch<{ foodAmount: number; travelAccommodationAmount: number; foodOptedOutMembers: AnyRecord[]; travelOptedOutMembers: AnyRecord[]; advanceSalaryEnabled: boolean; pfPercentage: number; esicPercentage: number; tdsPercentage: number }>("/api/finance/policy")
-      .then(setPolicyInfo).catch(() => {});
-    apiFetch<{ salaryCycleDay: number; salaryCycleStartDay: number | null; salaryCycleEndDay: number | null }>("/api/finance/salary-cycle")
-      .then(setSalaryCycle).catch(() => {});
-  }, [inApprovedCompany]);
-
-  useEffect(() => {
     if (!inApprovedCompany) { setIdCardRequestStatus(null); setIdCardSignature(null); setIdCardIssueDate(null); return; }
     apiFetch<{ status: string | null; requestId?: string; signature?: { name: string; role: string; signedAt: string } | null; issueDate?: string }>("/api/profile/id-card/status")
       .then((data) => {
@@ -379,60 +356,8 @@ export function ProfileTab({
         <CompanyTeamSection profile={profile} company={company} team={team} inApprovedCompany={inApprovedCompany}
           role={role} identityRequesting={identityRequesting} insights={insights} onRequestIdentity={requestIdentityCode} />
 
-        <PolicyQuotasSection company={company} policyInfo={policyInfo} salaryCycle={salaryCycle} profile={profile} session={session} />
-
         <CompensationSection inApprovedCompany={inApprovedCompany} effectiveBaseSalary={effectiveBaseSalary}
           insights={insights} role={role} salaryRequesting={salaryRequesting} onRequestSalary={requestSalary} />
-
-        {(role === "human-resource" || canUseEmptyCompanyControls) && profile?.companyStatus === "approved" ? (
-          <PolicyConfigSection
-            noticePeriodDays={policy.noticePeriodDays}
-            onNoticePeriodChange={policy.setNoticePeriodDays}
-            savingNoticePeriod={policy.savingNoticePeriod}
-            onSaveNoticePeriod={policy.saveNoticePeriodOnly}
-            paidLeaveDays={policy.paidLeaveDays}
-            onPaidLeaveDaysChange={policy.setPaidLeaveDays}
-            paidLeavePeriod={policy.paidLeavePeriod}
-            onPaidLeavePeriodChange={policy.setPaidLeavePeriod}
-            savingPaidLeave={policy.savingPaidLeave}
-            onSavePaidLeave={policy.savePaidLeaveOnly}
-            carryForwardLeaveDays={policy.carryForwardLeaveDays}
-            onCarryForwardLeaveChange={policy.setCarryForwardLeaveDays}
-            wfhDays={wfh.wfhDays}
-            onWfhDaysChange={wfh.setWfhDays}
-            wfhPeriod={wfh.wfhPeriod}
-            onWfhPeriodChange={wfh.setWfhPeriod}
-            wfhLoading={wfh.wfhLoading}
-            onSaveWfhQuota={wfh.saveWfhQuota}
-            carryForwardWfhDays={wfh.carryForwardWfhDays}
-            onCarryForwardWfhChange={wfh.setCarryForwardWfhDays}
-            minWorkHours={policy.minWorkHours}
-            onMinWorkHoursChange={policy.setMinWorkHours}
-            savingDayHour={policy.savingDayHour}
-            onSaveDayHour={policy.saveDayHourOnly}
-            identityCodeDigits={policy.identityCodeDigits}
-            onIdentityCodeDigitsChange={policy.setIdentityCodeDigits}
-            identityCodeStartRange={policy.identityCodeStartRange}
-            onIdentityCodeStartRangeChange={policy.setIdentityCodeStartRange}
-            identityCodeEndRange={policy.identityCodeEndRange}
-            onIdentityCodeEndRangeChange={policy.setIdentityCodeEndRange}
-            identityCodeNextNumber={policy.identityCodeNextNumber}
-            onIdentityCodeNextNumberChange={policy.setIdentityCodeNextNumber}
-            identityCodeRemaining={policy.identityCodeRemaining}
-            identityCodeLoaded={policy.identityCodeLoaded}
-            savingIdentityCode={policy.savingIdentityCode}
-            onSaveIdentityCode={policy.saveIdentityCodeSettings}
-            bulkImportFile={policy.bulkImportFile}
-            onBulkImportFileChange={policy.setBulkImportFile}
-            bulkPreview={policy.bulkPreview}
-            onBulkPreviewClear={() => policy.setBulkPreview(null)}
-            bulkImportLoading={policy.bulkImportLoading}
-            bulkApplying={policy.bulkApplying}
-            bulkResult={policy.bulkResult}
-            onPreviewBulkImport={policy.previewBulkImport}
-            onApplyBulkImport={policy.applyBulkImport}
-          />
-        ) : null}
 
         {canUseEmptyCompanyControls ? (
           <CompanyControlsSection company={company}

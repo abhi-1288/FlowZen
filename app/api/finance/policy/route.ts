@@ -29,6 +29,10 @@ export async function GET() {
       pfPercentage: 12,
       esicPercentage: 0.75,
       tdsPercentage: 0,
+      houseRentPercentage: 37.33,
+      conveyancePercentage: 5.92,
+      medicalPercentage: 4.63,
+      specialAllowancePercentage: 74.33,
     });
   }
 
@@ -41,6 +45,10 @@ export async function GET() {
     pfPercentage: policy.pfPercentage ?? 12,
     esicPercentage: policy.esicPercentage ?? 0.75,
     tdsPercentage: policy.tdsPercentage ?? 0,
+    houseRentPercentage: policy.houseRentPercentage ?? 37.33,
+    conveyancePercentage: policy.conveyancePercentage ?? 5.92,
+    medicalPercentage: policy.medicalPercentage ?? 4.63,
+    specialAllowancePercentage: policy.specialAllowancePercentage ?? 74.33,
   });
 }
 
@@ -78,6 +86,10 @@ export async function POST(request: Request) {
   if (typeof body.pfPercentage === "number") update.pfPercentage = Math.max(0, body.pfPercentage);
   if (typeof body.esicPercentage === "number") update.esicPercentage = Math.max(0, body.esicPercentage);
   if (typeof body.tdsPercentage === "number") update.tdsPercentage = Math.max(0, body.tdsPercentage);
+  if (typeof body.houseRentPercentage === "number") update.houseRentPercentage = Math.max(0, body.houseRentPercentage);
+  if (typeof body.conveyancePercentage === "number") update.conveyancePercentage = Math.max(0, body.conveyancePercentage);
+  if (typeof body.medicalPercentage === "number") update.medicalPercentage = Math.max(0, body.medicalPercentage);
+  if (typeof body.specialAllowancePercentage === "number") update.specialAllowancePercentage = Math.max(0, body.specialAllowancePercentage);
 
   const policy = await CompanyPolicy.findOneAndUpdate(
     { company: actor.company },
@@ -114,6 +126,10 @@ export async function POST(request: Request) {
     pfPercentage: policy.pfPercentage ?? 12,
     esicPercentage: policy.esicPercentage ?? 0.75,
     tdsPercentage: policy.tdsPercentage ?? 0,
+    houseRentPercentage: policy.houseRentPercentage ?? 37.33,
+    conveyancePercentage: policy.conveyancePercentage ?? 5.92,
+    medicalPercentage: policy.medicalPercentage ?? 4.63,
+    specialAllowancePercentage: policy.specialAllowancePercentage ?? 74.33,
   });
 }
 
@@ -191,6 +207,10 @@ export async function PATCH(request: Request) {
     pfPercentage: policy.pfPercentage ?? 12,
     esicPercentage: policy.esicPercentage ?? 0.75,
     tdsPercentage: policy.tdsPercentage ?? 0,
+    houseRentPercentage: policy.houseRentPercentage ?? 37.33,
+    conveyancePercentage: policy.conveyancePercentage ?? 5.92,
+    medicalPercentage: policy.medicalPercentage ?? 4.63,
+    specialAllowancePercentage: policy.specialAllowancePercentage ?? 74.33,
     nowOptedOut: !isOptedOut,
   });
 }

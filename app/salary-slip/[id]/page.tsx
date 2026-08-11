@@ -51,6 +51,11 @@ type SlipData = {
     periodStart: string;
     periodEnd: string;
     periodAdjusted: boolean;
+    basicSalaryComponent?: number;
+    houseRentAmount?: number;
+    conveyanceAmount?: number;
+    medicalAmount?: number;
+    specialAllowanceAmount?: number;
   };
 };
 
@@ -177,14 +182,41 @@ export default function SalarySlipPage() {
             <div className="rounded-lg border border-slate-200 p-4">
               <h2 className="mb-2 text-xs font-semibold uppercase text-emerald-600">Earnings</h2>
               <div className="space-y-1.5 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Basic Salary</span>
-                  <span className="font-medium text-slate-900">{formatINR(breakdown.monthlySalary)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Allowances</span>
-                  <span className="font-medium text-slate-900">{formatINR(slip.allowances)}</span>
-                </div>
+                {breakdown.basicSalaryComponent !== undefined ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Basic Salary</span>
+                      <span className="font-medium text-slate-900">{formatINR(breakdown.basicSalaryComponent)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">House Rent Allowances</span>
+                      <span className="font-medium text-slate-900">{formatINR(breakdown.houseRentAmount ?? 0)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Conveyance Allowances</span>
+                      <span className="font-medium text-slate-900">{formatINR(breakdown.conveyanceAmount ?? 0)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Medical Allowances</span>
+                      <span className="font-medium text-slate-900">{formatINR(breakdown.medicalAmount ?? 0)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Special Allowances</span>
+                      <span className="font-medium text-slate-900">{formatINR(breakdown.specialAllowanceAmount ?? 0)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Basic Salary</span>
+                    <span className="font-medium text-slate-900">{formatINR(breakdown.monthlySalary)}</span>
+                  </div>
+                )}
+                {(slip.allowances > 0 || breakdown.basicSalaryComponent === undefined) ? (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Allowances</span>
+                    <span className="font-medium text-slate-900">{formatINR(slip.allowances)}</span>
+                  </div>
+                ) : null}
                 <div className="border-t border-slate-100 pt-1.5 flex justify-between font-semibold">
                   <span className="text-slate-700">Gross Pay</span>
                   <span className="text-slate-900">{formatINR(breakdown.grossSalary + slip.allowances)}</span>
