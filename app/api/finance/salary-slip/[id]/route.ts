@@ -36,6 +36,19 @@ function roundCurrency(value: number) {
   return Math.round(Number.isFinite(value) ? value : 0);
 }
 
+function findFieldValue(documents: any[], labels: string[]) {
+  for (const doc of Array.isArray(documents) ? documents : []) {
+    for (const fv of Array.isArray(doc.fieldValues) ? doc.fieldValues : []) {
+      const label = String(fv.label ?? "").trim().toLowerCase();
+      if (labels.some((l) => label === l || label.startsWith(l))) {
+        const value = String(fv.value ?? "").trim();
+        if (value) return value;
+      }
+    }
+  }
+  return "";
+}
+
 export async function GET(request: Request, { params }: Params) {
   const { id } = await params;
   const userId = await requireUserId();
@@ -64,7 +77,7 @@ export async function GET(request: Request, { params }: Params) {
     }
 
     const [employee, companyDoc, policy] = await Promise.all([
-      User.findById(salary.employee).select("name email role companyIdentityCode baseSalary companyJoined createdAt pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted"),
+      User.findById(salary.employee).select("name email role companyIdentityCode baseSalary companyJoined createdAt pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted bankAccountNumber ifscCode documents"),
       Company.findById(salary.company).select("name icon"),
       CompanyPolicy.findOne({ company: salary.company }),
     ]);
@@ -275,6 +288,8 @@ export async function GET(request: Request, { params }: Params) {
         identityCode: employee.companyIdentityCode,
         pfNumber: (employee as any).pfNumber ?? "",
         esicNumber: (employee as any).esicNumber ?? "",
+        bankAccountNumber: String((employee as any).bankAccountNumber ?? "") || findFieldValue((employee as any).documents, ["account number", "bank account number", "account no."]),
+        ifscCode: String((employee as any).ifscCode ?? "") || findFieldValue((employee as any).documents, ["ifsc"]),
       },
       company: {
         name: companyDoc.name,

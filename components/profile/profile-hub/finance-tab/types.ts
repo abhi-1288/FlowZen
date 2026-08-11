@@ -17,6 +17,15 @@ export type SalaryBreakdown = {
   foodDeduction: number;
   travelDeduction: number;
   grossSalary: number;
+  basicSalaryComponent: number;
+  houseRentAmount: number;
+  conveyanceAmount: number;
+  medicalAmount: number;
+  specialAllowanceAmount: number;
+  houseRentPercentage: number;
+  conveyancePercentage: number;
+  medicalPercentage: number;
+  specialAllowancePercentage: number;
   finalSalary: number;
   periodStart: string;
   periodEnd: string;

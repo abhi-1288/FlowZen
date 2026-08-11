@@ -144,6 +144,8 @@ const UserSchema = new Schema(
     regionLabel: { type: String, default: "", trim: true },
     emergencyContact: { type: String, default: "", trim: true, maxlength: 20 },
     bloodGroup: { type: String, default: "", trim: true, maxlength: 5 },
+    bankAccountNumber: { type: String, default: "", trim: true },
+    ifscCode: { type: String, default: "", trim: true },
     maskPhone: { type: Boolean, default: false },
   },
   { timestamps: true },

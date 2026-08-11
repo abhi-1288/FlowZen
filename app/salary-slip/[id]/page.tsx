@@ -22,6 +22,8 @@ type SlipData = {
     identityCode: string;
     pfNumber?: string;
     esicNumber?: string;
+    bankAccountNumber?: string;
+    ifscCode?: string;
   };
   company: {
     name: string;
@@ -68,6 +70,13 @@ function monthLabel(month: string) {
   const m = Number(month.slice(5, 7));
   const names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   return `${names[m - 1]} ${y}`;
+}
+
+function maskAccountNumber(value?: string) {
+  const s = String(value ?? "").trim();
+  if (!s) return "";
+  if (s.length < 4) return "XXXX";
+  return `XXXX${s.slice(-4)}`;
 }
 
 export default function SalarySlipPage() {
@@ -150,6 +159,12 @@ export default function SalarySlipPage() {
               ) : null}
               {employee.esicNumber ? (
                 <p><span className="text-slate-500">ESIC:</span> <span className="text-slate-900">{employee.esicNumber}</span></p>
+              ) : null}
+              {maskAccountNumber(employee.bankAccountNumber) ? (
+                <p><span className="text-slate-500">Bank A/c:</span> <span className="text-slate-900">{maskAccountNumber(employee.bankAccountNumber)}</span></p>
+              ) : null}
+              {employee.ifscCode ? (
+                <p><span className="text-slate-500">IFSC:</span> <span className="text-slate-900">{employee.ifscCode}</span></p>
               ) : null}
             </div>
           </div>

@@ -95,13 +95,13 @@ function SalaryDetailContent({ detail }: { detail: AnyRecord }) {
             <RowDetail label="Payable Days" value={String(breakdown.payableDays)} />
             <RowDetail label="Daily Salary" value={`₹${breakdown.dailySalary.toLocaleString("en-IN")}`} />
             <RowDetail label="Gross Salary" value={`₹${breakdown.grossSalary.toLocaleString("en-IN")}`} />
-            {(breakdown as any).basicSalaryComponent !== undefined ? (
+            {breakdown.basicSalaryComponent !== undefined ? (
               <>
-                <RowDetail label="  -> Basic Component" value={`₹${(breakdown as any).basicSalaryComponent.toLocaleString("en-IN")}`} />
-                <RowDetail label="  -> House Rent Allowance" value={`₹${((breakdown as any).houseRentAmount ?? 0).toLocaleString("en-IN")}`} />
-                <RowDetail label="  -> Conveyance Allowance" value={`₹${((breakdown as any).conveyanceAmount ?? 0).toLocaleString("en-IN")}`} />
-                <RowDetail label="  -> Medical Allowance" value={`₹${((breakdown as any).medicalAmount ?? 0).toLocaleString("en-IN")}`} />
-                <RowDetail label="  -> Special Allowance" value={`₹${((breakdown as any).specialAllowanceAmount ?? 0).toLocaleString("en-IN")}`} />
+                <RowDetail label="  -> Basic Component" value={`₹${breakdown.basicSalaryComponent.toLocaleString("en-IN")}`} />
+                <RowDetail label="  -> House Rent Allowance" value={`₹${(breakdown.houseRentAmount ?? 0).toLocaleString("en-IN")}`} />
+                <RowDetail label="  -> Conveyance Allowance" value={`₹${(breakdown.conveyanceAmount ?? 0).toLocaleString("en-IN")}`} />
+                <RowDetail label="  -> Medical Allowance" value={`₹${(breakdown.medicalAmount ?? 0).toLocaleString("en-IN")}`} />
+                <RowDetail label="  -> Special Allowance" value={`₹${(breakdown.specialAllowanceAmount ?? 0).toLocaleString("en-IN")}`} />
               </>
             ) : null}
             <RowDetail label="Leave Deduction" value={`-₹${breakdown.leaveDeduction.toLocaleString("en-IN")}`} />

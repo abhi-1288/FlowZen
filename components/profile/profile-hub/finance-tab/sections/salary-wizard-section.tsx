@@ -209,6 +209,15 @@ function SalaryBreakdownForm({
           <div className="flex justify-between text-rose-600"><span>TDS Deduction ({tdsPercentage}%):</span> <span>- &#x20B9;{salaryBreakdown.tdsDeduction.toLocaleString("en-IN")}</span></div>
         ) : null}
       </div>
+      <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 p-3 space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Earning Breakdown Percentages (% of Basic)</p>
+        <div className="flex justify-between"><span>Basic Salary Component (Derived):</span> <span>&#x20B9;{salaryBreakdown.basicSalaryComponent.toLocaleString("en-IN")}</span></div>
+        <div className="flex justify-between"><span>House Rent Allowance ({salaryBreakdown.houseRentPercentage}%):</span> <span>&#x20B9;{salaryBreakdown.houseRentAmount.toLocaleString("en-IN")}</span></div>
+        <div className="flex justify-between"><span>Conveyance Allowance ({salaryBreakdown.conveyancePercentage}%):</span> <span>&#x20B9;{salaryBreakdown.conveyanceAmount.toLocaleString("en-IN")}</span></div>
+        <div className="flex justify-between"><span>Medical Allowance ({salaryBreakdown.medicalPercentage}%):</span> <span>&#x20B9;{salaryBreakdown.medicalAmount.toLocaleString("en-IN")}</span></div>
+        <div className="flex justify-between"><span>Special Allowance ({salaryBreakdown.specialAllowancePercentage}%):</span> <span>&#x20B9;{salaryBreakdown.specialAllowanceAmount.toLocaleString("en-IN")}</span></div>
+        <div className="flex justify-between font-medium text-emerald-800 border-t border-emerald-200 pt-1.5"><span>Sum of Components:</span> <span>&#x20B9;{salaryBreakdown.grossSalary.toLocaleString("en-IN")}</span></div>
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs font-medium text-slate-500 mb-1 block">Manual Allowances (&#x20B9;)</label>

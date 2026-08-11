@@ -110,6 +110,21 @@ export async function POST(request: Request) {
       user.bloodGroup = bloodGroupExtracted;
     }
 
+    const matchFieldValue = (labels: string[]) => {
+      for (const fv of fieldValues) {
+        const label = fv.label.trim().toLowerCase();
+        if (labels.some((l) => label === l || label.startsWith(l))) {
+          const value = fv.value.trim();
+          if (value) return value;
+        }
+      }
+      return "";
+    };
+    const bankAccountNumber = matchFieldValue(["account number", "bank account number", "account no."]);
+    const ifscCode = matchFieldValue(["ifsc"]);
+    if (bankAccountNumber) user.bankAccountNumber = bankAccountNumber;
+    if (ifscCode) user.ifscCode = ifscCode.toUpperCase();
+
     user.documents.push({ category, fileName, fileType, fileSize, fileUrl: url, fieldValues });
     await user.save();
 
