@@ -5,7 +5,7 @@ import type { SalaryModalTab } from "../types";
 import { getSalaryRole } from "../helpers";
 
 const overlayClass = "fixed inset-0 z-50 grid place-items-center bg-black/40";
-const modalClass = "flex max-h-[80vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-xl";
+const modalClass = "flex max-h-[80vh] w-full max-w-2xl flex-col rounded-2xl neu-card";
 
 export function SalaryOverviewModal({
   show,
@@ -33,19 +33,19 @@ export function SalaryOverviewModal({
   return (
     <div className={overlayClass}>
       <div className={modalClass}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-[var(--c-border-light)] px-6 py-4">
           <h4 className="text-lg font-semibold text-slate-900">Salary Overview</h4>
           <ActionButton variant="ghost" onClick={onClose}>Close</ActionButton>
         </div>
-        <div className="flex gap-2 border-b border-slate-200 px-6 py-3">
+        <div className="flex gap-2 border-b border-[var(--c-border-light)] px-6 py-3">
           <button
-            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${salaryModalTab === "unpaid" ? "bg-rose-600 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
+            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${salaryModalTab === "unpaid" ? "neu-tab-pressed" : "neu-tab-raised"}`}
             onClick={() => onTabChange("unpaid")}
           >
             Unpaid
           </button>
           <button
-            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${salaryModalTab === "paid" ? "bg-emerald-600 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
+            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${salaryModalTab === "paid" ? "neu-tab-pressed" : "neu-tab-raised"}`}
             onClick={() => onTabChange("paid")}
           >
             Paid
@@ -130,15 +130,15 @@ function SalaryOverviewContent({
     const totalAmount = salaryItems.reduce((sum, s) => sum + Number(s.netSalary ?? 0), 0);
 
     return (
-      <div className="mb-3 rounded-lg border border-slate-200 overflow-hidden" key={role}>
+      <div className="mb-3 rounded-lg border border-[var(--c-border-light)] overflow-hidden" key={role}>
         <button
-          className="flex w-full items-center justify-between bg-slate-50 px-4 py-3 text-left transition-colors hover:bg-slate-100"
+          className="flex w-full items-center justify-between bg-[var(--c-bg-muted)] px-4 py-3 text-left transition-colors hover:bg-[var(--c-bg-muted)]"
           onClick={() => onToggleRole(role)}
         >
           <div className="flex items-center gap-2">
             <span className={`text-xs transition-transform ${isOpen ? "rotate-90" : ""}`}>▶</span>
             <span className="text-sm font-semibold capitalize text-slate-900">{formatRole(role)}</span>
-            <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-200 px-1.5 text-[11px] font-bold text-slate-700">{items.length}</span>
+            <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--c-bg-hover)] px-1.5 text-[11px] font-bold text-slate-700">{items.length}</span>
           </div>
           {totalAmount > 0 ? (
             <span className="text-sm font-medium text-slate-600">₹{totalAmount.toLocaleString("en-IN")}</span>
@@ -173,7 +173,7 @@ function SalaryOverviewContent({
                     <p className="text-xs text-slate-400 capitalize">{formatRoleWithCustom(String(member.role ?? "employee"), member.customRole, Boolean((member as any).isSeniorSecurity))}</p>
                   </div>
                   <div className="shrink-0">
-                    <span className="inline-block rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-600">Not generated</span>
+                    <span className="inline-block rounded-full bg-[var(--c-bg-hover)] px-2 py-0.5 text-[11px] font-medium text-slate-600">Not generated</span>
                   </div>
                 </div>
               );

@@ -3,7 +3,7 @@ import { ActionButton, SectionHeader, formatRoleWithCustom } from "../../shared"
 import type { AnyRecord } from "../../shared";
 import type { SalaryBreakdown } from "../types";
 
-const sectionClass = "rounded-xl border border-slate-200 bg-white p-5";
+const sectionClass = "rounded-xl neu-card p-5";
 
 export function SalaryWizardSection({
   actorRole,
@@ -70,8 +70,8 @@ export function SalaryWizardSection({
           <form onSubmit={(e) => { e.preventDefault(); onStepChange(2); }} className="grid gap-3">
             <p className="text-sm font-medium text-slate-700">Step 1: Select Date Range</p>
             <div className="grid grid-cols-2 gap-3">
-              <input className="rounded-lg border border-slate-200 px-3 py-2" type="date" required value={salaryPeriod.start} onChange={(e) => onPeriodChange({ ...salaryPeriod, start: e.target.value })} />
-              <input className="rounded-lg border border-slate-200 px-3 py-2" type="date" required value={salaryPeriod.end} onChange={(e) => onPeriodChange({ ...salaryPeriod, end: e.target.value })} />
+              <input className="rounded-lg border border-[var(--c-border-light)] px-3 py-2" type="date" required value={salaryPeriod.start} onChange={(e) => onPeriodChange({ ...salaryPeriod, start: e.target.value })} />
+              <input className="rounded-lg border border-[var(--c-border-light)] px-3 py-2" type="date" required value={salaryPeriod.end} onChange={(e) => onPeriodChange({ ...salaryPeriod, end: e.target.value })} />
             </div>
             <ActionButton variant="primary" className="justify-self-end">Next</ActionButton>
           </form>
@@ -79,7 +79,7 @@ export function SalaryWizardSection({
         {salaryStep === 2 && (
           <form onSubmit={onCalculate} className="grid gap-3">
             <p className="text-sm font-medium text-slate-700">Step 2: Select Employee</p>
-            <select className="rounded-lg border border-slate-200 px-3 py-2" required value={salaryEmployeeId} onChange={(e) => onEmployeeChange(e.target.value)}>
+            <select className="rounded-lg border border-[var(--c-border-light)] px-3 py-2" required value={salaryEmployeeId} onChange={(e) => onEmployeeChange(e.target.value)}>
               <option value="">Select employee</option>
               {members.map((member) => (
                 <option key={String(member.id)} value={String(member.id)}>
@@ -179,7 +179,7 @@ function SalaryBreakdownForm({
   return (
     <form onSubmit={onSubmit} className="grid gap-3 text-sm">
       <p className="font-medium text-slate-700">Step 3: Review & Adjust</p>
-      <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 space-y-2">
+      <div className="rounded-lg neu-inset p-3 space-y-2">
         <div className="flex justify-between"><span>Period:</span> <span>{salaryBreakdown.periodStart} to {salaryBreakdown.periodEnd}</span></div>
         {salaryBreakdown.periodStart !== salaryPeriod.start && (
           <p className="text-xs text-amber-600 bg-amber-50 rounded px-2 py-1">&#9888; Period adjusted — employee joined on {salaryBreakdown.periodStart}</p>
@@ -221,24 +221,24 @@ function SalaryBreakdownForm({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs font-medium text-slate-500 mb-1 block">Manual Allowances (&#x20B9;)</label>
-          <input className="w-full rounded-lg border border-slate-200 px-3 py-2" type="number" min="0" value={salaryAllowances} onChange={(e) => onAllowancesChange(e.target.value)} />
+          <input className="w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2" type="number" min="0" value={salaryAllowances} onChange={(e) => onAllowancesChange(e.target.value)} />
         </div>
         <div>
           <label className="text-xs font-medium text-slate-500 mb-1 block">Manual Deductions (&#x20B9;)</label>
-          <input className="w-full rounded-lg border border-slate-200 px-3 py-2" type="number" min="0" value={salaryDeductions} onChange={(e) => onDeductionsChange(e.target.value)} />
+          <input className="w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2" type="number" min="0" value={salaryDeductions} onChange={(e) => onDeductionsChange(e.target.value)} />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         {!memberPfExempted ? (
         <div>
           <label className="text-xs font-medium text-slate-500 mb-1 block">PF Account No.</label>
-          <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" type="text" placeholder="Enter PF number" value={memberPfNumber} onChange={(e) => onPfNumberChange(e.target.value)} />
+          <input className="w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm" type="text" placeholder="Enter PF number" value={memberPfNumber} onChange={(e) => onPfNumberChange(e.target.value)} />
         </div>
         ) : null}
         {!memberEsicExempted ? (
         <div>
           <label className="text-xs font-medium text-slate-500 mb-1 block">ESIC Account No.</label>
-          <input className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" type="text" placeholder="Enter ESIC number" value={memberEsicNumber} onChange={(e) => onEsicNumberChange(e.target.value)} />
+          <input className="w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm" type="text" placeholder="Enter ESIC number" value={memberEsicNumber} onChange={(e) => onEsicNumberChange(e.target.value)} />
         </div>
         ) : null}
       </div>

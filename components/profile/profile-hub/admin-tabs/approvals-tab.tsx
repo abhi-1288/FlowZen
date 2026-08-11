@@ -157,7 +157,7 @@ export function ApprovalsTab({
   );
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-xl neu-card p-5">
       <SectionHeader title="Pending Approvals" description="Review and manage approval requests" accent="indigo" />
       <div className="mt-5 divide-y divide-slate-200">
         {visibleApprovals.map((request) => {
@@ -276,7 +276,7 @@ export function ApprovalsTab({
                 </ActionButton>
                 {["company", "salary"].includes(String(request.kind ?? "")) ? (
                   <div className="flex items-center gap-2">
-                    <select className="rounded-md border border-slate-200 bg-white px-1.5 py-1.5 text-[11px]"
+                    <select className="rounded-md neu-inset px-1.5 py-1.5 text-[11px]"
                       value={approvalSalaryCurrency[requestId] ?? "INR"}
                       onChange={(e) => setApprovalSalaryCurrency((a) => ({ ...a, [requestId]: e.target.value }))}
                     >
@@ -286,17 +286,17 @@ export function ApprovalsTab({
                       <option value="GBP">&#xA3; GBP</option>
                       <option value="JPY">&#xA5; JPY</option>
                     </select>
-                    <div className="flex rounded-md border border-slate-200">
+                    <div className="flex rounded-md border border-[var(--c-border-light)]">
                       <button type="button"
-                        className={`rounded-l-md px-2 py-1.5 text-[11px] font-medium transition ${(approvalSalaryPeriod[requestId] ?? getDefaultSalaryPeriod(request)) === "monthly" ? "bg-slate-950 text-white" : "bg-white text-slate-600 hover:text-slate-900"}`}
+                        className={`rounded-l-md px-2 py-1.5 text-[11px] font-medium transition ${(approvalSalaryPeriod[requestId] ?? getDefaultSalaryPeriod(request)) === "monthly" ? "neu-tab-pressed" : "bg-[var(--c-bg-elevated)] text-slate-600 hover:text-slate-900"}`}
                         onClick={() => setApprovalSalaryPeriod((a) => ({ ...a, [requestId]: "monthly" }))}
                       >/month</button>
                       <button type="button"
-                        className={`rounded-r-md px-2 py-1.5 text-[11px] font-medium transition ${(approvalSalaryPeriod[requestId] ?? getDefaultSalaryPeriod(request)) === "yearly" ? "bg-slate-950 text-white" : "bg-white text-slate-600 hover:text-slate-900"}`}
+                        className={`rounded-r-md px-2 py-1.5 text-[11px] font-medium transition ${(approvalSalaryPeriod[requestId] ?? getDefaultSalaryPeriod(request)) === "yearly" ? "neu-tab-pressed" : "bg-[var(--c-bg-elevated)] text-slate-600 hover:text-slate-900"}`}
                         onClick={() => setApprovalSalaryPeriod((a) => ({ ...a, [requestId]: "yearly" }))}
                       >/year</button>
                     </div>
-                    <input className="w-24 rounded-md border border-slate-200 px-2 py-1.5 text-[11px]" placeholder="Amount" type="number" min={0}
+                    <input className="w-24 rounded-md border border-[var(--c-border-light)] px-2 py-1.5 text-[11px]" placeholder="Amount" type="number" min={0}
                       value={salaryAmounts[requestId] ?? getDefaultSalaryAmount(request)}
                       onChange={(e) => setSalaryAmounts((a) => ({ ...a, [requestId]: e.target.value }))}
                     />
@@ -364,7 +364,7 @@ export function ApprovalsTab({
           </>
         }
       >
-        <textarea className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs" rows={3}
+        <textarea className="w-full rounded-md border border-[var(--c-border-light)] px-3 py-1.5 text-xs" rows={3}
           placeholder="e.g., Insufficient documentation, request doesn't meet company policy..."
           value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)}
         />
@@ -392,7 +392,7 @@ export function ApprovalsTab({
           </>
         }
       >
-        <textarea className="w-full min-h-[50vh] rounded-md border border-slate-200 p-4 text-xs leading-relaxed text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        <textarea className="neu-inset w-full min-h-[50vh] rounded-md p-4 text-xs leading-relaxed text-slate-800"
           value={letterContentDraft} onChange={(e) => setLetterContentDraft(e.target.value)}
           placeholder="Draft empty or not provided."
         />

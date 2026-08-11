@@ -23,7 +23,7 @@ export function BudgetListSection({
   const activeBudgets = budgets.filter((b) => !isExpiredDeadline(parseDeadline(b)));
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5">
+    <section className="rounded-xl neu-card p-5">
       <div className="mb-5 border-l-4 border-violet-500 pl-4">
         <h3 className="text-base font-semibold text-slate-900">
           Allocated Budgets

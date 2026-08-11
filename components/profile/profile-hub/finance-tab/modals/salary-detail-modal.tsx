@@ -5,7 +5,7 @@ import type { AnyRecord } from "../../shared";
 import type { SalaryBreakdown } from "../types";
 
 const overlayClass = "fixed inset-0 z-50 grid place-items-center bg-black/40";
-const modalClass = "flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-xl";
+const modalClass = "flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl neu-card";
 
 export function SalaryDetailModal({
   salaryId,
@@ -33,7 +33,7 @@ export function SalaryDetailModal({
   return (
     <div className={overlayClass}>
       <div className={modalClass}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-[var(--c-border-light)] px-6 py-4">
           <h4 className="text-lg font-semibold text-slate-900">Salary Detail</h4>
           <ActionButton variant="ghost" onClick={onClose}>Close</ActionButton>
         </div>
@@ -60,7 +60,7 @@ function SalaryDetailContent({ detail }: { detail: AnyRecord }) {
       {/* Employee Info */}
       <div>
         <h5 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Employee</h5>
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-1.5">
+        <div className="rounded-lg neu-inset p-3 space-y-1.5">
           <RowDetail label="Name" value={String(employee?.name ?? "")} />
           <RowDetail label="Email" value={String(employee?.email ?? "")} />
           <RowDetail label="Role" value={String(employee?.role ?? "")} />
@@ -72,7 +72,7 @@ function SalaryDetailContent({ detail }: { detail: AnyRecord }) {
       {/* Record Info */}
       <div>
         <h5 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Record</h5>
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-1.5">
+        <div className="rounded-lg neu-inset p-3 space-y-1.5">
           <RowDetail label="Month" value={String(detail.month ?? "")} />
           <RowDetail label="Status" value={String(detail.status ?? "")} />
           <RowDetail label="Allowances" value={`₹${Number(detail.allowances ?? 0).toLocaleString("en-IN")}`} />
@@ -86,7 +86,7 @@ function SalaryDetailContent({ detail }: { detail: AnyRecord }) {
       {breakdown ? (
         <div>
           <h5 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Breakdown</h5>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-1.5">
+          <div className="rounded-lg neu-inset p-3 space-y-1.5">
             <RowDetail label="Period" value={`${breakdown.periodStart} to ${breakdown.periodEnd}`} />
             <RowDetail label="Total Days" value={String(breakdown.totalDays)} />
             <RowDetail label="Absent Days" value={String(breakdown.absentDays)} />

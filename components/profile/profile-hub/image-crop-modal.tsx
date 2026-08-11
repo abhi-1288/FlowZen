@@ -90,9 +90,9 @@ export function ImageCropModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
-      <div className="flex w-full max-w-lg flex-col rounded-2xl bg-white shadow-xl">
-        <div className="border-b border-slate-200 px-6 py-4">
+    <div className="fixed inset-0 z-50 grid place-items-center neu-overlay">
+      <div className="flex w-full max-w-lg flex-col rounded-2xl neu-card">
+        <div className="border-b border-[var(--c-border-light)] px-6 py-4">
           <h4 className="text-lg font-semibold text-slate-900">Crop Image</h4>
         </div>
         <div className="relative h-80 w-full bg-slate-900">
@@ -106,10 +106,10 @@ export function ImageCropModal({
             onCropComplete={onCropComplete}
           />
         </div>
-        <div className="flex items-center gap-3 border-t border-slate-200 px-6 py-3">
+        <div className="flex items-center gap-3 border-t border-[var(--c-border-light)] px-6 py-3">
           <span className="text-xs text-slate-500">Zoom</span>
           <input
-            className="h-1 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-slate-950"
+            className="h-1 w-full cursor-pointer appearance-none rounded-full bg-[var(--c-bg-hover)] accent-slate-950"
             type="range"
             min={1}
             max={3}
@@ -118,16 +118,16 @@ export function ImageCropModal({
             onChange={(e) => setZoom(Number(e.target.value))}
           />
         </div>
-        <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+        <div className="flex justify-end gap-3 border-t border-[var(--c-border-light)] px-6 py-4">
           <button
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm text-slate-700 hover:bg-[var(--c-bg-muted)]"
             onClick={onCancel}
             type="button"
           >
             Cancel
           </button>
           <button
-            className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="neu-btn neu-btn-primary rounded-lg px-4 py-2 text-sm font-medium"
             disabled={cropping || !croppedAreaPixels}
             onClick={handleDone}
             type="button"

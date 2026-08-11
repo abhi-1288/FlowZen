@@ -29,7 +29,7 @@ export function ExpenseAllocatorSection({
       <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
         {acceptedExpenses.length === 0 ? <p className="py-2 text-sm text-slate-500">No accepted expenses ready for disbursement.</p> : null}
         {acceptedExpenses.map((expense) => (
-          <div className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2" key={String(expense.id)}>
+          <div className="flex items-center justify-between rounded-lg border border-[var(--c-border-light)] px-3 py-2" key={String(expense.id)}>
             <div>
               <p className="text-sm font-medium">{String(expense.title)} x {Number(expense.quantity ?? 1)}</p>
               <p className="text-xs text-slate-500">
@@ -42,7 +42,7 @@ export function ExpenseAllocatorSection({
         ))}
       </div>
       {disbursedExpenses.length > 0 ? (
-        <div className="mt-3 border-t border-slate-200 pt-3">
+        <div className="mt-3 border-t border-[var(--c-border-light)] pt-3">
           <p className="mb-2 text-xs font-medium text-slate-500">Disbursed</p>
           {disbursedExpenses.map((expense) => (
             <div key={String(expense.id)} className="flex items-center justify-between py-1.5 text-sm">

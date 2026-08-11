@@ -33,7 +33,7 @@ export function SalarySlipSection({
           }
           const slipId = String(slip._id ?? slip.id ?? "");
           return (
-            <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+            <div className="flex items-center justify-between rounded-lg neu-inset px-4 py-3">
               <div>
                 <p className="text-sm font-medium text-slate-900">
                   {new Date(month + "-01").toLocaleDateString("en-IN", { month: "long", year: "numeric" })}
@@ -48,7 +48,7 @@ export function SalarySlipSection({
                 href={`/salary-slip/${slipId}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="shrink-0 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+                className="neu-btn neu-btn-primary shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
               >
                 View Slip
               </a>

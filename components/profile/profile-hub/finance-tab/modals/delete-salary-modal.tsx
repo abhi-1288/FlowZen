@@ -1,7 +1,7 @@
 import { ActionButton } from "../../shared";
 
 const overlayClass = "fixed inset-0 z-50 grid place-items-center bg-black/40";
-const modalClass = "w-full max-w-md rounded-2xl bg-white p-6 shadow-xl";
+const modalClass = "w-full max-w-md rounded-2xl bg-[var(--c-bg-elevated)] p-6 shadow-xl";
 
 export function DeleteSalaryModal({
   deleteSalaryId,
@@ -25,7 +25,7 @@ export function DeleteSalaryModal({
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <ActionButton variant="secondary" onClick={onCancel}>Cancel</ActionButton>
-          <button className="rounded-lg bg-rose-600 px-4 py-2 text-sm text-white" onClick={onConfirm}>Delete</button>
+          <button className="neu-btn neu-btn-danger rounded-lg px-4 py-2 text-sm" onClick={onConfirm}>Delete</button>
         </div>
       </div>
     </div>

@@ -108,7 +108,7 @@ export function DashboardTab({
   function refreshLetters() {
     apiFetch<{ requests: AnyRecord[] }>("/api/hr/document-letter")
       .then((res) => setLetterRequests(res.requests ?? []))
-      .catch(() => {});
+      .catch(() => { });
   }
 
   function refreshOtherDocuments() {
@@ -121,7 +121,7 @@ export function DashboardTab({
         });
         setOtherDocuments(others);
       })
-      .catch(() => {});
+      .catch(() => { });
   }
 
   useEffect(() => {
@@ -137,7 +137,7 @@ export function DashboardTab({
           .map((c) => ({ name: c.name }));
         setMissingDocs(missing);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -151,7 +151,7 @@ export function DashboardTab({
     setLoadingTickets(true);
     apiFetch<{ reports: AnyRecord[] }>("/api/hr/security/lost-cards?scope=tickets")
       .then((res) => setLostCardTickets(res.reports ?? []))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoadingTickets(false));
   }, [role, currentUserId]);
 
@@ -163,7 +163,7 @@ export function DashboardTab({
         setIdentityCodeEndRange(data.endRange);
         setIdentityCodeNextNumber(data.nextNumber);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [role]);
 
   const attendanceRate = useMemo(() => {
@@ -204,7 +204,7 @@ export function DashboardTab({
   return (
     <div className="space-y-6">
       {/* Greeting */}
-      <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-indigo-500 to-indigo-700 p-6 text-white shadow-lg">
+      <div className="rounded-2xl border border-[var(--c-border-light)] bg-gradient-to-br from-indigo-500 to-indigo-700 p-6 text-white shadow-lg">
         <h1 className="text-2xl font-bold">
           {greeting}, {displayName}
         </h1>
@@ -214,7 +214,7 @@ export function DashboardTab({
       </div>
 
       {/* ══════ Analytics Dashboard ══════ */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-xl neu-card p-5">
         <h2 className="mb-4 flex items-center gap-2 text-base font-bold text-slate-900">
           <BarChart3 size={18} className="text-indigo-600" />
           Analytics Dashboard
@@ -223,7 +223,7 @@ export function DashboardTab({
           {kpiCards.map((kpi) => {
             const Icon = kpi.icon;
             return (
-              <div key={kpi.label} className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+              <div key={kpi.label} className="flex items-center gap-3 rounded-lg neu-inset px-4 py-3">
                 <div className={`rounded-lg ${kpi.bg} p-2.5`}>
                   <Icon size={20} className={kpi.color} />
                 </div>
@@ -274,7 +274,7 @@ export function DashboardTab({
             </div>
             <button
               type="button"
-              className={`shrink-0 rounded-lg px-4 py-2 text-sm font-medium text-white ${identityCodeRemaining === 0 ? "bg-red-600 hover:bg-red-700" : "bg-amber-600 hover:bg-amber-700"}`}
+              className={`shrink-0 rounded-lg px-4 py-2 text-sm font-medium ${identityCodeRemaining === 0 ? "neu-btn neu-btn-danger" : "neu-btn neu-btn-primary"}`}
               onClick={() => setRangeModalOpen(true)}
             >
               Increase Range
@@ -285,7 +285,7 @@ export function DashboardTab({
 
       {/* Stats Row */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl neu-card p-5">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-emerald-100 p-2.5">
               <Clock size={20} className="text-emerald-700" />
@@ -307,7 +307,7 @@ export function DashboardTab({
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl neu-card p-5">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-amber-100 p-2.5">
               <CheckSquare size={20} className="text-amber-700" />
@@ -319,7 +319,7 @@ export function DashboardTab({
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl neu-card p-5">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-sky-100 p-2.5">
               <Bell size={20} className="text-sky-700" />
@@ -334,7 +334,7 @@ export function DashboardTab({
 
       {/* Recent Notifications */}
       {notifications.length > 0 ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl neu-card p-5">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
             <Bell size={16} className="text-slate-500" />
             Recent Notifications
@@ -343,7 +343,7 @@ export function DashboardTab({
             {notifications.slice(0, 5).map((n) => (
               <div
                 key={String(n._id ?? n.id)}
-                className="flex items-start gap-3 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3"
+                className="flex items-start gap-3 rounded-lg neu-inset px-4 py-3"
               >
                 <div
                   className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${!n.readAt ? "bg-emerald-500" : "bg-slate-300"}`}
@@ -357,7 +357,7 @@ export function DashboardTab({
                     href={String(n.link)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="shrink-0 rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-100"
+                    className="shrink-0 rounded-lg neu-card p-1.5 text-slate-500 hover:bg-[var(--c-bg-muted)]"
                   >
                     <ExternalLink size={14} />
                   </a>
@@ -375,24 +375,16 @@ export function DashboardTab({
 
       {/* Document Letters Section */}
       {["human-resource", "admin"].includes(role) ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl neu-card p-5">
           <div className="mb-5 flex gap-2">
             <button
-              className={`rounded-full px-5 py-2 text-sm font-medium transition-colors ${
-                activeDocTab === "other"
-                  ? "bg-slate-900 text-white shadow-sm"
-                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-              }`}
+              className={`rounded-full px-5 py-2 text-sm font-medium transition-colors ${activeDocTab === "other" ? "neu-tab-pressed" : "neu-tab-raised"}`}
               onClick={() => setActiveDocTab("other")}
             >
               Other
             </button>
             <button
-              className={`rounded-full px-5 py-2 text-sm font-medium transition-colors ${
-                activeDocTab === "my"
-                  ? "bg-slate-900 text-white shadow-sm"
-                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-              }`}
+              className={`rounded-full px-5 py-2 text-sm font-medium transition-colors ${activeDocTab === "my" ? "neu-tab-pressed" : "neu-tab-raised"}`}
               onClick={() => setActiveDocTab("my")}
             >
               My
@@ -407,7 +399,7 @@ export function DashboardTab({
                   <h2 className="text-sm font-semibold text-slate-900">Other Documents</h2>
                 </div>
                 <select
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600"
+                  className="rounded-lg neu-inset px-3 py-1.5 text-xs font-medium text-slate-600"
                   value={docFilter}
                   onChange={(e) => setDocFilter(e.target.value as "all" | "approved" | "rejected")}
                 >
@@ -428,66 +420,66 @@ export function DashboardTab({
                   {otherDocuments
                     .filter((req) => docFilter === "all" || String(req.status ?? "") === docFilter)
                     .map((req) => {
-                    const letterType = String((req.metadata as any)?.letterType ?? "");
-                    const label = LETTER_LABELS[letterType] ?? letterType.replace("-", " ");
-                    const status = String(req.status ?? "");
-                    const reqId = String(req._id ?? req.id ?? "");
-                    const isApproved = status === "approved";
-                    return (
-                      <div
-                        key={reqId}
-                        className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-slate-900 capitalize">{label}</p>
-                          <p className="text-xs text-slate-500">
-                            {String((req.requester as any)?.name ?? "Unknown")}
-                            {" · "}
-                            {req.createdAt
-                              ? new Date(String(req.createdAt)).toLocaleDateString("en-IN", {
+                      const letterType = String((req.metadata as any)?.letterType ?? "");
+                      const label = LETTER_LABELS[letterType] ?? letterType.replace("-", " ");
+                      const status = String(req.status ?? "");
+                      const reqId = String(req._id ?? req.id ?? "");
+                      const isApproved = status === "approved";
+                      return (
+                        <div
+                          key={reqId}
+                          className="flex items-center justify-between gap-3 rounded-lg neu-inset px-4 py-3"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-slate-900 capitalize">{label}</p>
+                            <p className="text-xs text-slate-500">
+                              {String((req.requester as any)?.name ?? "Unknown")}
+                              {" · "}
+                              {req.createdAt
+                                ? new Date(String(req.createdAt)).toLocaleDateString("en-IN", {
                                   day: "numeric",
                                   month: "short",
                                   year: "numeric",
                                 })
-                              : ""}
-                            <span className="ml-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider"
-                              style={{
-                                backgroundColor: status === "rejected" ? "#fee2e2" : "#dcfce7",
-                                color: status === "rejected" ? "#991b1b" : "#166534",
-                              }}
-                            >
-                              {status}
-                            </span>
-                          </p>
-                          {(req.metadata as any)?.purpose ? (
-                            <p className="mt-0.5 truncate text-xs text-slate-400">
-                              Purpose: {String((req.metadata as any).purpose)}
+                                : ""}
+                              <span className="ml-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider"
+                                style={{
+                                  backgroundColor: status === "rejected" ? "#fee2e2" : "#dcfce7",
+                                  color: status === "rejected" ? "#991b1b" : "#166534",
+                                }}
+                              >
+                                {status}
+                              </span>
                             </p>
-                          ) : null}
+                            {(req.metadata as any)?.purpose ? (
+                              <p className="mt-0.5 truncate text-xs text-slate-400">
+                                Purpose: {String((req.metadata as any).purpose)}
+                              </p>
+                            ) : null}
+                          </div>
+                          <div className="flex gap-2">
+                            {isApproved ? (
+                              <a
+                                href={`/letter/${reqId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="neu-btn neu-btn-primary shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
+                              >
+                                View
+                              </a>
+                            ) : status === "rejected" ? (
+                              <button
+                                type="button"
+                                className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
+                                onClick={() => setViewingRejected(req)}
+                              >
+                                View Rejection
+                              </button>
+                            ) : null}
+                          </div>
                         </div>
-                        <div className="flex gap-2">
-                          {isApproved ? (
-                            <a
-                              href={`/letter/${reqId}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="shrink-0 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
-                            >
-                              View
-                            </a>
-                          ) : status === "rejected" ? (
-                            <button
-                              type="button"
-                              className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
-                              onClick={() => setViewingRejected(req)}
-                            >
-                              View Rejection
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
                 </div>
               ) : (
                 <p className="text-sm text-slate-500 mt-4">No documents found.</p>
@@ -510,7 +502,7 @@ export function DashboardTab({
                     return (
                       <div
                         key={reqId}
-                        className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3"
+                        className="flex items-center justify-between gap-3 rounded-lg neu-inset px-4 py-3"
                       >
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium text-slate-900 capitalize">{label}</p>
@@ -519,10 +511,10 @@ export function DashboardTab({
                             {" · "}
                             {req.createdAt
                               ? new Date(String(req.createdAt)).toLocaleDateString("en-IN", {
-                                  day: "numeric",
-                                  month: "short",
-                                  year: "numeric",
-                                })
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })
                               : ""}
                             <span className="ml-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider"
                               style={{
@@ -540,7 +532,7 @@ export function DashboardTab({
                               href={`/letter/${reqId}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="shrink-0 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+                              className="neu-btn neu-btn-primary shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
                             >
                               View
                             </a>
@@ -557,7 +549,7 @@ export function DashboardTab({
           )}
         </div>
       ) : letterRequests.length > 0 ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl neu-card p-5">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
             <FileText size={16} className="text-slate-500" />
             My Letters
@@ -572,7 +564,7 @@ export function DashboardTab({
               return (
                 <div
                   key={reqId}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3"
+                  className="flex items-center justify-between gap-3 rounded-lg neu-inset px-4 py-3"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-slate-900 capitalize">{label}</p>
@@ -581,10 +573,10 @@ export function DashboardTab({
                       {" · "}
                       {req.createdAt
                         ? new Date(String(req.createdAt)).toLocaleDateString("en-IN", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })
                         : ""}
                       <span className="ml-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider"
                         style={{
@@ -596,26 +588,26 @@ export function DashboardTab({
                       </span>
                     </p>
                   </div>
-                        <div className="flex gap-2">
-                          {isApproved ? (
-                            <a
-                              href={`/letter/${reqId}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="shrink-0 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
-                            >
-                              View
-                            </a>
-                          ) : (
-                            <button
-                              type="button"
-                              className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
-                              onClick={() => setViewingRejected(req)}
-                            >
-                              View
-                            </button>
-                          )}
-                        </div>
+                  <div className="flex gap-2">
+                    {isApproved ? (
+                      <a
+                        href={`/letter/${reqId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="neu-btn neu-btn-primary shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
+                      >
+                        View
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
+                        onClick={() => setViewingRejected(req)}
+                      >
+                        View
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -625,7 +617,7 @@ export function DashboardTab({
 
       {/* Lost Card Tickets */}
       {lostCardTickets.length > 0 ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl neu-card p-5">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
             <FileText size={16} className="text-slate-500" />
             Lost Card Tickets
@@ -638,7 +630,7 @@ export function DashboardTab({
               const juniorName = String((t.assignedJuniorSecurity as any)?.name ?? "");
               const isCompleted = Boolean(t.juniorCompletedAt);
               return (
-                <div key={String(t._id ?? t.id)} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                <div key={String(t._id ?? t.id)} className="flex items-center justify-between gap-3 rounded-lg neu-inset px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-slate-900 capitalize">{employeeName}</p>
                     <p className="text-xs text-slate-500">
@@ -659,7 +651,7 @@ export function DashboardTab({
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      className="shrink-0 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+                      className="neu-btn neu-btn-primary shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
                       onClick={() => setViewingLostCard(t)}
                     >
                       View Details
@@ -676,21 +668,21 @@ export function DashboardTab({
 
       {/* Role-specific sections */}
       {role === "human-resource" && insights?.hr ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl neu-card p-5">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
             <Users size={16} className="text-slate-500" />
             Company Overview
           </h2>
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg bg-slate-50 px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{String((insights.hr as any).totalMembers ?? "0")}</p>
               <p className="text-xs text-slate-500">Total Members</p>
             </div>
-            <div className="rounded-lg bg-slate-50 px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{String((insights.hr as any).pendingJoins ?? "0")}</p>
               <p className="text-xs text-slate-500">Pending Joins</p>
             </div>
-            <div className="rounded-lg bg-slate-50 px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{approvals.length}</p>
               <p className="text-xs text-slate-500">Pending Approvals</p>
             </div>
@@ -699,21 +691,21 @@ export function DashboardTab({
       ) : null}
 
       {role === "finance" ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl neu-card p-5">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
             <Wallet size={16} className="text-slate-500" />
             Finance Summary
           </h2>
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg bg-slate-50 px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-amber-700">{financeCount}</p>
               <p className="text-xs text-slate-500">Pending Actions</p>
             </div>
-            <div className="rounded-lg bg-slate-50 px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{checkOutRequestCount}</p>
               <p className="text-xs text-slate-500">Check-out Requests</p>
             </div>
-            <div className="rounded-lg bg-slate-50 px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{approvals.length}</p>
               <p className="text-xs text-slate-500">Pending Approvals</p>
             </div>
@@ -722,23 +714,23 @@ export function DashboardTab({
       ) : null}
 
       {role === "admin" ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl neu-card p-5">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
             <Building2 size={16} className="text-slate-500" />
             Company Overview
           </h2>
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg bg-slate-50 px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">
                 {String((insights?.hr as any)?.totalMembers ?? (insights?.admin as any)?.totalMembers ?? "0")}
               </p>
               <p className="text-xs text-slate-500">Total Members</p>
             </div>
-            <div className="rounded-lg bg-slate-50 px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{financeCount}</p>
               <p className="text-xs text-slate-500">Finance Pending</p>
             </div>
-            <div className="rounded-lg bg-slate-50 px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{approvals.length}</p>
               <p className="text-xs text-slate-500">Pending Approvals</p>
             </div>
@@ -747,19 +739,19 @@ export function DashboardTab({
       ) : null}
 
       {["project-manager", "qa-tester"].includes(role) && insights?.manager ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl neu-card p-5">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
             <Users size={16} className="text-slate-500" />
             Team Overview
           </h2>
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg bg-slate-50 px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">
                 {Array.isArray((insights.manager as any).teams) ? (insights.manager as any).teams.length : "0"}
               </p>
               <p className="text-xs text-slate-500">Teams Managed</p>
             </div>
-            <div className="rounded-lg bg-slate-50 px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{approvals.length}</p>
               <p className="text-xs text-slate-500">Pending Approvals</p>
             </div>
@@ -768,21 +760,21 @@ export function DashboardTab({
       ) : null}
 
       {["employee", "others"].includes(role) ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl neu-card p-5">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
             <User size={16} className="text-slate-500" />
             My Summary
           </h2>
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg bg-slate-50 px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{pendingApprovalsCount}</p>
               <p className="text-xs text-slate-500">Pending Approvals</p>
             </div>
-            <div className="rounded-lg bg-slate-50 px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{unreadCount}</p>
               <p className="text-xs text-slate-500">Unread Notifications</p>
             </div>
-            <div className="rounded-lg bg-slate-50 px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">
                 {checkedIn ? "✓" : "--"}
               </p>
@@ -794,11 +786,11 @@ export function DashboardTab({
 
       {viewingRejected ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setViewingRejected(null); }}
         >
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl">
-            <div className="border-b border-slate-100 px-6 py-4">
+          <div className="w-full max-w-md rounded-2xl neu-card">
+            <div className="border-b border-[var(--c-border-light)] px-6 py-4">
               <h4 className="text-lg font-semibold text-slate-900">Rejected Letter</h4>
             </div>
             <div className="space-y-3 px-6 py-5 text-sm">
@@ -817,10 +809,10 @@ export function DashboardTab({
                 <span className="font-medium text-slate-700">Date:</span>{" "}
                 {viewingRejected.createdAt
                   ? new Date(String(viewingRejected.createdAt)).toLocaleDateString("en-IN", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    })
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })
                   : ""}
               </p>
               <p>
@@ -833,16 +825,16 @@ export function DashboardTab({
                   {String((viewingRejected.metadata as any)?.rejectionReason ?? "No reason provided.")}
                 </p>
               </div>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <div className="rounded-lg neu-inset p-3">
                 <p className="font-medium text-slate-700 mb-2">Submitted Draft</p>
-                <div className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-md bg-white p-3 text-xs border border-slate-200 text-slate-600">
+                <div className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-md bg-[var(--c-bg-card)] p-3 text-xs border border-[var(--c-border-light)] text-slate-600">
                   {String((viewingRejected.metadata as any)?.letterContent ?? "").trim() || generateFallbackLetter(viewingRejected)}
                 </div>
               </div>
             </div>
-            <div className="flex justify-end border-t border-slate-100 px-6 py-4">
+            <div className="flex justify-end border-t border-[var(--c-border-light)] px-6 py-4">
               <button
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
                 type="button"
                 onClick={() => setViewingRejected(null)}
               >
@@ -890,22 +882,22 @@ export function DashboardTab({
         return (
           <div
             key="lost-card-detail-modal"
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4"
             onClick={(e) => { if (e.target === e.currentTarget) setViewingLostCard(null); }}
           >
-            <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-xl" style={{ maxHeight: "90vh", overflowY: "auto" }}>
-              <div className="border-b border-slate-100 px-6 py-4">
+            <div className="w-full max-w-lg rounded-2xl neu-card" style={{ maxHeight: "90vh", overflowY: "auto" }}>
+              <div className="border-b border-[var(--c-border-light)] px-6 py-4">
                 <div className="flex items-center justify-between">
                   <h4 className="text-lg font-semibold text-slate-900">Lost Card Report</h4>
-                  <button type="button" onClick={() => setViewingLostCard(null)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+                  <button type="button" onClick={() => setViewingLostCard(null)} className="rounded-lg p-1 text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-600">
                     &times;
                   </button>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusColors[status] ?? "bg-slate-100 text-slate-600"}`}>
+                  <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusColors[status] ?? "bg-[var(--c-bg-muted)] text-slate-600"}`}>
                     {status.replace(/-/g, " ")}
                   </span>
-                  <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 capitalize">{reason}</span>
+                  <span className="rounded bg-[var(--c-bg-hover)] px-1.5 py-0.5 text-[10px] font-medium text-slate-600 capitalize">{reason}</span>
                   {isEmergency ? <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-red-700">Emergency</span> : null}
                 </div>
               </div>
@@ -970,7 +962,7 @@ export function DashboardTab({
                     <p className="text-xs font-semibold uppercase text-slate-500">Follow-up Notes</p>
                     <div className="mt-1 space-y-1.5">
                       {followUpNotes.map((fn: any, i: number) => (
-                        <div key={i} className="rounded-lg bg-slate-50 px-3 py-2">
+                        <div key={i} className="rounded-lg bg-[var(--c-bg-muted)] px-3 py-2">
                           <p className="text-[10px] font-medium text-slate-700">{fn.addedByName ?? "Unknown"}</p>
                           <p className="text-xs text-slate-600">{fn.note}</p>
                           {fn.addedAt ? <p className="mt-0.5 text-[10px] text-slate-400">{new Date(fn.addedAt).toLocaleString("en-IN")}</p> : null}
@@ -991,7 +983,7 @@ export function DashboardTab({
                       {expandedTimeline === String(lc.id ?? lc._id) ? "Hide Timeline" : "Show Timeline"}
                     </button>
                     {expandedTimeline === String(lc.id ?? lc._id) ? (
-                      <div className="mt-2 border-l-2 border-slate-200 pl-3">
+                      <div className="mt-2 border-l-2 border-[var(--c-border-light)] pl-3">
                         {timeline.map((t: any, i: number) => (
                           <div key={i} className="relative pb-2 last:pb-0">
                             <div className="absolute -left-[17px] top-1 h-2 w-2 rounded-full bg-indigo-400" />
@@ -1008,9 +1000,9 @@ export function DashboardTab({
                 ) : null}
               </div>
 
-              <div className="flex justify-end border-t border-slate-100 px-6 py-4">
+              <div className="flex justify-end border-t border-[var(--c-border-light)] px-6 py-4">
                 <button
-                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
                   type="button"
                   onClick={() => setViewingLostCard(null)}
                 >
@@ -1032,7 +1024,7 @@ export function DashboardTab({
               setIdentityCodeEndRange(data.endRange);
               setIdentityCodeNextNumber(data.nextNumber);
             })
-            .catch(() => {});
+            .catch(() => { });
         }}
         showToast={showToast}
         currentEndRange={identityCodeEndRange}

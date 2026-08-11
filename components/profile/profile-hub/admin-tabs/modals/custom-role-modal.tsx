@@ -1,7 +1,7 @@
 import { ActionButton } from "../../shared";
 
 const overlayClass = "fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4";
-const modalClass = "w-full max-w-md rounded-xl bg-white p-5 shadow-xl";
+const modalClass = "w-full max-w-md rounded-xl bg-[var(--c-bg-elevated)] p-5 shadow-xl";
 
 export function CustomRoleModal({
   member,
@@ -32,7 +32,7 @@ export function CustomRoleModal({
           Set a custom role label for <strong>{String(member.name ?? "")}</strong>.
         </p>
         <input
-          className="mt-4 w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs"
+          className="mt-4 w-full rounded-md border border-[var(--c-border-light)] px-3 py-1.5 text-xs"
           list={`custom-role-${memberId}`}
           placeholder="Select or enter custom role"
           type="text"

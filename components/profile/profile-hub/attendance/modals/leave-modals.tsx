@@ -79,13 +79,13 @@ export function LeaveModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
+    <div className="fixed inset-0 z-[60] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl ring-1 ring-slate-200">
         <h3 className="text-xl font-bold text-slate-900">Ask Leave</h3>
         <p className="mt-1 text-sm text-slate-500">
           Submit a paid leave request for HR and admin approval.
         </p>
-        <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+        <p className="mt-3 rounded-lg bg-[var(--c-bg-muted)] px-3 py-2 text-xs text-slate-600">
           Remaining paid leave:{" "}
           <span className="font-semibold text-slate-900">
             {Math.max(0, Number(leavePolicy?.remainingPaidLeaveDays ?? 0))} day{Math.max(0, Number(leavePolicy?.remainingPaidLeaveDays ?? 0)) === 1 ? "" : "s"}
@@ -106,7 +106,7 @@ export function LeaveModal({
                 onChange={(e) =>
                   setFormData({ ...formData, startDate: e.target.value })
                 }
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+                className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
               />
             </div>
             <div className="space-y-1">
@@ -120,7 +120,7 @@ export function LeaveModal({
                 onChange={(e) =>
                   setFormData({ ...formData, endDate: e.target.value })
                 }
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+                className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
               />
             </div>
           </div>
@@ -136,7 +136,7 @@ export function LeaveModal({
               onChange={(e) =>
                 setFormData({ ...formData, reason: e.target.value })
               }
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+              className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
             />
           </div>
           {dropdownUsers.length > 0 && (
@@ -147,7 +147,7 @@ export function LeaveModal({
               <select
                 value={selectedHr}
                 onChange={(e) => setSelectedHr(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+                className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
               >
                 <option value="">{isOnlyHr ? "Auto-assign any Admin" : "Auto-assign any HR"}</option>
                 {dropdownUsers.map((u) => (
@@ -161,7 +161,7 @@ export function LeaveModal({
               Attachment (Optional)
             </label>
             <div className="flex items-center gap-3">
-              <label className="flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500 hover:bg-slate-100 transition-colors">
+              <label className="flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-[var(--c-bg-muted)] text-sm text-slate-500 hover:bg-[var(--c-bg-muted)] transition-colors">
                 <Camera size={18} />
                 <span>
                   {formData.attachmentUrl
@@ -176,7 +176,7 @@ export function LeaveModal({
                 />
               </label>
               {formData.attachmentUrl && (
-                <div className="relative h-12 w-12 overflow-hidden rounded-lg border border-slate-200">
+                <div className="relative h-12 w-12 overflow-hidden rounded-lg border border-[var(--c-border-light)]">
                   <img
                     src={formData.attachmentUrl}
                     alt="preview"
@@ -206,7 +206,7 @@ export function LeaveModal({
             <button
               disabled={loading}
               type="submit"
-              className="rounded-full bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+              className="neu-btn neu-btn-primary rounded-full px-6 py-2 text-sm font-medium"
             >
               {loading ? "Submitting..." : "Submit"}
             </button>
@@ -263,9 +263,9 @@ export function RequestsListModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl ring-1 ring-slate-200">
-        <div className="flex items-center justify-between border-b border-slate-100 p-6">
+    <div className="fixed inset-0 z-[60] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
+      <div className="w-full max-w-2xl rounded-2xl neu-card ring-1 ring-slate-200">
+        <div className="flex items-center justify-between border-b border-[var(--c-border-light)] p-6">
           <div>
             <h3 className="text-xl font-bold text-slate-900">Leave Requests</h3>
             <p className="text-sm text-slate-500">
@@ -299,7 +299,7 @@ export function RequestsListModal({
                   <div
                     key={req._id}
                     onClick={() => setSelectedLeave(req)}
-                    className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 cursor-pointer hover:border-slate-200 hover:bg-slate-100/50 transition-all active:scale-[0.98]"
+                    className="rounded-xl neu-inset/50 p-4 cursor-pointer hover:border-[var(--c-border-light)] hover:bg-[var(--c-bg-muted)]/50 transition-all active:scale-[0.98]"
                   >
                     <div className="flex items-start justify-between">
                       <div>
@@ -308,12 +308,7 @@ export function RequestsListModal({
                             {req.requester?.name || "User"}
                           </span>
                           <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${req.status === "approved"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : req.status === "rejected"
-                                ? "bg-rose-100 text-rose-700"
-                                : "bg-amber-100 text-amber-700"
-                              }`}
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${req.status === "approved" ? "bg-emerald-100 text-emerald-700" : req.status === "rejected" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700" }`}
                           >
                             {req.status}
                           </span>
@@ -337,7 +332,7 @@ export function RequestsListModal({
             </div>
           )}
         </div>
-        <div className="border-t border-slate-100 p-4 flex justify-end">
+        <div className="border-t border-[var(--c-border-light)] p-4 flex justify-end">
           <ActionButton
             variant="secondary"
             onClick={onClose}
@@ -402,17 +397,17 @@ export function LeaveDetailsModal({
   }, [canApprove, step]);
 
   return (
-    <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-md">
-      <div className="w-full max-w-lg animate-in zoom-in-95 fade-in duration-300 rounded-2xl bg-white shadow-xl ring-1 ring-slate-200 overflow-hidden">
+    <div className="fixed inset-0 z-[80] grid place-items-center neu-overlay p-4 backdrop-blur-md">
+      <div className="w-full max-w-lg animate-in zoom-in-95 fade-in duration-300 rounded-2xl neu-card ring-1 ring-slate-200 overflow-hidden">
         <div className="relative h-32 bg-slate-900">
           <div className="absolute -bottom-8 left-6">
-            <div className="h-16 w-16 rounded-2xl bg-emerald-600 shadow-xl shadow-emerald-600/20 grid place-items-center text-white">
+            <div className="neu-btn neu-btn-success h-16 w-16 rounded-2xl shadow-xl shadow-emerald-600/20 grid place-items-center">
               <Clock size={32} />
             </div>
           </div>
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 h-8 w-8 grid place-items-center rounded-full bg-white/10 text-white hover:bg-white/20 transition"
+            className="absolute top-4 right-4 h-8 w-8 grid place-items-center rounded-full bg-[var(--c-bg-card)]/10 text-white hover:bg-[var(--c-bg-card)]/20 transition"
           >
             <LogOut className="rotate-180" size={16} />
           </button>
@@ -429,18 +424,13 @@ export function LeaveDetailsModal({
               </p>
             </div>
             <span
-              className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${leave.status === "approved"
-                ? "bg-emerald-100 text-emerald-700"
-                : leave.status === "rejected"
-                  ? "bg-rose-100 text-rose-700"
-                  : "bg-amber-100 text-amber-700"
-                }`}
+              className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${leave.status === "approved" ? "bg-emerald-100 text-emerald-700" : leave.status === "rejected" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700" }`}
             >
               {String(leave.status)}
             </span>
           </div>
 
-          <div className="mt-8 grid grid-cols-2 gap-6 rounded-2xl bg-slate-50 p-5">
+          <div className="mt-8 grid grid-cols-2 gap-6 rounded-2xl bg-[var(--c-bg-muted)] p-5">
             <div className="space-y-1">
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                 Duration
@@ -475,7 +465,7 @@ export function LeaveDetailsModal({
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
                   Attachments
                 </p>
-                <div className="group relative aspect-video w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                <div className="group relative aspect-video w-full overflow-hidden rounded-2xl neu-inset">
                   <img
                     src={String(leave.attachmentUrl)}
                     alt="attachment"
@@ -486,7 +476,7 @@ export function LeaveDetailsModal({
                     download="attachment"
                     className="absolute inset-0 grid place-items-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
                   >
-                    <div className="rounded-full bg-white px-4 py-2 text-xs font-bold text-slate-900 shadow-xl">
+                    <div className="rounded-full bg-[var(--c-bg-card)] px-4 py-2 text-xs font-bold text-slate-900 shadow-xl">
                       View Original
                     </div>
                   </a>
@@ -516,7 +506,7 @@ export function LeaveDetailsModal({
                   <select
                     value={selectedAdmin}
                     onChange={(e) => setSelectedAdmin(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+                    className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
                   >
                     <option value="">Auto-assign any admin</option>
                     {adminUsers.map((au) => (
@@ -540,7 +530,7 @@ export function LeaveDetailsModal({
                     e.stopPropagation();
                     onApprove(selectedAdmin || undefined);
                   }}
-                  className="flex-1 rounded-2xl bg-emerald-600 py-4 text-sm font-bold text-white hover:bg-emerald-700 transition shadow-xl shadow-emerald-600/20"
+                  className="neu-btn neu-btn-success flex-1 rounded-2xl py-4 text-sm font-bold transition shadow-xl shadow-emerald-600/20"
                 >
                   Approve
                 </button>
@@ -565,7 +555,7 @@ export function LeaveDetailsModal({
           <div className="mt-6">
             <button
               onClick={onClose}
-              className="w-full rounded-2xl border border-slate-200 py-4 text-sm font-bold text-slate-600 hover:bg-slate-50 transition"
+              className="w-full rounded-2xl border border-[var(--c-border-light)] py-4 text-sm font-bold text-slate-600 hover:bg-[var(--c-bg-muted)] transition"
             >
               Back to List
             </button>
@@ -581,7 +571,7 @@ export function LeaveDetailsModal({
                     /* ignore */
                   }
                 }}
-                className="w-full mt-2 rounded-2xl bg-slate-100 py-3 text-sm font-bold text-slate-700 hover:bg-slate-200 transition"
+                className="w-full mt-2 rounded-2xl bg-[var(--c-bg-muted)] py-3 text-sm font-bold text-slate-700 hover:bg-[var(--c-bg-hover)] transition"
               >
                 View Day Details
               </button>

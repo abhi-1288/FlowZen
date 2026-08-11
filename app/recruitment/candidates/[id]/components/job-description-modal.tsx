@@ -26,13 +26,13 @@ export default function JobDescriptionModal() {
   const currencySymbol = CURRENCY_SYMBOLS[job?.currency ?? "INR"] ?? "₹";
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/35">
+    <div className="fixed inset-0 z-50 overflow-y-auto neu-overlay">
       <div className="flex min-h-full items-start justify-center p-4 pt-12">
-        <div className="w-full max-w-lg rounded-lg bg-white shadow-soft">
-          <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+        <div className="w-full max-w-lg rounded-lg neu-card">
+          <header className="flex items-center justify-between border-b border-[var(--c-border-light)] px-5 py-4">
             <h2 className="text-base font-semibold">Job Description</h2>
             <button
-              className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100"
+              className="rounded-md p-1.5 text-slate-500 hover:bg-[var(--c-bg-muted)]"
               onClick={() => setModal(null)}
               type="button"
             >
@@ -67,7 +67,7 @@ export default function JobDescriptionModal() {
                   </p>
                 </div>
 
-                <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                <div className="rounded-lg neu-inset p-3">
                   <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
                     Salary Range
                   </p>
@@ -88,7 +88,7 @@ export default function JobDescriptionModal() {
                       {job.requiredSkills.map((skill, i) => (
                         <span
                           key={i}
-                          className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
+                          className="rounded-full bg-[var(--c-bg-muted)] px-3 py-1 text-xs font-medium text-slate-700"
                         >
                           {skill}
                         </span>

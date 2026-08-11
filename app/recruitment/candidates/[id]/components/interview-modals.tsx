@@ -33,12 +33,12 @@ function ScheduleInterviewModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/35 px-4">
-      <div className="w-full max-w-md rounded-lg bg-white shadow-soft">
-        <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+    <div className="fixed inset-0 z-50 grid place-items-center neu-overlay px-4">
+      <div className="w-full max-w-md rounded-lg neu-card">
+        <header className="flex items-center justify-between border-b border-[var(--c-border-light)] px-5 py-4">
           <h2 className="text-base font-semibold">Schedule Interview</h2>
           <button
-            className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100"
+            className="rounded-md p-1.5 text-slate-500 hover:bg-[var(--c-bg-muted)]"
             onClick={() => setModal(null)}
             type="button"
           >
@@ -61,7 +61,7 @@ function ScheduleInterviewModal({
             </span>
             <select
               name="roundType"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none"
+              className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
             >
               <option value="screening">Screening</option>
               <option value="technical">Technical</option>
@@ -77,7 +77,7 @@ function ScheduleInterviewModal({
               <select
                 name="interviewer"
                 required
-                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none"
+                className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
               >
                 <option value="">Select an interviewer...</option>
                 {assignedOptions.map((a: any) => {
@@ -94,7 +94,7 @@ function ScheduleInterviewModal({
                 name="interviewer"
                 required
                 placeholder="User ID"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
               />
             )}
             {assignedOptions.length === 0 && (
@@ -112,7 +112,7 @@ function ScheduleInterviewModal({
               name="scheduledAt"
               type="datetime-local"
               required
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+              className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
             />
           </label>
           <label className="block">
@@ -122,12 +122,12 @@ function ScheduleInterviewModal({
             <input
               name="meetingLink"
               placeholder="https://meet.google.com/..."
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+              className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
             />
           </label>
           <button
             type="submit"
-            className="w-full rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+            className="neu-btn neu-btn-primary w-full rounded-full px-4 py-2.5 text-sm font-medium"
           >
             Schedule
           </button>
@@ -164,12 +164,12 @@ function AddFeedbackModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/35 px-4">
-      <div className="w-full max-w-md rounded-lg bg-white shadow-soft">
-        <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+    <div className="fixed inset-0 z-50 grid place-items-center neu-overlay px-4">
+      <div className="w-full max-w-md rounded-lg neu-card">
+        <header className="flex items-center justify-between border-b border-[var(--c-border-light)] px-5 py-4">
           <h2 className="text-base font-semibold">Interview Feedback</h2>
           <button
-            className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100"
+            className="rounded-md p-1.5 text-slate-500 hover:bg-[var(--c-bg-muted)]"
             onClick={() => setModal(null)}
             type="button"
           >
@@ -200,7 +200,7 @@ function AddFeedbackModal({
                 <select
                   name={field}
                   defaultValue="3"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none"
+                  className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
                 >
                   {[1, 2, 3, 4, 5].map((n) => (
                     <option key={n} value={n}>
@@ -217,7 +217,7 @@ function AddFeedbackModal({
             </span>
             <select
               name="recommendation"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none"
+              className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
             >
               <option value="strong-hire">Strong Hire</option>
               <option value="hire">Hire</option>
@@ -232,12 +232,12 @@ function AddFeedbackModal({
             <textarea
               name="notes"
               rows={3}
-              className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+              className="neu-inset w-full resize-y rounded-lg px-3 py-2.5 text-sm"
             />
           </label>
           <button
             type="submit"
-            className="w-full rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+            className="neu-btn neu-btn-primary w-full rounded-full px-4 py-2.5 text-sm font-medium"
           >
             Submit Feedback
           </button>
@@ -275,12 +275,12 @@ function EditInterviewModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/35 px-4">
-      <div className="w-full max-w-md rounded-lg bg-white shadow-soft">
-        <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+    <div className="fixed inset-0 z-50 grid place-items-center neu-overlay px-4">
+      <div className="w-full max-w-md rounded-lg neu-card">
+        <header className="flex items-center justify-between border-b border-[var(--c-border-light)] px-5 py-4">
           <h2 className="text-base font-semibold">Update Interview</h2>
           <button
-            className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100"
+            className="rounded-md p-1.5 text-slate-500 hover:bg-[var(--c-bg-muted)]"
             onClick={() => setModal(null)}
             type="button"
           >
@@ -304,7 +304,7 @@ function EditInterviewModal({
             <input
               name="scheduledAt"
               type="datetime-local"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+              className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
             />
           </label>
           <label className="block">
@@ -314,7 +314,7 @@ function EditInterviewModal({
             <input
               name="meetingLink"
               defaultValue={interview?.meetingLink || ""}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+              className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
             />
           </label>
           <label className="block">
@@ -323,7 +323,7 @@ function EditInterviewModal({
             </span>
             <select
               name="status"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none"
+              className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
             >
               <option value="">Keep current</option>
               <option value="cancelled">Cancel</option>
@@ -332,7 +332,7 @@ function EditInterviewModal({
           </label>
           <button
             type="submit"
-            className="w-full rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+            className="neu-btn neu-btn-primary w-full rounded-full px-4 py-2.5 text-sm font-medium"
           >
             Update
           </button>

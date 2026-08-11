@@ -58,8 +58,8 @@ export function DayDetailsModal({
   });
 
   return (
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-md">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 text-slate-900 shadow-xl ring-1 ring-slate-200 dark:bg-black dark:text-zinc-100 dark:ring-zinc-700">
+    <div className="fixed inset-0 z-[100] grid place-items-center neu-overlay p-4 backdrop-blur-md">
+      <div className="w-full max-w-lg rounded-2xl bg-[var(--c-bg-card)] p-6 text-slate-900 shadow-xl ring-1 ring-slate-200 dark:bg-black dark:text-zinc-100 dark:ring-zinc-700">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-bold">{date.toLocaleDateString()}</h3>
           <button onClick={onClose} className="text-sm text-slate-500 hover:text-slate-800 font-medium dark:text-zinc-400 dark:hover:text-zinc-100">
@@ -104,7 +104,7 @@ export function DayDetailsModal({
           )}
 
           {attendance ? (
-            <div className="rounded-xl border border-slate-100 p-4 dark:border-zinc-800">
+            <div className="rounded-xl border border-[var(--c-border-light)] p-4 dark:border-zinc-800">
               <div className="flex justify-between">
                 <p className="text-sm font-bold text-slate-900 dark:text-zinc-100">Check-in</p>
                 <p className="text-sm text-slate-600 dark:text-zinc-400">
@@ -152,7 +152,7 @@ export function DayDetailsModal({
               })()}
             </div>
           ) : (
-            <div className="rounded-xl border border-slate-100 p-4 dark:border-zinc-800">
+            <div className="rounded-xl border border-[var(--c-border-light)] p-4 dark:border-zinc-800">
               <p className="text-sm font-bold text-slate-900 dark:text-zinc-100">No attendance recorded</p>
             </div>
           )}

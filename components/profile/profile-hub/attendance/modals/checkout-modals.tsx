@@ -11,9 +11,9 @@ export function CheckOutRequestsListModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl ring-1 ring-slate-200">
-        <div className="flex items-center justify-between border-b border-slate-100 p-6">
+    <div className="fixed inset-0 z-[60] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
+      <div className="w-full max-w-2xl rounded-2xl neu-card ring-1 ring-slate-200">
+        <div className="flex items-center justify-between border-b border-[var(--c-border-light)] p-6">
           <div>
             <h3 className="text-xl font-bold text-slate-900">Check-Out Requests</h3>
             <p className="text-sm text-slate-500">Your check-out requests and their status.</p>
@@ -33,7 +33,7 @@ export function CheckOutRequestsListModal({
               {requests.map((req: any) => {
                 const att = req.attendance as any;
                 return (
-                  <div key={req._id} className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+                  <div key={req._id} className="rounded-xl neu-inset/50 p-4">
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="flex items-center gap-2">
@@ -41,13 +41,7 @@ export function CheckOutRequestsListModal({
                             {new Date(req.date).toLocaleDateString()}
                           </span>
                           <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                              req.status === "approved"
-                                ? "bg-emerald-100 text-emerald-700"
-                                : req.status === "rejected"
-                                  ? "bg-rose-100 text-rose-700"
-                                  : "bg-amber-100 text-amber-700"
-                            }`}
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${ req.status === "approved" ? "bg-emerald-100 text-emerald-700" : req.status === "rejected" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700" }`}
                           >
                             {req.status}
                           </span>
@@ -142,8 +136,8 @@ export function CheckOutRequestModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
+    <div className="fixed inset-0 z-[60] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl ring-1 ring-slate-200">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-slate-900">Request Check-Out</h3>
           <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:text-slate-600 transition">
@@ -159,7 +153,7 @@ export function CheckOutRequestModal({
           <select
             value={selectedId}
             onChange={(e) => setSelectedId(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm mb-4"
+            className="w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm mb-4"
           >
             <option value="">Select a date...</option>
             {recordsWithoutCheckOut.map((h: any) => (
@@ -175,7 +169,7 @@ export function CheckOutRequestModal({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Reason for requesting check-out..."
-            className="mb-4 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            className="mb-4 w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm"
             rows={3}
           />
         )}
@@ -187,7 +181,7 @@ export function CheckOutRequestModal({
             <select
               value={selectedFinance}
               onChange={(e) => setSelectedFinance(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+              className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
             >
               <option value="">Auto-assign any finance</option>
               {financeUsers.map((fu) => (
@@ -206,7 +200,7 @@ export function CheckOutRequestModal({
           <button
             onClick={handleSubmit}
             disabled={loading || !selectedId}
-            className="rounded-full bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+            className="neu-btn neu-btn-primary rounded-full px-6 py-2 text-sm font-medium"
           >
             {loading ? "Sending..." : "Request"}
           </button>

@@ -206,17 +206,17 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-xl">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+      <div className="w-full max-w-lg rounded-2xl neu-card">
+        <div className="flex items-start justify-between gap-4 border-b border-[var(--c-border-light)] px-6 py-4">
           <div className="flex items-start gap-3">
             {showPreview ? (
               <button
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-[var(--c-border-light)] text-slate-500 hover:bg-[var(--c-bg-muted)]"
                 type="button"
                 onClick={() => setShowPreview(false)}
                 aria-label="Back"
@@ -234,7 +234,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
             </div>
           </div>
           <button
-            className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
+            className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 hover:bg-[var(--c-bg-muted)]"
             type="button"
             onClick={onClose}
             aria-label="Close"
@@ -248,7 +248,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
             <div>
               <label className="text-xs font-semibold uppercase text-slate-500">Letter Content</label>
               <textarea
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-lg neu-inset px-3 py-2 text-sm"
                 rows={12}
                 value={letterContent}
                 onChange={(e) => setLetterContent(e.target.value)}
@@ -262,7 +262,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
               Letter Type
             </label>
             <select
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-lg neu-inset px-3 py-2 text-sm"
               value={letterType}
               onChange={(e) => setLetterType(e.target.value)}
             >
@@ -284,7 +284,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
                 Custom Letter Type
               </label>
               <input
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-lg neu-inset px-3 py-2 text-sm"
                 placeholder="e.g., Bonafide Certificate"
                 value={customType}
                 onChange={(e) => setCustomType(e.target.value)}
@@ -301,7 +301,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
                   </label>
                   <input
                     type="date"
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-lg neu-inset px-3 py-2 text-sm"
                     value={internshipStart}
                     onChange={(e) => setInternshipStart(e.target.value)}
                   />
@@ -312,7 +312,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
                   </label>
                   <input
                     type="date"
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-lg neu-inset px-3 py-2 text-sm"
                     value={internshipEnd}
                     onChange={(e) => setInternshipEnd(e.target.value)}
                   />
@@ -323,7 +323,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
                   Project Title <span className="text-red-500">*</span>
                 </label>
                 <input
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg neu-inset px-3 py-2 text-sm"
                   placeholder="e.g., Task Management Dashboard"
                   value={projectTitle}
                   onChange={(e) => setProjectTitle(e.target.value)}
@@ -334,7 +334,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
                   What does it do? <span className="text-red-500">*</span>
                 </label>
                 <textarea
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg neu-inset px-3 py-2 text-sm"
                   rows={2}
                   placeholder="Briefly describe what the project does"
                   value={projectDescription}
@@ -346,7 +346,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
                   Achievements
                 </label>
                 <textarea
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg neu-inset px-3 py-2 text-sm"
                   rows={2}
                   placeholder="What did you achieve? (optional)"
                   value={projectAchievements}
@@ -364,7 +364,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
                 </label>
                 <input
                   type="date"
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg neu-inset px-3 py-2 text-sm"
                   value={resignationLastWorkingDay}
                   onChange={(e) => setResignationLastWorkingDay(e.target.value)}
                   min={new Date(Date.now() + noticePeriodDays * 86400000).toISOString().slice(0, 10)}
@@ -388,7 +388,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
                 Purpose
               </label>
               <textarea
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-lg neu-inset px-3 py-2 text-sm"
                 rows={3}
                 placeholder="e.g., For visa application, higher education, bank loan..."
                 value={purpose}
@@ -402,7 +402,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
               {isJuniorSecurity ? "Assign to Senior Security" : "Assign to HR"}
             </label>
             <select
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-lg neu-inset px-3 py-2 text-sm"
               value={selectedHrId}
               onChange={(e) => setSelectedHrId(e.target.value)}
             >
@@ -435,7 +435,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
               <button
                 type="button"
                 onClick={handlePreview}
-                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                className="w-full rounded-lg neu-inset px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
               >
                 {letterContent ? "Edit Letter Content" : "Preview & Edit Letter Content"}
               </button>
@@ -444,10 +444,10 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
         </div>
         )}
 
-        <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">
+        <div className="flex justify-end gap-3 border-t border-[var(--c-border-light)] px-6 py-4">
           {showPreview ? (
             <button
-              className="rounded-lg bg-slate-950 px-5 py-2 text-sm font-medium text-white"
+              className="neu-btn neu-btn-primary rounded-lg px-5 py-2 text-sm font-medium"
               type="button"
               onClick={() => setShowPreview(false)}
             >
@@ -456,14 +456,14 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
           ) : (
             <>
               <button
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
                 type="button"
                 onClick={onClose}
               >
                 Cancel
               </button>
               <button
-                className="rounded-lg bg-slate-950 px-5 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                className="neu-btn neu-btn-primary rounded-lg px-5 py-2 text-sm font-medium disabled:cursor-not-allowed"
                 type="button"
                 disabled={submitting}
                 onClick={() => void handleSubmit()}

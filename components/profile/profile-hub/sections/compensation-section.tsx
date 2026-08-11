@@ -17,7 +17,7 @@ export function CompensationSection({
   onRequestSalary: () => Promise<void>;
 }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-zinc-800 dark:bg-[#000000]">
+    <section className="rounded-xl neu-card p-5 dark:border-zinc-800 dark:bg-[#000000]">
       <SectionHeader title="Compensation" description="Salary details" accent="rose" />
       <dl className="mt-4 space-y-3 text-sm">
         {inApprovedCompany && effectiveBaseSalary > 0 ? (
@@ -28,13 +28,13 @@ export function CompensationSection({
         ) : null}
       </dl>
       {inApprovedCompany && !insights?.hasSalary ? (
-        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 dark:border-zinc-800 dark:bg-[#000000]">
+        <div className="mt-4 rounded-lg neu-card p-4 dark:border-zinc-800 dark:bg-[#000000]">
           <p className="text-sm font-medium text-slate-700 dark:text-zinc-300">Salary not assigned yet?</p>
           <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
             {role === "human-resource" ? "Request admin to set up your salary record." : role === "admin" ? "Request another admin or HR to set up your salary record." : "Request the HR who enrolled you to set up your salary."}
           </p>
           <button
-            className="mt-3 rounded-full bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="neu-btn neu-btn-primary mt-3 rounded-full px-4 py-2 text-sm font-medium disabled:cursor-not-allowed"
             disabled={salaryRequesting || Boolean(insights?.pendingSalaryRequest)}
             onClick={onRequestSalary}
             type="button"

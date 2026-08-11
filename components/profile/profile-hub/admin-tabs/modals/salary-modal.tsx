@@ -2,7 +2,7 @@ import { ActionButton } from "../../shared";
 import { currencySymbol } from "../helpers";
 
 const overlayClass = "fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4";
-const modalClass = "w-full max-w-md rounded-xl bg-white p-5 shadow-xl";
+const modalClass = "w-full max-w-md rounded-xl bg-[var(--c-bg-elevated)] p-5 shadow-xl";
 
 export function SalaryModal({
   member,
@@ -40,7 +40,7 @@ export function SalaryModal({
         </p>
         <div className="mt-4 flex gap-2">
           <select
-            className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs"
+            className="rounded-md neu-inset px-2 py-1.5 text-xs"
             value={salaryCurrency}
             onChange={(e) => onCurrencyChange(e.target.value)}
           >
@@ -50,17 +50,17 @@ export function SalaryModal({
             <option value="GBP">£ GBP</option>
             <option value="JPY">¥ JPY</option>
           </select>
-          <div className="flex flex-1 rounded-md border border-slate-200 p-1">
+          <div className="flex flex-1 rounded-md border border-[var(--c-border-light)] p-1">
             <button
               type="button"
-              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${salaryPeriodType === "monthly" ? "bg-slate-950 text-white" : "text-slate-600 hover:text-slate-900"}`}
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${salaryPeriodType === "monthly" ? "neu-tab-pressed" : "text-slate-600 hover:text-slate-900"}`}
               onClick={() => onPeriodChange("monthly")}
             >
               Per Month
             </button>
             <button
               type="button"
-              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${salaryPeriodType === "yearly" ? "bg-slate-950 text-white" : "text-slate-600 hover:text-slate-900"}`}
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${salaryPeriodType === "yearly" ? "neu-tab-pressed" : "text-slate-600 hover:text-slate-900"}`}
               onClick={() => onPeriodChange("yearly")}
             >
               Per Year
@@ -70,7 +70,7 @@ export function SalaryModal({
         <div className="mt-4 flex items-center gap-2">
           <span className="text-lg font-semibold text-slate-700">{sym}</span>
           <input
-            className="flex-1 rounded-md border border-slate-200 px-3 py-1.5 text-xs"
+            className="flex-1 rounded-md border border-[var(--c-border-light)] px-3 py-1.5 text-xs"
             min={0}
             placeholder={salaryPeriodType === "monthly" ? "Monthly base salary" : "Yearly base salary"}
             type="number"

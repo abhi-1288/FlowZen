@@ -297,7 +297,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
             handleScanWithCode(code.toUpperCase());
           }
         },
-        () => {},
+        () => { },
       );
       scannerRef.current = scanner;
       setCameraReady(true);
@@ -562,7 +562,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
       found: "bg-teal-100 text-teal-700",
       "found-after-replacement": "bg-orange-100 text-orange-700",
     };
-    return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${colors[status] ?? "bg-slate-100 text-slate-500"}`}>{status.replace("-", " ")}</span>;
+    return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${colors[status] ?? "bg-[var(--c-bg-muted)] text-slate-500"}`}>{status.replace("-", " ")}</span>;
   };
 
   const REPLACEMENT_STEPS = [
@@ -638,9 +638,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
       {SECTIONS.map((s) => (
         <button
           key={s.key}
-          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-            activeSection === s.key ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-          }`}
+          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${activeSection === s.key ? "neu-tab-pressed" : "neu-tab-raised"}`}
           onClick={() => setActiveSection(s.key)}
           type="button"
         >
@@ -651,7 +649,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
   );
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-xl neu-card p-5">
       <SectionHeader title="Security Dashboard" description="Verify identities, manage visitors, and monitor premises." accent="indigo" />
       {sectionNav}
 
@@ -661,7 +659,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
           <h3 className="mb-3 text-sm font-semibold text-slate-800">Verify Employee ID</h3>
           <div className="mb-4 flex gap-2">
             <input
-              className="flex-1 rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              className="neu-inset flex-1 rounded-md px-3 py-1.5 text-xs"
               placeholder="Search by name, email, or identity code..."
               value={verifyQuery}
               onChange={(e) => setVerifyQuery(e.target.value)}
@@ -672,7 +670,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
             </ActionButton>
           </div>
           {verifyResult ? (
-            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+            <div className="rounded-xl neu-inset/50 p-4">
               <div className="flex items-center gap-4">
                 <div className="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-100 text-lg font-bold text-indigo-600">
                   {String((verifyResult as any).name ?? "?").charAt(0).toUpperCase()}
@@ -681,18 +679,14 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                   <p className="font-semibold text-slate-900">{String((verifyResult as any).name ?? "")}</p>
                   <p className="text-sm text-slate-500">{String((verifyResult as any).email ?? "")}</p>
                   <div className="mt-1 flex flex-wrap gap-2">
-                    <span className="rounded bg-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                    <span className="rounded bg-[var(--c-bg-hover)] px-2 py-0.5 text-[10px] font-medium text-slate-600">
                       {String((verifyResult as any).role ?? "")}
                     </span>
-                    <span className={`rounded px-2 py-0.5 text-[10px] font-medium ${
-                      String((verifyResult as any).companyStatus) === "approved"
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-amber-100 text-amber-700"
-                    }`}>
+                    <span className={`rounded px-2 py-0.5 text-[10px] font-medium ${String((verifyResult as any).companyStatus) === "approved" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                       {String((verifyResult as any).companyStatus ?? "")}
                     </span>
                     {(verifyResult as any).companyIdentityCode ? (
-                      <span className="rounded bg-slate-200 px-2 py-0.5 text-[10px] font-mono text-slate-600">
+                      <span className="rounded bg-[var(--c-bg-hover)] px-2 py-0.5 text-[10px] font-mono text-slate-600">
                         ID: {String((verifyResult as any).companyIdentityCode)}
                       </span>
                     ) : null}
@@ -712,7 +706,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
           {scanResult ? (
             <div>
               {scanResult.data ? (
-                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                <div className="rounded-xl neu-inset/50 p-4">
                   {scanResult.type === "employee" ? (
                     <div>
                       <div className="flex items-center gap-4">
@@ -723,14 +717,10 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                           <p className="font-semibold text-slate-900">{String(scanResult.data.name ?? "")}</p>
                           <p className="text-sm text-slate-500">{String(scanResult.data.email ?? "")}</p>
                           <div className="mt-1 flex flex-wrap gap-2">
-                            <span className="rounded bg-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                            <span className="rounded bg-[var(--c-bg-hover)] px-2 py-0.5 text-[10px] font-medium text-slate-600">
                               {String(scanResult.data.role ?? "")}
                             </span>
-                            <span className={`rounded px-2 py-0.5 text-[10px] font-medium ${
-                              String(scanResult.data.companyStatus) === "approved"
-                                ? "bg-emerald-100 text-emerald-700"
-                                : "bg-amber-100 text-amber-700"
-                            }`}>
+                            <span className={`rounded px-2 py-0.5 text-[10px] font-medium ${String(scanResult.data.companyStatus) === "approved" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                               {String(scanResult.data.companyStatus ?? "")}
                             </span>
                             {scanResult.data.bloodGroup ? (
@@ -739,7 +729,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                               </span>
                             ) : null}
                             {scanResult.data.regionLabel ? (
-                              <span className="rounded bg-slate-200 px-2 py-0.5 text-[10px] text-slate-600">
+                              <span className="rounded bg-[var(--c-bg-hover)] px-2 py-0.5 text-[10px] text-slate-600">
                                 {String(scanResult.data.regionLabel)}
                               </span>
                             ) : null}
@@ -761,22 +751,16 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                         <p className="font-semibold text-slate-900">{String(scanResult.data.visitorName ?? "")}</p>
                         <p className="text-sm text-slate-500">{String(scanResult.data.visitorEmail ?? "")}</p>
                         <div className="mt-1 flex flex-wrap gap-2">
-                          <span className={`rounded px-2 py-0.5 text-[10px] font-medium ${
-                            String(scanResult.data.status) === "approved"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : String(scanResult.data.status) === "pending"
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-slate-100 text-slate-500"
-                          }`}>
+                          <span className={`rounded px-2 py-0.5 text-[10px] font-medium ${String(scanResult.data.status) === "approved" ? "bg-emerald-100 text-emerald-700" : String(scanResult.data.status) === "pending" ? "bg-amber-100 text-amber-700" : "bg-[var(--c-bg-muted)] text-slate-500"}`}>
                             {String(scanResult.data.status ?? "")}
                           </span>
                           {scanResult.data.visitorCompany ? (
-                            <span className="rounded bg-slate-200 px-2 py-0.5 text-[10px] text-slate-600">
+                            <span className="rounded bg-[var(--c-bg-hover)] px-2 py-0.5 text-[10px] text-slate-600">
                               {String(scanResult.data.visitorCompany)}
                             </span>
                           ) : null}
                           {scanResult.data.purpose ? (
-                            <span className="rounded bg-slate-200 px-2 py-0.5 text-[10px] text-slate-600">
+                            <span className="rounded bg-[var(--c-bg-hover)] px-2 py-0.5 text-[10px] text-slate-600">
                               {String(scanResult.data.purpose)}
                             </span>
                           ) : null}
@@ -818,7 +802,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
             <div>
               <div className="mb-4 flex gap-2">
                 <input
-                  className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono uppercase outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  className="neu-inset flex-1 rounded-lg px-3 py-2 text-sm font-mono uppercase"
                   placeholder="Enter identity code manually..."
                   value={scanCode}
                   onChange={(e) => setScanCode(e.target.value.toUpperCase())}
@@ -845,11 +829,11 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
               <div className="relative mx-auto max-w-sm">
                 <div
                   id="qr-reader"
-                  className="min-h-[180px] rounded-xl border border-slate-200"
+                  className="min-h-[180px] rounded-xl border border-[var(--c-border-light)]"
                 />
                 {!cameraReady ? (
                   <div
-                    className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-xl bg-white"
+                    className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-xl bg-[var(--c-bg-card)]"
                     onClick={cameraStarting ? undefined : handleStartCamera}
                   >
                     <span className="text-sm font-medium text-slate-600">
@@ -864,7 +848,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
               <div className="mt-3 text-center">
                 <button
                   className="text-xs text-indigo-600 hover:underline"
-                  onClick={() => { try { scannerRef.current?.stop(); } catch {} setShowManualEntry(true); }}
+                  onClick={() => { try { scannerRef.current?.stop(); } catch { } setShowManualEntry(true); }}
                   type="button"
                 >
                   Enter code manually
@@ -881,18 +865,16 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
           <h3 className="mb-4 text-sm font-semibold text-slate-800">Today&apos;s Visitors</h3>
 
           <div className="mb-4 flex gap-2">
-              {["approved", "pending", "expired", "rejected", "all"].map((f) => (
-                <button
-                  key={f}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    passFilter === f ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-                  onClick={() => setPassFilter(f)}
-                  type="button"
-                >
-                  {f.charAt(0).toUpperCase() + f.slice(1)}{f !== "all" && passCounts[f] ? ` (${passCounts[f]})` : ""}
-                </button>
-              ))}
+            {["approved", "pending", "expired", "rejected", "all"].map((f) => (
+              <button
+                key={f}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${passFilter === f ? "neu-tab-pressed" : "neu-tab-raised"}`}
+                onClick={() => setPassFilter(f)}
+                type="button"
+              >
+                {f.charAt(0).toUpperCase() + f.slice(1)}{f !== "all" && passCounts[f] ? ` (${passCounts[f]})` : ""}
+              </button>
+            ))}
           </div>
 
           {filteredPasses.length === 0 ? (
@@ -900,19 +882,12 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
           ) : (
             <div className="space-y-3">
               {filteredPasses.map((pass) => (
-                <div key={pass.id || pass._id} className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                <div key={pass.id || pass._id} className="rounded-xl neu-inset/50 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-semibold text-slate-900">{pass.visitorName}</p>
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                          pass.status === "approved" ? "bg-emerald-100 text-emerald-700" :
-                          pass.status === "pending" ? "bg-amber-100 text-amber-700" :
-                          pass.status === "active" ? "bg-blue-100 text-blue-700" :
-                          pass.status === "completed" ? "bg-slate-100 text-slate-500" :
-                          pass.status === "expired" ? "bg-slate-100 text-slate-500" :
-                          "bg-rose-100 text-rose-700"
-                        }`}>
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${pass.status === "approved" ? "bg-emerald-100 text-emerald-700" : pass.status === "pending" ? "bg-amber-100 text-amber-700" : pass.status === "active" ? "bg-blue-100 text-blue-700" : pass.status === "completed" ? "bg-[var(--c-bg-muted)] text-slate-500" : pass.status === "expired" ? "bg-[var(--c-bg-muted)] text-slate-500" : "bg-rose-100 text-rose-700"}`}>
                           {pass.status}
                         </span>
                       </div>
@@ -943,9 +918,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
               {["", "entry", "exit"].map((t) => (
                 <button
                   key={t}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    logType === t ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${logType === t ? "neu-tab-pressed" : "neu-tab-raised"}`}
                   onClick={() => { setLogType(t); }}
                   type="button"
                 >
@@ -956,7 +929,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
             <div className="flex items-center gap-1">
               <button
                 type="button"
-                className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 transition-colors"
+                className="rounded-lg p-1.5 text-slate-600 hover:bg-[var(--c-bg-muted)] transition-colors"
                 onClick={() => {
                   const d = new Date(logDate + "T00:00:00");
                   d.setDate(d.getDate() - 1);
@@ -969,11 +942,11 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                 type="date"
                 value={logDate}
                 onChange={(e) => setLogDate(e.target.value)}
-                className="rounded-md border border-slate-200 px-2 py-1 text-[11px] outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                className="neu-inset rounded-md px-2 py-1 text-[11px]"
               />
               <button
                 type="button"
-                className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 transition-colors"
+                className="rounded-lg p-1.5 text-slate-600 hover:bg-[var(--c-bg-muted)] transition-colors"
                 onClick={() => {
                   const d = new Date(logDate + "T00:00:00");
                   d.setDate(d.getDate() + 1);
@@ -989,15 +962,15 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
           </div>
 
           {isSenior && (
-            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg neu-inset px-3 py-2.5">
               <span className="text-xs font-semibold text-slate-600">Export to Excel:</span>
               <input type="date" value={exportFromDate} onChange={(e) => setExportFromDate(e.target.value)}
-                className="rounded-md border border-slate-200 px-2 py-1 text-[11px] outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                className="neu-inset rounded-md px-2 py-1 text-[11px]"
                 title="From date"
               />
               <span className="text-xs text-slate-400">to</span>
               <input type="date" value={exportToDate} onChange={(e) => setExportToDate(e.target.value)}
-                className="rounded-md border border-slate-200 px-2 py-1 text-[11px] outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                className="neu-inset rounded-md px-2 py-1 text-[11px]"
                 title="To date"
               />
               <ActionButton variant="secondary" className="px-3 py-1.5 text-xs" disabled={exporting} onClick={handleExportLogs}>
@@ -1014,7 +987,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-xs font-semibold uppercase text-slate-500">
+                  <tr className="border-b border-[var(--c-border-light)] text-xs font-semibold uppercase text-slate-500">
                     <th className="px-3 py-2">Person</th>
                     <th className="px-3 py-2">Type</th>
                     <th className="px-3 py-2">Method</th>
@@ -1024,14 +997,12 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                 </thead>
                 <tbody>
                   {entryLogs.map((log) => (
-                    <tr key={log.id} className="border-b border-slate-100 text-slate-700">
+                    <tr key={log.id} className="border-b border-[var(--c-border-light)] text-slate-700">
                       <td className="px-3 py-2.5">
                         {(log.user as any)?.name ? String((log.user as any).name) : "Visitor"}
                       </td>
                       <td className="px-3 py-2.5">
-                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-                          log.type === "entry" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
-                        }`}>
+                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${log.type === "entry" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
                           {log.type}
                         </span>
                       </td>
@@ -1072,9 +1043,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
             ].map(({ key, label }) => (
               <button
                 key={key}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  lostCardFilter === key ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${lostCardFilter === key ? "neu-tab-pressed" : "neu-tab-raised"}`}
                 onClick={() => setLostCardFilter(key)}
                 type="button"
               >
@@ -1111,7 +1080,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                 };
 
                 return (
-                  <div key={card.id} className={`rounded-xl border p-4 transition-all duration-300 ${highlightedCard === card.id ? "ring-2 ring-emerald-400 bg-emerald-50/50" : card.isEmergency ? "border-red-300 bg-red-50/50" : "border-slate-200 bg-slate-50/50"}`}>
+                  <div key={card.id} className={`rounded-xl border p-4 transition-all duration-300 ${highlightedCard === card.id ? "ring-2 ring-emerald-400 bg-emerald-50/50" : card.isEmergency ? "border-red-300 bg-red-50/50" : "border-[var(--c-border-light)] bg-[var(--c-bg-muted)]/50"}`}>
                     {/* Emergency badge */}
                     {card.isEmergency ? (
                       <div className="mb-2 flex items-center gap-1.5">
@@ -1125,14 +1094,14 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                         {/* Employee info */}
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-semibold text-slate-900">{userName}</p>
-                          {userIdCode ? <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-mono text-slate-600">ID: {userIdCode}</span> : null}
+                          {userIdCode ? <span className="rounded bg-[var(--c-bg-hover)] px-1.5 py-0.5 text-[10px] font-mono text-slate-600">ID: {userIdCode}</span> : null}
                         </div>
                         <p className="text-xs text-slate-500">{userEmail}</p>
 
                         {/* Status + Reason + Priority */}
                         <div className="mt-1.5 flex flex-wrap items-center gap-2">
                           {statusBadge(card.status)}
-                          <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] text-slate-600 capitalize">{card.reason}</span>
+                          <span className="rounded bg-[var(--c-bg-hover)] px-1.5 py-0.5 text-[10px] text-slate-600 capitalize">{card.reason}</span>
                           {card.lastLocation ? <span className="text-[10px] text-slate-400">Location: {card.lastLocation}</span> : null}
                         </div>
 
@@ -1174,7 +1143,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                                 Ticket: {card.juniorCompletedAt ? "Completed" : card.assignedJuniorSecurity ? "In Progress" : "Awaiting Junior"}
                               </span>
                             ) : (
-                              <span className="inline-block rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-slate-500">Ticket: Pending</span>
+                              <span className="inline-block rounded-full bg-[var(--c-bg-muted)] px-1.5 py-0.5 text-[9px] font-semibold uppercase text-slate-500">Ticket: Pending</span>
                             )}
                           </div>
                         ) : null}
@@ -1202,7 +1171,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                               {expandedTimeline === card.id ? "Hide Timeline" : "Show Timeline"}
                             </button>
                             {expandedTimeline === card.id ? (
-                              <div className="mt-2 border-l-2 border-slate-200 pl-3">
+                              <div className="mt-2 border-l-2 border-[var(--c-border-light)] pl-3">
                                 {card.timeline.map((t, i) => (
                                   <div key={i} className="relative pb-2 last:pb-0">
                                     <div className="absolute -left-[17px] top-1 h-2 w-2 rounded-full bg-indigo-400" />
@@ -1229,11 +1198,11 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                               return (
                                 <div key={step.status} className="flex items-center">
                                   <div
-                                    className={`h-2 w-2 rounded-full ${isDone ? "bg-emerald-500" : isCurrent ? "bg-indigo-500 ring-2 ring-indigo-200" : "bg-slate-200"}`}
+                                    className={`h-2 w-2 rounded-full ${isDone ? "bg-emerald-500" : isCurrent ? "bg-indigo-500 ring-2 ring-indigo-200" : "bg-[var(--c-bg-hover)]"}`}
                                     title={step.label}
                                   />
                                   {i < REPLACEMENT_STEPS.length - 1 ? (
-                                    <div className={`h-0.5 w-3 ${isDone ? "bg-emerald-300" : "bg-slate-200"}`} />
+                                    <div className={`h-0.5 w-3 ${isDone ? "bg-emerald-300" : "bg-[var(--c-bg-hover)]"}`} />
                                   ) : null}
                                 </div>
                               );
@@ -1348,8 +1317,8 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
 
           {/* Disable Access Popup */}
           {disableAccessPopup.show ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-3">
-              <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
+            <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
+              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl">
                 <h3 className="mb-3 text-sm font-semibold text-slate-800">Disable Building Access</h3>
                 <p className="mb-3 text-xs text-slate-500">Select zones to disable for the lost card:</p>
                 {(["office-entry", "parking", "cafeteria", "printer", "server-room", "attendance-card"] as const).map((z) => (
@@ -1374,8 +1343,8 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
 
           {/* Found Card Popup */}
           {foundPopup.show ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-3">
-              <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
+            <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
+              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl">
                 <h3 className="mb-3 text-sm font-semibold text-slate-800">Card Found</h3>
                 <p className="mb-3 text-xs text-slate-500">Was a replacement already issued for this card?</p>
                 <div className="flex gap-2">
@@ -1395,11 +1364,11 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
 
           {/* Complete Ticket Popup */}
           {completeTicketPopup.show ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-3">
-              <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
+            <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
+              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl">
                 <h3 className="mb-3 text-sm font-semibold text-slate-800">Complete Ticket</h3>
                 <p className="mb-3 text-xs text-slate-500">Add a follow-up note before completing this ticket:</p>
-                <textarea className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                <textarea className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
                   rows={3} value={completeTicketNote} onChange={(e) => setCompleteTicketNote(e.target.value)} placeholder="Describe what was done..."
                 />
                 <div className="mt-4 flex justify-end gap-2">
@@ -1414,25 +1383,25 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
 
           {/* Print Card Popup */}
           {printCardPopup.show ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-3">
-              <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
+            <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
+              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl">
                 <h3 className="mb-4 text-sm font-semibold text-slate-800">Print New Card</h3>
                 <div className="space-y-3">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">Card Number *</label>
-                    <input className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                    <input className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
                       value={printCardNumber} onChange={(e) => setPrintCardNumber(e.target.value)} placeholder="e.g. CARD-2026-0042"
                     />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">RFID UID (optional)</label>
-                    <input className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                    <input className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
                       value={printRfidUid} onChange={(e) => setPrintRfidUid(e.target.value)} placeholder="e.g. 04A3B2C1"
                     />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">Expiry Date (optional)</label>
-                    <input type="date" className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                    <input type="date" className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
                       value={printExpiryDate} onChange={(e) => setPrintExpiryDate(e.target.value)}
                     />
                   </div>
@@ -1457,8 +1426,8 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
 
           {/* Verify Popup */}
           {verifyPopup.show ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-3">
-              <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
+            <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
+              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl">
                 <h3 className="mb-3 text-sm font-semibold text-slate-800">Verify Lost Card Report</h3>
                 <p className="text-xs text-slate-500">
                   This marks the report as <span className="font-medium text-slate-700">Under Verification</span> and notifies HR that the investigation is in progress.
@@ -1478,11 +1447,11 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
 
           {/* Reject Popup */}
           {rejectPopup.show ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-3">
-              <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
+            <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
+              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl">
                 <h3 className="mb-3 text-sm font-semibold text-slate-800">Reject Report</h3>
                 <p className="mb-3 text-xs text-slate-500">Provide a reason for rejection:</p>
-                <textarea className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                <textarea className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
                   rows={3} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Enter rejection reason..."
                 />
                 <div className="mt-4 flex justify-end gap-2">
@@ -1516,7 +1485,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-xs font-semibold uppercase text-slate-500">
+                  <tr className="border-b border-[var(--c-border-light)] text-xs font-semibold uppercase text-slate-500">
                     <th className="px-3 py-2">Name</th>
                     <th className="px-3 py-2">Role</th>
                     <th className="px-3 py-2">Emergency Contact</th>
@@ -1527,7 +1496,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                 </thead>
                 <tbody>
                   {emergencyContacts.map((c) => (
-                    <tr key={c.id} className="border-b border-slate-100 text-slate-700">
+                    <tr key={c.id} className="border-b border-[var(--c-border-light)] text-slate-700">
                       <td className="px-3 py-2.5 font-medium">{c.name}</td>
                       <td className="px-3 py-2.5 text-xs text-slate-500">{c.role}</td>
                       <td className="px-3 py-2.5 text-xs text-slate-500">{c.emergencyContact || "-"}</td>

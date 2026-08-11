@@ -47,7 +47,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#fafafa] dark:bg-[#1a1a1a] px-5 py-12">
+    <main className="flex min-h-screen items-center justify-center bg-[var(--c-bg)] dark:bg-[#1a1a1a] px-5 py-12">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white">
@@ -57,7 +57,7 @@ export default function LoginPage() {
           <p className="mt-1.5 text-sm text-slate-500 dark:text-zinc-400">Sign in to your FlowZen account</p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] p-8 shadow-sm">
+        <div className="neu-card rounded-3xl p-8">
           <form className="space-y-4" onSubmit={submit}>
             <Field label="Email" value={email} onChange={setEmail} type="email" placeholder="you@company.com" />
             <Field label="Password" value={password} onChange={setPassword} type="password" placeholder="Enter your password" />
@@ -74,7 +74,7 @@ export default function LoginPage() {
             ) : null}
             <button
               suppressHydrationWarning
-              className="flex w-full items-center justify-center gap-2.5 rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800 active:bg-slate-950 disabled:opacity-60"
+              className="neu-btn neu-btn-primary flex w-full items-center justify-center gap-2.5 rounded-full px-5 py-3 text-sm font-medium"
               disabled={loading}
             >
               {loading ? <Loader2 className="animate-spin" size={16} /> : <Mail size={16} />}
@@ -83,9 +83,9 @@ export default function LoginPage() {
           </form>
 
           <div className="my-6 flex items-center gap-4">
-            <span className="h-px flex-1 bg-slate-100 dark:bg-zinc-700" />
+            <span className="neu-divider flex-1" />
             <span className="text-xs text-slate-400 dark:text-zinc-500">or continue with</span>
-            <span className="h-px flex-1 bg-slate-100 dark:bg-zinc-700" />
+            <span className="neu-divider flex-1" />
           </div>
 
           <OAuthProviderIcons />
@@ -100,7 +100,7 @@ export default function LoginPage() {
           <Link className="text-sm text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300" href="/forgot-password">Forgot password?</Link>
         </div>
 
-        <div className="mt-8 rounded-2xl border border-slate-100 dark:border-zinc-800 bg-white dark:bg-[#000000] p-5">
+        <div className="mt-8 rounded-3xl neu-card p-5">
           <button
             suppressHydrationWarning
             type="button"
@@ -123,17 +123,17 @@ export default function LoginPage() {
                 ["Jr. Security", "j_security@flowzen.com", "j_security@flowzen"],
                 ["Others", "other@flowzen.com", "other@flowzen"],
               ].map(([role, mail, pass]) => (
-                <div key={mail} className="flex items-center justify-between rounded-xl bg-slate-50 dark:bg-zinc-700 px-4 py-2.5 transition-colors hover:bg-slate-100 dark:hover:bg-zinc-700">
+                <div key={mail} className="neu-inset flex items-center justify-between rounded-xl px-4 py-2.5 transition-colors">
                   <div className="min-w-0">
                     <span className="text-sm font-medium text-slate-700 dark:text-zinc-300">{role}</span>
                     <span className="ml-2 text-xs text-slate-400 dark:text-zinc-500">{mail}</span>
                   </div>
                   <div className="ml-3 flex shrink-0 items-center gap-2">
-                    <span className="rounded-md bg-white dark:bg-zinc-700 px-2 py-0.5 font-mono text-xs text-slate-500 dark:text-zinc-400 ring-1 ring-slate-200 dark:ring-zinc-700">{pass}</span>
+                    <span className="neu-chip rounded-md px-2 py-0.5 font-mono text-xs text-slate-500 dark:text-zinc-400">{pass}</span>
                     <button
                       type="button"
                       onClick={() => { setEmail(String(mail)); setPassword(String(pass)); }}
-                      className="rounded-md bg-emerald-600 px-2.5 py-0.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700"
+                      className="neu-btn neu-btn-success rounded-md px-2.5 py-0.5 text-xs font-medium"
                     >
                       Use
                     </button>
@@ -156,7 +156,7 @@ export default function LoginPage() {
                   }
                 }}
                 disabled={seeding}
-                className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] px-4 py-2.5 text-sm font-medium text-slate-600 dark:text-zinc-400 transition-colors hover:bg-slate-50 dark:hover:bg-zinc-700 disabled:opacity-50"
+                className="neu-btn mt-3 flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-slate-600 dark:text-zinc-400"
               >
                 {seeding ? <Loader2 className="animate-spin" size={15} /> : <Database size={15} />}
                 {seeding ? "Seeding..." : "Populate demo accounts"}
@@ -179,7 +179,7 @@ function Field({ label, value, onChange, type, placeholder }: { label: string; v
       <div className="relative">
         <input
           suppressHydrationWarning
-          className={`w-full rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] px-4 py-3 text-sm text-slate-900 dark:text-zinc-100 outline-none transition-colors placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 ${isPassword ? "pr-12" : ""}`}
+          className={`neu-inset w-full rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-zinc-100 transition-colors ${isPassword ? "pr-12" : ""}`}
           type={isPassword && showPassword ? "text" : type}
           value={value}
           placeholder={placeholder}

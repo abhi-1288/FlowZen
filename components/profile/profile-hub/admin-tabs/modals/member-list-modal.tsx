@@ -137,20 +137,20 @@ export function MemberListModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4"
       role="presentation"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="max-h-[min(90vh,720px)] w-full max-w-3xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
+        className="max-h-[min(90vh,720px)] w-full max-w-3xl overflow-hidden rounded-xl neu-card dark:border-zinc-800 dark:bg-[#000000]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="members-modal-title"
       >
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+        <div className="flex items-start justify-between gap-4 border-b border-[var(--c-border-light)] px-6 py-4 dark:border-zinc-800">
           <div>
-            <h4 className="text-sm font-semibold" id="members-modal-title">{modalRole === "senior-security" ? "Senior Security" : modalRole === "junior-security" ? "Junior Security" : formatRole(modalRole)}</h4>
-            <p className="text-sm text-slate-500">
+            <h4 className="text-sm font-semibold text-slate-900 dark:text-zinc-100" id="members-modal-title">{modalRole === "senior-security" ? "Senior Security" : modalRole === "junior-security" ? "Junior Security" : formatRole(modalRole)}</h4>
+            <p className="text-sm text-slate-500 dark:text-zinc-400">
               {modalMembers.length} member{modalMembers.length === 1 ? "" : "s"}
             </p>
           </div>
@@ -158,14 +158,14 @@ export function MemberListModal({
             <button
               type="button"
               onClick={exportToExcel}
-              className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-800"
+              className="inline-flex items-center gap-1.5 rounded-md neu-card px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] hover:text-slate-800 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
               <Download size={14} />
               Export Excel
             </button>
             <button
               aria-label="Close"
-              className="inline-flex items-center justify-center gap-2 rounded-md p-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+              className="inline-flex items-center justify-center gap-2 rounded-md p-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 text-slate-500 hover:text-slate-700 hover:bg-[var(--c-bg-muted)] dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-800"
               type="button"
               onClick={onClose}
             >
@@ -175,13 +175,13 @@ export function MemberListModal({
         </div>
 
         {modalRole === "others" ? (
-          <div className="border-b border-slate-100 px-6 py-4">
-            <label className="text-xs font-semibold uppercase text-slate-500" htmlFor="others-role-filter">
+          <div className="border-b border-[var(--c-border-light)] px-6 py-4 dark:border-zinc-800">
+            <label className="text-xs font-semibold uppercase text-slate-500 dark:text-zinc-500" htmlFor="others-role-filter">
               Filter others by label
             </label>
             <select
               id="others-role-filter"
-              className="mt-2 w-full max-w-xs rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs"
+              className="mt-2 w-full max-w-xs rounded-md neu-inset px-3 py-1.5 text-xs dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-100"
               value={selectedOtherRole}
               onChange={(e) => onSelectedOtherRoleChange(e.target.value)}
             >
@@ -200,7 +200,7 @@ export function MemberListModal({
               onChange={(e) => onSearchInputChange(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") onSearch(); }}
               placeholder="Search members..."
-              className="flex-1 rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-950 focus:ring-0"
+              className="neu-inset flex-1 rounded-md px-3 py-1.5 text-xs dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-100 dark:placeholder:text-zinc-500"
             />
             <ActionButton variant="primary" onClick={onSearch}>Search</ActionButton>
           </div>
@@ -219,7 +219,7 @@ export function MemberListModal({
                 })
               : modalMembers;
             if (filtered.length === 0) {
-              return <p className="py-8 text-center text-sm text-slate-500">No members match your search.</p>;
+              return <p className="py-8 text-center text-sm text-slate-500 dark:text-zinc-500">No members match your search.</p>;
             }
             return (
               <ul className="space-y-4">
@@ -229,29 +229,29 @@ export function MemberListModal({
                   const isSelf = selfId && memberId === selfId;
                   const joinedBy = member.joinedBy && typeof member.joinedBy === "object" ? (member.joinedBy as AnyRecord) : null;
                   return (
-                    <li className="rounded-xl border border-slate-200 bg-white p-4" key={memberId}>
+                    <li className="rounded-xl neu-card p-4 dark:border-zinc-800 dark:bg-[#000000]" key={memberId}>
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0">
-                          <p className="font-semibold">{String(member.name ?? "Member")}</p>
-                          <p className="truncate text-sm text-slate-500">{String(member.email ?? "")}</p>
+                          <p className="font-semibold text-slate-900 dark:text-zinc-100">{String(member.name ?? "Member")}</p>
+                          <p className="truncate text-sm text-slate-500 dark:text-zinc-400">{String(member.email ?? "")}</p>
                           {joinedBy?.name ? (
-                            <p className="mt-1 text-xs text-slate-500">
-                              Joined by <span className="font-medium text-slate-700">{String(joinedBy.name)}</span>
+                            <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
+                              Joined by <span className="font-medium text-slate-700 dark:text-zinc-200">{String(joinedBy.name)}</span>
                             </p>
                           ) : null}
                         </div>
 
                         <div className="grid items-center gap-2">
-                          <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
+                          <span className="rounded-lg neu-inset px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-200">
                             role: {formatRoleWithCustom(String(member.role ?? "employee"), member.customRole, Boolean((member as any).isSeniorSecurity))}
                           </span>
-                          <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
+                          <span className="rounded-lg neu-inset px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-200">
                             salary: {(() => {
                               const cur = String(member.salaryCurrency ?? "INR");
                               return Number(member.baseSalary ?? 0) > 0 ? `${currencySymbol(cur)} ${Number(member.baseSalary).toLocaleString("en-IN")}` : "not set";
                             })()}
                           </span>
-                          <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700" title={teams.length ? teams.join(", ") : "No team joined"}>
+                          <span className="rounded-lg neu-inset px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-200" title={teams.length ? teams.join(", ") : "No team joined"}>
                             team: {teams.length ? teams.join(", ") : "-"}
                           </span>
                         </div>

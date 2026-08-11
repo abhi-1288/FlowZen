@@ -38,7 +38,7 @@ export function InvoicesSection({
       <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
         {invoices.length === 0 ? <p className="py-2 text-sm text-slate-500">No invoices yet.</p> : null}
         {invoices.map((inv) => (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 px-3 py-2" key={String(inv.id)}>
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--c-border-light)] px-3 py-2" key={String(inv.id)}>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium truncate">{String(inv.clientName)} &mdash; &#x20B9;{Number(inv.amount ?? 0).toLocaleString("en-IN")}</p>
               <p className="text-xs text-slate-500 truncate">{String(inv.invoiceNumber)} &bull; {String(inv.status)}</p>

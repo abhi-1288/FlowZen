@@ -36,7 +36,7 @@ export function CompanyAddressSection({
   const approvedAddresses = multiOffice && Array.isArray(company?.addresses) ? (company.addresses as AnyRecord[]) : [];
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5">
+    <section className="rounded-xl neu-card p-5">
       <div className="mb-4 border-l-4 border-indigo-500 pl-4">
         <h3 className="text-base font-semibold text-slate-900">Office Address Management</h3>
         <p className="mt-0.5 text-sm text-slate-500">
@@ -45,14 +45,14 @@ export function CompanyAddressSection({
       </div>
 
       {/* Summary card */}
-      <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4">
+      <div className="flex items-center justify-between rounded-xl border border-[var(--c-border-light)] bg-gradient-to-br from-slate-50 to-white p-4 dark:border-zinc-800 dark:from-zinc-900 dark:to-[#000000]">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 dark:bg-indigo-950/70">
             <MapPin size={18} className="text-indigo-600" />
           </div>
           <div>
-            <p className="text-sm font-medium text-slate-700">Multi-Office Mode</p>
-            <p className="text-xs text-slate-500">
+            <p className="text-sm font-medium text-slate-700 dark:text-zinc-200">Multi-Office Mode</p>
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
               {multiOffice
                 ? `${approvedAddresses.length} approved office${approvedAddresses.length !== 1 ? "s" : ""}`
                 : "Single office"}
@@ -62,7 +62,7 @@ export function CompanyAddressSection({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-800"
+          className="rounded-lg neu-card px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] hover:text-slate-800 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-800"
         >
           Edit
         </button>
@@ -223,15 +223,15 @@ function AddressModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4">
+      <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl dark:border dark:border-zinc-800 dark:bg-[#000000]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="text-lg font-semibold text-slate-900">Office Address Management</h3>
-            <p className="mt-1 text-sm text-slate-500">Manage multi-office settings and submit new addresses.</p>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Office Address Management</h3>
+            <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">Manage multi-office settings and submit new addresses.</p>
           </div>
           <button
-            className="shrink-0 rounded-lg border border-slate-200 px-2 py-1 text-sm text-slate-500 hover:bg-slate-50"
+            className="shrink-0 rounded-lg border border-[var(--c-border-light)] px-2 py-1 text-sm text-slate-500 hover:bg-[var(--c-bg-muted)] dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800"
             onClick={onClose}
             type="button"
           >
@@ -242,16 +242,16 @@ function AddressModal({
         <div className="mt-5 space-y-5">
         {/* Multi-office toggle (admin only) */}
         {isAdmin && (
-          <div className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
+          <div className="flex items-center justify-between rounded-lg border border-[var(--c-border-light)] p-3 dark:border-zinc-800 dark:bg-[#0b0b0b]">
             <div className="flex items-center gap-2">
-              <MapPin size={16} className="text-slate-500" />
-              <span className="text-sm font-medium text-slate-700">Multiple offices in different regions</span>
+              <MapPin size={16} className="text-slate-500 dark:text-zinc-400" />
+              <span className="text-sm font-medium text-slate-700 dark:text-zinc-200">Multiple offices in different regions</span>
             </div>
             <button
               type="button"
               disabled={toggling}
               onClick={handleToggleMultiOffice}
-              className="text-slate-500 hover:text-slate-700 disabled:opacity-50"
+              className="text-slate-500 hover:text-slate-700 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-200"
             >
               {multiOffice ? <ToggleRight size={24} className="text-indigo-600" /> : <ToggleLeft size={24} />}
             </button>
@@ -268,27 +268,23 @@ function AddressModal({
             {/* Admin: manage authorized HRs */}
             {isAdmin && hrs.length > 0 && (
               <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Authorized HR Managers</span>
-                <p className="text-xs text-slate-400 mt-0.5 mb-2">Select which HR members can submit office addresses.</p>
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">Authorized HR Managers</span>
+                <p className="text-xs text-slate-400 mt-0.5 mb-2 dark:text-zinc-500">Select which HR members can submit office addresses.</p>
                 <div className="space-y-1.5">
                   {hrs.map((hr) => {
                     const isAuthorized = authorizedHrs.includes(hr.id);
                     return (
-                      <div key={hr.id} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
+                      <div key={hr.id} className="flex items-center justify-between rounded-lg border border-[var(--c-border-light)] px-3 py-2 dark:border-zinc-800 dark:bg-[#0b0b0b]">
                         <div className="flex items-center gap-2">
-                          {isAuthorized ? <UserCheck size={14} className="text-emerald-500" /> : <UserX size={14} className="text-slate-300" />}
-                          <span className="text-sm text-slate-700">{hr.name}</span>
-                          <span className="text-xs text-slate-400">({hr.email})</span>
+                          {isAuthorized ? <UserCheck size={14} className="text-emerald-500" /> : <UserX size={14} className="text-slate-300 dark:text-zinc-600" />}
+                          <span className="text-sm text-slate-700 dark:text-zinc-200">{hr.name}</span>
+                          <span className="text-xs text-slate-400 dark:text-zinc-500">({hr.email})</span>
                         </div>
                         <button
                           type="button"
                           disabled={managingHr}
                           onClick={() => handleToggleHr(hr.id)}
-                          className={`text-xs font-medium px-2.5 py-1 rounded-md border transition-colors ${
-                            isAuthorized
-                              ? "border-red-200 text-red-600 hover:bg-red-50"
-                              : "border-indigo-200 text-indigo-600 hover:bg-indigo-50"
-                          } disabled:opacity-50`}
+                          className={`text-xs font-medium px-2.5 py-1 rounded-md border transition-colors ${ isAuthorized ? "border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40" : "border-indigo-200 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-900 dark:text-indigo-300 dark:hover:bg-indigo-950/40" } disabled:opacity-50`}
                         >
                           {isAuthorized ? "Revoke" : "Authorize"}
                         </button>
@@ -301,19 +297,19 @@ function AddressModal({
 
             {/* Unauthorized HR message */}
             {!isAdmin && role === "human-resource" && !isAuthHr && (
-              <p className="text-sm text-slate-400 italic">You are not authorized to submit office addresses. Contact your admin for access.</p>
+              <p className="text-sm text-slate-400 italic dark:text-zinc-500">You are not authorized to submit office addresses. Contact your admin for access.</p>
             )}
 
             {/* Approved offices */}
             {approvedAddresses.length > 0 && (
               <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Approved Offices</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">Approved Offices</span>
                 <div className="mt-2 space-y-2">
                   {approvedAddresses.map((addr, i) => (
-                    <div key={i} className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
+                    <div key={i} className="flex items-center justify-between rounded-lg border border-[var(--c-border-light)] p-3 dark:border-zinc-800 dark:bg-[#0b0b0b]">
                       <div>
-                        <p className="text-sm font-medium text-slate-800">{String(addr.label ?? "")}</p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-sm font-medium text-slate-800 dark:text-zinc-200">{String(addr.label ?? "")}</p>
+                        <p className="text-xs text-slate-500 dark:text-zinc-400">
                           {[String(addr.line1 ?? ""), String(addr.city ?? ""), String(addr.state ?? "")].filter(Boolean).join(", ")}
                         </p>
                       </div>
@@ -321,7 +317,7 @@ function AddressModal({
                         {approvedAddresses.length >= 2 && isAdmin ? (
                           <button
                             type="button"
-                            className="text-xs font-medium text-red-500 hover:text-red-700"
+                            className="text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                             onClick={async () => {
                               const next = approvedAddresses.filter((_, idx) => idx !== i);
                               try {
@@ -350,10 +346,10 @@ function AddressModal({
             {/* Show legacy single address when multi-office is off */}
             {!multiOffice && legacyAddress && (
               <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Office Address</span>
-                <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/50 p-3">
-                  <p className="text-sm font-medium text-slate-800">Main Office</p>
-                  <p className="text-xs text-slate-500">{legacyAddress}</p>
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">Office Address</span>
+                <div className="mt-2 rounded-lg neu-inset/50 p-3">
+                  <p className="text-sm font-medium text-slate-800 dark:text-zinc-200">Main Office</p>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400">{legacyAddress}</p>
                 </div>
               </div>
             )}
@@ -361,20 +357,20 @@ function AddressModal({
             {/* Pending submissions */}
             {pendingAddresses.length > 0 && (
               <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Pending Approval</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">Pending Approval</span>
                 <div className="mt-2 space-y-2">
                   {pendingAddresses.map((req) => {
                     const meta = (req.metadata ?? {}) as AnyRecord;
                     return (
-                      <div key={String(req._id ?? req.id)} className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 p-3">
+                      <div key={String(req._id ?? req.id)} className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/30">
                         <div>
-                          <p className="text-sm font-medium text-slate-800">{String(meta.label ?? "")}</p>
-                          <p className="text-xs text-slate-500">
+                          <p className="text-sm font-medium text-slate-800 dark:text-zinc-100">{String(meta.label ?? "")}</p>
+                          <p className="text-xs text-slate-500 dark:text-zinc-400">
                             {String(meta.line1 ?? "")}, {String(meta.city ?? "")}
                           </p>
-                          {meta.adminName ? <p className="text-xs text-slate-400 mt-0.5">Assigned to: {String(meta.adminName)}</p> : null}
+                          {meta.adminName ? <p className="text-xs text-slate-400 mt-0.5 dark:text-zinc-500">Assigned to: {String(meta.adminName)}</p> : null}
                         </div>
-                        <Clock size={16} className="shrink-0 text-amber-500" />
+                        <Clock size={16} className="shrink-0 text-amber-500 dark:text-amber-400" />
                       </div>
                     );
                   })}
@@ -384,17 +380,17 @@ function AddressModal({
 
             {/* Submit form (only for authorized HR) */}
             {isAuthHr && (
-              <div className="rounded-lg border border-dashed border-slate-300 p-4 space-y-3">
+              <div className="rounded-lg border border-dashed border-slate-300 p-4 space-y-3 dark:border-zinc-800 dark:bg-[#0b0b0b]">
                 <div className="flex items-center gap-2">
-                  <MapPin size={16} className="text-slate-500" />
-                  <span className="text-sm font-semibold text-slate-700">Submit New Office Address</span>
+                  <MapPin size={16} className="text-slate-500 dark:text-zinc-400" />
+                  <span className="text-sm font-semibold text-slate-700 dark:text-zinc-200">Submit New Office Address</span>
                 </div>
 
                 {admins.length > 0 && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500">Assign to Admin *</label>
+                    <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-zinc-400">Assign to Admin *</label>
                     <select
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                      className="neu-inset w-full rounded-lg px-3 py-2 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
                       value={selectedAdminId}
                       onChange={(e) => setSelectedAdminId(e.target.value)}
                     >
@@ -408,60 +404,60 @@ function AddressModal({
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
-                    <label className="mb-1 block text-xs font-medium text-slate-500">Region / Office Name *</label>
+                    <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-zinc-400">Region / Office Name *</label>
                     <input
                       type="text"
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                      className="neu-inset w-full rounded-lg px-3 py-2 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
                       placeholder="e.g. Haldwani Office, North India Branch"
                       value={newAddrLabel}
                       onChange={(e) => setNewAddrLabel(e.target.value)}
                     />
                   </div>
                   <div className="col-span-2">
-                    <label className="mb-1 block text-xs font-medium text-slate-500">Address Line 1 *</label>
+                    <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-zinc-400">Address Line 1 *</label>
                     <input
                       type="text"
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                      className="neu-inset w-full rounded-lg px-3 py-2 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
                       placeholder="Street, building"
                       value={newAddrLine1}
                       onChange={(e) => setNewAddrLine1(e.target.value)}
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500">City</label>
+                    <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-zinc-400">City</label>
                     <input
                       type="text"
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                      className="neu-inset w-full rounded-lg px-3 py-2 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
                       placeholder="City"
                       value={newAddrCity}
                       onChange={(e) => setNewAddrCity(e.target.value)}
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500">State</label>
+                    <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-zinc-400">State</label>
                     <input
                       type="text"
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                      className="neu-inset w-full rounded-lg px-3 py-2 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
                       placeholder="State"
                       value={newAddrState}
                       onChange={(e) => setNewAddrState(e.target.value)}
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500">ZIP / Postal Code</label>
+                    <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-zinc-400">ZIP / Postal Code</label>
                     <input
                       type="text"
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                      className="neu-inset w-full rounded-lg px-3 py-2 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
                       placeholder="ZIP"
                       value={newAddrZip}
                       onChange={(e) => setNewAddrZip(e.target.value)}
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500">Country</label>
+                    <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-zinc-400">Country</label>
                     <input
                       type="text"
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                      className="neu-inset w-full rounded-lg px-3 py-2 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
                       placeholder="Country"
                       value={newAddrCountry}
                       onChange={(e) => setNewAddrCountry(e.target.value)}
@@ -473,7 +469,7 @@ function AddressModal({
                   type="button"
                   disabled={submittingAddr}
                   onClick={handleSubmitAddress}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                  className="neu-btn neu-btn-primary inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-medium"
                 >
                   <Send size={14} /> {submittingAddr ? "Submitting..." : "Submit for Approval"}
                 </button>

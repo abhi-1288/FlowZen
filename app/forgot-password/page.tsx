@@ -29,7 +29,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#fafafa] dark:bg-[#1a1a1a] px-5 py-12">
+    <main className="flex min-h-screen items-center justify-center bg-[var(--c-bg)] dark:bg-[#1a1a1a] px-5 py-12">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white">
@@ -41,12 +41,12 @@ export default function ForgotPasswordPage() {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] p-8 shadow-sm">
+        <div className="neu-card rounded-3xl p-8">
           <form className="space-y-4" onSubmit={submit}>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-zinc-300">Email address</label>
               <input
-                className="w-full rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] px-4 py-3 text-sm text-slate-900 dark:text-zinc-100 outline-none transition-colors placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
+                className="neu-inset w-full rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-zinc-100 transition-colors"
                 type="email"
                 placeholder="you@company.com"
                 value={email}
@@ -57,7 +57,7 @@ export default function ForgotPasswordPage() {
             {error ? <div className="rounded-xl bg-rose-50 dark:bg-rose-950 px-4 py-3 text-sm text-rose-600">{error}</div> : null}
             {message ? <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950 px-4 py-3 text-sm text-emerald-600">{message}</div> : null}
             <button
-              className="flex w-full items-center justify-center gap-2.5 rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800 active:bg-slate-950 disabled:opacity-60"
+              className="neu-btn neu-btn-primary flex w-full items-center justify-center gap-2.5 rounded-full px-5 py-3 text-sm font-medium"
               disabled={loading}
             >
               {loading ? <Loader2 className="animate-spin" size={16} /> : <KeyRound size={16} />}

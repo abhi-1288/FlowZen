@@ -41,39 +41,34 @@ export default function OfferDetailPage() {
         <ArrowLeft size={16} /> Back
       </button>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="rounded-xl neu-card p-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold text-slate-900">Offer: {candidateName}</h1>
             <p className="text-sm text-slate-500">{offer.designation} {jobTitle ? `· ${jobTitle}` : ""}</p>
           </div>
-          <span className={`rounded-full px-3 py-1 text-sm font-medium ${
-            offer.status === "draft" ? "bg-amber-50 text-amber-700" :
-            offer.status === "sent" ? "bg-sky-50 text-sky-700" :
-            offer.status === "accepted" ? "bg-emerald-50 text-emerald-700" :
-            "bg-rose-50 text-rose-700"
-          }`}>{offer.status}</span>
+          <span className={`rounded-full px-3 py-1 text-sm font-medium ${ offer.status === "draft" ? "bg-amber-50 text-amber-700" : offer.status === "sent" ? "bg-sky-50 text-sky-700" : offer.status === "accepted" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700" }`}>{offer.status}</span>
         </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+          <div className="rounded-lg neu-inset p-3">
             <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Designation</p>
             <p className="mt-1 text-sm font-medium text-slate-900">{offer.designation}</p>
           </div>
-          <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+          <div className="rounded-lg neu-inset p-3">
             <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Department</p>
             <p className="mt-1 text-sm font-medium text-slate-900">{offer.department || "N/A"}</p>
           </div>
           {offer.joiningDate && (
-            <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+            <div className="rounded-lg neu-inset p-3">
               <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Joining Date</p>
               <p className="mt-1 text-sm font-medium text-slate-900">{new Date(offer.joiningDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</p>
             </div>
           )}
         </div>
 
-        <div className="mt-6 rounded-xl border border-slate-200 bg-white">
-          <div className="border-b border-slate-100 px-5 py-3">
+        <div className="mt-6 rounded-xl neu-card">
+          <div className="border-b border-[var(--c-border-light)] px-5 py-3">
             <p className="text-sm font-semibold text-slate-900">Salary Breakdown (per {salaryPeriodLabel})</p>
           </div>
           <div className="space-y-0 divide-y divide-slate-100 px-5 py-3">
@@ -95,11 +90,11 @@ export default function OfferDetailPage() {
             </div>
           </div>
           {offer.pfAmount || offer.esicAmount ? (
-            <div className="border-t border-slate-200 bg-slate-50 px-5 py-3">
+            <div className="border-t border-[var(--c-border-light)] bg-[var(--c-bg-muted)] px-5 py-3">
               <p className="text-xs text-slate-500">Food &amp; travel accommodation deductions are applied as per company policy. See the full offer letter for the complete breakdown.</p>
             </div>
           ) : null}
-          <div className="border-t border-slate-200 px-5 py-3">
+          <div className="border-t border-[var(--c-border-light)] px-5 py-3">
             <p className="text-xs text-slate-400 italic">Note: A detailed offer letter will be provided after joining the company.</p>
           </div>
         </div>
@@ -107,18 +102,16 @@ export default function OfferDetailPage() {
         <div className="mt-6 flex gap-3">
           <a
             href={`/recruitment/offers/${offer.id}/letter`}
-            className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+            className="neu-btn neu-btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium"
           >
             <FileText size={16} /> View Offer Letter
           </a>
         </div>
 
-        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mt-6 rounded-xl neu-card p-6">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-900">Digital Signature</h3>
-            <span className={`rounded-full px-3 py-1 text-xs font-medium ${
-              offer.isSigned ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-            }`}>
+            <span className={`rounded-full px-3 py-1 text-xs font-medium ${ offer.isSigned ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700" }`}>
               {offer.isSigned ? "Signed" : "Not Signed"}
             </span>
           </div>
@@ -139,7 +132,7 @@ export default function OfferDetailPage() {
             <div className="mt-3">
               <button
                 onClick={async () => { await signOffer(offer.id); }}
-                className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"
+                className="neu-btn neu-btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium"
               >
                 <PenSquare size={16} /> Sign Offer
               </button>

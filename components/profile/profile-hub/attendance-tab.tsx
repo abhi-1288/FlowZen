@@ -416,7 +416,7 @@ export function AttendanceTab({
   const weekDays = ["SUN.", "Mon.", "Tue.", "Wed.", "Thr.", "Fri.", "Sat."];
   if (!isAttendanceEnabled) {
     return (
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
+      <section className="rounded-xl neu-card p-5">
         <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
           <p className="text-4xl font-extrabold tracking-tight text-slate-900">
             {todayDate.toLocaleDateString()}
@@ -431,7 +431,7 @@ export function AttendanceTab({
 }
   return (
     <>
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
+      <section className="rounded-xl neu-card p-5">
         <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
           <div>
             <h3 className="text-xl font-semibold">Attendance Tracker</h3>
@@ -440,11 +440,11 @@ export function AttendanceTab({
             </p>
           </div>
           {canExportAttendance ? (
-            <div className="flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            <div className="flex flex-wrap items-end gap-2 rounded-lg neu-inset px-3 py-2">
               <label className="text-xs font-medium text-slate-600">
                 From
                 <input
-                  className="mt-1 block rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900"
+                  className="mt-1 block rounded-md neu-inset px-2 py-1.5 text-sm text-slate-900"
                   type="date"
                   value={exportFrom}
                   onChange={(event) => setExportFrom(event.target.value)}
@@ -453,7 +453,7 @@ export function AttendanceTab({
               <label className="text-xs font-medium text-slate-600">
                 To
                 <input
-                  className="mt-1 block rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900"
+                  className="mt-1 block rounded-md neu-inset px-2 py-1.5 text-sm text-slate-900"
                   type="date"
                   value={exportTo}
                   onChange={(event) => setExportTo(event.target.value)}
@@ -491,7 +491,7 @@ export function AttendanceTab({
                     ["pending", "manager-approved", "hr-approved"].includes(String(r.status))
                   ).length;
                 return totalPending > 0 ? (
-                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] text-white">
+                  <span className="neu-btn neu-btn-danger absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[10px]">
                     {totalPending}
                   </span>
                 ) : null;
@@ -538,7 +538,7 @@ export function AttendanceTab({
             )}
           </div>
         </div>
-        <div className="mb-6 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+        <div className="mb-6 rounded-lg neu-inset px-4 py-3 text-sm text-slate-700">
           Paid leave policy:{" "}
           <span className="font-semibold text-slate-950">
             {paidLeaveDays} day{paidLeaveDays === 1 ? "" : "s"} {paidLeavePeriod}
@@ -549,7 +549,7 @@ export function AttendanceTab({
           </span>
           .
         </div>
-        <div className="mb-6 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+        <div className="mb-6 rounded-lg neu-inset px-4 py-3 text-sm text-slate-700">
           WFH policy:{" "}
           <span className="font-semibold text-slate-950">
             {wfhDays} day{wfhDays === 1 ? "" : "s"} {wfhPeriod}
@@ -640,8 +640,8 @@ export function AttendanceTab({
           />
         )}
         {showDeleteHolidayConfirm && holidayToDelete && (
-          <div className="fixed inset-0 z-[90] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
+          <div className="fixed inset-0 z-[90] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl ring-1 ring-slate-200">
               <h3 className="text-xl font-bold text-slate-900">
                 Confirm Delete
               </h3>
@@ -665,7 +665,7 @@ export function AttendanceTab({
                     setShowDeleteHolidayConfirm(false);
                     setHolidayToDelete(null);
                   }}
-                  className="flex-1 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700"
+                  className="neu-btn neu-btn-danger flex-1 rounded-lg px-4 py-2 text-sm font-medium"
                 >
                   Delete
                 </button>
@@ -690,8 +690,8 @@ export function AttendanceTab({
           />
         )}
         {rejectingId && (
-          <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/40 p-4 backdrop-blur-md">
-            <div className="w-full max-w-md animate-in zoom-in-95 fade-in duration-200 rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
+          <div className="fixed inset-0 z-[70] grid place-items-center neu-overlay p-4 backdrop-blur-md">
+            <div className="w-full max-w-md animate-in zoom-in-95 fade-in duration-200 rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl ring-1 ring-slate-200">
               <h3 className="text-xl font-bold text-slate-900">
                 Reject Request
               </h3>
@@ -705,7 +705,7 @@ export function AttendanceTab({
                   placeholder="Reason for rejection (required)..."
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 p-4 text-sm focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all resize-none"
+                  className="neu-inset w-full rounded-xl p-4 text-sm transition-all resize-none"
                 />
                 <div className="flex gap-3 pt-2">
                   <ActionButton
@@ -721,7 +721,7 @@ export function AttendanceTab({
                   <button
                     disabled={!rejectionReason.trim()}
                     onClick={handleReject}
-                    className="flex-1 rounded-xl bg-rose-600 py-3 text-sm font-semibold text-white hover:bg-rose-700 transition shadow-lg shadow-rose-500/20 disabled:opacity-50"
+                    className="neu-btn neu-btn-danger flex-1 rounded-xl py-3 text-sm font-semibold transition shadow-lg shadow-rose-500/20"
                   >
                     Reject Request
                   </button>
@@ -765,8 +765,8 @@ export function AttendanceTab({
           />
         )}
         {wfhRejectingId && (
-          <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/40 p-4 backdrop-blur-md">
-            <div className="w-full max-w-md animate-in zoom-in-95 fade-in duration-200 rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
+          <div className="fixed inset-0 z-[70] grid place-items-center neu-overlay p-4 backdrop-blur-md">
+            <div className="w-full max-w-md animate-in zoom-in-95 fade-in duration-200 rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl ring-1 ring-slate-200">
               <h3 className="text-xl font-bold text-slate-900">
                 Reject WFH Request
               </h3>
@@ -780,7 +780,7 @@ export function AttendanceTab({
                   placeholder="Reason for rejection (required)..."
                   value={wfhRejectionReason}
                   onChange={(e) => setWfhRejectionReason(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 p-4 text-sm focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all resize-none"
+                  className="neu-inset w-full rounded-xl p-4 text-sm transition-all resize-none"
                 />
                 <div className="flex gap-3 pt-2">
                   <ActionButton
@@ -796,7 +796,7 @@ export function AttendanceTab({
                   <button
                     disabled={!wfhRejectionReason.trim()}
                     onClick={handleWfhReject}
-                    className="flex-1 rounded-xl bg-rose-600 py-3 text-sm font-semibold text-white hover:bg-rose-700 transition shadow-lg shadow-rose-500/20 disabled:opacity-50"
+                    className="neu-btn neu-btn-danger flex-1 rounded-xl py-3 text-sm font-semibold transition shadow-lg shadow-rose-500/20"
                   >
                     Reject Request
                   </button>
@@ -810,11 +810,11 @@ export function AttendanceTab({
             <ActionButton onClick={prevMonth} variant="secondary" className="h-10 w-12" aria-label="Previous month">
               <ChevronLeft size={20} />
             </ActionButton>
-            <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 shadow-sm dark:border-zinc-800">
-              <div className="border-r border-slate-200 bg-slate-50 px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+            <div className="flex items-center overflow-hidden rounded-xl border border-[var(--c-border-light)] shadow-sm dark:border-zinc-800">
+              <div className="border-r border-[var(--c-border-light)] bg-[var(--c-bg-muted)] px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
                 {monthNames[month]}
               </div>
-              <div className="bg-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-900 dark:bg-black dark:text-zinc-100">
+              <div className="bg-[var(--c-bg-card)] px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-900 dark:bg-black dark:text-zinc-100">
                 {year}
               </div>
             </div>
@@ -823,15 +823,12 @@ export function AttendanceTab({
             </ActionButton>
           </div>
         </div>
-        <div className="rounded-2xl border border-slate-100 bg-gradient-to-br from-rose-50 via-white to-emerald-50 p-4 dark:border-zinc-800 dark:from-[#180007] dark:via-black dark:to-[#00130e]">
+        <div className="rounded-2xl border border-[var(--c-border-light)] bg-gradient-to-br from-rose-50 via-white to-emerald-50 p-4 dark:border-zinc-800 dark:from-[#180007] dark:via-black dark:to-[#00130e]">
           <div className="grid grid-cols-7 gap-3">
             {weekDays.map((wd, i) => (
               <div
                 key={wd}
-                className={`flex flex-col gap-3 rounded-2xl p-2 pb-6 transition-all ${i === 0
-                  ? "bg-rose-50/50 text-rose-600 border border-rose-100/50 dark:bg-[#180007] dark:text-pink-500 dark:border-pink-950"
-                  : "bg-emerald-50/50 text-emerald-600 border border-emerald-100/50 dark:bg-[#00130e] dark:text-emerald-500 dark:border-emerald-950"
-                  }`}
+                className={`flex flex-col gap-3 rounded-2xl p-2 pb-6 transition-all ${i === 0 ? "bg-rose-50/50 text-rose-600 border border-rose-100/50 dark:bg-[#180007] dark:text-pink-500 dark:border-pink-950" : "bg-emerald-50/50 text-emerald-600 border border-emerald-100/50 dark:bg-[#00130e] dark:text-emerald-500 dark:border-emerald-950" }`}
               >
                 <span className="text-center text-[10px] font-black uppercase tracking-tighter sm:text-xs">
                   {wd}
@@ -879,36 +876,7 @@ export function AttendanceTab({
                         }}
                         role={day ? "button" : undefined}
                         tabIndex={day ? 0 : undefined}
-                        className={`relative cursor-pointer grid h-10 w-full place-items-center rounded-xl text-xs font-bold sm:h-14 sm:text-sm transition-all ${day
-                          ? beforeStart
-                            ? "bg-slate-100 text-slate-400 border border-slate-200 shadow-sm dark:bg-zinc-900 dark:text-zinc-600 dark:border-zinc-800"
-                            : pendingLeave
-                              ? "bg-amber-50 text-amber-900 border border-amber-200 shadow-sm dark:bg-[#2a2300] dark:text-amber-500 dark:border-amber-700"
-                              : holiday
-                                ? "bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 shadow-sm dark:bg-[#25000d] dark:text-pink-500 dark:border-pink-900"
-                                : halfDayStatus
-                                  ? "bg-amber-100 text-amber-700 border border-amber-200 shadow-sm dark:bg-[#2a2300] dark:text-amber-500 dark:border-amber-700"
-                                  : attAbsentStatus
-                                    ? "bg-rose-50 text-rose-600 border border-rose-200 shadow-sm dark:bg-[#25000d] dark:text-pink-500 dark:border-pink-900"
-                                    : today
-                                      ? checkedIn
-                                        ? "bg-sky-100 text-sky-700 border border-sky-200 shadow-inner dark:bg-[#001b2a] dark:text-sky-400 dark:border-sky-800"
-                                        : "bg-white text-rose-600 border border-rose-200 shadow-sm dark:bg-black dark:text-pink-500 dark:border-pink-900"
-                                      : checkedIn
-                                        ? "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm dark:bg-[#00251b] dark:text-emerald-500 dark:border-emerald-800"
-                                        : companyWfh
-                                          ? "bg-teal-100 text-teal-700 border border-teal-200 shadow-sm dark:bg-[#00251f] dark:text-teal-400 dark:border-teal-800"
-                                          : wfh
-                                            ? "bg-[var(--color-primary-bg)] text-[var(--color-primary-dark)] border border-[var(--color-primary-bg)] shadow-sm"
-                                            : leave
-                                          ? "bg-pink-100 text-pink-700 border border-emerald-200 shadow-sm dark:bg-[#00251b] dark:text-emerald-400 dark:border-emerald-800"
-                                          : weekend
-                                          ? "bg-slate-100 text-slate-500 border border-slate-200 shadow-sm dark:bg-zinc-900 dark:text-zinc-500 dark:border-zinc-800"
-                                          : missed
-                                            ? "bg-white text-rose-600 border border-rose-200 shadow-sm dark:bg-black dark:text-pink-500 dark:border-pink-900"
-                                            : "bg-white shadow-sm border border-slate-100 text-slate-700 dark:bg-black dark:border-zinc-800 dark:text-zinc-300"
-                          : "opacity-0"
-                          }`}
+                        className={`relative cursor-pointer grid h-10 w-full place-items-center rounded-xl text-xs font-bold sm:h-14 sm:text-sm transition-all ${day ? beforeStart ? "bg-[var(--c-bg-muted)] text-slate-400 border-[var(--c-border-light)] dark:bg-zinc-900 dark:text-zinc-600 dark:border-zinc-800" : pendingLeave ? "bg-amber-50 text-amber-900 border-amber-200 dark:bg-[#2a2300] dark:text-amber-500 dark:border-amber-700" : holiday ? "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200 dark:bg-[#25000d] dark:text-pink-500 dark:border-pink-900" : halfDayStatus ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-[#2a2300] dark:text-amber-500 dark:border-amber-700" : attAbsentStatus ? "bg-rose-50 text-rose-600 border-rose-200 dark:bg-[#25000d] dark:text-pink-500 dark:border-pink-900" : today ? checkedIn ? "bg-sky-100 text-sky-700 border-sky-200 inner dark:bg-[#001b2a] dark:text-sky-400 dark:border-sky-800" : "bg-[var(--c-bg-elevated)] text-rose-600 border-rose-200 dark:bg-black dark:text-pink-500 dark:border-pink-900" : checkedIn ? "bg-emerald-100 text-emerald-900 border-emerald-200 dark:bg-[#00251b] dark:text-emerald-500 dark:border-emerald-800" : companyWfh ? "bg-teal-100 text-teal-700 border-teal-200 dark:bg-[#00251f] dark:text-teal-400 dark:border-teal-800" : wfh ? "bg-[var(--color-primary-bg)] text-[var(--color-primary-dark)] border-[var(--color-primary-bg)] " : leave ? "bg-pink-100 text-pink-700 border-emerald-200 dark:bg-[#00251b] dark:text-emerald-400 dark:border-emerald-800" : weekend ? "bg-[var(--c-bg-muted)] text-slate-500 border-[var(--c-border-light)] dark:bg-zinc-900 dark:text-zinc-500 dark:border-zinc-800" : missed ? "bg-[var(--c-bg-elevated)] text-rose-600 border-rose-200 dark:bg-black dark:text-pink-500 dark:border-pink-900" : "neu-card border-[var(--c-border-light)] text-slate-700 dark:bg-black dark:border-zinc-800 dark:text-zinc-300" : "opacity-0" }`}
                       >
                         {day}
                         {(day && (getWfhDetail(day) || isOnWfh(day) || companyWfh)) && (
@@ -953,7 +921,7 @@ export function AttendanceTab({
             ))}
           </div>
         </div>
-        <div className="mt-6 flex flex-wrap justify-center gap-6 text-xs font-semibold text-slate-600 bg-slate-50 py-3 px-6 rounded-full w-fit mx-auto border border-slate-200 dark:text-zinc-400 dark:bg-zinc-900 dark:border-zinc-800">
+        <div className="mt-6 flex flex-wrap justify-center gap-6 text-xs font-semibold text-slate-600 bg-[var(--c-bg-muted)] py-3 px-6 rounded-full w-fit mx-auto border border-[var(--c-border-light)] dark:text-zinc-400 dark:bg-zinc-900 dark:border-zinc-800">
           <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-emerald-100 border border-emerald-300 dark:bg-emerald-950/50 dark:border-emerald-700"></span> Present</div>
           <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-amber-100 border border-amber-300 dark:bg-amber-950/50 dark:border-amber-700"></span> Half-Day</div>
           <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-[var(--color-primary-bg)] border border-[var(--color-primary-light)]"></span> WFH</div>

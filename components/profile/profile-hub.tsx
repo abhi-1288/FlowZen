@@ -111,9 +111,9 @@ export function ProfileHub() {
 
   const initialRoute = typeof window !== "undefined" ? getTabFromPath() : { tab: undefined as Tab | undefined, showInvalid: false };
   const [showInvalidRoute, setShowInvalidRoute] = useState(initialRoute.showInvalid);
-  
+
   const [tab, setTabState] = useState<Tab>(initialRoute.tab || "dashboard");
-  
+
   // Sync tab from URL on popstate (browser back/forward)
   useEffect(() => {
     const onPop = () => {
@@ -439,7 +439,7 @@ export function ProfileHub() {
         audio.volume = 1;
         notificationSndRef.current = audio;
       }).catch(() => {
-        try { new AudioContext().resume(); } catch {}
+        try { new AudioContext().resume(); } catch { }
       });
       document.removeEventListener("click", unlock);
     };
@@ -465,7 +465,7 @@ export function ProfileHub() {
           console.log("SSE: ProfileHub notification:new received");
           if (notificationSndRef.current) {
             notificationSndRef.current.currentTime = 0;
-            notificationSndRef.current.play().catch(() => {});
+            notificationSndRef.current.play().catch(() => { });
           } else {
             new Audio("/sound/notification_sound.mp3").play().catch((err) => console.warn("Notification sound unavailable:", err));
           }
@@ -475,7 +475,7 @@ export function ProfileHub() {
               if (latest) showNotificationToast(String(latest.title ?? "Notification"), String(latest.body ?? ""));
               setUnreadCount(res.unreadCount);
             })
-            .catch(() => {});
+            .catch(() => { });
           void reloadNotifications();
           const now = Date.now();
           if (now - silentLoadThrottleRef.current > 3000) {
@@ -489,7 +489,7 @@ export function ProfileHub() {
           console.log("SSE: ProfileHub message:new received");
           if (notificationSndRef.current) {
             notificationSndRef.current.currentTime = 0;
-            notificationSndRef.current.play().catch(() => {});
+            notificationSndRef.current.play().catch(() => { });
           } else {
             new Audio("/sound/notification_sound.mp3").play().catch((err) => console.warn("Notification sound unavailable:", err));
           }
@@ -503,7 +503,7 @@ export function ProfileHub() {
             .then((res) => {
               if (mounted) setMessagesCount(res.unreadCount);
             })
-            .catch(() => {});
+            .catch(() => { });
           window.dispatchEvent(new CustomEvent("messages:refresh"));
         });
 
@@ -524,7 +524,7 @@ export function ProfileHub() {
           console.log("SSE: ProfileHub message:reaction received");
           if (notificationSndRef.current) {
             notificationSndRef.current.currentTime = 0;
-            notificationSndRef.current.play().catch(() => {});
+            notificationSndRef.current.play().catch(() => { });
           } else {
             new Audio("/sound/notification_sound.mp3").play().catch((err) => console.warn("Notification sound unavailable:", err));
           }
@@ -672,11 +672,11 @@ export function ProfileHub() {
   }, [profile]);
 
   return (
-    <main className="min-h-screen bg-[#f7f8fb] text-slate-950 dark:bg-[#1a1a1a]">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex dark:bg-[#000000] dark:border-zinc-800">
+    <main className="min-h-screen bg-[var(--c-bg)] text-[var(--c-text)] dark:bg-[#1a1a1a]">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-[var(--c-bg-card)] shadow-[10px_0_24px_-14px_rgba(151,163,184,0.65)] lg:flex dark:bg-[#000000] dark:border-r dark:border-zinc-800">
         <div className="shrink-0 p-4">
           <div className="flex items-center gap-2.5">
-            <div className="relative h-8 w-8 overflow-hidden rounded-lg">
+            <div className="relative h-8 w-8 overflow-hidden rounded-lg neu-avatar">
               <Image
                 src="/Logos/logo.jpg"
                 alt="FlowZen Logo"
@@ -688,7 +688,7 @@ export function ProfileHub() {
               FlowZen
             </h1>
           </div>
-          <div className="mt-4 flex items-center gap-2.5 rounded-lg bg-slate-50 p-2.5 dark:bg-zinc-700">
+          <div className="mt-4 flex items-center gap-2.5 rounded-xl neu-inset p-2.5 dark:bg-zinc-700">
             <AvatarBadge
               avatarUrl={avatarUrl}
               name={displayName}
@@ -725,7 +725,7 @@ export function ProfileHub() {
             onClick={() => setTab("timeline")}
           />
           <NavButton
-            active={tab === "onboarding"} 
+            active={tab === "onboarding"}
             icon={<ShieldCheck size={16} />}
             label="Onboarding"
             onClick={() => setTab("onboarding")}
@@ -738,7 +738,7 @@ export function ProfileHub() {
           />
           {canViewMembersTab || canViewCompanyTabs ? (
             <>
-              <div className="my-2 h-px bg-slate-100 dark:bg-zinc-700" />
+              <div className="neu-divider my-2" />
               <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Admin</p>
             </>
           ) : null}
@@ -808,7 +808,7 @@ export function ProfileHub() {
           ) : null}
           {canViewFinanceTab ? (
             <>
-              <div className="my-2 h-px bg-slate-100 dark:bg-zinc-700" />
+              <div className="neu-divider my-2" />
               <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Finance</p>
               <NavButton
                 active={tab === "finance"}
@@ -860,19 +860,19 @@ export function ProfileHub() {
 
       <section className="lg:pl-64">
         {/* ── Header ── */}
-        <div className="border-b border-slate-200 bg-white px-6 py-5 sm:px-8 dark:bg-[#000000] dark:border-zinc-800">
+        <div className="bg-[var(--c-bg-card)] px-6 py-5 shadow-[0_1px_0_0_rgba(23,32,51,0.07)] sm:px-8 dark:bg-[#000000] dark:border-b dark:border-zinc-800">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="relative shrink-0">
                 <AvatarBadge avatarUrl={avatarUrl} name={displayName} size="lg" />
-                <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white dark:border-[#0a0a0a] bg-emerald-400" />
+                <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[var(--c-bg-card)] dark:border-[#0a0a0a] bg-emerald-400" />
               </div>
               <div>
                 <h1 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-zinc-100">
                   {displayName}
                 </h1>
                 <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-zinc-700 dark:text-zinc-400">
+                  <span className="neu-chip inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-zinc-700 dark:text-zinc-400">
                     <ShieldCheck size={11} />
                     {displayRole}
                   </span>
@@ -885,25 +885,25 @@ export function ProfileHub() {
 
             <div className="flex items-center gap-3">
               {company?.name ? (
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 px-2.5 py-1 text-xs text-slate-500 dark:bg-zinc-700 dark:text-zinc-400">
-                   <Building2 size={12} />
+                <span className="neu-chip inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs text-slate-500 dark:bg-zinc-700 dark:text-zinc-400">
+                  <Building2 size={12} />
                   {String(company.name)}
                 </span>
               ) : null}
               {team?.name ? (
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 px-2.5 py-1 text-xs text-slate-500 dark:bg-zinc-700 dark:text-zinc-400">
-                   <Users size={12} />
+                <span className="neu-chip inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs text-slate-500 dark:bg-zinc-700 dark:text-zinc-400">
+                  <Users size={12} />
                   {String(team.name)}
                 </span>
               ) : null}
               {profile?.companyJoined ? (
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 px-2.5 py-1 text-xs text-slate-500 dark:bg-zinc-700 dark:text-zinc-400">
-                   <Calendar size={12} />
+                <span className="neu-chip inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs text-slate-500 dark:bg-zinc-700 dark:text-zinc-400">
+                  <Calendar size={12} />
                   {new Date(profile.companyJoined as string | Date).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
                 </span>
               ) : null}
               <button
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                className="neu-btn inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 dark:border dark:border-zinc-800 dark:bg-transparent dark:text-zinc-400 dark:hover:bg-zinc-700"
                 onClick={() => signOut({ callbackUrl: "/login" })}
               >
                 <LogOut size={13} />
@@ -925,28 +925,27 @@ export function ProfileHub() {
                       : item === "security" && lostCardReportedCount > 0
                         ? `Security (${lostCardReportedCount})`
                         : item === "finance" && financeCount > 0
-                      ? `Finance (${financeCount})`
-                      : item === "approvals" && approvals.length > 0
-                        ? `Approvals (${approvals.length})`
-                        : item === "notifications" && unreadCount > 0
-                          ? `Notifications (${unreadCount})`
-                          : item === "careers" && jobsCount > 0
-                            ? `Careers (${jobsCount})`
-                            : item === "messages" && messagesCount > 0
-                              ? `Messages (${messagesCount})`
-                              : item === "finance-policy"
-                                ? "Finance Policy"
-                                : item === "hr-policy"
-                                  ? "HR Policy"
-                                  : item.charAt(0).toUpperCase() + item.slice(1);
+                          ? `Finance (${financeCount})`
+                          : item === "approvals" && approvals.length > 0
+                            ? `Approvals (${approvals.length})`
+                            : item === "notifications" && unreadCount > 0
+                              ? `Notifications (${unreadCount})`
+                              : item === "careers" && jobsCount > 0
+                                ? `Careers (${jobsCount})`
+                                : item === "messages" && messagesCount > 0
+                                  ? `Messages (${messagesCount})`
+                                  : item === "finance-policy"
+                                    ? "Finance Policy"
+                                    : item === "hr-policy"
+                                      ? "HR Policy"
+                                      : item.charAt(0).toUpperCase() + item.slice(1);
 
               return (
                 <button
-                  className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors duration-100 ${
-                    tab === item
-                      ? "bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700"
-                  }`}
+                  className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors duration-100 ${tab === item
+                    ? "neu-tab-pressed dark:bg-zinc-100 dark:text-zinc-900"
+                    : "bg-[var(--c-bg-muted)] text-slate-600 hover:bg-[var(--c-bg-hover)] dark:bg-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                    }`}
                   key={item}
                   onClick={() => setTab(item)}
                 >
@@ -957,7 +956,7 @@ export function ProfileHub() {
           </div>
         </div>
 
-        <div className="bg-[#fafafa] p-5 sm:p-6 dark:bg-[#1a1a1a]">
+        <div className="bg-[var(--c-bg)] p-5 sm:p-6 dark:bg-[#1a1a1a]">
           {loading ? (
             <ProfileSkeleton />
           ) : (
@@ -996,142 +995,142 @@ export function ProfileHub() {
                     <p className="mt-1.5 text-sm text-slate-500 dark:text-zinc-400">The route <span className="font-medium text-slate-700 dark:text-zinc-300">/profile/{window.location.pathname.replace("/profile/", "")}</span> doesn't exist.</p>
                     <button
                       onClick={() => { router.push("/profile"); setShowInvalidRoute(false); }}
-                      className="mt-6 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                      className="neu-btn neu-btn-primary mt-6 rounded-full px-4 py-2 text-sm font-medium dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
                     >
                       Go to profile
                     </button>
                   </div>
                 </div>
               ) : <>
-              {tab === "dashboard" ? (
-                <DashboardTab
-                  profile={profile}
-                  insights={insights}
-                  notifications={notifications}
-                  approvals={approvals}
-                  attendanceHistory={attendanceHistory}
-                  leaveRequests={leaveRequests}
-                  wfhRequests={wfhRequests}
-                  financeCount={financeCount}
-                  checkOutRequestCount={checkOutRequestCount}
-                  role={String(role)}
-                  company={company}
-                  showToast={showToast}
-                />
-              ) : null}
+                {tab === "dashboard" ? (
+                  <DashboardTab
+                    profile={profile}
+                    insights={insights}
+                    notifications={notifications}
+                    approvals={approvals}
+                    attendanceHistory={attendanceHistory}
+                    leaveRequests={leaveRequests}
+                    wfhRequests={wfhRequests}
+                    financeCount={financeCount}
+                    checkOutRequestCount={checkOutRequestCount}
+                    role={String(role)}
+                    company={company}
+                    showToast={showToast}
+                  />
+                ) : null}
 
-              {tab === "profile" ? (
-                <ProfileTab
-                  profile={profile}
-                  insights={insights}
-                  refresh={load}
-                  showToast={showToast}
-                />
-              ) : null}
+                {tab === "profile" ? (
+                  <ProfileTab
+                    profile={profile}
+                    insights={insights}
+                    refresh={load}
+                    showToast={showToast}
+                  />
+                ) : null}
 
-              {tab === "timeline" ? (
-                <TimelineTab items={timeline} role={role} />
-              ) : null}
+                {tab === "timeline" ? (
+                  <TimelineTab items={timeline} role={role} />
+                ) : null}
 
-              {tab === "onboarding" ? (
-                <OnboardingTab
-                  profile={profile}
-                  insights={insights}
-                  role={String(role)}
-                  refresh={load}
-                  showToast={showToast}
-                />
-              ) : null}
+                {tab === "onboarding" ? (
+                  <OnboardingTab
+                    profile={profile}
+                    insights={insights}
+                    role={String(role)}
+                    refresh={load}
+                    showToast={showToast}
+                  />
+                ) : null}
 
-              {tab === "approvals" && canViewCompanyTabs ? (
-                <ApprovalsTab
-                  approvals={approvals}
-                  refresh={load}
-                  showToast={showToast}
-                />
-              ) : null}
+                {tab === "approvals" && canViewCompanyTabs ? (
+                  <ApprovalsTab
+                    approvals={approvals}
+                    refresh={load}
+                    showToast={showToast}
+                  />
+                ) : null}
 
-              {tab === "members" && canViewMembersTab ? (
-                <MembersTab
-                  insights={insights}
-                  actorRole={String(role)}
-                  showToast={showToast}
-                  refresh={load}
-                  regionOptions={
-                    company?.multiOffice && Array.isArray(company?.addresses)
-                      ? (company.addresses as AnyRecord[]).map((a: AnyRecord) => String(a.label ?? "")).filter(Boolean)
-                      : company?.address
-                        ? ["Main Office"]
-                        : []
-                  }
-                />
-              ) : null}
+                {tab === "members" && canViewMembersTab ? (
+                  <MembersTab
+                    insights={insights}
+                    actorRole={String(role)}
+                    showToast={showToast}
+                    refresh={load}
+                    regionOptions={
+                      company?.multiOffice && Array.isArray(company?.addresses)
+                        ? (company.addresses as AnyRecord[]).map((a: AnyRecord) => String(a.label ?? "")).filter(Boolean)
+                        : company?.address
+                          ? ["Main Office"]
+                          : []
+                    }
+                  />
+                ) : null}
 
-              {tab === "documents" && canViewCompanyTabs ? (
-                <DocumentsTab actorRole={String(role)} showToast={showToast} />
-              ) : null}
+                {tab === "documents" && canViewCompanyTabs ? (
+                  <DocumentsTab actorRole={String(role)} showToast={showToast} />
+                ) : null}
 
-              {tab === "careers" ? (
-                <CareersTab />
-              ) : null}
+                {tab === "careers" ? (
+                  <CareersTab />
+                ) : null}
 
-              {tab === "messages" && canViewCompanyTabs ? (
-                <MessagesTab showToast={showToast} />
-              ) : null}
+                {tab === "messages" && canViewCompanyTabs ? (
+                  <MessagesTab showToast={showToast} />
+                ) : null}
 
-              {tab === "notifications" ? (
-                <NotificationsTab
-                  notifications={notifications}
-                  markAllRead={markAllRead}
-                  deleteAll={deleteAllNotifications}
-                  markRead={markNotificationRead}
-                  deleteOne={deleteNotification}
-                  page={notificationPage}
-                  totalPages={notificationTotalPages}
-                  fromDate={notificationFromDate}
-                  toDate={notificationToDate}
-                  onPageChange={(p) => {
-                    setNotificationPage(p);
-                    reloadNotifications(p);
-                  }}
-                  onDateFilterChange={(from, to) => {
-                    setNotificationFromDate(from);
-                    setNotificationToDate(to);
-                    setNotificationPage(1);
-                    reloadNotifications(1, from, to);
-                  }}
-                />
-              ) : null}
+                {tab === "notifications" ? (
+                  <NotificationsTab
+                    notifications={notifications}
+                    markAllRead={markAllRead}
+                    deleteAll={deleteAllNotifications}
+                    markRead={markNotificationRead}
+                    deleteOne={deleteNotification}
+                    page={notificationPage}
+                    totalPages={notificationTotalPages}
+                    fromDate={notificationFromDate}
+                    toDate={notificationToDate}
+                    onPageChange={(p) => {
+                      setNotificationPage(p);
+                      reloadNotifications(p);
+                    }}
+                    onDateFilterChange={(from, to) => {
+                      setNotificationFromDate(from);
+                      setNotificationToDate(to);
+                      setNotificationPage(1);
+                      reloadNotifications(1, from, to);
+                    }}
+                  />
+                ) : null}
 
-              {tab === "finance" ? (
-                <FinanceTab actorRole={String(role)} profileId={String(profile?.id ?? session?.user?.id ?? "")} showToast={showToast} />
-              ) : null}
+                {tab === "finance" ? (
+                  <FinanceTab actorRole={String(role)} profileId={String(profile?.id ?? session?.user?.id ?? "")} showToast={showToast} />
+                ) : null}
 
-              {tab === "finance-policy" && ["finance", "admin"].includes(String(role)) ? (
-                <FinancePolicyTab actorRole={String(role)} profileId={String(profile?.id ?? session?.user?.id ?? "")} showToast={showToast} />
-              ) : null}
+                {tab === "finance-policy" && ["finance", "admin"].includes(String(role)) ? (
+                  <FinancePolicyTab actorRole={String(role)} profileId={String(profile?.id ?? session?.user?.id ?? "")} showToast={showToast} />
+                ) : null}
 
-              {tab === "hr-policy" && canViewCompanyTabs ? (
-                <HrPolicyTab company={company} profile={profile} insights={insights} actorRole={String(role)} refresh={load} showToast={showToast} />
-              ) : null}
+                {tab === "hr-policy" && canViewCompanyTabs ? (
+                  <HrPolicyTab company={company} profile={profile} insights={insights} actorRole={String(role)} refresh={load} showToast={showToast} />
+                ) : null}
 
-              {tab === "attendance" && canViewCompanyTabs ? (
-                <AttendanceTab profile={profile} showToast={showToast} />
-              ) : null}
+                {tab === "attendance" && canViewCompanyTabs ? (
+                  <AttendanceTab profile={profile} showToast={showToast} />
+                ) : null}
 
-              {tab === "calendar" && canViewCompanyTabs ? (
-                <CompanyCalendarTab />
-              ) : null}
+                {tab === "calendar" && canViewCompanyTabs ? (
+                  <CompanyCalendarTab />
+                ) : null}
 
-              {tab === "security" && canViewSecurityTab ? (
-                <SecurityTab company={company} showToast={showToast} />
-              ) : null}
+                {tab === "security" && canViewSecurityTab ? (
+                  <SecurityTab company={company} showToast={showToast} />
+                ) : null}
 
-              {tab === "visitors" && canViewVisitorsTab ? (
-                <VisitorsTab company={company} showToast={showToast} />
-              ) : null}
-            </>}
-          </>
+                {tab === "visitors" && canViewVisitorsTab ? (
+                  <VisitorsTab company={company} showToast={showToast} />
+                ) : null}
+              </>}
+            </>
           )}
         </div>
       </section>

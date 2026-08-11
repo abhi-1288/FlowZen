@@ -104,8 +104,8 @@ export default function JoinPage() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-[#f7f8fb] px-4">
-      <section className="w-full max-w-xl rounded-lg border border-slate-200 bg-white p-8 shadow-soft">
+    <main className="grid min-h-screen place-items-center bg-[var(--c-bg)] px-4">
+      <section className="neu-card w-full max-w-xl rounded-2xl p-8">
         <div className="mb-6 flex items-center gap-3">
           <div className="grid h-11 w-11 place-items-center rounded-lg bg-emerald-600 text-white">
             {kind === "company" ? <Building2 size={22} /> : <Users size={22} />}
@@ -118,12 +118,12 @@ export default function JoinPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4">
+        <div className="neu-inset rounded-lg p-4">
           <p className="text-xs font-semibold uppercase text-slate-500">Invite Code</p>
           <p className="mt-2 font-mono text-sm font-semibold text-indigo-700">{code || "Missing code"}</p>
         </div>
 
-        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+        <div className="neu-inset mt-4 rounded-lg p-4">
           {previewLoading ? (
             <p className="text-sm text-slate-500">Loading invite details...</p>
           ) : preview ? (
@@ -151,7 +151,7 @@ export default function JoinPage() {
         {message ? <p className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</p> : null}
 
         <button
-          className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+          className="neu-btn neu-btn-primary mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold"
           disabled={joinState !== "available" || !code || loading || kind === "unknown" || !preview || previewLoading}
           onClick={handleJoin}
           type="button"
@@ -170,7 +170,7 @@ export default function JoinPage() {
 
 function MetaRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
+    <div className="neu-inset flex items-center justify-between gap-3 rounded-md px-3 py-2">
       <span className="text-slate-500">{label}</span>
       <span className="font-semibold capitalize text-slate-800">{value}</span>
     </div>

@@ -16,19 +16,13 @@ function TabBtn({
 }) {
   return (
     <button
-      className={`rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
-        active
-          ? "bg-slate-950 text-white shadow-sm"
-          : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-      }`}
+      className={`rounded-lg border px-4 py-2 text-sm font-medium transition-all duration-200 ${ active ? "neu-tab-pressed border-transparent " : "bg-[var(--c-bg-elevated)] border-[var(--c-border-light)] text-slate-600 hover:bg-[var(--c-bg-muted)]" }`}
       onClick={onClick}
     >
       {label}
       {count > 0 ? (
         <span
-          className={`ml-1.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold leading-none ${
-            active ? "bg-white/20 text-white" : badgeClass
-          }`}
+          className={`ml-1.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold leading-none ${ active ? "bg-white/20 text-white" : badgeClass }`}
         >
           {count}
         </span>

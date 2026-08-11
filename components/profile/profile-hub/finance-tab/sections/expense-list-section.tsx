@@ -72,7 +72,7 @@ export function ExpenseListSection({
                   <>
                     <ActionButton variant="danger" className="px-3" onClick={() => onReject(expenseId, "expense")}>Reject</ActionButton>
                     <select
-                      className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                      className="rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm"
                       required
                       value={forwardAdminByExpense[expenseId] ?? ""}
                       onChange={(e) => onForwardAdmin(expenseId, e.target.value)}

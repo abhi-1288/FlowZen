@@ -79,7 +79,7 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var p=localStorage.getItem('flowzen_theme');if(p!=='light'&&p!=='dark'&&p!=='system')p=localStorage.getItem('flowzen_darkMode')==='true'?'dark':'system';var d=p==='dark'||(p==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);document.documentElement.style.colorScheme=d?'dark':'light'}catch(e){}`,
+            __html: `try{var p=localStorage.getItem('flowzen_theme');if(!['light','dark','system','light-neumorphism','dark-neumorphism'].includes(p))p=localStorage.getItem('flowzen_darkMode')==='true'?'dark':'system';var d=p==='dark'||p==='dark-neumorphism'||(p==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.classList.toggle('dark',d);r.classList.toggle('theme-neu',p==='light-neumorphism'||p==='dark-neumorphism');r.classList.toggle('theme-neu-light',p==='light-neumorphism');r.classList.toggle('theme-neu-dark',p==='dark-neumorphism');r.style.colorScheme=d?'dark':'light'}catch(e){}`,
           }}
         />
       </head>

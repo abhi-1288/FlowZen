@@ -113,10 +113,10 @@ export function PolicyConfigSection({
   const previewStart = identityCodeStartRange ?? 10000000;
   const previewCode = `ACME-${String(previewStart).padStart(previewDigits, "0")}`;
 
-  const cardBase = "rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:shadow-md hover:border-slate-300";
+  const cardBase = "rounded-xl neu-card p-5 transition-all duration-200 hover:-slate-300";
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5">
+    <section className="rounded-xl neu-card p-5">
       <div className="mb-5 border-l-4 border-emerald-500 pl-4">
         <h3 className="text-base font-semibold text-slate-900">Policy</h3>
         <p className="mt-0.5 text-sm text-slate-500">Configure company-wide policies</p>
@@ -135,7 +135,7 @@ export function PolicyConfigSection({
             </div>
           </div>
           <button
-            className="mt-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="mt-3 w-full rounded-lg neu-card px-3 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
             onClick={() => setActiveModal("notice")}
             type="button"
           >
@@ -158,7 +158,7 @@ export function PolicyConfigSection({
             </div>
           </div>
           <button
-            className="mt-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="mt-3 w-full rounded-lg neu-card px-3 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
             onClick={() => setActiveModal("paid-leave")}
             type="button"
           >
@@ -181,7 +181,7 @@ export function PolicyConfigSection({
             </div>
           </div>
           <button
-            className="mt-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="mt-3 w-full rounded-lg neu-card px-3 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
             onClick={() => setActiveModal("wfh")}
             type="button"
           >
@@ -201,7 +201,7 @@ export function PolicyConfigSection({
             </div>
           </div>
           <button
-            className="mt-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="mt-3 w-full rounded-lg neu-card px-3 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
             onClick={() => setActiveModal("day-hour")}
             type="button"
           >
@@ -227,7 +227,7 @@ export function PolicyConfigSection({
               </div>
             </div>
             <button
-              className="mt-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="mt-3 w-full rounded-lg neu-card px-3 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
               onClick={() => setActiveModal("identity")}
               type="button"
             >
@@ -248,7 +248,7 @@ export function PolicyConfigSection({
       >
         <label className="text-xs font-semibold uppercase text-slate-500" htmlFor="notice-period-modal">Current notice period</label>
         <select
-          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+          className="mt-1 w-full rounded-lg neu-inset px-3 py-2 text-sm"
           id="notice-period-modal"
           value={noticePeriodDays}
           onChange={(e) => onNoticePeriodChange(Number(e.target.value))}
@@ -274,7 +274,7 @@ export function PolicyConfigSection({
       >
         <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
           <input
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+            className="rounded-lg neu-inset px-3 py-2 text-sm"
             min={0}
             max={365}
             type="number"
@@ -282,7 +282,7 @@ export function PolicyConfigSection({
             onChange={(e) => onPaidLeaveDaysChange(Math.max(0, Number(e.target.value)))}
           />
           <select
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+            className="rounded-lg neu-inset px-3 py-2 text-sm"
             value={paidLeavePeriod}
             onChange={(e) => onPaidLeavePeriodChange(e.target.value === "yearly" ? "yearly" : "monthly")}
           >
@@ -291,21 +291,17 @@ export function PolicyConfigSection({
           </select>
         </div>
 
-        <div className="mt-3 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+        <div className="mt-3 flex items-center justify-between rounded-lg neu-inset px-3 py-2.5">
           <span className="text-sm text-slate-700">Carry forward unused leave</span>
           <button
             type="button"
             role="switch"
             aria-checked={carryForwardLeaveDays}
             onClick={() => onCarryForwardLeaveChange(!carryForwardLeaveDays)}
-            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 ${
-              carryForwardLeaveDays ? "bg-emerald-500" : "bg-slate-300"
-            }`}
+            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 ${ carryForwardLeaveDays ? "bg-emerald-500" : "bg-slate-300" }`}
           >
             <span
-              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out mt-0.5 ${
-                carryForwardLeaveDays ? "translate-x-4 ml-0.5" : "translate-x-0 ml-0.5"
-              }`}
+              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full neu-card ring-0 transition duration-200 ease-in-out mt-0.5 ${ carryForwardLeaveDays ? "translate-x-4 ml-0.5" : "translate-x-0 ml-0.5" }`}
             />
           </button>
         </div>
@@ -326,33 +322,29 @@ export function PolicyConfigSection({
             min={0}
             value={wfhDays}
             onChange={(e) => onWfhDaysChange(Math.max(0, Number(e.target.value)))}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+            className="rounded-lg neu-card px-3 py-2 text-sm"
           />
           <select
             value={wfhPeriod}
             onChange={(e) => onWfhPeriodChange(e.target.value as "monthly" | "yearly")}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+            className="rounded-lg neu-card px-3 py-2 text-sm"
           >
             <option value="monthly">Per month</option>
             <option value="yearly">Per year</option>
           </select>
         </div>
 
-        <div className="mt-3 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+        <div className="mt-3 flex items-center justify-between rounded-lg neu-inset px-3 py-2.5">
           <span className="text-sm text-slate-700">Carry forward unused WFH</span>
           <button
             type="button"
             role="switch"
             aria-checked={carryForwardWfhDays}
             onClick={() => onCarryForwardWfhChange(!carryForwardWfhDays)}
-            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 ${
-              carryForwardWfhDays ? "bg-emerald-500" : "bg-slate-300"
-            }`}
+            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 ${ carryForwardWfhDays ? "bg-emerald-500" : "bg-slate-300" }`}
           >
             <span
-              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out mt-0.5 ${
-                carryForwardWfhDays ? "translate-x-4 ml-0.5" : "translate-x-0 ml-0.5"
-              }`}
+              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full neu-card ring-0 transition duration-200 ease-in-out mt-0.5 ${ carryForwardWfhDays ? "translate-x-4 ml-0.5" : "translate-x-0 ml-0.5" }`}
             />
           </button>
         </div>
@@ -378,7 +370,7 @@ export function PolicyConfigSection({
           />
           <span className="text-sm text-slate-600">hours per day</span>
         </div>
-        <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
+        <p className="mt-3 rounded-lg bg-[var(--c-bg-muted)] p-3 text-xs text-slate-500">
           Attendance rules: &lt; {Math.floor(minWorkHours / 2)} hrs = absent, &ge; {Math.floor(minWorkHours / 2)} hrs and &lt; {minWorkHours} hrs = half-day, &ge; {minWorkHours} hrs = present
         </p>
       </PolicyModal>
@@ -401,7 +393,7 @@ export function PolicyConfigSection({
               type="number"
               min={4}
               max={12}
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-lg neu-inset px-3 py-2 text-sm"
               placeholder="e.g. 6"
               value={identityCodeDigits ?? ""}
               onChange={(e) => onIdentityCodeDigitsChange(e.target.value === "" ? null : Number(e.target.value))}
@@ -412,7 +404,7 @@ export function PolicyConfigSection({
             <input
               id="id-start"
               type="number"
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-lg neu-inset px-3 py-2 text-sm"
               placeholder="e.g. 400000"
               value={identityCodeStartRange ?? ""}
               onChange={(e) => onIdentityCodeStartRangeChange(e.target.value === "" ? null : Number(e.target.value))}
@@ -423,7 +415,7 @@ export function PolicyConfigSection({
             <input
               id="id-end"
               type="number"
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-lg neu-inset px-3 py-2 text-sm"
               placeholder="e.g. 600000"
               value={identityCodeEndRange ?? ""}
               onChange={(e) => onIdentityCodeEndRangeChange(e.target.value === "" ? null : Number(e.target.value))}
@@ -434,7 +426,7 @@ export function PolicyConfigSection({
             <input
               id="id-next"
               type="number"
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-lg neu-inset px-3 py-2 text-sm"
               placeholder="Auto-set from start"
               value={identityCodeNextNumber ?? ""}
               onChange={(e) => onIdentityCodeNextNumberChange(e.target.value === "" ? null : Number(e.target.value))}
@@ -442,7 +434,7 @@ export function PolicyConfigSection({
           </div>
         </div>
 
-        <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-white p-3">
+        <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-[var(--c-bg-card)] p-3">
           <p className="text-xs font-semibold uppercase text-slate-500">Preview</p>
           <p className="mt-1 font-mono text-sm font-semibold text-indigo-700">{previewCode}</p>
         </div>
@@ -460,17 +452,17 @@ export function PolicyConfigSection({
         ) : null}
 
         {/* Bulk Import */}
-        <div className="mt-5 border-t border-slate-100 pt-5">
+        <div className="mt-5 border-t border-[var(--c-border-light)] pt-5">
           <p className="text-xs font-semibold uppercase text-slate-500">Bulk Import</p>
           <p className="mt-1 mb-3 text-xs text-slate-500">
             Upload an Excel file with columns: User Name, Email, Flowzen Code, Original Code.
           </p>
 
-          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-3">
+          <div className="rounded-lg border border-dashed border-slate-300 bg-[var(--c-bg-card)] p-3">
             <input
               type="file"
               accept=".xlsx,.xls,.csv"
-              className="w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-950 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white hover:file:bg-slate-800"
+              className="neu-btn neu-btn-primary w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:-0 file: file:px-3 file:py-1.5 file:text-xs file:font-medium file: hover:file:"
               onChange={(e) => {
                 onBulkImportFileChange(e.target.files?.[0] ?? null);
                 onBulkPreviewClear();
@@ -483,7 +475,7 @@ export function PolicyConfigSection({
 
           {bulkImportFile && !bulkPreview && !bulkResult ? (
             <button
-              className="mt-2 rounded-full bg-slate-950 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+              className="neu-btn neu-btn-primary mt-2 rounded-full px-3 py-1.5 text-xs font-medium"
               disabled={bulkImportLoading}
               type="button"
               onClick={onPreviewBulkImport}
@@ -509,9 +501,9 @@ export function PolicyConfigSection({
                 ) : null}
               </div>
 
-              <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-white">
+              <div className="max-h-48 overflow-y-auto rounded-lg neu-card">
                 <table className="w-full text-left text-[11px]">
-                  <thead className="sticky top-0 border-b border-slate-200 bg-slate-50">
+                  <thead className="sticky top-0 border-b border-[var(--c-border-light)] bg-[var(--c-bg-muted)]">
                     <tr>
                       <th className="px-2 py-1.5 font-medium text-slate-600">Row</th>
                       <th className="px-2 py-1.5 font-medium text-slate-600">Email</th>
@@ -528,12 +520,7 @@ export function PolicyConfigSection({
                         <td className="px-2 py-1 font-mono text-slate-600">{row.flowzenCode || "—"}</td>
                         <td className="px-2 py-1 font-mono text-indigo-700">{row.originalCode}</td>
                         <td className="px-2 py-1">
-                          <span className={`inline-block rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${
-                            row.status === "ready" ? "bg-emerald-100 text-emerald-700" :
-                            row.status === "not-found" ? "bg-red-100 text-red-700" :
-                            row.status === "code-taken" ? "bg-red-100 text-red-700" :
-                            "bg-amber-100 text-amber-700"
-                          }`}>
+                          <span className={`inline-block rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${ row.status === "ready" ? "bg-emerald-100 text-emerald-700" : row.status === "not-found" ? "bg-red-100 text-red-700" : row.status === "code-taken" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700" }`}>
                             {row.status === "ready" ? "Ready" :
                              row.status === "not-found" ? "Not Found" :
                              row.status === "conflict" ? "Mismatch" :
@@ -551,7 +538,7 @@ export function PolicyConfigSection({
               <div className="mt-2 flex gap-2">
                 {bulkPreview.summary.ready > 0 ? (
                   <button
-                    className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                    className="neu-btn neu-btn-success rounded-full px-3 py-1.5 text-xs font-medium"
                     disabled={bulkApplying}
                     type="button"
                     onClick={onApplyBulkImport}
@@ -560,7 +547,7 @@ export function PolicyConfigSection({
                   </button>
                 ) : null}
                 <button
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  className="rounded-lg neu-card px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
                   type="button"
                   onClick={onBulkPreviewClear}
                 >

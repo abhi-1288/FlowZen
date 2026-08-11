@@ -290,7 +290,7 @@ export function FinanceTab({
   }, [data?.members]);
 
   if (!data) {
-    return <section className="rounded-xl border border-slate-200 bg-white p-5">Loading finance...</section>;
+    return <section className="rounded-xl neu-card p-5">Loading finance...</section>;
   }
 
   const isFinanceOrAdmin = actorRole === "finance" || actorRole === "admin";
@@ -313,7 +313,7 @@ export function FinanceTab({
             <h3 className="text-base font-semibold text-slate-900">Finance</h3>
             <p className="mt-0.5 text-sm text-slate-500">Monthly payroll, salary slips, and expense requests.</p>
           </div>
-          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
+          <input className="rounded-xl border border-[var(--c-border-light)] px-3 py-2 text-sm" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
         </div>
 
         <div>
@@ -356,7 +356,7 @@ export function FinanceTab({
           <h3 className="text-base font-semibold text-slate-900">Finance</h3>
           <p className="mt-0.5 text-sm text-slate-500">Payroll, payout status, budgets, and expense requests.</p>
         </div>
-        <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
+        <input className="rounded-xl border border-[var(--c-border-light)] px-3 py-2 text-sm" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
       </div>
 
       {isFinanceOrAdmin ? <SalaryReminder actorRole={actorRole} onView={() => setShowSalaryModal(true)} /> : null}

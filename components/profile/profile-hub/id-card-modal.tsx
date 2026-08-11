@@ -532,7 +532,7 @@ export function IdCardModal({
           if (e.target === e.currentTarget) onClose();
         }}
       >
-        <div className="idc-modal-box ">
+        <div className="idc-modal-box">
           {/* ── Toolbar ── */}
           <div className="idc-toolbar py-10">
             <h3>ID Card</h3>
@@ -558,7 +558,7 @@ export function IdCardModal({
                 <span className="cut-line-dash" />
               </div>
 
-              <div className="idc-card  border-2 border-gray-300 border-dashed">
+              <div className="idc-card border-2 border-gray-300 border-dashed">
                 {/* Blue header */}
                 <div className="idc-front-header">
                   <img src={companyIcon} alt={companyName} />
@@ -750,7 +750,7 @@ export function IdCardModal({
               </div>
 
               <div className="idc-card border-2 border-gray-300 border-dashed">
-                <div className="pt-8 "></div>
+                <div className="pt-8"></div>
                 {isVisitor ? (
                   <>
                     {/* Purpose */}

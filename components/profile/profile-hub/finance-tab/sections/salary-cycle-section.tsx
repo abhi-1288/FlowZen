@@ -96,11 +96,11 @@ export function SalaryCycleSection({
   const displayEnd = endDay ?? (cycleDay > 1 ? cycleDay - 1 : null);
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5">
+    <section className="rounded-xl neu-card p-5">
       <SectionHeader title="Salary Cycle" description="Configure the salary period cycle day and manage pending changes." accent="cyan" />
 
       {/* Current Setting */}
-      <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <div className="mb-4 rounded-lg neu-inset p-3">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Current Cycle Day</span>
           <span className="text-sm font-semibold text-slate-900">
@@ -143,7 +143,7 @@ export function SalaryCycleSection({
             <div className="flex-1 min-w-[120px]">
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-400">Last Month Date</label>
               <input
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm"
                 type="number"
                 min={1}
                 max={31}
@@ -155,7 +155,7 @@ export function SalaryCycleSection({
             <div className="flex-1 min-w-[120px]">
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-400">Current Month Date</label>
               <input
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm"
                 type="number"
                 min={1}
                 max={31}
@@ -167,7 +167,7 @@ export function SalaryCycleSection({
             <div className="flex-1 min-w-[160px]">
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-400">Assign Admin</label>
               <select
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm"
                 value={assignedAdmin}
                 onChange={(e) => setAssignedAdmin(e.target.value)}
               >

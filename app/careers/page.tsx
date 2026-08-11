@@ -52,10 +52,10 @@ export default function CareersPage() {
 
   return (
     <main className="min-h-screen bg-[#fafafa] dark:bg-[#1a1a1a]">
-      <header className="border-b border-slate-200 dark:border-zinc-800 bg-white/80 dark:bg-[#000000]/80 backdrop-blur-md">
+      <header className="border-b border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)]/80 dark:bg-[#000000]/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 sm:px-8">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white">
+            <div className="neu-btn neu-btn-primary flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold">
               F
             </div>
             <span className="text-base font-semibold text-slate-900 dark:text-zinc-100">FlowZen</span>
@@ -64,7 +64,7 @@ export default function CareersPage() {
           </div>
           <Link
             href="/login"
-            className="rounded-full border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] px-5 py-2.5 text-sm font-medium text-slate-700 dark:text-zinc-300 transition-all hover:border-slate-300 hover:bg-slate-50 dark:hover:bg-zinc-700 hover:shadow-sm"
+            className="rounded-full border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] dark:bg-[#000000] px-5 py-2.5 text-sm font-medium text-slate-700 dark:text-zinc-300 transition-all hover:border-slate-300 hover:bg-[var(--c-bg-muted)] dark:hover:bg-zinc-700 hover:shadow-sm"
           >
             Sign in
           </Link>
@@ -84,7 +84,7 @@ export default function CareersPage() {
 
         {loading ? (
           <div className="mt-20 grid place-items-center">
-            <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-900" />
+            <div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--c-border-light)] border-t-slate-900" />
           </div>
         ) : companies.length === 0 ? (
           <div className="mt-20 text-center">
@@ -100,7 +100,7 @@ export default function CareersPage() {
                   {group.company.icon ? (
                     <img src={group.company.icon} alt="" className="h-10 w-10 rounded-xl object-cover" />
                   ) : (
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 dark:bg-zinc-700 text-slate-600 dark:text-zinc-400">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--c-bg-muted)] dark:bg-zinc-700 text-slate-600 dark:text-zinc-400">
                       <Building2 size={20} />
                     </div>
                   )}
@@ -116,13 +116,13 @@ export default function CareersPage() {
                     <Link
                       key={job.id}
                       href={`/careers/jobs/${slugify(group.company.name)}/${job.id}`}
-                      className="group block rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] p-6 transition-all duration-200 hover:border-slate-300 hover:shadow-lg hover:shadow-slate-200/50"
+                      className="group block rounded-2xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] dark:bg-[#000000] p-6 transition-all duration-200 hover:border-slate-300 hover:shadow-lg hover:shadow-slate-200/50"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100 group-hover:text-indigo-600 transition-colors">
                           {job.title}
                         </h3>
-                        <span className="shrink-0 rounded-full bg-slate-100 dark:bg-zinc-700 px-3 py-1 text-xs font-medium text-slate-600 dark:text-zinc-400">
+                        <span className="shrink-0 rounded-full bg-[var(--c-bg-muted)] dark:bg-zinc-700 px-3 py-1 text-xs font-medium text-slate-600 dark:text-zinc-400">
                           {job.employmentType}
                         </span>
                       </div>
@@ -148,7 +148,7 @@ export default function CareersPage() {
                       {job.requiredSkills.length > 0 && (
                         <div className="mt-4 flex flex-wrap gap-2">
                           {job.requiredSkills.slice(0, 4).map((skill) => (
-                            <span key={skill} className="rounded-full bg-slate-100 dark:bg-zinc-700 px-3 py-1 text-xs font-medium text-slate-600 dark:text-zinc-400">
+                            <span key={skill} className="rounded-full bg-[var(--c-bg-muted)] dark:bg-zinc-700 px-3 py-1 text-xs font-medium text-slate-600 dark:text-zinc-400">
                               {skill}
                             </span>
                           ))}
@@ -165,7 +165,7 @@ export default function CareersPage() {
                           Closes: {new Date(job.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                         </p>
                       )}
-                      <span className="mt-5 block w-full rounded-full bg-slate-900 px-5 py-2.5 text-center text-sm font-medium text-white transition-all duration-200 group-hover:bg-slate-800 active:bg-slate-950">
+                      <span className="neu-btn neu-btn-primary mt-5 block w-full rounded-full px-5 py-2.5 text-center text-sm font-medium transition-all duration-200 group-">
                         Apply Now
                       </span>
                     </Link>

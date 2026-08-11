@@ -287,7 +287,7 @@ export function VisitorsTab({
   const ambarAccent = { hex: "#d97706", dark: "#b45309", light: "#fef3c7" };
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-xl neu-card p-5">
       {/* ═══════════════ VISIT NOTICES ═══════════════ */}
       <SectionHeader title="Visit Notices" description="Post announcements for upcoming visits and generate registration links." accent="amber" />
 
@@ -306,7 +306,7 @@ export function VisitorsTab({
           {events.map((ev) => {
             const url = `${origin}/visit/${ev.slug}`;
             return (
-              <div key={ev.id || ev._id} className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+              <div key={ev.id || ev._id} className="rounded-xl neu-inset/50 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-slate-900">{ev.visitorCompany || "Unnamed"}</p>
@@ -317,11 +317,11 @@ export function VisitorsTab({
                     {ev.hostName ? <p className="text-xs text-slate-400">Host: {ev.hostName}</p> : null}
                     <div className="mt-1.5 flex items-center gap-2">
                       <input
-                        className="flex-1 rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
+                        className="flex-1 rounded neu-inset px-2 py-1 text-xs text-slate-600"
                         value={url} readOnly onClick={(e) => (e.target as HTMLInputElement).select()}
                       />
                       <button
-                        className="rounded bg-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-300"
+                        className="rounded bg-[var(--c-bg-hover)] px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-300"
                         onClick={() => { navigator.clipboard.writeText(url); showToast("Link copied!"); }}
                         type="button"
                       >
@@ -353,11 +353,7 @@ export function VisitorsTab({
         {(["pending", "approved", "expired", "rejected", "all"] as const).map((f) => (
           <button
             key={f}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-              passFilter === f
-                ? "bg-amber-500 text-white"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${ passFilter === f ? "bg-amber-500 text-white" : "bg-[var(--c-bg-muted)] text-slate-600 hover:bg-[var(--c-bg-hover)]" }`}
             onClick={() => setPassFilter(f)}
             type="button"
           >
@@ -382,25 +378,25 @@ export function VisitorsTab({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-600">Visitor Name *</label>
-              <input className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              <input className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
                 value={genName} onChange={(e) => setGenName(e.target.value)} required
               />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-600">Email *</label>
-              <input type="email" className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              <input type="email" className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
                 value={genEmail} onChange={(e) => setGenEmail(e.target.value)} required
               />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-600">Phone</label>
-              <input className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              <input className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
                 value={genPhone} onChange={(e) => setGenPhone(e.target.value)}
               />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-600">Office Region</label>
-              <select className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              <select className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
                 value={genRegion} onChange={(e) => setGenRegion(e.target.value)}
               >
                 <option value="">Select region</option>
@@ -413,25 +409,25 @@ export function VisitorsTab({
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-600">Purpose</label>
-              <input className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              <input className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
                 value={genPurpose} onChange={(e) => setGenPurpose(e.target.value)}
               />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-600">Date</label>
-              <input type="date" className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              <input type="date" className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
                 value={genDate} onChange={(e) => setGenDate(e.target.value)}
               />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-600">Time In (±15 min)</label>
-              <input type="time" step="900" className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              <input type="time" step="900" className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
                 value={genTimeInTime} onChange={(e) => setGenTimeInTime(e.target.value)}
               />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-600">Duration</label>
-              <select className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              <select className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
                 value={genDuration} onChange={(e) => setGenDuration(e.target.value)}
               >
                 <option value="0.5">30 min</option>
@@ -464,7 +460,7 @@ export function VisitorsTab({
             {genDate && genTimeInTime ? (
               <div>
                 <label className="mb-1 block text-xs font-medium text-slate-600">Time Out</label>
-                <div className="w-full rounded-md border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs text-slate-600">
+                <div className="w-full rounded-md neu-inset px-3 py-1.5 text-xs text-slate-600">
                   {(() => {
                     const ti = new Date(`${genDate}T${genTimeInTime}`);
                     ti.setMinutes(ti.getMinutes() + parseFloat(genDuration) * 60);
@@ -475,7 +471,7 @@ export function VisitorsTab({
             ) : (
               <div>
                 <label className="mb-1 block text-xs font-medium text-slate-400">Time Out</label>
-                <div className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-400">
+                <div className="w-full rounded-md neu-inset px-3 py-1.5 text-xs text-slate-400">
                   —
                 </div>
               </div>
@@ -507,11 +503,11 @@ export function VisitorsTab({
             const statusColor = isPending ? "bg-amber-100 text-amber-700" :
               isApproved ? "bg-emerald-100 text-emerald-700" :
               isActive ? "bg-blue-100 text-blue-700" :
-              isCompleted ? "bg-slate-100 text-slate-500" :
+              isCompleted ? "bg-[var(--c-bg-muted)] text-slate-500" :
               isRejected ? "bg-rose-100 text-rose-700" :
-              "bg-slate-100 text-slate-500";
+              "bg-[var(--c-bg-muted)] text-slate-500";
             return (
-              <div key={passId} className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+              <div key={passId} className="rounded-xl neu-inset/50 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -581,21 +577,21 @@ export function VisitorsTab({
 
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600">Visitor Company *</label>
-            <input className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+            <input className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
               value={newEventCompany} onChange={(e) => setNewEventCompany(e.target.value)} required
             />
           </div>
 
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600">Expected Date</label>
-            <input type="date" className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+            <input type="date" className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
               value={newEventDate} onChange={(e) => setNewEventDate(e.target.value)}
             />
           </div>
 
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600">Purpose</label>
-            <textarea className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+            <textarea className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
               rows={2} value={newEventPurpose} onChange={(e) => setNewEventPurpose(e.target.value)}
             />
           </div>
@@ -603,13 +599,13 @@ export function VisitorsTab({
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="mb-1 block text-xs font-medium text-slate-600">Host Name</label>
-              <input className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              <input className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
                 value={newEventHostName} onChange={(e) => setNewEventHostName(e.target.value)}
               />
             </div>
             <div className="flex-1">
               <label className="mb-1 block text-xs font-medium text-slate-600">Host Email</label>
-              <input type="email" className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              <input type="email" className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
                 value={newEventHostEmail} onChange={(e) => setNewEventHostEmail(e.target.value)}
               />
             </div>
@@ -617,7 +613,7 @@ export function VisitorsTab({
 
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600">Notes</label>
-            <textarea className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+            <textarea className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
               rows={2} value={newEventNotes} onChange={(e) => setNewEventNotes(e.target.value)}
             />
           </div>
@@ -638,7 +634,7 @@ export function VisitorsTab({
         <form onSubmit={(e) => { e.preventDefault(); handleDecline(); }} className="space-y-4">
           <h3 className="text-sm font-semibold text-slate-900">Decline Visit</h3>
           <p className="text-xs text-slate-500">Reason for declining {declineTarget?.visitorName}&apos;s visit:</p>
-          <textarea className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+          <textarea className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
             rows={3} value={declineReason} onChange={(e) => setDeclineReason(e.target.value)}
           />
           <div className="flex justify-end gap-2">

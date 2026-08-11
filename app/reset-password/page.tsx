@@ -52,9 +52,9 @@ function ResetPasswordContent() {
   }, [router, token]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#fafafa] dark:bg-[#1a1a1a] px-5 py-12">
+    <main className="flex min-h-screen items-center justify-center bg-[var(--c-bg)] dark:bg-[#1a1a1a] px-5 py-12">
       <div className="w-full max-w-md">
-        <div className="rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] p-8 shadow-sm text-center">
+        <div className="neu-card rounded-3xl p-8 text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white">
             {error ? <KeyRound size={24} /> : <Loader2 className="animate-spin" size={24} />}
           </div>
@@ -66,7 +66,7 @@ function ResetPasswordContent() {
           </p>
           {error ? (
             <Link
-              className="mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+              className="neu-btn neu-btn-primary mt-6 inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-medium"
               href="/forgot-password"
             >
               Request new link
@@ -80,8 +80,8 @@ function ResetPasswordContent() {
 
 function ResetPasswordStatus() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#fafafa] dark:bg-[#1a1a1a] px-5 py-12">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] p-8 shadow-sm text-center">
+    <main className="flex min-h-screen items-center justify-center bg-[var(--c-bg)] dark:bg-[#1a1a1a] px-5 py-12">
+      <div className="neu-card w-full max-w-md rounded-2xl p-8 text-center">
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white">
           <Loader2 className="animate-spin" size={24} />
         </div>

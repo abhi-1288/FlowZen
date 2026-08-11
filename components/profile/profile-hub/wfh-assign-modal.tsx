@@ -58,8 +58,8 @@ export function WfhAssignModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
+    <div className="fixed inset-0 z-[60] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl ring-1 ring-slate-200">
         <h3 className="text-xl font-bold text-slate-900">Assign Work From Home</h3>
         <p className="mt-1 text-sm text-slate-500">
           Assign Work From Home (WFH) dates for the company.
@@ -78,7 +78,7 @@ export function WfhAssignModal({
                 onChange={(e) =>
                   setFormData({ ...formData, startDate: e.target.value })
                 }
-                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm"
+                className="w-full rounded-xl border border-[var(--c-border-light)] px-4 py-2.5 text-sm"
               />
             </div>
             <div className="space-y-1">
@@ -91,7 +91,7 @@ export function WfhAssignModal({
                 onChange={(e) =>
                   setFormData({ ...formData, endDate: e.target.value })
                 }
-                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm"
+                className="w-full rounded-xl border border-[var(--c-border-light)] px-4 py-2.5 text-sm"
               />
             </div>
           </div>
@@ -108,7 +108,7 @@ export function WfhAssignModal({
               onChange={(e) =>
                 setFormData({ ...formData, reason: e.target.value })
               }
-              className="w-full rounded-xl border border-slate-200 p-4 text-sm resize-none"
+              className="w-full rounded-xl border border-[var(--c-border-light)] p-4 text-sm resize-none"
             />
           </div>
 
@@ -116,14 +116,14 @@ export function WfhAssignModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition"
+              className="flex-1 rounded-xl border border-[var(--c-border-light)] py-3 text-sm font-semibold text-slate-600 hover:bg-[var(--c-bg-muted)] transition"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading || !formData.startDate || !formData.reason}
-              className="flex-1 rounded-full bg-slate-950 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition disabled:opacity-50"
+              className="neu-btn neu-btn-primary flex-1 rounded-full py-3 text-sm font-semibold transition"
             >
               {loading ? "Assigning..." : "Assign WFH"}
             </button>

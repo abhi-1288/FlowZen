@@ -24,7 +24,7 @@ export function CodePanel({
   const codes = [code ? { code, label } : null, ...secondaryCodes].filter(Boolean) as { code: string; label: string }[];
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5">
+    <section className="rounded-xl neu-card p-5">
       <div className="mb-4 flex items-center gap-2">
         <Building2 size={18} />
         <h3 className="text-lg font-semibold uppercase tracking-wide text-slate-700">{title}</h3>
@@ -34,7 +34,7 @@ export function CodePanel({
           <div className={codes.length > 1 ? "grid gap-3 md:grid-cols-2" : "space-y-3"}>
             {codes.map((item) => (
               <div key={item.code}>
-                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4">
+                <div className="rounded-lg border border-dashed border-slate-300 bg-[var(--c-bg-muted)] p-4">
                   <p className="text-xs font-semibold uppercase text-slate-500">{item.label}</p>
                   <div className="mt-2 flex items-center justify-between gap-3">
                     <p className="min-w-0 truncate font-mono text-sm font-semibold text-indigo-700">{item.code}</p>

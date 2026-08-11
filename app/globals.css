@@ -6,30 +6,42 @@
    Semantic color tokens — flip in .dark
    ============================================ */
 :root {
-  --c-bg: #fafafa;
-  --c-bg-card: #ffffff;
-  --c-bg-elevated: #ffffff;
-  --c-bg-input: #ffffff;
-  --c-bg-hover: #f5f5f5;
-  --c-bg-muted: #f1f5f9;
-  --c-bg-code: #f1f5f9;
-  --c-bg-overlay: rgba(0, 0, 0, 0.4);
+  --c-bg: #e9edf4;
+  --c-bg-card: #e9edf4;
+  --c-bg-elevated: #f2f5fa;
+  --c-bg-input: #e1e6ef;
+  --c-bg-hover: #e3e8f1;
+  --c-bg-muted: #edf1f7;
+  --c-bg-code: #e1e6ef;
+  --c-bg-overlay: rgba(23, 32, 51, 0.35);
 
-  --c-text: #0f172a;
-  --c-text-secondary: #475569;
-  --c-text-muted: #94a3b8;
+  --c-text: #1e2532;
+  --c-text-secondary: #5b6472;
+  --c-text-muted: #97a1b3;
   --c-text-inverse: #ffffff;
 
-  --c-border: #e2e8f0;
-  --c-border-light: #f1f5f9;
-  --c-border-strong: #cbd5e1;
+  --c-border: rgba(255, 255, 255, 0.6);
+  --c-border-light: rgba(23, 32, 51, 0.08);
+  --c-border-strong: #c9d1df;
 
-  --c-skeleton: #e2e8f0;
-  --c-skeleton-muted: #f1f5f9;
+  --c-skeleton: #dbe1ec;
+  --c-skeleton-muted: #e4e9f1;
 
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-dropdown: 0 4px 16px rgba(0, 0, 0, 0.08);
-  --shadow-modal: 0 8px 30px rgba(0, 0, 0, 0.12);
+  --shadow-card: 0 2px 6px rgba(23, 32, 51, 0.06);
+  --shadow-dropdown: 0 10px 28px rgba(23, 32, 51, 0.18);
+  --shadow-modal: 0 20px 50px rgba(23, 32, 51, 0.28);
+
+  /* Neumorphic soft-UI shadows */
+  --neu-shadow-out: 9px 9px 18px rgba(151, 163, 184, 0.5), -9px -9px 18px rgba(255, 255, 255, 0.85);
+  --neu-shadow-out-sm: 5px 5px 12px rgba(151, 163, 184, 0.45), -5px -5px 12px rgba(255, 255, 255, 0.8);
+  --neu-shadow-out-xs: 3px 3px 8px rgba(151, 163, 184, 0.4), -3px -3px 8px rgba(255, 255, 255, 0.8);
+  --neu-shadow-in: inset 4px 4px 10px rgba(151, 163, 184, 0.5), inset -4px -4px 10px rgba(255, 255, 255, 0.8);
+  --neu-shadow-in-sm: inset 2px 2px 6px rgba(151, 163, 184, 0.45), inset -2px -2px 6px rgba(255, 255, 255, 0.75);
+  --neu-shadow-in-xs: inset 1.5px 1.5px 4px rgba(151, 163, 184, 0.4), inset -1.5px -1.5px 4px rgba(255, 255, 255, 0.7);
+  --neu-primary: linear-gradient(145deg, #818cf8, #4f46e5);
+  --neu-primary-soft: linear-gradient(145deg, #6366f1, #4338ca);
+  --neu-success: linear-gradient(145deg, #34d399, #059669);
+  --neu-danger-soft: linear-gradient(145deg, #fb7185, #e11d48);
 }
 
 .dark {
@@ -57,6 +69,15 @@
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-dropdown: 0 4px 16px rgba(0, 0, 0, 0.5);
   --shadow-modal: 0 8px 30px rgba(0, 0, 0, 0.6);
+
+  /* Dark-mode neumorphism: use a restrained edge highlight instead of
+     the bright white light-mode highlight, which bleeds on black surfaces. */
+  --neu-shadow-out: 9px 9px 18px rgba(0, 0, 0, 0.72), -9px -9px 18px rgba(255, 255, 255, 0.07);
+  --neu-shadow-out-sm: 5px 5px 12px rgba(0, 0, 0, 0.62), -5px -5px 12px rgba(255, 255, 255, 0.06);
+  --neu-shadow-out-xs: 3px 3px 8px rgba(0, 0, 0, 0.55), -3px -3px 8px rgba(255, 255, 255, 0.05);
+  --neu-shadow-in: inset 4px 4px 10px rgba(0, 0, 0, 0.62), inset -4px -4px 10px rgba(255, 255, 255, 0.05);
+  --neu-shadow-in-sm: inset 2px 2px 6px rgba(0, 0, 0, 0.55), inset -2px -2px 6px rgba(255, 255, 255, 0.04);
+  --neu-shadow-in-xs: inset 1.5px 1.5px 4px rgba(0, 0, 0, 0.48), inset -1.5px -1.5px 4px rgba(255, 255, 255, 0.035);
 }
 
 /* ============================================
@@ -206,6 +227,242 @@ select {
   .shadow-card-v    { box-shadow: var(--shadow-card); }
   .shadow-dropdown-v { box-shadow: var(--shadow-dropdown); }
   .shadow-modal-v   { box-shadow: var(--shadow-modal); }
+}
+
+/* ============================================
+   Neumorphic soft-UI components (light mode)
+   ============================================ */
+@layer components {
+  /* Raised extruded surface (cards, panels) */
+  .neu-card {
+    background-color: var(--c-bg-card);
+    box-shadow: var(--neu-shadow-out);
+  }
+
+  .neu-card-hover {
+    transition: box-shadow 0.18s ease, transform 0.18s ease;
+  }
+
+  .neu-card-hover:hover {
+    box-shadow: 12px 12px 24px rgba(151, 163, 184, 0.55),
+      -12px -12px 24px rgba(255, 255, 255, 0.9);
+    transform: translateY(-2px);
+  }
+
+  .dark .neu-card-hover:hover {
+    box-shadow: 12px 12px 24px rgba(0, 0, 0, 0.78),
+      -12px -12px 24px rgba(255, 255, 255, 0.08);
+  }
+
+  /* Pressed / recessed surface (selected card, active nav item) */
+  .neu-card-pressed {
+    background-color: var(--c-bg-input);
+    box-shadow: var(--neu-shadow-in);
+  }
+
+  /* Inset field (inputs, selects, textareas) */
+  .neu-inset {
+    background-color: var(--c-bg-input);
+    box-shadow: var(--neu-shadow-in-sm);
+    border: none;
+  }
+
+  .neu-inset:focus {
+    outline: none;
+    box-shadow: var(--neu-shadow-in-sm), 0 0 0 3px rgba(99, 102, 241, 0.18);
+  }
+
+  .neu-inset::placeholder {
+    color: var(--c-text-muted);
+  }
+
+  /* Raised pill button */
+  .neu-btn {
+    border: none;
+    background-color: var(--c-bg-card);
+    color: var(--c-text);
+    box-shadow: var(--neu-shadow-out-sm);
+    transition: box-shadow 0.15s ease, transform 0.1s ease,
+      background-color 0.15s ease, color 0.15s ease;
+  }
+
+  .neu-btn:hover {
+    box-shadow: var(--neu-shadow-out);
+  }
+
+  .neu-btn:active {
+    box-shadow: var(--neu-shadow-in-sm);
+    transform: translateY(1px);
+  }
+
+  .neu-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+    box-shadow: var(--neu-shadow-out-xs);
+  }
+
+  .neu-btn-primary {
+    background: var(--neu-primary);
+    color: #fff;
+    box-shadow: var(--neu-shadow-out-sm), 0 4px 14px rgba(79, 70, 229, 0.35);
+  }
+
+  .neu-btn-primary:hover {
+    background: var(--neu-primary-soft);
+    box-shadow: var(--neu-shadow-out), 0 6px 18px rgba(79, 70, 229, 0.4);
+  }
+
+  .neu-btn-primary:active {
+    box-shadow: var(--neu-shadow-in-sm), 0 2px 6px rgba(79, 70, 229, 0.3);
+  }
+
+  .neu-btn-success {
+    background: var(--neu-success);
+    color: #fff;
+    box-shadow: var(--neu-shadow-out-sm), 0 4px 14px rgba(5, 150, 105, 0.3);
+  }
+
+  .neu-btn-success:hover {
+    background: linear-gradient(145deg, #10b981, #047857);
+    box-shadow: var(--neu-shadow-out), 0 6px 18px rgba(5, 150, 105, 0.35);
+  }
+
+  .neu-btn-success:active {
+    box-shadow: var(--neu-shadow-in-sm), 0 2px 6px rgba(5, 150, 105, 0.25);
+  }
+
+  .neu-btn-danger {
+    background: var(--neu-danger-soft);
+    color: #fff;
+    box-shadow: var(--neu-shadow-out-sm), 0 4px 14px rgba(225, 29, 72, 0.28);
+  }
+
+  .neu-btn-danger:hover {
+    background: linear-gradient(145deg, #f43f5e, #be123c);
+    box-shadow: var(--neu-shadow-out), 0 6px 18px rgba(225, 29, 72, 0.34);
+  }
+
+  .neu-btn-danger:active {
+    box-shadow: var(--neu-shadow-in-sm), 0 2px 6px rgba(225, 29, 72, 0.24);
+  }
+
+  .neu-btn-ghost {
+    background: transparent;
+    color: var(--c-text-muted);
+    box-shadow: none;
+  }
+
+  .neu-btn-ghost:hover {
+    color: var(--c-text);
+    background-color: var(--c-bg-hover);
+  }
+
+  .neu-btn-ghost:active {
+    background-color: var(--c-bg-muted);
+    box-shadow: none;
+    transform: none;
+  }
+
+  /* Small raised pill (chips, stat counters) */
+  .neu-chip {
+    background-color: var(--c-bg-card);
+    box-shadow: var(--neu-shadow-out-xs);
+  }
+
+  /* Raised avatar */
+  .neu-avatar {
+    box-shadow: var(--neu-shadow-out-xs);
+  }
+
+  /* Tab states */
+  .neu-tab-pressed {
+    background-color: var(--c-bg-input);
+    border: 1px solid var(--c-border-light);
+    box-shadow: var(--neu-shadow-in-sm);
+    color: var(--c-text);
+  }
+
+  .neu-tab-raised {
+    background-color: var(--c-bg-card);
+    border: 1px solid var(--c-border-light);
+    box-shadow: var(--neu-shadow-out-xs);
+    color: var(--c-text-secondary);
+  }
+
+  .neu-tab-raised:hover {
+    box-shadow: var(--neu-shadow-out-sm);
+    color: var(--c-text);
+  }
+
+  /* Soft divider */
+  .neu-divider {
+    height: 1px;
+    background-color: var(--c-border-light);
+  }
+
+  /* Backdrop + modal panel */
+  .neu-overlay {
+    background-color: var(--c-bg-overlay);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+
+  .neu-modal {
+    background-color: var(--c-bg-card);
+    box-shadow: var(--neu-shadow-out);
+  }
+}
+
+/* Neumorphic styling is opt-in. Light, dark, and system still use standard
+   bordered cards and buttons while the two explicit neumorphism preferences
+   enable the soft extruded treatment. */
+html:not(.theme-neu) .neu-card,
+html:not(.theme-neu) .neu-btn,
+html:not(.theme-neu) .neu-chip,
+html:not(.theme-neu) .neu-tab-raised,
+html:not(.theme-neu) .neu-modal {
+  background-color: #ffffff;
+  border: 1px solid var(--c-border-light);
+  box-shadow: none;
+}
+
+html:not(.theme-neu) .neu-card-pressed,
+html:not(.theme-neu) .neu-inset,
+html:not(.theme-neu) .neu-tab-pressed {
+  background-color: #eef2fb;
+  border: 1px solid var(--c-border-light);
+  box-shadow: none;
+}
+
+html:not(.theme-neu) .neu-avatar {
+  box-shadow: none;
+}
+
+html:not(.theme-neu) .neu-btn:hover,
+html:not(.theme-neu) .neu-tab-raised:hover {
+  box-shadow: none;
+}
+
+html.dark:not(.theme-neu) .neu-card,
+html.dark:not(.theme-neu) .neu-btn,
+html.dark:not(.theme-neu) .neu-chip,
+html.dark:not(.theme-neu) .neu-tab-raised,
+html.dark:not(.theme-neu) .neu-modal {
+  background-color: var(--c-bg-card);
+  border: 1px solid var(--c-border);
+  box-shadow: none;
+}
+
+html.dark:not(.theme-neu) .neu-card-pressed,
+html.dark:not(.theme-neu) .neu-inset,
+html.dark:not(.theme-neu) .neu-tab-pressed {
+  background-color: var(--c-bg-input);
+  border: 1px solid var(--c-border);
+  box-shadow: none;
+}
+
+html.dark:not(.theme-neu) .neu-avatar {
+  box-shadow: none;
 }
 
 /* ============================================

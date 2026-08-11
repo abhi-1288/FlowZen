@@ -18,9 +18,7 @@ export function Card({
   const pad = padding === "sm" ? "p-3" : padding === "md" ? "p-5" : "";
   return (
     <section
-      className={`rounded-card border border-border bg-surface ${pad} ${
-        hover ? "transition-default hover:bg-surface-secondary hover:shadow-card-hover" : ""
-      } ${className}`}
+      className={`neu-card rounded-2xl ${pad} ${ hover ? "neu-card-hover" : "" } ${className}`}
     >
       {children}
     </section>
@@ -73,11 +71,11 @@ export function EmptyState({
 // ── Action Button ──
 
 const buttonVariants: Record<string, string> = {
-  primary: "bg-slate-900 text-white hover:bg-slate-800 active:bg-slate-950",
-  secondary: "border border-border bg-surface text-ink hover:bg-surface-secondary active:bg-slate-100",
-  approve: "bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800",
-  danger: "border border-red-200 text-red-600 hover:bg-red-50 active:bg-red-100",
-  ghost: "text-muted hover:text-ink hover:bg-surface-secondary",
+  primary: "neu-btn neu-btn-primary",
+  secondary: "neu-btn",
+  approve: "neu-btn neu-btn-success",
+  danger: "neu-btn neu-btn-danger",
+  ghost: "neu-btn-ghost",
 };
 
 export function ActionButton({
@@ -90,7 +88,7 @@ export function ActionButton({
 }) {
   return (
     <button
-      className={`inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${buttonVariants[variant] ?? buttonVariants.secondary} ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${buttonVariants[variant] ?? buttonVariants.secondary} ${className}`}
       {...props}
     >
       {children}
@@ -197,7 +195,7 @@ export function AvatarBadge({
     return (
       <img
         alt={`${name} avatar`}
-        className={`${base} rounded-full border border-border object-cover ${ring}`}
+        className={`${base} rounded-full neu-avatar object-cover ${ring}`}
         src={avatarUrl}
       />
     );
@@ -205,7 +203,7 @@ export function AvatarBadge({
 
   return (
     <div
-      className={`${base} grid place-items-center rounded-full bg-neutral-100 font-medium text-neutral-600 dark:bg-zinc-700 dark:text-zinc-300 ${ring}`}
+      className={`${base} grid place-items-center rounded-full neu-avatar bg-neutral-100 font-medium text-neutral-600 dark:bg-zinc-700 dark:text-zinc-300 ${ring}`}
     >
       {initials}
     </div>

@@ -119,8 +119,8 @@ export default function SignupPage() {
 
   if (checking) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#fafafa] dark:bg-[#1a1a1a] px-5 py-12">
-        <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] p-8 shadow-sm">
+      <main className="flex min-h-screen items-center justify-center bg-[var(--c-bg)] dark:bg-[#1a1a1a] px-5 py-12">
+        <div className="neu-card w-full max-w-md rounded-2xl p-8">
           <p className="text-center text-sm text-slate-400 dark:text-zinc-500">
             Loading...
           </p>
@@ -130,7 +130,7 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#fafafa] dark:bg-[#1a1a1a] px-5 py-12">
+    <main className="flex min-h-screen items-center justify-center bg-[var(--c-bg)] dark:bg-[#1a1a1a] px-5 py-12">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white">
@@ -146,7 +146,7 @@ export default function SignupPage() {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] p-8 shadow-sm">
+        <div className="neu-card rounded-3xl p-8">
           {step === "details" ? (
             <>
               <form className="space-y-4" onSubmit={register}>
@@ -175,7 +175,7 @@ export default function SignupPage() {
                     Role
                   </label>
                   <select
-                    className="w-full rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] px-4 py-3 text-sm text-slate-900 dark:text-zinc-100 outline-none transition-colors focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
+                    className="neu-inset w-full rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-zinc-100 transition-colors"
                     value={role}
                     onChange={(event) =>
                       setRole(event.target.value as UserRole)
@@ -193,7 +193,7 @@ export default function SignupPage() {
                 </div>
                 <Notice error={error} notice={notice} />
                 <button
-                  className="flex w-full items-center justify-center gap-2.5 rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800 active:bg-slate-950 disabled:opacity-60"
+                  className="neu-btn neu-btn-primary flex w-full items-center justify-center gap-2.5 rounded-full px-5 py-3 text-sm font-medium"
                   disabled={loading}
                 >
                   {loading ? (
@@ -206,11 +206,11 @@ export default function SignupPage() {
               </form>
 
               <div className="my-6 flex items-center gap-4">
-                <span className="h-px flex-1 bg-slate-100 dark:bg-zinc-700" />
+                <span className="neu-divider flex-1" />
                 <span className="text-xs text-slate-400 dark:text-zinc-500">
                   or sign up with
                 </span>
-                <span className="h-px flex-1 bg-slate-100 dark:bg-zinc-700" />
+                <span className="neu-divider flex-1" />
               </div>
               <OAuthProviderIcons />
             </>
@@ -258,7 +258,7 @@ export default function SignupPage() {
                       e.preventDefault();
                     }}
                     id={`otp-${index}`}
-                    className="h-14 w-12 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] text-center text-lg font-semibold text-slate-900 dark:text-zinc-100 outline-none transition-colors focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
+                    className="neu-inset h-14 w-12 rounded-xl text-center text-lg font-semibold text-slate-900 dark:text-zinc-100 transition-colors"
                     required
                   />
                 ))}
@@ -272,7 +272,7 @@ export default function SignupPage() {
               />
               <Notice error={error} notice={notice} />
               <button
-                className="flex w-full items-center justify-center gap-2.5 rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800 active:bg-slate-950 disabled:opacity-60"
+                className="neu-btn neu-btn-primary flex w-full items-center justify-center gap-2.5 rounded-full px-5 py-3 text-sm font-medium"
                 disabled={loading}
               >
                 {loading ? (
@@ -329,7 +329,7 @@ function Field({
       </label>
       <div className="relative">
         <input
-          className={`w-full rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] px-4 py-3 text-sm text-slate-900 dark:text-zinc-100 outline-none transition-colors placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 ${isPassword ? "pr-12" : ""}`}
+          className={`neu-inset w-full rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-zinc-100 transition-colors ${isPassword ? "pr-12" : ""}`}
           type={isPassword && showPassword ? "text" : type}
           value={value}
           placeholder={placeholder}

@@ -48,39 +48,39 @@ export function WeekendModal({
     <>
       <button
         onClick={() => setShowWeekendModal(true)}
-        className="mt-3 rounded-full bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition"
+        className="neu-btn neu-btn-primary mt-3 rounded-full px-4 py-2 text-sm font-medium transition"
         type="button"
       >
         Manage Weekend
         {weekendDates.length > 0 && (
-          <span className="ml-1.5 rounded-full bg-white/20 px-1.5 py-0.5 text-xs text-white">{weekendDates.length}</span>
+          <span className="ml-1.5 rounded-full bg-[var(--c-bg-card)]/20 px-1.5 py-0.5 text-xs text-white">{weekendDates.length}</span>
         )}
       </button>
 
       {showWeekendModal ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setShowWeekendModal(false); }}
         >
-          <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-[#000000]">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4 dark:border-zinc-800/50">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-2xl neu-card dark:border-zinc-800 dark:bg-[#000000]">
+            <div className="flex items-start justify-between gap-4 border-b border-[var(--c-border-light)] px-6 py-4 dark:border-zinc-800/50">
               <div>
                 <h4 className="text-xl font-semibold">Manage Weekends</h4>
                 <p className="mt-0.5 text-sm text-slate-500 dark:text-zinc-400">{weekendDates.length} weekend{weekendDates.length === 1 ? "" : "s"} assigned</p>
               </div>
-              <button className="grid h-10 w-10 place-items-center rounded-full text-slate-500 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-zinc-700" type="button" onClick={() => setShowWeekendModal(false)} aria-label="Close">
+              <button className="grid h-10 w-10 place-items-center rounded-full text-slate-500 hover:bg-[var(--c-bg-muted)] dark:text-zinc-400 dark:hover:bg-zinc-700" type="button" onClick={() => setShowWeekendModal(false)} aria-label="Close">
                 <X size={18} />
               </button>
             </div>
 
-            <div className="border-b border-slate-100 px-6 py-4 dark:border-zinc-800/50">
+            <div className="border-b border-[var(--c-border-light)] px-6 py-4 dark:border-zinc-800/50">
               <div className="flex flex-wrap items-center gap-3">
-                <input className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-zinc-800 dark:bg-[#000000]" type="month" value={weekendMonth} onChange={(event) => setWeekendMonth(event.target.value)} />
+                <input className="rounded-lg neu-inset px-3 py-2 text-sm dark:border-zinc-800 dark:bg-[#000000]" type="month" value={weekendMonth} onChange={(event) => setWeekendMonth(event.target.value)} />
                 <label className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-zinc-300">
                   <input type="checkbox" checked={weekendDays.saturday} onChange={(event) => setWeekendDays({ ...weekendDays, saturday: event.target.checked })} />
                   Saturday
                 </label>
-                <button className="rounded-full bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50" disabled={wfhLoading} type="button" onClick={() => void assignWeekends()}>Assign</button>
+                <button className="neu-btn neu-btn-primary rounded-full px-4 py-2 text-sm font-medium" disabled={wfhLoading} type="button" onClick={() => void assignWeekends()}>Assign</button>
               </div>
             </div>
 
@@ -120,7 +120,7 @@ export function WeekendModal({
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") { e.preventDefault(); const utcStr = `${weekendMonth}-${String(day).padStart(2, "0")}T00:00:00.000Z`; setConfirmDateStr(utcStr); setConfirmDateIsWeekend(isWeekend); setConfirmDateDay(day); setShowDateConfirm(true); }
                         }}
-                        className={`relative min-h-[80px] cursor-pointer rounded-lg border p-1.5 transition hover:shadow-sm ${isWeekend ? "border-indigo-200 bg-indigo-50 dark:border-indigo-800 dark:bg-indigo-950" : "border-slate-100 bg-white hover:border-slate-300 dark:border-zinc-800/50 dark:bg-[#000000]"}`}
+                        className={`relative min-h-[80px] cursor-pointer rounded-lg border p-1.5 transition hover:shadow-sm ${isWeekend ? "border-indigo-200 bg-indigo-50 dark:border-indigo-800 dark:bg-indigo-950" : "border-[var(--c-border-light)] bg-[var(--c-bg-elevated)] hover:border-slate-300 dark:border-zinc-800/50 dark:bg-[#000000]"}`}
                       >
                         <span className="text-xs font-semibold text-slate-600 dark:text-zinc-400">{day}</span>
                         {isWeekend && <div className="mt-1 flex items-center justify-between gap-1 rounded-md bg-indigo-100 px-1.5 py-1 text-[11px] font-medium text-indigo-700 dark:text-indigo-300"><span>Weekend</span></div>}
@@ -134,15 +134,15 @@ export function WeekendModal({
 
             {showDateConfirm && (
               <div
-                className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4"
+                className="fixed inset-0 z-[60] flex items-center justify-center neu-overlay p-4"
                 onClick={(e) => { if (e.target === e.currentTarget) setShowDateConfirm(false); }}
               >
-                <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl dark:bg-[#000000]">
+                <div className="w-full max-w-sm rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl dark:bg-[#000000]">
                   <h4 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">{confirmDateIsWeekend ? "Remove weekend" : "Set as weekend"}</h4>
                   <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">{confirmDateIsWeekend ? `Remove weekend for ${weekendMonth}-${String(confirmDateDay).padStart(2, "0")}?` : `Set ${weekendMonth}-${String(confirmDateDay).padStart(2, "0")} as a weekend?`}</p>
                   <div className="mt-5 flex justify-end gap-3">
-                    <button className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700" type="button" onClick={() => setShowDateConfirm(false)}>Cancel</button>
-                    <button className="rounded-full bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50" type="button" disabled={wfhLoading} onClick={() => {
+                    <button className="rounded-full border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)] dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700" type="button" onClick={() => setShowDateConfirm(false)}>Cancel</button>
+                    <button className="neu-btn neu-btn-primary rounded-full px-4 py-2 text-sm font-medium" type="button" disabled={wfhLoading} onClick={() => {
                       setShowDateConfirm(false);
                       if (confirmDateIsWeekend) {
                         const wd = visibleWeekendDates.find((item) => String(item.date).startsWith(confirmDateStr.slice(0, 10)));

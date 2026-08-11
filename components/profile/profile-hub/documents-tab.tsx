@@ -21,31 +21,22 @@ export function DocumentsTab({
   const isHrOrAdmin = ["human-resource", "admin", "finance"].includes(String(actorRole ?? ""));
   const [subTab, setSubTab] = useState<"required" | "upload">("upload");
 
-  const sectionClass =
-    "rounded-xl border border-slate-200 bg-white p-5";
+  const sectionClass = "rounded-xl neu-card p-5";
 
   return (
     <div className="space-y-6">
       {isHrOrAdmin ? (
-        <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
+        <div className="flex gap-1 rounded-xl bg-[var(--c-bg-muted)] p-1">
           <button
             type="button"
-            className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${
-              subTab === "required"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
+            className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${ subTab === "required" ? "neu-tab-pressed" : "text-slate-500 hover:text-slate-700" }`}
             onClick={() => setSubTab("required")}
           >
             Required Documents
           </button>
           <button
             type="button"
-            className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${
-              subTab === "upload"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
+            className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${ subTab === "upload" ? "neu-tab-pressed" : "text-slate-500 hover:text-slate-700" }`}
             onClick={() => setSubTab("upload")}
           >
             Upload Documents
@@ -151,8 +142,7 @@ function RequiredDocumentsSection({
     setDirty(true);
   }
 
-  const sectionClass =
-    "rounded-xl border border-slate-200 bg-white p-5";
+  const sectionClass = "rounded-xl neu-card p-5";
 
   return (
     <section className={sectionClass}>
@@ -170,7 +160,7 @@ function RequiredDocumentsSection({
           {categories.length > 0 ? (
             <div className="mb-4 space-y-2">
               {categories.map((cat, i) => (
-                <div key={i} className="rounded-lg border border-slate-200 bg-slate-50">
+                <div key={i} className="rounded-lg neu-inset">
                   <div className="flex items-center gap-2 px-3 py-2 text-sm">
                     <button
                       type="button"
@@ -180,7 +170,7 @@ function RequiredDocumentsSection({
                       {expanded[i] ? "▾" : "▸"}
                     </button>
                     <span className="flex-1 font-medium text-slate-800">{cat.name}</span>
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${cat.mandatory ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"}`}>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${cat.mandatory ? "bg-rose-100 text-rose-700" : "bg-[var(--c-bg-muted)] text-slate-600"}`}>
                       {cat.mandatory ? "Mandatory" : "Optional"}
                     </span>
                     <button
@@ -196,7 +186,7 @@ function RequiredDocumentsSection({
                   </div>
 
                   {expanded[i] ? (
-                    <div className="border-t border-slate-200 px-4 pb-3 pt-2 space-y-3">
+                    <div className="border-t border-[var(--c-border-light)] px-4 pb-3 pt-2 space-y-3">
                       {/* File type toggles */}
                       <div>
                         <p className="mb-1 text-xs font-medium text-slate-500">Accepted file types</p>
@@ -207,11 +197,7 @@ function RequiredDocumentsSection({
                               <button
                                 key={ext}
                                 type="button"
-                                className={`rounded px-2 py-1 text-xs font-medium border transition ${
-                                  selected
-                                    ? "bg-slate-800 text-white border-slate-800"
-                                    : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
-                                }`}
+                                className={`neu-btn rounded px-2 py-1 text-xs font-medium transition ${ selected ? "neu-tab-pressed" : "neu-tab-raised" }`}
                                 onClick={() => toggleFileType(i, ext)}
                               >
                                 .{ext}
@@ -233,12 +219,12 @@ function RequiredDocumentsSection({
                                   placeholder="Field label (e.g. Aadhaar Number)"
                                   value={f.label}
                                   onChange={(e) => updateField(i, fi, "label", e.target.value)}
-                                  className="flex-1 rounded border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-slate-950"
+                                  className="neu-inset flex-1 rounded px-2 py-1.5 text-xs"
                                 />
                                 <select
                                   value={f.type}
                                   onChange={(e) => updateField(i, fi, "type", e.target.value)}
-                                  className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs"
+                                  className="rounded neu-card px-2 py-1.5 text-xs"
                                 >
                                   <option value="text">Text</option>
                                   <option value="number">Number</option>
@@ -267,7 +253,7 @@ function RequiredDocumentsSection({
                       </div>
                     </div>
                   ) : (
-                    <div className="border-t border-slate-200 px-4 pb-2 pt-1 text-xs text-slate-400">
+                    <div className="border-t border-[var(--c-border-light)] px-4 pb-2 pt-1 text-xs text-slate-400">
                       {(cat.acceptedFileTypes ?? []).length > 0
                         ? `Types: ${cat.acceptedFileTypes.map((t) => `.${t}`).join(", ")}`
                         : "No file type restriction"}
@@ -287,12 +273,12 @@ function RequiredDocumentsSection({
               placeholder="Document name (e.g. Resume, Aadhaar)"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-950"
+              className="neu-inset flex-1 rounded-lg px-3 py-2 text-sm"
             />
             <select
               value={newMandatory ? "yes" : "no"}
               onChange={(e) => setNewMandatory(e.target.value === "yes")}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+              className="rounded-lg neu-card px-3 py-2 text-sm"
             >
               <option value="no">Optional</option>
               <option value="yes">Mandatory</option>
@@ -510,10 +496,10 @@ function DocumentsUploadSection({
         {categories.map((cat) => {
           const doc = documents[cat.name];
           return (
-            <div key={cat.name} className="rounded-lg border border-slate-200 bg-white p-4">
+            <div key={cat.name} className="rounded-lg neu-card p-4">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-sm font-medium text-slate-800">{cat.name}</span>
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${cat.mandatory ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"}`}>
+                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${cat.mandatory ? "bg-rose-100 text-rose-700" : "bg-[var(--c-bg-muted)] text-slate-600"}`}>
                   {cat.mandatory ? "Required" : "Optional"}
                 </span>
                 {(cat.acceptedFileTypes ?? []).length > 0 ? (
@@ -541,7 +527,7 @@ function DocumentsUploadSection({
                                 [cat.name]: { ...(fieldDrafts[cat.name] ?? {}), [f.label]: e.target.value },
                               })
                             }
-                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-950"
+                            className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
                           />
                         )}
                       </div>
@@ -558,7 +544,7 @@ function DocumentsUploadSection({
                       <span className="ml-1">({(doc.fileSize / 1024).toFixed(0)} KB)</span>
                     </div>
                     <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer"
-                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
+                      className="rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)] transition"
                     >
                       View
                     </a>
@@ -574,7 +560,7 @@ function DocumentsUploadSection({
                     <div className="flex-1" />
                     <div className="flex flex-col items-end gap-1">
                       <button type="button"
-                        className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 transition"
+                        className="neu-btn neu-btn-primary rounded-lg px-3 py-1.5 text-xs font-medium transition"
                         onClick={() => handlePickFile(cat.name)}
                       >
                         Upload
@@ -592,18 +578,18 @@ function DocumentsUploadSection({
       {/* Upload preview modal */}
       {preview ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4"
           onClick={(e) => { if (e.target === e.currentTarget) closePreview(); }}
         >
-          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-xl">
-            <div className="border-b border-slate-100 px-6 py-4">
+          <div className="w-full max-w-lg rounded-2xl neu-card">
+            <div className="border-b border-[var(--c-border-light)] px-6 py-4">
               <h4 className="text-lg font-semibold text-slate-900">Preview & Upload</h4>
               <p className="mt-0.5 text-sm text-slate-500">{preview.category}</p>
             </div>
 
             <div className="px-6 py-4 space-y-4">
               {/* File preview */}
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div className="rounded-lg neu-inset p-4">
                 {preview.file.type.startsWith("image/") ? (
                   <img
                     src={preview.previewUrl}
@@ -640,7 +626,7 @@ function DocumentsUploadSection({
                               [cat.name]: { ...(fieldDrafts[cat.name] ?? {}), [f.label]: e.target.value },
                             })
                           }
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-950"
+                          className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
                         />
                       </div>
                     ))}
@@ -649,7 +635,7 @@ function DocumentsUploadSection({
               })()}
             </div>
 
-            <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">
+            <div className="flex justify-end gap-3 border-t border-[var(--c-border-light)] px-6 py-4">
               <ActionButton variant="secondary" type="button" onClick={closePreview}>
                 Cancel
               </ActionButton>

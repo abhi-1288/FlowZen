@@ -303,7 +303,7 @@ export function OnboardingTab({
     }
   }
 
-  const sectionBase = "rounded-xl border border-slate-200 bg-white p-5";
+  const sectionBase = "rounded-xl neu-card p-5";
 
   return (
     <div className="grid gap-5 xl:grid-cols-2">
@@ -323,7 +323,7 @@ export function OnboardingTab({
             {company ? null : (
               <CodePanel title="Create a company" code={undefined} label="HR code" empty="Register a company to generate onboarding codes." showToast={showToast}>
                 <form className="mt-4 flex gap-2" onSubmit={createCompany}>
-                  <input className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2.5" placeholder="Company name" value={companyName} onChange={(event) => setCompanyName(event.target.value)} />
+                  <input className="min-w-0 flex-1 rounded-lg border border-[var(--c-border-light)] px-3 py-2.5" placeholder="Company name" value={companyName} onChange={(event) => setCompanyName(event.target.value)} />
                   <ActionButton variant="primary">Register</ActionButton>
                 </form>
               </CodePanel>
@@ -357,7 +357,7 @@ export function OnboardingTab({
                 disabled={Boolean(insights?.pendingQuit) || replacementHrCandidates.length === 0} type="button" onClick={() => setHrQuitModal(true)}>
                 {pendingQuitText("Request Quit Company")}
               </button>
-              {insights?.pendingQuit ? <button className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50" type="button" onClick={() => setCancelQuitModal(true)}>Cancel Request</button> : null}
+              {insights?.pendingQuit ? <button className="mt-2 w-full rounded-lg neu-card px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]" type="button" onClick={() => setCancelQuitModal(true)}>Cancel Request</button> : null}
               {replacementHrCandidates.length === 0 ? <p className="mt-2 text-xs text-amber-700">Another approved HR is required before you can quit.</p> : null}
             </section>
           </>
@@ -381,7 +381,7 @@ export function OnboardingTab({
                 <p className="mt-0.5 text-sm text-slate-500">{isSeniorSecurity ? "You are a senior security member." : "You are a junior security member."}</p>
               </div>
               <div className="mt-5 space-y-4">
-                <div className="rounded-lg border border-slate-200 p-4">
+                <div className="rounded-lg border border-[var(--c-border-light)] p-4">
                   <div className="flex justify-between gap-4"><span className="text-slate-500">Company</span><span className="font-medium">{company?.name ? String(company.name) : "Not assigned"}</span></div>
                   <div className="mt-3 flex justify-between gap-4"><span className="text-slate-500">Role</span><span className="font-medium capitalize">{isSeniorSecurity ? "Senior Security" : "Junior Security"}</span></div>
                   <div className="mt-3 flex justify-between gap-4"><span className="text-slate-500">Status</span><span className="font-medium capitalize text-emerald-600">{String(profile?.companyStatus)}</span></div>
@@ -393,7 +393,7 @@ export function OnboardingTab({
                   disabled={Boolean(insights?.pendingQuit)} onClick={requestManagerQuit}>
                   {pendingQuitText("Request Quit Company")}
                 </button>
-                {insights?.pendingQuit ? <button className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50" onClick={() => setCancelQuitModal(true)} type="button">Cancel Request</button> : null}
+                {insights?.pendingQuit ? <button className="w-full rounded-lg neu-card px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]" onClick={() => setCancelQuitModal(true)} type="button">Cancel Request</button> : null}
               </div>
             </section>
           </>
@@ -424,20 +424,20 @@ export function OnboardingTab({
                 <p className="mt-0.5 text-sm text-slate-500">You are currently assigned to a company.</p>
               </div>
               <div className="mt-5 space-y-4">
-                <div className="rounded-lg border border-slate-200 p-4">
+                <div className="rounded-lg border border-[var(--c-border-light)] p-4">
                   <div className="flex justify-between gap-4"><span className="text-slate-500">Company</span><span className="font-medium">{company?.name ? String(company.name) : "Not assigned"}</span></div>
                   <div className="mt-3 flex justify-between gap-4"><span className="text-slate-500">Total Team</span><span className="font-medium">{Array.isArray(managerTeams) ? `${managerTeams.length} (${createdTeamsCount} created)` : "No team created"}</span></div>
                   <div className="mt-3 flex justify-between gap-4"><span className="text-slate-500">Status</span><span className="font-medium capitalize text-emerald-600">{String(profile?.companyStatus)}</span></div>
                 </div>
                 {canCreateMoreTeams ? (
                   <form className="flex gap-2" onSubmit={createTeam}>
-                    <input className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2.5" placeholder="Team name" value={teamName} onChange={(event) => setTeamName(event.target.value)} />
-                    <button className="rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white"><Plus size={16} /></button>
+                    <input className="min-w-0 flex-1 rounded-lg border border-[var(--c-border-light)] px-3 py-2.5" placeholder="Team name" value={teamName} onChange={(event) => setTeamName(event.target.value)} />
+                    <button className="neu-btn neu-btn-primary rounded-lg px-4 py-2.5 text-sm font-medium"><Plus size={16} /></button>
                   </form>
                 ) : (
                   <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">Team creation limit reached ({createdTeamsCount}/{teamLimit}).</p>
                 )}
-                <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                <p className="rounded-lg bg-[var(--c-bg-muted)] px-3 py-2 text-sm text-slate-600">
                   {role === "human-resource" ? "HR" : role === "admin" ? "Admins" : "Managers"} can create up to {teamLimit} teams. Created: {createdTeamsCount}/{teamLimit} &middot; Total managed: {managerTeams.length}
                 </p>
                 {managerTeams.length > 0 ? (
@@ -445,7 +445,7 @@ export function OnboardingTab({
                     <p className="mb-2 text-xs font-semibold uppercase text-slate-500">My Teams</p>
                     <div className="space-y-1">
                       {managerTeams.map((t) => (
-                        <div key={String(t.id)} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                        <div key={String(t.id)} className="flex items-center justify-between rounded-lg bg-[var(--c-bg-muted)] px-3 py-2 text-sm">
                           <span className="font-medium text-slate-900">{String(t.name ?? "")}</span>
                           <span className="text-xs text-slate-500">{Number(t.employeeCount ?? 0)} employees</span>
                         </div>
@@ -457,7 +457,7 @@ export function OnboardingTab({
                   disabled={Boolean(insights?.pendingQuit)} onClick={() => setRoleQuitModal(true)} type="button">
                   {pendingQuitText("Request Quit Company")}
                 </button>
-                {insights?.pendingQuit ? <button className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50" onClick={() => setCancelQuitModal(true)} type="button">Cancel Request</button> : null}
+                {insights?.pendingQuit ? <button className="w-full rounded-lg neu-card px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]" onClick={() => setCancelQuitModal(true)} type="button">Cancel Request</button> : null}
               </div>
             </section>
 
@@ -473,7 +473,7 @@ export function OnboardingTab({
                     const otherCode = String(teamItem.otherJoinCode ?? "");
                     const teamName = String(teamItem.name ?? "Team");
                     return (
-                      <div key={String(teamItem.id)} className="rounded-lg border border-slate-200 p-4">
+                      <div key={String(teamItem.id)} className="rounded-lg border border-[var(--c-border-light)] p-4">
                         <div className="mb-2 flex items-center justify-between gap-3">
                           <p className="text-sm font-semibold text-slate-800">{teamName}</p>
                           <span className="text-xs text-slate-500">{Number(teamItem.employeeCount ?? 0)} employees</span>
@@ -483,12 +483,12 @@ export function OnboardingTab({
                           ...(otherCode ? [{ code: otherCode, label: "Others code" }] : []),
                         ].map((item) => (
                           <div className="mb-3 last:mb-0" key={item.code}>
-                            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3">
+                            <div className="rounded-lg border border-dashed border-slate-300 bg-[var(--c-bg-muted)] p-3">
                               <p className="text-xs font-semibold uppercase text-slate-500">{item.label}</p>
                               <div className="mt-2 flex items-center justify-between gap-3">
                                 <p className="min-w-0 truncate font-mono text-sm font-semibold text-indigo-700">{item.code}</p>
                                 <button aria-label={`Copy ${teamName} ${item.label}`}
-                                  className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                                  className="grid h-9 w-9 place-items-center rounded-lg neu-card text-slate-700 hover:bg-[var(--c-bg-muted)]"
                                   onClick={() => { navigator.clipboard.writeText(item.code); showToast(`${teamName} ${item.label.toLowerCase()} copied.`); }} title="Copy code" type="button">
                                   <Users size={20} />
                                 </button>
@@ -522,7 +522,7 @@ export function OnboardingTab({
                       const tid = String(t.id ?? "");
                       const checked = teamTransferTeamIds.includes(tid);
                       return (
-                        <label key={tid} className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50">
+                        <label key={tid} className="flex cursor-pointer items-center gap-3 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm hover:bg-[var(--c-bg-muted)]">
                           <input type="checkbox" className="size-4 accent-slate-900" checked={checked} onChange={() => setTeamTransferTeamIds((prev) => checked ? prev.filter((id) => id !== tid) : [...prev, tid])} />
                           <div className="min-w-0 flex-1">
                             <p className="font-medium text-slate-900">{String(t.name ?? "Team")}</p>
@@ -533,7 +533,7 @@ export function OnboardingTab({
                     })}
                     <div>
                       <label className="text-xs font-semibold uppercase text-slate-500">Replacement</label>
-                      <select className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" value={teamTransferReplacementId}
+                      <select className="mt-1 w-full rounded-lg neu-inset px-3 py-2 text-sm" value={teamTransferReplacementId}
                         onChange={(e) => setTeamTransferReplacementId(e.target.value)}>
                         <option value="">Select replacement</option>
                         {replacementRoleCandidates.map((member) => (
@@ -561,13 +561,13 @@ export function OnboardingTab({
                 {(role === "admin" ? transferTeams : managerTeams).length > 0 ? (
                   (role === "admin" ? transferTeams : managerTeams).map((t) => (
                     <button key={String(t.id)} type="button" onClick={() => setTeamModal(t)}
-                      className="flex w-full items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-left text-sm hover:bg-slate-100">
+                      className="flex w-full items-center justify-between rounded-lg bg-[var(--c-bg-muted)] px-3 py-2 text-left text-sm hover:bg-[var(--c-bg-muted)]">
                       <span>{String(t.name)}</span>
                       <span className="font-medium">{Number(t.employeeCount ?? 0)} employees</span>
                     </button>
                   ))
                 ) : (
-                  <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">No teams yet.</p>
+                  <p className="rounded-lg bg-[var(--c-bg-muted)] px-3 py-2 text-sm text-slate-500">No teams yet.</p>
                 )}
               </div>
             </section>
@@ -601,7 +601,7 @@ export function OnboardingTab({
                 <p className="mt-0.5 text-sm text-slate-500">You are currently approved in this company.</p>
               </div>
               <div className="mt-5 space-y-4">
-                <div className="rounded-lg border border-slate-200 p-4">
+                <div className="rounded-lg border border-[var(--c-border-light)] p-4">
                   <div className="flex justify-between gap-4"><span className="text-slate-500">Company</span><span className="font-medium">{company?.name ? String(company.name) : "Not assigned"}</span></div>
                   <div className="mt-3 flex justify-between gap-4"><span className="text-slate-500">Team</span><span className="font-medium">{team?.name ? String(team.name) : "Not assigned"}</span></div>
                   <div className="mt-3 flex justify-between gap-4"><span className="text-slate-500">Manager Name</span><span className="font-medium">{typeof team?.manager === "object" && team?.manager ? ((team.manager as { name?: string })?.name ?? "Not assigned") : "Not assigned"}</span></div>
@@ -617,7 +617,7 @@ export function OnboardingTab({
                   disabled={Boolean(insights?.pendingQuit)} onClick={requestManagerQuit}>
                   {pendingQuitText("Request Quit Company")}
                 </button>
-                {insights?.pendingQuit ? <button className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50" onClick={() => setCancelQuitModal(true)} type="button">Cancel Request</button> : null}
+                {insights?.pendingQuit ? <button className="w-full rounded-lg neu-card px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]" onClick={() => setCancelQuitModal(true)} type="button">Cancel Request</button> : null}
               </div>
             </section>
             {teamJoinStatus !== "approved" ? (

@@ -24,9 +24,9 @@ export default function JobBoardPage() {
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="border-b border-slate-200 bg-white px-4 py-3">
+      <header className="border-b border-[var(--c-border-light)] bg-[var(--c-bg-card)] px-4 py-3">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.push(`/recruitment/jobs/${id}`)} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100">
+          <button onClick={() => router.push(`/recruitment/jobs/${id}`)} className="rounded-md p-1.5 text-slate-500 hover:bg-[var(--c-bg-muted)]">
             <ArrowLeft size={18} />
           </button>
           <div>

@@ -16,7 +16,7 @@ export function LeaveImpactSection({
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-xs font-medium uppercase text-slate-500">
+            <tr className="border-b border-[var(--c-border-light)] text-xs font-medium uppercase text-slate-500">
               <th className="pb-3 pr-4">Employee</th>
               <th className="pb-3 pr-4">Leaves</th>
               <th className="pb-3 text-right">Salary Deduction</th>
@@ -24,7 +24,7 @@ export function LeaveImpactSection({
           </thead>
           <tbody>
             {leaveImpacts.map((li, idx) => (
-              <tr className="border-b border-slate-100" key={idx}>
+              <tr className="border-b border-[var(--c-border-light)]" key={idx}>
                 <td className="py-2 pr-4 font-medium">{li.employeeName}</td>
                 <td className="py-2 pr-4">{li.leaves}</td>
                 <td className="py-2 text-right text-rose-600">- &#x20B9;{li.deduction.toLocaleString("en-IN")}</td>
@@ -32,7 +32,7 @@ export function LeaveImpactSection({
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t border-slate-200 font-semibold">
+            <tr className="border-t border-[var(--c-border-light)] font-semibold">
               <td className="pt-3 pr-4">Total</td>
               <td className="pt-3 pr-4">{leaveImpacts.reduce((s, li) => s + li.leaves, 0)}</td>
               <td className="pt-3 text-right">- &#x20B9;{leaveImpacts.reduce((s, li) => s + li.deduction, 0).toLocaleString("en-IN")}</td>

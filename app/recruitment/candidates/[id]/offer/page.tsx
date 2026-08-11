@@ -55,7 +55,7 @@ export default function CandidateOfferLetterPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-100">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--c-bg-muted)]">
         <p className="text-slate-500">Loading letter...</p>
       </div>
     );
@@ -63,7 +63,7 @@ export default function CandidateOfferLetterPage() {
 
   if (error || !offer) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-100">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--c-bg-muted)]">
         <p className="text-rose-600">{error || "Offer not found."}</p>
       </div>
     );
@@ -81,17 +81,13 @@ export default function CandidateOfferLetterPage() {
   const amountPeriodLabel = isMonthlySalary ? "month" : "year";
 
   return (
-    <div className="min-h-screen bg-slate-100 print:bg-white">
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3 print:hidden">
+    <div className="min-h-screen bg-[var(--c-bg-muted)] print:bg-[var(--c-bg-card)]">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--c-border-light)] bg-[var(--c-bg-card)] px-6 py-3 print:hidden">
         <h1 className="text-lg font-semibold text-slate-900">Offer Letter</h1>
         <div className="flex items-center gap-3">
-          <span className={`rounded-full px-3 py-1 text-sm font-medium ${
-            offer.status === "draft" ? "bg-amber-50 text-amber-700" :
-            offer.status === "sent" || offer.status === "accepted" ? "bg-emerald-50 text-emerald-700" :
-            "bg-rose-50 text-rose-700"
-          }`}>{offer.status}</span>
+          <span className={`rounded-full px-3 py-1 text-sm font-medium ${ offer.status === "draft" ? "bg-amber-50 text-amber-700" : offer.status === "sent" || offer.status === "accepted" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700" }`}>{offer.status}</span>
           <button
-            className="rounded-full bg-slate-950 px-5 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            className="neu-btn neu-btn-primary rounded-full px-5 py-2 text-sm font-medium"
             onClick={() => window.print()}
           >
             Download PDF
@@ -99,13 +95,13 @@ export default function CandidateOfferLetterPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-[210mm] bg-white p-10 shadow-lg print:mx-auto print:min-h-screen print:shadow-none print:p-6 print:text-[11px]">
+      <div className="mx-auto max-w-[210mm] bg-[var(--c-bg-card)] p-10 shadow-lg print:mx-auto print:min-h-screen print:shadow-none print:p-6 print:text-[11px]">
         <div className="mb-8 text-center print:mb-4">
           <div className="flex items-center justify-center gap-3">
             {companyIcon ? (
               <img src={companyIcon} alt="" className="h-10 w-10 rounded-lg object-cover" />
             ) : (
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white">
+              <div className="neu-btn neu-btn-primary flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold">
                 {companyName[0]}
               </div>
             )}
@@ -132,7 +128,7 @@ export default function CandidateOfferLetterPage() {
             We were impressed with your qualifications and believe your skills and experience will be a valuable addition to our team.
           </p>
 
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 print:p-2">
+          <div className="rounded-lg neu-inset p-4 print:p-2">
             <table className="w-full text-sm">
               <tbody>
                 <tr>
@@ -177,39 +173,39 @@ export default function CandidateOfferLetterPage() {
 
           <div className="mt-6 print:mt-4">
             <h3 className="mb-3 text-sm font-semibold text-slate-900 print:mb-2">Compensation Summary ({compensationPeriod})</h3>
-            <div className="overflow-hidden rounded-lg border border-slate-200">
+            <div className="overflow-hidden rounded-lg border border-[var(--c-border-light)]">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-slate-100">
+                  <tr className="bg-[var(--c-bg-muted)]">
                     <th className="px-4 py-2.5 text-left font-semibold text-slate-700 print:px-2 print:py-1">Component</th>
                     <th className="px-4 py-2.5 text-right font-semibold text-slate-700 print:px-2 print:py-1">Amount (per {amountPeriodLabel})</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  <tr className="bg-white">
+                  <tr className="bg-[var(--c-bg-elevated)]">
                     <td className="px-4 py-2.5 text-slate-700 print:px-2 print:py-1">Gross CTC</td>
                     <td className="px-4 py-2.5 text-right font-medium text-slate-900 print:px-2 print:py-1">₹{Number(offer.offeredCTC).toLocaleString()}</td>
                   </tr>
                   {pfAmt > 0 ? (
-                    <tr className="bg-white">
+                    <tr className="bg-[var(--c-bg-elevated)]">
                       <td className="px-4 py-2.5 text-slate-600 print:px-2 print:py-1">- PF Deduction</td>
                       <td className="px-4 py-2.5 text-right text-rose-600 print:px-2 print:py-1">- ₹{pfAmt.toLocaleString()}</td>
                     </tr>
                   ) : null}
                   {esicAmt > 0 ? (
-                    <tr className="bg-white">
+                    <tr className="bg-[var(--c-bg-elevated)]">
                       <td className="px-4 py-2.5 text-slate-600 print:px-2 print:py-1">- ESIC Deduction</td>
                       <td className="px-4 py-2.5 text-right text-rose-600 print:px-2 print:py-1">- ₹{esicAmt.toLocaleString()}</td>
                     </tr>
                   ) : null}
                   {foodAmt > 0 ? (
-                    <tr className="bg-white">
+                    <tr className="bg-[var(--c-bg-elevated)]">
                       <td className="px-4 py-2.5 text-slate-600 print:px-2 print:py-1">- Food Accommodation</td>
                       <td className="px-4 py-2.5 text-right text-rose-600 print:px-2 print:py-1">- ₹{foodAmt.toLocaleString()}</td>
                     </tr>
                   ) : null}
                   {travelAmt > 0 ? (
-                    <tr className="bg-white">
+                    <tr className="bg-[var(--c-bg-elevated)]">
                       <td className="px-4 py-2.5 text-slate-600 print:px-2 print:py-1">- Travel Accommodation</td>
                       <td className="px-4 py-2.5 text-right text-rose-600 print:px-2 print:py-1">- ₹{travelAmt.toLocaleString()}</td>
                     </tr>
@@ -275,7 +271,7 @@ export default function CandidateOfferLetterPage() {
           </div>
         </div>
 
-        <div className="mt-12 border-t border-slate-200 pt-4 text-center text-xs text-slate-400 print:mt-6 print:pt-2 print:text-[9px]">
+        <div className="mt-12 border-t border-[var(--c-border-light)] pt-4 text-center text-xs text-slate-400 print:mt-6 print:pt-2 print:text-[9px]">
           {offer.joiningDate && (
             <p className="mb-2 text-slate-600">
               Please bring this Offer Letter to {companyName} on your joining date ({new Date(offer.joiningDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}).

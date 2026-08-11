@@ -279,7 +279,7 @@ export default function CandidateProfilePage() {
             <select
               value={id}
               onChange={(e) => handleCandidateSwitch(e.target.value)}
-              className="appearance-none rounded-lg border border-slate-200 bg-white px-3 py-1.5 pr-8 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500"
+              className="neu-inset appearance-none rounded-lg px-3 py-1.5 pr-8 text-sm text-slate-700"
             >
               {candidateList.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -295,11 +295,11 @@ export default function CandidateProfilePage() {
         )}
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="rounded-xl neu-card p-6">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-950 text-lg font-bold text-white">
+              <div className="neu-btn neu-btn-primary flex h-14 w-14 items-center justify-center rounded-full text-lg font-bold">
                 {activeCandidate.firstName[0]}
                 {activeCandidate.lastName[0]}
               </div>
@@ -315,7 +315,7 @@ export default function CandidateProfilePage() {
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-600">
               {jobTitle && (
-                <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium">
+                <span className="rounded-lg bg-[var(--c-bg-muted)] px-2.5 py-1 text-xs font-medium">
                   {jobTitle}
                 </span>
               )}
@@ -368,7 +368,7 @@ export default function CandidateProfilePage() {
                           (activeCandidate.job as any).id,
                       })
                     }
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
                   >
                     <Briefcase size={14} /> Job Description
                   </button>
@@ -406,13 +406,13 @@ export default function CandidateProfilePage() {
             <a
               href={activeCandidate.resumeUrl}
               target="_blank"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
             >
               <Download size={14} /> Resume
             </a>
           )}
           <div className="flex flex-col gap-1">
-            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]">
               <Upload size={14} /> Upload Resume
               <input
                 type="file"
@@ -427,7 +427,7 @@ export default function CandidateProfilePage() {
             <a
               href={(activeCandidate as any).linkedInUrl}
               target="_blank"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-sky-600 hover:bg-sky-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-sky-600 hover:bg-sky-50"
             >
               LinkedIn
             </a>
@@ -436,7 +436,7 @@ export default function CandidateProfilePage() {
             <a
               href={(activeCandidate as any).portfolioUrl}
               target="_blank"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
             >
               Portfolio
             </a>
@@ -445,7 +445,7 @@ export default function CandidateProfilePage() {
 
         {/* Assigned Team */}
         {assignedTeam.length > 0 && (
-          <div className="mt-4 rounded-lg bg-slate-50 p-3">
+          <div className="mt-4 rounded-lg bg-[var(--c-bg-muted)] p-3">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
               Assigned Interviewers
             </p>
@@ -456,7 +456,7 @@ export default function CandidateProfilePage() {
                   className="flex items-center justify-between text-xs"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="rounded bg-slate-200 px-1.5 py-0.5 font-medium capitalize">
+                    <span className="rounded bg-[var(--c-bg-hover)] px-1.5 py-0.5 font-medium capitalize">
                       {a.role}
                     </span>
                     <span className="text-slate-500">{a.roundType}</span>
@@ -466,25 +466,13 @@ export default function CandidateProfilePage() {
                       <span className="text-amber-600">Unassigned</span>
                     )}
                     <span
-                      className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                        a.status === "completed"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : a.status === "in-progress"
-                            ? "bg-amber-50 text-amber-700"
-                            : "bg-slate-200 text-slate-500"
-                      }`}
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${ a.status === "completed" ? "bg-emerald-50 text-emerald-700" : a.status === "in-progress" ? "bg-amber-50 text-amber-700" : "bg-[var(--c-bg-hover)] text-slate-500" }`}
                     >
                       {a.status}
                     </span>
                     {a.feedback && (
                       <span
-                        className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                          a.feedback === "suitable"
-                            ? "bg-emerald-50 text-emerald-700"
-                            : a.feedback === "not-suitable"
-                              ? "bg-rose-50 text-rose-700"
-                              : "bg-amber-50 text-amber-700"
-                        }`}
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${ a.feedback === "suitable" ? "bg-emerald-50 text-emerald-700" : a.feedback === "not-suitable" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700" }`}
                       >
                         {a.feedback}
                       </span>
@@ -511,13 +499,7 @@ export default function CandidateProfilePage() {
               Stage
             </p>
             <span
-              className={`rounded-full px-3 py-1 text-sm font-semibold ${
-                activeCandidate.stage === "joined"
-                  ? "bg-emerald-50 text-emerald-700"
-                  : activeCandidate.stage === "rejected"
-                    ? "bg-rose-50 text-rose-700"
-                    : "bg-indigo-50 text-indigo-700"
-              }`}
+              className={`rounded-full px-3 py-1 text-sm font-semibold ${ activeCandidate.stage === "joined" ? "bg-emerald-50 text-emerald-700" : activeCandidate.stage === "rejected" ? "bg-rose-50 text-rose-700" : "bg-indigo-50 text-indigo-700" }`}
             >
               {STAGE_LABELS[activeCandidate.stage]}
             </span>
@@ -534,13 +516,13 @@ export default function CandidateProfilePage() {
                         ? "bg-slate-950 text-white"
                         : idx < currentStageIndex
                           ? "bg-emerald-50 text-emerald-700"
-                          : "bg-slate-100 text-slate-400 hover:bg-slate-200",
+                          : "bg-[var(--c-bg-muted)] text-slate-400 hover:bg-[var(--c-bg-hover)]",
                     )}
                   >
                     {STAGE_LABELS[stage]}
                   </button>
                   {idx < STAGES.length - 1 && (
-                    <div className="h-px flex-1 bg-slate-200" />
+                    <div className="h-px flex-1 bg-[var(--c-bg-hover)]" />
                   )}
                 </div>
               ))}
@@ -556,7 +538,7 @@ export default function CandidateProfilePage() {
                 onClick={() =>
                   setModal({ type: "schedule-interview", candidateId: id })
                 }
-                className="inline-flex items-center gap-1.5 rounded-full bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                className="neu-btn neu-btn-primary inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium"
               >
                 <Calendar size={14} /> Schedule Interview
               </button>
@@ -564,20 +546,20 @@ export default function CandidateProfilePage() {
                 onClick={() =>
                   setModal({ type: "generate-offer", candidateId: id })
                 }
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
               >
                 <FileText size={14} /> Generate Offer
               </button>
               <button
                 onClick={() => setShowAssignForm(!showAssignForm)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
               >
                 <UserPlus size={14} /> Assign Interviewer
               </button>
               {activeCandidate.stage === "joined" && (
                 <button
                   onClick={() => setShowConvertModal(true)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700"
+                className="neu-btn neu-btn-success inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium"
               >
                 <Briefcase size={14} /> Convert To Employee
                 </button>
@@ -585,7 +567,7 @@ export default function CandidateProfilePage() {
               {isSeniorSecurity && activeCandidate.stage === "joined" && (
                 <button
                   onClick={() => setShowConvertModal(true)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700"
+                className="neu-btn neu-btn-success inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium"
               >
                 <Briefcase size={14} /> Convert To Junior Security
                 </button>
@@ -614,14 +596,14 @@ export default function CandidateProfilePage() {
 
           {/* Stage change request for assigned non-HR */}
           {!isHr && myAssignment && myAssignment.status !== "completed" && (
-            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-amber-50 p-2">
+            <div className="flex items-center gap-2 rounded-lg border border-[var(--c-border-light)] bg-amber-50 p-2">
               <span className="text-xs font-medium text-amber-700">
                 Complete your round:
               </span>
               <select
                 value={stageFeedback}
                 onChange={(e) => setStageFeedback(e.target.value)}
-                className="rounded border border-amber-200 bg-white px-2 py-1 text-xs outline-none"
+                className="rounded border border-amber-200 bg-[var(--c-bg-card)] px-2 py-1 text-xs outline-none"
               >
                 <option value="suitable">Suitable</option>
                 <option value="not-suitable">Not Suitable</option>
@@ -641,7 +623,7 @@ export default function CandidateProfilePage() {
 
         {/* Assign Interviewer Form */}
         {showAssignForm && isHr && (
-          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <div className="mt-4 rounded-lg neu-inset p-4">
             <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
               Assign Interviewer
             </p>
@@ -654,7 +636,7 @@ export default function CandidateProfilePage() {
                     setAssignRole(e.target.value);
                     void fetchUsersByRole(e.target.value);
                   }}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none"
+                  className="neu-inset rounded-lg px-3 py-2 text-sm"
                 >
                   <option value="project-manager">Project Manager</option>
                   <option value="qa-tester">QA Tester</option>
@@ -670,7 +652,7 @@ export default function CandidateProfilePage() {
                 <select
                   value={assignRoundType}
                   onChange={(e) => setAssignRoundType(e.target.value)}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none"
+                  className="neu-inset rounded-lg px-3 py-2 text-sm"
                 >
                   <option value="screening">Screening</option>
                   <option value="technical">Technical</option>
@@ -683,7 +665,7 @@ export default function CandidateProfilePage() {
                 <select
                   value={assignSelectedUser}
                   onChange={(e) => setAssignSelectedUser(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none"
+                  className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
                 >
                   {assignUsers.length === 0 && (
                     <option value="">No users found</option>
@@ -697,7 +679,7 @@ export default function CandidateProfilePage() {
               </label>
               <button
                 onClick={handleAssign}
-                className="rounded-full bg-slate-950 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                className="neu-btn neu-btn-primary rounded-full px-4 py-2 text-xs font-medium"
               >
                 Assign
               </button>
@@ -707,7 +689,7 @@ export default function CandidateProfilePage() {
       </div>
 
       <div className="mt-6">
-        <div className="flex border-b border-slate-200">
+        <div className="flex border-b border-[var(--c-border-light)]">
           {(["timeline", "interviews", "notes"] as const).map((tab) => (
             <button
               key={tab}
@@ -741,9 +723,9 @@ export default function CandidateProfilePage() {
                   return (
                     <div
                       key={entry.id}
-                      className="flex items-start gap-3 rounded-lg border border-slate-100 bg-white p-3"
+                      className="flex items-start gap-3 rounded-lg neu-card p-3"
                     >
-                      <div className="rounded-full bg-slate-100 p-2 text-slate-600">
+                      <div className="rounded-full bg-[var(--c-bg-muted)] p-2 text-slate-600">
                         <Icon size={14} />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -811,7 +793,7 @@ export default function CandidateProfilePage() {
                   return (
                     <div
                       key={interview.id}
-                      className="rounded-lg border border-slate-200 bg-white p-4"
+                      className="rounded-lg neu-card p-4"
                     >
                       <div className="flex items-center justify-between">
                         <div>
@@ -835,13 +817,7 @@ export default function CandidateProfilePage() {
                           </p>
                         </div>
                         <span
-                          className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
-                            interview.status === "completed"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : interview.status === "cancelled"
-                                ? "bg-rose-50 text-rose-700"
-                                : "bg-amber-50 text-amber-700"
-                          }`}
+                          className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${ interview.status === "completed" ? "bg-emerald-50 text-emerald-700" : interview.status === "cancelled" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700" }`}
                         >
                           {interview.status}
                         </span>
@@ -859,31 +835,20 @@ export default function CandidateProfilePage() {
                         interview.feedback.overallRecommendation &&
                         interview.status === "completed" && (
                           <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                            <span className="rounded bg-slate-100 px-2 py-0.5">
+                            <span className="rounded bg-[var(--c-bg-muted)] px-2 py-0.5">
                               Tech: {interview.feedback.technicalSkills}/5
                             </span>
-                            <span className="rounded bg-slate-100 px-2 py-0.5">
+                            <span className="rounded bg-[var(--c-bg-muted)] px-2 py-0.5">
                               Comm: {interview.feedback.communication}/5
                             </span>
-                            <span className="rounded bg-slate-100 px-2 py-0.5">
+                            <span className="rounded bg-[var(--c-bg-muted)] px-2 py-0.5">
                               Problem: {interview.feedback.problemSolving}/5
                             </span>
-                            <span className="rounded bg-slate-100 px-2 py-0.5">
+                            <span className="rounded bg-[var(--c-bg-muted)] px-2 py-0.5">
                               Culture: {interview.feedback.cultureFit}/5
                             </span>
                             <span
-                              className={`rounded px-2 py-0.5 font-medium ${
-                                interview.feedback.overallRecommendation ===
-                                "strong-hire"
-                                  ? "bg-emerald-50 text-emerald-700"
-                                  : interview.feedback.overallRecommendation ===
-                                      "hire"
-                                    ? "bg-sky-50 text-sky-700"
-                                    : interview.feedback
-                                          .overallRecommendation === "hold"
-                                      ? "bg-amber-50 text-amber-700"
-                                      : "bg-rose-50 text-rose-700"
-                              }`}
+                              className={`rounded px-2 py-0.5 font-medium ${ interview.feedback.overallRecommendation === "strong-hire" ? "bg-emerald-50 text-emerald-700" : interview.feedback.overallRecommendation === "hire" ? "bg-sky-50 text-sky-700" : interview.feedback .overallRecommendation === "hold" ? "bg-amber-50 text-amber-700" : "bg-rose-50 text-rose-700" }`}
                             >
                               {interview.feedback.overallRecommendation}
                             </span>
@@ -898,7 +863,7 @@ export default function CandidateProfilePage() {
                                 interviewId: interview.id,
                               })
                             }
-                            className="rounded-full bg-slate-950 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800"
+                            className="neu-btn neu-btn-primary rounded-full px-2.5 py-1 text-xs font-medium"
                           >
                             Add Feedback
                           </button>
@@ -909,7 +874,7 @@ export default function CandidateProfilePage() {
                                 interviewId: interview.id,
                               })
                             }
-                            className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                            className="rounded-lg border border-[var(--c-border-light)] px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
                           >
                             Reschedule
                           </button>
@@ -927,10 +892,10 @@ export default function CandidateProfilePage() {
               {Array.isArray(activeCandidate.notes) && activeCandidate.notes.length > 0 ? (
                 <div className="mb-4 space-y-3">
                   {[...activeCandidate.notes].reverse().map((note: any, idx: number) => (
-                    <div key={note._id || idx} className="rounded-lg border border-slate-200 bg-white p-3">
+                    <div key={note._id || idx} className="rounded-lg neu-card p-3">
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
-                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-600">
+                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--c-bg-hover)] text-[10px] font-semibold text-slate-600">
                             {(note.author?.name?.[0] || "U").toUpperCase()}
                           </div>
                           <span className="text-xs font-medium text-slate-700">
@@ -967,7 +932,7 @@ export default function CandidateProfilePage() {
                   ))}
                 </div>
               ) : typeof activeCandidate.notes === "string" && activeCandidate.notes ? (
-                <div className="mb-4 whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700">
+                <div className="mb-4 whitespace-pre-wrap rounded-lg neu-card p-4 text-sm text-slate-700">
                   {activeCandidate.notes}
                 </div>
               ) : null}
@@ -977,12 +942,12 @@ export default function CandidateProfilePage() {
                   onChange={(e) => setNoteText(e.target.value)}
                   placeholder="Add a note..."
                   rows={2}
-                  className="flex-1 resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="neu-inset flex-1 resize-y rounded-lg px-3 py-2 text-sm"
                 />
                 <button
                   onClick={handleSaveNote}
                   disabled={!noteText.trim()}
-                  className="self-end rounded-full bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                  className="neu-btn neu-btn-primary self-end rounded-full px-4 py-2 text-sm font-medium"
                 >
                   Save
                 </button>

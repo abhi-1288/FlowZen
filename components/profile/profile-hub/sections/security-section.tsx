@@ -20,7 +20,7 @@ export function SecuritySection({
   onDeleteAccount: () => void;
 }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-zinc-800 dark:bg-[#000000]">
+    <section className="rounded-xl neu-card p-5 dark:border-zinc-800 dark:bg-[#000000]">
       <SectionHeader title="Security" description="Password &amp; account management" accent="rose" />
       {passwordResetRequired ? (
         <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-950 dark:text-amber-400">
@@ -30,7 +30,7 @@ export function SecuritySection({
       <form className="mt-4 space-y-3" onSubmit={onUpdatePassword}>
         {!passwordResetRequired ? (
           <input
-            className="w-full rounded-lg border border-slate-200 px-3 py-2.5 dark:border-zinc-800 dark:bg-[#000000]"
+            className="w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2.5 dark:border-zinc-800 dark:bg-[#000000]"
             placeholder="Current password"
             type="password"
             value={currentPassword}
@@ -38,7 +38,7 @@ export function SecuritySection({
           />
         ) : null}
         <input
-          className="w-full rounded-lg border border-slate-200 px-3 py-2.5 dark:border-zinc-800 dark:bg-[#000000]"
+          className="w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2.5 dark:border-zinc-800 dark:bg-[#000000]"
           placeholder="New password"
           type="password"
           value={newPassword}

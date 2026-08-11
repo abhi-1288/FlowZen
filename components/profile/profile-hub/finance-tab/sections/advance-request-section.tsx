@@ -4,7 +4,7 @@ import { useState } from "react";
 import { apiFetch } from "@/lib/client-utils";
 import { ActionButton } from "../../shared";
 
-const sectionClass = "rounded-xl border border-slate-200 bg-white p-5";
+const sectionClass = "rounded-xl neu-card p-5";
 
 export function AdvanceRequestSection({
   approvers,
@@ -74,7 +74,7 @@ export function AdvanceRequestSection({
               Amount (₹)
             </label>
             <input
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm"
               type="number"
               min={1}
               placeholder="e.g. 5000"
@@ -88,7 +88,7 @@ export function AdvanceRequestSection({
               Repay in (months)
             </label>
             <select
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm"
               value={repayInMonths}
               onChange={(e) => setRepayInMonths(e.target.value)}
             >
@@ -112,7 +112,7 @@ export function AdvanceRequestSection({
             Reason
           </label>
           <textarea
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm"
             rows={2}
             placeholder="Why do you need this advance?"
             value={reason}
@@ -126,7 +126,7 @@ export function AdvanceRequestSection({
               Assign to
             </label>
             <select
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm"
               value={approverId}
               onChange={(e) => setApproverId(e.target.value)}
               required

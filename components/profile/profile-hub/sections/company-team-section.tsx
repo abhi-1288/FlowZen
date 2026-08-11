@@ -32,7 +32,7 @@ export function CompanyTeamSection({
     ? companyAddresses.find((a) => String(a.label ?? "") === regionLabel)
     : null;
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 dark:bg-[#000000] dark:border-zinc-800">
+    <section className="rounded-xl neu-card p-5 dark:bg-[#000000] dark:border-zinc-800">
       <SectionHeader title="Company & Team" description="Organizational structure" accent="emerald" />
       <dl className="mt-4 space-y-3 text-sm">
         <Row label="Company" value={company?.name ? String(company.name) : undefined} />
@@ -55,7 +55,7 @@ export function CompanyTeamSection({
         <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:bg-amber-950">
           <p className="text-xs font-medium text-amber-700 dark:text-amber-400">No unique company identity code has been issued yet.</p>
           <button
-            className="mt-2 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="neu-btn neu-btn-primary mt-2 rounded-md px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed"
             disabled={identityRequesting || Boolean(insights?.pendingIdentityCodeRequest)}
             onClick={onRequestIdentity}
             type="button"

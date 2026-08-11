@@ -38,8 +38,8 @@ export function HolidayModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
+    <div className="fixed inset-0 z-[60] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl ring-1 ring-slate-200">
         <h3 className="text-xl font-bold text-slate-900">Add Holiday</h3>
         <p className="mt-1 text-sm text-slate-500">
           Create a future holiday for the organization.
@@ -58,7 +58,7 @@ export function HolidayModal({
                 setFormData({ ...formData, title: e.target.value })
               }
               placeholder="Holiday name"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+              className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
             />
           </div>
 
@@ -73,7 +73,7 @@ export function HolidayModal({
                 setFormData({ ...formData, description: e.target.value })
               }
               placeholder="Optional holiday note"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+              className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
             />
           </div>
 
@@ -89,7 +89,7 @@ export function HolidayModal({
                 onChange={(e) =>
                   setFormData({ ...formData, startDate: e.target.value })
                 }
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+                className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
               />
             </div>
             <div className="space-y-1">
@@ -103,7 +103,7 @@ export function HolidayModal({
                 onChange={(e) =>
                   setFormData({ ...formData, endDate: e.target.value })
                 }
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+                className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
               />
             </div>
           </div>
@@ -119,7 +119,7 @@ export function HolidayModal({
             <button
               disabled={loading}
               type="submit"
-              className="rounded-full bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+              className="neu-btn neu-btn-primary rounded-full px-6 py-2 text-sm font-medium"
             >
               {loading ? "Saving..." : "Save Holiday"}
             </button>
@@ -188,8 +188,8 @@ export function EditHolidayModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200 relative">
+    <div className="fixed inset-0 z-[80] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl ring-1 ring-slate-200 relative">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-xl font-bold text-slate-900">Edit Holiday</h3>
@@ -218,7 +218,7 @@ export function EditHolidayModal({
                 setFormData({ ...formData, title: e.target.value })
               }
               placeholder="Holiday name"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+              className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
             />
           </div>
 
@@ -233,7 +233,7 @@ export function EditHolidayModal({
                 setFormData({ ...formData, description: e.target.value })
               }
               placeholder="Optional holiday note"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+              className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
             />
           </div>
 
@@ -249,7 +249,7 @@ export function EditHolidayModal({
                 onChange={(e) =>
                   setFormData({ ...formData, startDate: e.target.value })
                 }
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+                className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
               />
             </div>
             <div className="space-y-1">
@@ -263,7 +263,7 @@ export function EditHolidayModal({
                 onChange={(e) =>
                   setFormData({ ...formData, endDate: e.target.value })
                 }
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+                className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
               />
             </div>
           </div>
@@ -287,7 +287,7 @@ export function EditHolidayModal({
               <button
                 disabled={loading}
                 type="submit"
-                className="rounded-full bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                className="neu-btn neu-btn-primary rounded-full px-6 py-2 text-sm font-medium"
               >
                 {loading ? "Saving..." : "Save Changes"}
               </button>
@@ -297,8 +297,8 @@ export function EditHolidayModal({
       </div>
 
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-[90] grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
+        <div className="fixed inset-0 z-[90] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl ring-1 ring-slate-200">
             <h3 className="text-xl font-bold text-slate-900">Confirm Delete</h3>
             <p className="mt-2 text-sm text-slate-500">
               Delete holiday "{String(holiday.title ?? "")}"? This action cannot
@@ -308,7 +308,7 @@ export function EditHolidayModal({
               <button
                 type="button"
                 onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="flex-1 rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
               >
                 Cancel
               </button>
@@ -316,7 +316,7 @@ export function EditHolidayModal({
                 type="button"
                 onClick={handleDelete}
                 disabled={loading}
-                className="flex-1 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50"
+                className="neu-btn neu-btn-danger flex-1 rounded-lg px-4 py-2 text-sm font-medium"
               >
                 Delete
               </button>
@@ -344,9 +344,9 @@ export function AdminLeaveHistoryModal({
   onAddHoliday: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/40 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-5xl rounded-2xl bg-white shadow-xl ring-1 ring-slate-200 overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-100 p-6">
+    <div className="fixed inset-0 z-[70] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
+      <div className="w-full max-w-5xl rounded-2xl neu-card ring-1 ring-slate-200 overflow-hidden">
+        <div className="flex items-center justify-between border-b border-[var(--c-border-light)] p-6">
           <div>
             <h3 className="text-xl font-bold text-slate-900">
               Manage Holidays
@@ -358,13 +358,13 @@ export function AdminLeaveHistoryModal({
           <div className="flex gap-2">
             <button
               onClick={onAddHoliday}
-              className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition"
+              className="neu-btn neu-btn-success rounded-full px-4 py-2 text-sm font-medium transition"
             >
               Add Holiday
             </button>
             <button
               onClick={onClose}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+              className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)] transition"
             >
               Close
             </button>
@@ -372,10 +372,10 @@ export function AdminLeaveHistoryModal({
         </div>
 
         <div className="max-h-[70vh] overflow-y-auto p-6">
-          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50">
+          <div className="overflow-x-auto rounded-2xl neu-inset">
             <table className="min-w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-slate-100">
+                <tr className="bg-[var(--c-bg-muted)]">
                   <th className="px-3 py-2 border text-left">Title</th>
                   <th className="px-3 py-2 border text-left">From</th>
                   <th className="px-3 py-2 border text-left">To</th>
@@ -396,7 +396,7 @@ export function AdminLeaveHistoryModal({
                   holidays.map((h: any) => (
                     <tr
                       key={h._id}
-                      className="border-b bg-white hover:bg-slate-50 transition"
+                      className="border-b bg-[var(--c-bg-card)] hover:bg-[var(--c-bg-muted)] transition"
                     >
                       <td className="px-3 py-3 border">{h.title}</td>
                       <td className="px-3 py-3 border">

@@ -60,11 +60,7 @@ export default function JobDetailPage() {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold text-slate-900">{activeJob.title}</h1>
-            <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              activeJob.status === "open" ? "bg-emerald-50 text-emerald-700" :
-              activeJob.status === "draft" ? "bg-amber-50 text-amber-700" :
-              "bg-slate-100 text-slate-600"
-            }`}>{activeJob.status}</span>
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${ activeJob.status === "open" ? "bg-emerald-50 text-emerald-700" : activeJob.status === "draft" ? "bg-amber-50 text-amber-700" : "bg-[var(--c-bg-muted)] text-slate-600" }`}>{activeJob.status}</span>
           </div>
           <p className="mt-1 text-sm text-slate-500">{activeJob.department} &middot; {activeJob.location || "Remote"} &middot; {activeJob.employmentType}</p>
           {activeJob.salaryRangeMin > 0 || activeJob.salaryRangeMax > 0 ? (
@@ -84,7 +80,7 @@ export default function JobDetailPage() {
                 const url = slug ? `${window.location.origin}/careers/jobs/${slug}/${id}` : "";
                 if (url) navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
               }}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50"
             >
               {copied ? <Check size={15} /> : <Share2 size={15} />} {copied ? "Copied" : "Share"}
             </button>
@@ -100,26 +96,26 @@ export default function JobDetailPage() {
           {activeJob.status === "open" && isAdmin && (
             <button
               onClick={() => { void updateJob(id, { status: "closed" as JobStatus }); }}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50"
             >
               <Archive size={15} /> Close
             </button>
           )}
           <button
             onClick={() => router.push(`/recruitment/jobs/${id}/edit`)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
           >
             <Pencil size={15} /> Edit
           </button>
           <button
             onClick={() => router.push(`/recruitment/jobs/${id}/board`)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
           >
             <Eye size={15} /> Kanban
           </button>
           <button
             onClick={() => setModal({ type: "create-candidate", jobId: id })}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            className="neu-btn neu-btn-primary inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium"
           >
             <Plus size={15} /> Add Candidate
           </button>
@@ -135,7 +131,7 @@ export default function JobDetailPage() {
       </div>
 
       {activeJob.description && (
-        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+        <div className="mt-4 rounded-lg neu-card p-4">
           <p className="text-sm text-slate-600 whitespace-pre-wrap">{activeJob.description}</p>
         </div>
       )}
@@ -143,7 +139,7 @@ export default function JobDetailPage() {
       {activeJob.requiredSkills?.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
           {activeJob.requiredSkills.map((skill) => (
-            <span key={skill} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">{skill}</span>
+            <span key={skill} className="rounded-full bg-[var(--c-bg-muted)] px-3 py-1 text-xs font-medium text-slate-700">{skill}</span>
           ))}
         </div>
       )}
@@ -152,7 +148,7 @@ export default function JobDetailPage() {
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-900">Candidates ({candidates.length})</h2>
           <select
-            className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none"
+            className="neu-inset rounded-lg px-3 py-1.5 text-sm"
             value={candidateFilter}
             onChange={(e) => setCandidateFilter(e.target.value)}
           >
@@ -167,7 +163,7 @@ export default function JobDetailPage() {
           {filtered.map((candidate) => (
             <div
               key={candidate.id}
-              className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 transition hover:shadow-sm"
+              className="flex items-center justify-between rounded-lg neu-card p-4 transition"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
@@ -183,17 +179,12 @@ export default function JobDetailPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                  candidate.stage === "joined" ? "bg-emerald-50 text-emerald-700" :
-                  candidate.stage === "rejected" ? "bg-rose-50 text-rose-700" :
-                  candidate.stage === "offer" ? "bg-indigo-50 text-indigo-700" :
-                  "bg-slate-100 text-slate-600"
-                }`}>
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${ candidate.stage === "joined" ? "bg-emerald-50 text-emerald-700" : candidate.stage === "rejected" ? "bg-rose-50 text-rose-700" : candidate.stage === "offer" ? "bg-indigo-50 text-indigo-700" : "bg-[var(--c-bg-muted)] text-slate-600" }`}>
                   {STAGE_LABELS[candidate.stage]}
                 </span>
                 <button
                   onClick={() => router.push(`/recruitment/candidates/${candidate.id}`)}
-                  className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  className="rounded-lg border border-[var(--c-border-light)] px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
                 >
                   Profile
                 </button>
@@ -218,8 +209,8 @@ function DeleteJobModal({ id }: { id: string }) {
   if (modal?.type !== "delete-job") return null;
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/35 px-4">
-      <div className="w-full max-w-sm rounded-lg bg-white shadow-soft">
+    <div className="fixed inset-0 z-50 grid place-items-center neu-overlay px-4">
+      <div className="w-full max-w-sm rounded-lg neu-card">
         <div className="p-5">
           <h2 className="text-base font-semibold text-slate-900">Delete Job</h2>
           <p className="mt-2 text-sm text-slate-600">
@@ -228,13 +219,13 @@ function DeleteJobModal({ id }: { id: string }) {
           <div className="mt-5 flex justify-end gap-2">
             <button
               onClick={() => setModal(null)}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
             >
               Cancel
             </button>
             <button
               onClick={async () => { await deleteJob(id); setModal(null); router.push("/recruitment/jobs"); }}
-              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              className="neu-btn neu-btn-danger rounded-lg px-4 py-2 text-sm font-medium"
             >
               Delete
             </button>
@@ -272,11 +263,11 @@ function CandidateModal({ jobId }: { jobId: string }) {
   const sources = ["Referral", "LinkedIn", "Company Website", "Naukri", "Indeed", "Walk-In", "Other"];
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/35 px-4">
-      <div className="w-full max-w-lg rounded-lg bg-white shadow-soft">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+    <div className="fixed inset-0 z-50 grid place-items-center neu-overlay px-4">
+      <div className="w-full max-w-lg rounded-lg neu-card">
+        <div className="flex items-center justify-between border-b border-[var(--c-border-light)] px-5 py-4">
           <h2 className="text-base font-semibold">Add Candidate</h2>
-          <button className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100" onClick={() => setModal(null)} type="button">
+          <button className="rounded-md p-1.5 text-slate-500 hover:bg-[var(--c-bg-muted)]" onClick={() => setModal(null)} type="button">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
         </div>
@@ -284,48 +275,48 @@ function CandidateModal({ jobId }: { jobId: string }) {
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700">First Name *</span>
-              <input name="firstName" required className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+              <input name="firstName" required className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700">Last Name</span>
-              <input name="lastName" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+              <input name="lastName" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700">Email *</span>
-              <input name="email" type="email" required className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+              <input name="email" type="email" required className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700">Phone</span>
-              <input name="phone" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+              <input name="phone" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700">Current Company</span>
-              <input name="currentCompany" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+              <input name="currentCompany" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700">Experience (years)</span>
-              <input name="experienceYears" type="number" min="0" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+              <input name="experienceYears" type="number" min="0" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700">Current CTC</span>
-              <input name="currentCTC" type="number" min="0" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+              <input name="currentCTC" type="number" min="0" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700">Expected CTC</span>
-              <input name="expectedCTC" type="number" min="0" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+              <input name="expectedCTC" type="number" min="0" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700">Notice Period (days)</span>
-              <input name="noticePeriod" type="number" min="0" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+              <input name="noticePeriod" type="number" min="0" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700">Source</span>
-              <select name="source" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none">
+              <select name="source" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm">
                 {sources.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </label>
           </div>
-          <button type="submit" className="w-full rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800">
+          <button type="submit" className="neu-btn neu-btn-primary w-full rounded-full px-4 py-2.5 text-sm font-medium">
             Add Candidate
           </button>
         </form>

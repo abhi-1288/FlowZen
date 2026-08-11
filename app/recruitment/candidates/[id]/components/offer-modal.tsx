@@ -79,13 +79,13 @@ export default function OfferModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/35">
+    <div className="fixed inset-0 z-50 overflow-y-auto neu-overlay">
       <div className="flex min-h-full items-start justify-center p-4 pt-12">
-        <div className="w-full max-w-lg rounded-lg bg-white shadow-soft">
-          <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+        <div className="w-full max-w-lg rounded-lg neu-card">
+          <header className="flex items-center justify-between border-b border-[var(--c-border-light)] px-5 py-4">
             <h2 className="text-base font-semibold">Generate Offer</h2>
             <button
-              className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100"
+              className="rounded-md p-1.5 text-slate-500 hover:bg-[var(--c-bg-muted)]"
               onClick={() => setModal(null)}
               type="button"
             >
@@ -108,7 +108,7 @@ export default function OfferModal({
           ) : (
             <form className="p-5" onSubmit={handleSubmit} key={job?.id === jobId ? `loaded-${jobId}` : "empty"}>
               <div className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
-                <div className="col-span-full rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="col-span-full rounded-lg neu-inset p-4">
                   <span className="mb-1 block text-sm font-medium text-slate-700">
                     Offered CTC * ({salaryLabel})
                   </span>
@@ -164,7 +164,7 @@ export default function OfferModal({
                     required
                     defaultValue={job?.title || ""}
                     readOnly={Boolean(job?.title)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 read-only:bg-slate-50 read-only:text-slate-600"
+                    className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm read-only: read-only:text-slate-600"
                   />
                 </label>
                 <label className="block">
@@ -174,7 +174,7 @@ export default function OfferModal({
                   <input
                     name="department"
                     defaultValue={job?.department || ""}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
                   />
                 </label>
                 <label className="block">
@@ -185,7 +185,7 @@ export default function OfferModal({
                     name="pfAmount"
                     type="number"
                     min="0"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
                     placeholder="0"
                   />
                 </label>
@@ -197,7 +197,7 @@ export default function OfferModal({
                     name="esicAmount"
                     type="number"
                     min="0"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
                     placeholder="0"
                   />
                 </label>
@@ -208,7 +208,7 @@ export default function OfferModal({
                   <input
                     name="joiningDate"
                     type="date"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
                   />
                 </label>
                 <label className="block">
@@ -217,7 +217,7 @@ export default function OfferModal({
                   </span>
                   <input
                     name="officeLocation"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
                     placeholder="e.g. Bangalore, India"
                   />
                 </label>
@@ -228,7 +228,7 @@ export default function OfferModal({
                   <textarea
                     name="perks"
                     rows={2}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
                     placeholder="e.g. Company provides travel allowance and complimentary meals."
                   />
                 </label>
@@ -236,7 +236,7 @@ export default function OfferModal({
               <button
                 type="submit"
                 disabled={saving}
-                className="mt-4 w-full rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                className="neu-btn neu-btn-primary mt-4 w-full rounded-full px-4 py-2.5 text-sm font-medium"
               >
                 {saving ? "Generating..." : "Generate Offer"}
               </button>

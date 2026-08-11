@@ -53,11 +53,11 @@ export default function ConvertEmployeeModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay">
+      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-2xl ring-1 ring-slate-200">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold">Convert To Employee</h2>
-          <button onClick={() => { setPassword(""); setConfirmPassword(""); setSelectedRole("others"); onClose(); }} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+          <button onClick={() => { setPassword(""); setConfirmPassword(""); setSelectedRole("others"); onClose(); }} className="rounded-lg p-1 text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-600">
             <X size={20} />
           </button>
         </div>
@@ -71,7 +71,7 @@ export default function ConvertEmployeeModal({
               value={selectedRole}
               onChange={(e) => setSelectedRole(e.target.value)}
               disabled={isSeniorSecurity}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="neu-inset w-full rounded-lg px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
             >
               {ROLE_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -88,7 +88,7 @@ export default function ConvertEmployeeModal({
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]"
+                className="neu-inset w-full rounded-lg px-3 py-2 pr-10 text-sm"
                 placeholder="Enter password"
               />
               <button
@@ -107,7 +107,7 @@ export default function ConvertEmployeeModal({
                 type={showConfirmPassword ? "text" : "password"}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]"
+                className="neu-inset w-full rounded-lg px-3 py-2 pr-10 text-sm"
                 placeholder="Confirm password"
               />
               <button

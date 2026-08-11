@@ -6,7 +6,7 @@ export function ProfileSkeleton() {
       <div className="h-px bg-slate-100 dark:bg-zinc-700" />
       <div className="grid gap-4 xl:grid-cols-2">
         {[1, 2].map((item) => (
-          <div key={item} className="rounded-xl border border-slate-100 bg-white p-5 dark:bg-[#000000] dark:border-zinc-800/50">
+          <div key={item} className="neu-card rounded-2xl p-5">
             <div className="h-5 w-40 rounded-md bg-slate-100 dark:bg-zinc-700" />
             <div className="mt-5 space-y-3">
               {[1, 2, 3, 4].map((line) => (
@@ -36,11 +36,7 @@ export function NavButton({
   return (
     <button
       suppressHydrationWarning
-      className={`group flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-all duration-150 ${
-        active
-          ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
-          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-100"
-      }`}
+      className={`group flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-all duration-150 ${ active ? "neu-card-pressed text-indigo-700 dark:text-indigo-300" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-100" }`}
       onClick={onClick}
     >
       {icon ? (

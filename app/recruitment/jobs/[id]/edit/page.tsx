@@ -64,19 +64,19 @@ export default function EditJobPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block sm:col-span-2">
             <span className="mb-1 block text-sm font-medium text-slate-700">Title *</span>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} required className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+            <input value={title} onChange={(e) => setTitle(e.target.value)} required className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Department *</span>
-            <input value={department} onChange={(e) => setDepartment(e.target.value)} required className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+            <input value={department} onChange={(e) => setDepartment(e.target.value)} required className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Location</span>
-            <input value={location} onChange={(e) => setLocation(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+            <input value={location} onChange={(e) => setLocation(e.target.value)} className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Employment Type</span>
-            <select value={employmentType} onChange={(e) => setEmploymentType(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none">
+            <select value={employmentType} onChange={(e) => setEmploymentType(e.target.value)} className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm">
               <option value="full-time">Full Time</option>
               <option value="part-time">Part Time</option>
               <option value="contract">Contract</option>
@@ -85,7 +85,7 @@ export default function EditJobPage() {
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Status</span>
-            <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none">
+            <select value={status} onChange={(e) => setStatus(e.target.value)} className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm">
               <option value="draft">Draft</option>
               <option value="open">Open</option>
               <option value="closed">Closed</option>
@@ -93,15 +93,15 @@ export default function EditJobPage() {
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Min Salary</span>
-            <input value={salaryRangeMin} onChange={(e) => setSalaryRangeMin(e.target.value)} type="number" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+            <input value={salaryRangeMin} onChange={(e) => setSalaryRangeMin(e.target.value)} type="number" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Max Salary</span>
-            <input value={salaryRangeMax} onChange={(e) => setSalaryRangeMax(e.target.value)} type="number" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+            <input value={salaryRangeMax} onChange={(e) => setSalaryRangeMax(e.target.value)} type="number" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Currency</span>
-            <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none">
+            <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm">
               <option value="INR">₹ INR</option>
               <option value="USD">$ USD</option>
               <option value="EUR">€ EUR</option>
@@ -111,22 +111,22 @@ export default function EditJobPage() {
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Openings</span>
-            <input value={openings} onChange={(e) => setOpenings(e.target.value)} type="number" min="1" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+            <input value={openings} onChange={(e) => setOpenings(e.target.value)} type="number" min="1" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Auto-Close Date</span>
-            <input value={autoCloseDate} onChange={(e) => setAutoCloseDate(e.target.value)} type="date" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+            <input value={autoCloseDate} onChange={(e) => setAutoCloseDate(e.target.value)} type="date" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
           </label>
         </div>
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-700">Required Skills (comma separated)</span>
-          <input value={requiredSkills} onChange={(e) => setRequiredSkills(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+          <input value={requiredSkills} onChange={(e) => setRequiredSkills(e.target.value)} className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
         </label>
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-700">Description</span>
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className="neu-inset w-full resize-y rounded-lg px-3 py-2.5 text-sm" />
         </label>
-        <button type="submit" className="rounded-full bg-slate-950 px-6 py-2.5 text-sm font-medium text-white hover:bg-slate-800">Save Changes</button>
+        <button type="submit" className="neu-btn neu-btn-primary rounded-full px-6 py-2.5 text-sm font-medium">Save Changes</button>
       </form>
     </div>
   );

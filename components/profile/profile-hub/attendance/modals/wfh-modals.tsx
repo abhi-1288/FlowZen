@@ -59,8 +59,8 @@ export function WfhRequestModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
+    <div className="fixed inset-0 z-[60] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl ring-1 ring-slate-200">
         <h3 className="text-xl font-bold text-slate-900">Request WFH</h3>
         <p className="mt-1 text-sm text-slate-500">
           Submit a Work From Home request for approval.
@@ -74,7 +74,7 @@ export function WfhRequestModal({
                 type="date"
                 value={formData.startDate}
                 onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+                className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
               />
             </div>
             <div className="space-y-1">
@@ -84,7 +84,7 @@ export function WfhRequestModal({
                 type="date"
                 value={formData.endDate}
                 onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+                className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
               />
             </div>
           </div>
@@ -96,7 +96,7 @@ export function WfhRequestModal({
               placeholder="Why are you requesting WFH?"
               value={formData.reason}
               onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+              className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
             />
           </div>
           {dropdownUsers.length > 0 && (
@@ -107,7 +107,7 @@ export function WfhRequestModal({
               <select
                 value={selectedHr}
                 onChange={(e) => setSelectedHr(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-950 focus:ring-0"
+                className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
               >
                 <option value="">{isOnlyHr ? "Auto-assign any Admin" : "Auto-assign any HR"}</option>
                 {dropdownUsers.map((u) => (
@@ -127,7 +127,7 @@ export function WfhRequestModal({
             <button
               disabled={loading}
               type="submit"
-              className="rounded-full bg-slate-950 px-6 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+              className="neu-btn neu-btn-primary rounded-full px-6 py-2 text-sm font-medium"
             >
               {loading ? "Submitting..." : "Submit"}
             </button>
@@ -196,16 +196,16 @@ export function WfhRequestsListModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/20 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl ring-1 ring-slate-200">
-        <div className="flex items-center justify-between border-b border-slate-100 p-6">
+    <div className="fixed inset-0 z-[60] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
+      <div className="w-full max-w-2xl rounded-2xl neu-card ring-1 ring-slate-200">
+        <div className="flex items-center justify-between border-b border-[var(--c-border-light)] p-6">
           <div>
             <h3 className="text-xl font-bold text-slate-900">WFH Requests</h3>
             <p className="text-sm text-slate-500">
               Manage WFH request approvals and view status.
             </p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 hover:bg-slate-50 text-slate-400">
+          <button onClick={onClose} className="rounded-lg p-2 hover:bg-[var(--c-bg-muted)] text-slate-400">
             <Trash2 size={20} />
           </button>
         </div>
@@ -222,7 +222,7 @@ export function WfhRequestsListModal({
                   <div
                     key={req._id}
                     onClick={() => setSelectedWfh(req)}
-                    className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 cursor-pointer hover:border-slate-200 hover:bg-slate-100/50 transition-all active:scale-[0.98]"
+                    className="rounded-xl neu-inset/50 p-4 cursor-pointer hover:border-[var(--c-border-light)] hover:bg-[var(--c-bg-muted)]/50 transition-all active:scale-[0.98]"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -231,12 +231,7 @@ export function WfhRequestsListModal({
                             {req.requester?.name || "User"}
                           </span>
                           <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${req.status === "approved"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : req.status === "rejected"
-                                ? "bg-rose-100 text-rose-700"
-                                : "bg-amber-100 text-amber-700"
-                              }`}
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${req.status === "approved" ? "bg-emerald-100 text-emerald-700" : req.status === "rejected" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700" }`}
                           >
                             {req.status}
                           </span>
@@ -258,10 +253,10 @@ export function WfhRequestsListModal({
             </div>
           )}
         </div>
-        <div className="border-t border-slate-100 p-4 flex justify-end">
+        <div className="border-t border-[var(--c-border-light)] p-4 flex justify-end">
           <button
             onClick={onClose}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+            className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)] transition"
           >
             Close
           </button>
@@ -314,17 +309,17 @@ export function WfhDetailsModal({
     new Date(String(wfh.startDate)) > now;
 
   return (
-    <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-md">
-      <div className="w-full max-w-lg animate-in zoom-in-95 fade-in duration-300 rounded-2xl bg-white shadow-xl ring-1 ring-slate-200 overflow-hidden">
+    <div className="fixed inset-0 z-[80] grid place-items-center neu-overlay p-4 backdrop-blur-md">
+      <div className="w-full max-w-lg animate-in zoom-in-95 fade-in duration-300 rounded-2xl neu-card ring-1 ring-slate-200 overflow-hidden">
         <div className="relative h-32 bg-slate-900">
           <div className="absolute -bottom-8 left-6">
-            <div className="h-16 w-16 rounded-2xl bg-emerald-600 shadow-xl shadow-emerald-600/20 grid place-items-center text-white">
+            <div className="neu-btn neu-btn-success h-16 w-16 rounded-2xl shadow-xl shadow-emerald-600/20 grid place-items-center">
               <Clock size={32} />
             </div>
           </div>
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 h-8 w-8 grid place-items-center rounded-full bg-white/10 text-white hover:bg-white/20 transition"
+            className="absolute top-4 right-4 h-8 w-8 grid place-items-center rounded-full bg-[var(--c-bg-card)]/10 text-white hover:bg-[var(--c-bg-card)]/20 transition"
           >
             <LogOut className="rotate-180" size={16} />
           </button>
@@ -341,12 +336,7 @@ export function WfhDetailsModal({
               </p>
             </div>
             <span
-              className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${wfh.status === "approved"
-                ? "bg-emerald-100 text-emerald-700"
-                : wfh.status === "rejected"
-                  ? "bg-rose-100 text-rose-700"
-                  : "bg-amber-100 text-amber-700"
-                }`}
+              className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${wfh.status === "approved" ? "bg-emerald-100 text-emerald-700" : wfh.status === "rejected" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700" }`}
             >
               {String(wfh.status)}
             </span>
@@ -354,13 +344,13 @@ export function WfhDetailsModal({
 
           <div className="mt-6 space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="rounded-xl bg-slate-50 p-4">
+              <div className="rounded-xl bg-[var(--c-bg-muted)] p-4">
                 <p className="text-xs font-bold uppercase text-slate-500">Start Date</p>
                 <p className="mt-1 text-sm font-semibold text-slate-900">
                   {new Date(String(wfh.startDate)).toLocaleDateString()}
                 </p>
               </div>
-              <div className="rounded-xl bg-slate-50 p-4">
+              <div className="rounded-xl bg-[var(--c-bg-muted)] p-4">
                 <p className="text-xs font-bold uppercase text-slate-500">End Date</p>
                 <p className="mt-1 text-sm font-semibold text-slate-900">
                   {new Date(String(wfh.endDate)).toLocaleDateString()}
@@ -368,14 +358,14 @@ export function WfhDetailsModal({
               </div>
             </div>
 
-            <div className="rounded-xl bg-slate-50 p-4">
+            <div className="rounded-xl bg-[var(--c-bg-muted)] p-4">
               <p className="text-xs font-bold uppercase text-slate-500">Duration</p>
               <p className="mt-1 text-sm font-semibold text-slate-900">
                 {Number(wfh.duration)} day{Number(wfh.duration) === 1 ? "" : "s"}
               </p>
             </div>
 
-            <div className="rounded-xl bg-slate-50 p-4">
+            <div className="rounded-xl bg-[var(--c-bg-muted)] p-4">
               <p className="text-xs font-bold uppercase text-slate-500">Reason</p>
               <p className="mt-1 text-sm text-slate-700 leading-relaxed">{String(wfh.reason)}</p>
             </div>
@@ -398,7 +388,7 @@ export function WfhDetailsModal({
               </button>
               <button
                 onClick={onApprove}
-                className="flex-1 rounded-full bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/20"
+                className="neu-btn neu-btn-success flex-1 rounded-full py-3 text-sm font-semibold transition shadow-lg shadow-emerald-500/20"
               >
                 Approve
               </button>

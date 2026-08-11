@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ActionButton, displayNested } from "../../shared";
 import type { AnyRecord } from "../../shared";
 
-const sectionClass = "rounded-xl border border-slate-200 bg-white p-5";
+const sectionClass = "rounded-xl neu-card p-5";
 
 type SalaryTab = "all" | "pending" | "approved" | "paid" | "rejected";
 
@@ -27,18 +27,12 @@ function TabBtn({
 }) {
   return (
     <button
-      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
-        active
-          ? "bg-slate-950 text-white shadow-sm"
-          : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-      }`}
+      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all duration-200 ${ active ? "neu-tab-pressed border-transparent " : "bg-[var(--c-bg-elevated)] border-[var(--c-border-light)] text-slate-600 hover:bg-[var(--c-bg-muted)]" }`}
       onClick={onClick}
     >
       {label}
       {count > 0 ? (
-        <span className={`ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none ${
-          active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
-        }`}>
+        <span className={`ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none ${ active ? "bg-white/20 text-white" : "bg-[var(--c-bg-muted)] text-slate-600" }`}>
           {count}
         </span>
       ) : null}
@@ -110,7 +104,7 @@ export function SalaryRecordsSection({
         </div>
         <a
           href={`/api/finance/export?month=${month}`}
-          className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+          className="shrink-0 rounded-lg neu-card px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
         >
           Export CSV
         </a>
@@ -129,7 +123,7 @@ export function SalaryRecordsSection({
       </div>
 
       {canBulk ? (
-        <div className="mb-4 flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5">
+        <div className="mb-4 flex items-center gap-3 rounded-lg neu-inset px-4 py-2.5">
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input
               type="checkbox"
@@ -186,7 +180,7 @@ export function SalaryRecordsSection({
                   <ActionButton variant="approve" className="px-3" onClick={() => onStatusUpdate("salary", String(salary.id), "paid")}>Mark paid</ActionButton>
                 ) : null}
                 {String(salary.status) === "paid" ? (
-                  <a href={`/salary-slip/${String(salary.id)}`} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800">View Slip</a>
+                  <a href={`/salary-slip/${String(salary.id)}`} target="_blank" rel="noopener noreferrer" className="neu-btn neu-btn-primary rounded-lg px-3 py-1.5 text-xs font-medium">View Slip</a>
                 ) : null}
                 {actorRole === "admin" && onViewDetail ? (
                   <ActionButton variant="secondary" className="px-3" onClick={() => onViewDetail(String(salary.id), displayNested(salary.employee, "name", "Employee"))}>Details</ActionButton>

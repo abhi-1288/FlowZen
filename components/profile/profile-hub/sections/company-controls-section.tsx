@@ -10,7 +10,7 @@ export function CompanyControlsSection({
   onTakedown: () => void;
 }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-zinc-800 dark:bg-[#000000]">
+    <section className="rounded-xl neu-card p-5 dark:border-zinc-800 dark:bg-[#000000]">
       <div className="mb-5 border-l-4 border-rose-500 pl-4">
         <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">Company controls</h3>
         <p className="mt-0.5 text-sm text-slate-500 dark:text-zinc-400">

@@ -28,7 +28,7 @@ export function PolicyQuotasSection({
   const displayEndDay = endDay ?? (cycleDay > 1 ? cycleDay - 1 : null);
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-zinc-800 dark:bg-[#000000]">
+    <section className="rounded-xl neu-card p-5 dark:border-zinc-800 dark:bg-[#000000]">
       <SectionHeader title="Policy & Quotas" description="Benefits and entitlements" accent="amber" />
       <dl className="mt-4 space-y-3 text-sm">
         <Row

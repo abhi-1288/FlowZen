@@ -1,7 +1,7 @@
 import { ActionButton } from "../../shared";
 
 const overlayClass = "fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4";
-const modalClass = "w-full max-w-md rounded-xl bg-white p-5 shadow-xl overflow-y-auto max-h-[90vh]";
+const modalClass = "w-full max-w-md rounded-xl bg-[var(--c-bg-elevated)] p-5 shadow-xl overflow-y-auto max-h-[90vh]";
 
 export type PfEsicFormData = {
   pfNumber: string;
@@ -47,27 +47,27 @@ export function PfEsicModal({
         <div className="mt-4 space-y-4">
           <div>
             <label className="text-[11px] font-medium text-slate-500 mb-1 block">PF Account Number</label>
-            <input className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs" type="text" placeholder="Enter PF number" value={data.pfNumber} onChange={(e) => onDataChange({ ...data, pfNumber: e.target.value })} />
+            <input className="w-full rounded-md border border-[var(--c-border-light)] px-3 py-1.5 text-xs" type="text" placeholder="Enter PF number" value={data.pfNumber} onChange={(e) => onDataChange({ ...data, pfNumber: e.target.value })} />
           </div>
           <div>
             <label className="text-[11px] font-medium text-slate-500 mb-1 block">PF Deduction (%)</label>
-            <input className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs" type="number" min="0" step="0.01" placeholder={`Company default: ${companyPfPct ?? 12}%`} value={data.pfDeductionAmount} onChange={(e) => onDataChange({ ...data, pfDeductionAmount: e.target.value })} />
+            <input className="w-full rounded-md border border-[var(--c-border-light)] px-3 py-1.5 text-xs" type="number" min="0" step="0.01" placeholder={`Company default: ${companyPfPct ?? 12}%`} value={data.pfDeductionAmount} onChange={(e) => onDataChange({ ...data, pfDeductionAmount: e.target.value })} />
             <p className="mt-1 text-xs text-slate-400">Percentage of monthly salary. Default: {companyPfPct ?? 12}%</p>
           </div>
           <hr className="border-slate-100" />
           <div>
             <label className="text-[11px] font-medium text-slate-500 mb-1 block">ESIC Account Number</label>
-            <input className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs" type="text" placeholder="Enter ESIC number" value={data.esicNumber} onChange={(e) => onDataChange({ ...data, esicNumber: e.target.value })} />
+            <input className="w-full rounded-md border border-[var(--c-border-light)] px-3 py-1.5 text-xs" type="text" placeholder="Enter ESIC number" value={data.esicNumber} onChange={(e) => onDataChange({ ...data, esicNumber: e.target.value })} />
           </div>
           <div>
             <label className="text-[11px] font-medium text-slate-500 mb-1 block">ESIC Deduction (%)</label>
-            <input className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs" type="number" min="0" step="0.01" placeholder={`Company default: ${companyEsicPct ?? 0.75}%`} value={data.esicDeductionAmount} onChange={(e) => onDataChange({ ...data, esicDeductionAmount: e.target.value })} />
+            <input className="w-full rounded-md border border-[var(--c-border-light)] px-3 py-1.5 text-xs" type="number" min="0" step="0.01" placeholder={`Company default: ${companyEsicPct ?? 0.75}%`} value={data.esicDeductionAmount} onChange={(e) => onDataChange({ ...data, esicDeductionAmount: e.target.value })} />
             <p className="mt-1 text-xs text-slate-400">Percentage of monthly salary. Default: {companyEsicPct ?? 0.75}%</p>
           </div>
           <hr className="border-slate-100" />
           <div>
             <label className="text-[11px] font-medium text-slate-500 mb-1 block">TDS Deduction (%)</label>
-            <input className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs" type="number" min="0" step="0.01" placeholder={companyTdsPct && companyTdsPct > 0 ? `Company default: ${companyTdsPct}%` : "Company TDS not configured"} value={data.tdsDeductionAmount} onChange={(e) => onDataChange({ ...data, tdsDeductionAmount: e.target.value })} />
+            <input className="w-full rounded-md border border-[var(--c-border-light)] px-3 py-1.5 text-xs" type="number" min="0" step="0.01" placeholder={companyTdsPct && companyTdsPct > 0 ? `Company default: ${companyTdsPct}%` : "Company TDS not configured"} value={data.tdsDeductionAmount} onChange={(e) => onDataChange({ ...data, tdsDeductionAmount: e.target.value })} />
             <p className="mt-1 text-xs text-slate-400">Percentage of monthly salary{companyTdsPct && companyTdsPct > 0 ? `. Default: ${companyTdsPct}%` : ". Company TDS rate not configured."}</p>
           </div>
           <hr className="border-slate-100" />

@@ -129,7 +129,7 @@ export default function JobDetailPage() {
   if (loading) {
     return (
       <main className="grid min-h-screen place-items-center bg-[#fafafa] dark:bg-[#1a1a1a]">
-        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-900" />
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--c-border-light)] border-t-slate-900" />
       </main>
     );
   }
@@ -143,7 +143,7 @@ export default function JobDetailPage() {
           <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">This position may have been filled or removed.</p>
           <Link
             href="/careers"
-            className="mt-8 inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-slate-800"
+            className="neu-btn neu-btn-primary mt-8 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition-all"
           >
             <ArrowLeft size={16} /> Browse all openings
           </Link>
@@ -164,7 +164,7 @@ export default function JobDetailPage() {
           </p>
           <Link
             href="/careers"
-            className="mt-10 inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-slate-800"
+            className="neu-btn neu-btn-primary mt-10 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition-all"
           >
             <ArrowLeft size={16} /> Browse more jobs
           </Link>
@@ -175,10 +175,10 @@ export default function JobDetailPage() {
 
   return (
     <main className="min-h-screen bg-[#fafafa] dark:bg-[#1a1a1a]">
-      <header className="border-b border-slate-200 dark:border-zinc-800 bg-white/80 dark:bg-[#000000]/80 backdrop-blur-md">
+      <header className="border-b border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)]/80 dark:bg-[#000000]/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4 sm:px-8">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white">F</div>
+            <div className="neu-btn neu-btn-primary flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold">F</div>
             <span className="text-base font-semibold text-slate-900 dark:text-zinc-100">FlowZen</span>
             <span className="hidden text-sm text-slate-400 dark:text-zinc-500 sm:inline">·</span>
             <span className="hidden text-sm text-slate-500 dark:text-zinc-400 sm:inline">Careers</span>
@@ -190,12 +190,12 @@ export default function JobDetailPage() {
       </header>
 
       <div className="mx-auto max-w-4xl px-6 pb-16 pt-10 sm:px-8">
-        <div className="rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] p-6 shadow-sm sm:p-8">
+        <div className="rounded-2xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] dark:bg-[#000000] p-6 shadow-sm sm:p-8">
           <div className="flex items-center gap-4">
             {job.company.icon ? (
               <img src={job.company.icon} alt="" className="h-11 w-11 rounded-xl object-cover" />
             ) : (
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 dark:bg-zinc-700 text-slate-600 dark:text-zinc-400">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--c-bg-muted)] dark:bg-zinc-700 text-slate-600 dark:text-zinc-400">
                 <Building2 size={20} />
               </div>
             )}
@@ -229,7 +229,7 @@ export default function JobDetailPage() {
           {job.requiredSkills.length > 0 && (
             <div className="mt-5 flex flex-wrap gap-2">
               {job.requiredSkills.map((skill) => (
-                <span key={skill} className="rounded-full bg-slate-100 dark:bg-zinc-700 px-3 py-1 text-sm font-medium text-slate-600 dark:text-zinc-400">{skill}</span>
+                <span key={skill} className="rounded-full bg-[var(--c-bg-muted)] dark:bg-zinc-700 px-3 py-1 text-sm font-medium text-slate-600 dark:text-zinc-400">{skill}</span>
               ))}
             </div>
           )}
@@ -239,7 +239,7 @@ export default function JobDetailPage() {
           )}
         </div>
 
-        <div className="mt-6 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] p-6 shadow-sm sm:p-8">
+        <div className="mt-6 rounded-2xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] dark:bg-[#000000] p-6 shadow-sm sm:p-8">
           <h2 className="text-lg font-bold text-slate-900 dark:text-zinc-100">Apply for this position</h2>
           <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">
             Fields marked with <span className="text-rose-500">*</span> are required.
@@ -262,12 +262,12 @@ export default function JobDetailPage() {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={4}
-                className="w-full resize-y rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] px-4 py-3 text-sm text-slate-900 dark:text-zinc-100 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
+                className="neu-inset w-full resize-y rounded-xl dark:border-zinc-800 dark:bg-[#000000] px-4 py-3 text-sm text-slate-900 dark:text-zinc-100 transition-all placeholder:text-slate-400 dark:placeholder:text-zinc-500"
                 placeholder="Tell us about yourself..."
               />
             </div>
 
-            <div className="rounded-xl border border-slate-200 dark:border-zinc-800 p-5">
+            <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 p-5">
               <p className="mb-3 text-sm font-medium text-slate-700 dark:text-zinc-300">Do you know anyone working at this company?</p>
               <div className="flex items-center gap-5">
                 <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-zinc-400">
@@ -299,7 +299,7 @@ export default function JobDetailPage() {
                       value={referralId}
                       onChange={(e) => setReferralId(e.target.value)}
                       placeholder="HELLO-COMPANY-41279814"
-                      className="w-full rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] px-4 py-3 pr-12 text-sm text-slate-900 dark:text-zinc-100 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
+                      className="neu-inset w-full rounded-xl dark:border-zinc-800 dark:bg-[#000000] px-4 py-3 pr-12 text-sm text-slate-900 dark:text-zinc-100 transition-all placeholder:text-slate-400 dark:placeholder:text-zinc-500"
                     />
                     {referralStatus === "verifying" && (
                       <Loader2 size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 animate-spin text-slate-400" />
@@ -326,7 +326,7 @@ export default function JobDetailPage() {
             <div>
               <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-zinc-300">Resume / CV *</label>
               <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-3 rounded-xl border border-slate-200 dark:border-zinc-800 px-4 py-3">
+                <div className="flex items-center gap-3 rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 px-4 py-3">
                   <Upload size={16} className="shrink-0 text-slate-400 dark:text-zinc-500" />
                   <input
                     type="file"
@@ -342,7 +342,7 @@ export default function JobDetailPage() {
                       setError("");
                       setResumeFile(file);
                     }}
-                    className="w-full text-sm text-slate-500 dark:text-zinc-400 outline-none file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-slate-100 file:px-3 file:py-1 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-slate-200"
+                    className="w-full text-sm text-slate-500 dark:text-zinc-400 outline-none file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-[var(--c-bg-muted)] file:px-3 file:py-1 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-[var(--c-bg-hover)]"
                   />
                 </div>
                 <p className="text-xs text-slate-400 dark:text-zinc-500">PDF, DOC, DOCX, PNG, or JPG — max 2 MB</p>
@@ -372,7 +372,7 @@ export default function JobDetailPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="flex w-full items-center justify-center gap-2.5 rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white transition-all duration-200 hover:bg-slate-800 active:bg-slate-950 disabled:opacity-50"
+              className="neu-btn neu-btn-primary flex w-full items-center justify-center gap-2.5 rounded-full px-5 py-3 text-sm font-medium transition-all duration-200"
             >
               {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
               {submitting ? "Submitting..." : "Submit Application"}
@@ -417,7 +417,7 @@ function FieldInput({
           required={required}
           placeholder={placeholder}
           min={min}
-          className={`w-full rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#000000] px-4 py-3 text-sm text-slate-900 dark:text-zinc-100 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 ${icon ? "pl-10" : ""}`}
+          className={`neu-inset w-full rounded-xl dark:border-zinc-800 dark:bg-[#000000] px-4 py-3 text-sm text-slate-900 dark:text-zinc-100 transition-all placeholder:text-slate-400 dark:placeholder:text-zinc-500 ${icon ? "pl-10" : ""}`}
         />
       </div>
     </label>

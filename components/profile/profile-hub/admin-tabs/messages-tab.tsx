@@ -417,22 +417,20 @@ export function MessagesTab({
   }
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5">
+    <section className="rounded-xl neu-card p-5">
       <SectionHeader title="Messages" description="Real-time company chat and announcements." accent="sky" />
 
       {/* Main chat window split grid */}
-      <div className="mt-6 grid grid-cols-1 overflow-hidden rounded-xl border border-slate-200 lg:grid-cols-12" style={{ height: "650px" }}>
+      <div className="mt-6 grid grid-cols-1 overflow-hidden rounded-xl border border-[var(--c-border-light)] lg:grid-cols-12" style={{ height: "650px" }}>
         
         {/* Left Side Pane (Members / Channels) */}
-        <div className="flex flex-col border-r border-slate-200 bg-slate-50 lg:col-span-4">
+        <div className="flex flex-col border-r border-[var(--c-border-light)] bg-[var(--c-bg-muted)] lg:col-span-4">
           
           {/* Header Action Mode Switchers */}
-          <div className="border-b border-slate-200 bg-white p-4">
-            <div className="flex rounded-lg bg-slate-100 p-1">
+          <div className="border-b border-[var(--c-border-light)] bg-[var(--c-bg-card)] p-4">
+            <div className="flex rounded-lg bg-[var(--c-bg-muted)] p-1">
               <button
-                className={`flex-1 rounded-md py-2 text-center text-xs font-semibold transition-all ${
-                  mode === "normal" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
-                }`}
+                className={`flex-1 rounded-md py-2 text-center text-xs font-semibold transition-all ${ mode === "normal" ? "neu-tab-pressed" : "text-slate-500 hover:text-slate-800" }`}
                 onClick={() => {
                   setMode("normal");
                   setSelectedMember(null);
@@ -442,9 +440,7 @@ export function MessagesTab({
                 Messages
               </button>
               <button
-                className={`flex-1 rounded-md py-2 text-center text-xs font-semibold transition-all ${
-                  mode === "bulk" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
-                }`}
+                className={`flex-1 rounded-md py-2 text-center text-xs font-semibold transition-all ${ mode === "bulk" ? "neu-tab-pressed" : "text-slate-500 hover:text-slate-800" }`}
                 onClick={() => {
                   setMode("bulk");
                   setSelectedMember(null);
@@ -454,9 +450,7 @@ export function MessagesTab({
                 Bulk Message
               </button>
               <button
-                className={`flex-1 rounded-md py-2 text-center text-xs font-semibold transition-all ${
-                  mode === "meeting" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
-                }`}
+                className={`flex-1 rounded-md py-2 text-center text-xs font-semibold transition-all ${ mode === "meeting" ? "neu-tab-pressed" : "text-slate-500 hover:text-slate-800" }`}
                 onClick={() => {
                   setMode("meeting");
                   setSelectedMember(null);
@@ -466,9 +460,7 @@ export function MessagesTab({
                 Schedule Meeting
               </button>
               <button
-                className={`flex-1 rounded-md py-2 text-center text-xs font-semibold transition-all ${
-                  mode === "group" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
-                }`}
+                className={`flex-1 rounded-md py-2 text-center text-xs font-semibold transition-all ${ mode === "group" ? "neu-tab-pressed" : "text-slate-500 hover:text-slate-800" }`}
                 onClick={() => {
                   setMode("group");
                   setSelectedMember(null);
@@ -491,12 +483,12 @@ export function MessagesTab({
                   onKeyDown={(e) => {
                     if (e.key === "Enter") setSearchQuery(searchInput);
                   }}
-                  className="w-full rounded-md border border-slate-200 bg-slate-50 pl-8 pr-3 py-1.5 text-[11px] outline-none transition focus:border-slate-400 focus:bg-white"
+                  className="neu-inset w-full rounded-md pl-8 pr-3 py-1.5 text-[11px] transition"
                 />
               </div>
               <button
                 onClick={() => setSearchQuery(searchInput)}
-                className="rounded-md bg-slate-900 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-slate-800"
+                className="neu-btn neu-btn-primary rounded-md px-3 py-1.5 text-[11px] font-medium"
               >
                 Go
               </button>
@@ -525,11 +517,7 @@ export function MessagesTab({
                       <button
                         key={groupId}
                         onClick={() => setSelectedGroup(group)}
-                        className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition-all ${
-                          isSelected
-                            ? "bg-white text-slate-950 shadow-sm ring-1 ring-slate-100"
-                            : "hover:bg-slate-100 text-slate-700"
-                        }`}
+                        className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition-all ${ isSelected ? "neu-tab-pressed" : "hover:bg-[var(--c-bg-muted)] text-slate-700" }`}
                       >
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700">
                           <Users size={16} />
@@ -582,16 +570,10 @@ export function MessagesTab({
                         setSelectedMember(member);
                       }
                     }}
-                    className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition-all ${
-                      isSelected
-                        ? mode === "bulk" || mode === "meeting"
-                          ? "bg-slate-100 text-slate-900"
-                          : "bg-white text-slate-950 shadow-sm ring-1 ring-slate-100"
-                        : "hover:bg-slate-100 text-slate-700"
-                    }`}
+                    className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition-all ${ isSelected ? mode === "bulk" || mode === "meeting" ? "bg-[var(--c-bg-muted)] text-slate-900" : "neu-tab-pressed" : "hover:bg-[var(--c-bg-muted)] text-slate-700" }`}
                   >
                     {/* Avatar Initials / Image */}
-                    <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 font-semibold text-slate-700 text-xs">
+                    <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--c-bg-hover)] font-semibold text-slate-700 text-xs">
                       {member.avatarUrl ? (
                         <img
                           src={String(member.avatarUrl)}
@@ -609,7 +591,7 @@ export function MessagesTab({
 
                       {/* Bulk/Meeting mode selection indicator */}
                       {(mode === "bulk" || mode === "meeting") && isSelected && (
-                        <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white">
+                        <span className="neu-btn neu-btn-success absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full">
                           <Check size={10} strokeWidth={3} />
                         </span>
                       )}
@@ -657,7 +639,7 @@ export function MessagesTab({
         </div>
 
         {/* Right Side Chat Conversation Area */}
-        <div className="flex flex-col bg-white lg:col-span-8">
+        <div className="flex flex-col bg-[var(--c-bg-card)] lg:col-span-8">
           {mode === "meeting" ? (
             /* Schedule Meeting panel */
             <div className="flex flex-col h-full overflow-y-auto p-6">
@@ -669,7 +651,7 @@ export function MessagesTab({
                 Select participants on the left and fill in the meeting details below.
               </p>
 
-              <div className="mt-4 flex flex-wrap gap-1.5 max-h-24 overflow-y-auto border border-slate-100 rounded-lg p-2 bg-slate-50">
+              <div className="mt-4 flex flex-wrap gap-1.5 max-h-24 overflow-y-auto border border-[var(--c-border-light)] rounded-lg p-2 bg-[var(--c-bg-muted)]">
                 {selectedBulkIds.length === 0 ? (
                   <span className="text-[11px] text-slate-400 italic">No participants selected. Click users on the sidebar to add them.</span>
                 ) : (
@@ -677,7 +659,7 @@ export function MessagesTab({
                     const memberObj = members.find((m) => String(m.id ?? m._id) === id);
                     if (!memberObj) return null;
                     return (
-                      <span key={id} className="inline-flex items-center gap-1 rounded bg-slate-200 px-2 py-1 text-[10px] font-medium text-slate-700">
+                      <span key={id} className="inline-flex items-center gap-1 rounded bg-[var(--c-bg-hover)] px-2 py-1 text-[10px] font-medium text-slate-700">
                         {String(memberObj.name)}
                         <button onClick={() => toggleBulkSelected(id)} className="hover:text-red-500 font-bold ml-1 text-slate-400">&times;</button>
                       </span>
@@ -692,7 +674,7 @@ export function MessagesTab({
                   <input
                     value={meetingTitle}
                     onChange={(e) => setMeetingTitle(e.target.value)}
-                    className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-950"
+                    className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
                     placeholder="Meeting title"
                   />
                 </div>
@@ -731,7 +713,7 @@ export function MessagesTab({
                     <input
                       value={meetingLink}
                       onChange={(e) => setMeetingLink(e.target.value)}
-                      className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-950"
+                      className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
                       placeholder="https://meet.google.com/... or Zoom/Teams link"
                     />
                   </div>
@@ -741,7 +723,7 @@ export function MessagesTab({
                     <input
                       value={meetingLocation}
                       onChange={(e) => setMeetingLocation(e.target.value)}
-                      className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-950"
+                      className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
                       placeholder="Room 301, Conference Hall, etc."
                     />
                   </div>
@@ -756,7 +738,7 @@ export function MessagesTab({
                       type="date"
                       value={meetingDate}
                       onChange={(e) => setMeetingDate(e.target.value)}
-                      className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-950"
+                      className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
                     />
                   </div>
                   <div>
@@ -767,7 +749,7 @@ export function MessagesTab({
                       type="time"
                       value={meetingTime}
                       onChange={(e) => setMeetingTime(e.target.value)}
-                      className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-950"
+                      className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
                     />
                   </div>
                 </div>
@@ -777,7 +759,7 @@ export function MessagesTab({
                   <select
                     value={meetingDuration}
                     onChange={(e) => setMeetingDuration(Number(e.target.value))}
-                    className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-950"
+                    className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
                   >
                     <option value={15}>15 minutes</option>
                     <option value={30}>30 minutes</option>
@@ -794,13 +776,13 @@ export function MessagesTab({
                     value={meetingDescription}
                     onChange={(e) => setMeetingDescription(e.target.value)}
                     rows={2}
-                    className="w-full resize-none rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-950"
+                    className="neu-inset w-full resize-none rounded-md px-3 py-1.5 text-xs"
                     placeholder="Any additional details..."
                   />
                 </div>
               </div>
 
-              <div className="mt-4 flex justify-end border-t border-slate-100 pt-4">
+              <div className="mt-4 flex justify-end border-t border-[var(--c-border-light)] pt-4">
                 <ActionButton
                   variant="primary"
                   disabled={sendingMeeting || selectedBulkIds.length === 0 || !meetingTitle.trim() || !meetingDate || (meetingType === "online" && !meetingLink.trim()) || (meetingType === "offline" && !meetingLocation.trim())}
@@ -822,7 +804,7 @@ export function MessagesTab({
                   Select users on the left pane and write a message below. It will send individual messages to each user.
                 </p>
 
-                <div className="mt-4 flex flex-wrap gap-1.5 max-h-40 overflow-y-auto border border-slate-100 rounded-lg p-2 bg-slate-50">
+                <div className="mt-4 flex flex-wrap gap-1.5 max-h-40 overflow-y-auto border border-[var(--c-border-light)] rounded-lg p-2 bg-[var(--c-bg-muted)]">
                   {selectedBulkIds.length === 0 ? (
                     <span className="text-[11px] text-slate-400 italic">No users selected. Click users on the sidebar to add them.</span>
                   ) : (
@@ -830,7 +812,7 @@ export function MessagesTab({
                       const memberObj = members.find((m) => String(m.id ?? m._id) === id);
                       if (!memberObj) return null;
                       return (
-                        <span key={id} className="inline-flex items-center gap-1 rounded bg-slate-200 px-2 py-1 text-[10px] font-medium text-slate-700">
+                        <span key={id} className="inline-flex items-center gap-1 rounded bg-[var(--c-bg-hover)] px-2 py-1 text-[10px] font-medium text-slate-700">
                           {String(memberObj.name)}
                           <button onClick={() => toggleBulkSelected(id)} className="hover:text-red-500 font-bold ml-1 text-slate-400">×</button>
                         </span>
@@ -843,7 +825,7 @@ export function MessagesTab({
                   placeholder="Type here your bulk messages..."
                   value={bulkMessage}
                   onChange={(e) => setBulkMessage(e.target.value)}
-                  className="mt-4 h-48 w-full rounded-xl border border-slate-200 p-3 text-[11px] outline-none focus:border-slate-400 resize-none"
+                  className="neu-inset mt-4 h-48 w-full rounded-xl p-3 text-[11px] resize-none"
                 />
               </div>
 
@@ -862,7 +844,7 @@ export function MessagesTab({
             <div className="flex flex-col h-full overflow-hidden">
               
               {/* Active Group Header */}
-              <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4">
+              <div className="flex items-center gap-3 border-b border-[var(--c-border-light)] px-5 py-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-100 text-sky-700">
                   <Users size={16} />
                 </div>
@@ -874,7 +856,7 @@ export function MessagesTab({
                 </div>
                 <button
                   onClick={() => setShowInfoModal(true)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-700 transition-colors"
                   title="Group info"
                 >
                   <Info size={15} />
@@ -884,7 +866,7 @@ export function MessagesTab({
               {/* Group Chat Message History */}
               <div
                 ref={chatContainerRef}
-                className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50 scrollbar-thin"
+                className="flex-1 overflow-y-auto p-4 space-y-4 bg-[var(--c-bg-muted)]/50 scrollbar-thin"
               >
                 {loadingGroupChat ? (
                   <div className="py-8 text-center text-xs text-slate-400">Loading conversation...</div>
@@ -914,7 +896,7 @@ export function MessagesTab({
                         <div key={msgId} className="flex flex-col space-y-1">
                           {showDateHeader && (
                             <div className="my-4 flex items-center justify-center">
-                              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider bg-slate-200/60 px-3 py-1 rounded-full">
+                              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider bg-[var(--c-bg-hover)]/60 px-3 py-1 rounded-full">
                                 {getMessageDateLabel(msgCreatedAt)}
                               </span>
                             </div>
@@ -930,7 +912,7 @@ export function MessagesTab({
                               <div className={`absolute -top-3 ${isMe ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1"} hidden group-hover/msg:flex items-center gap-0.5 z-10`}>
                                 <button
                                   onClick={() => handleReply(msg)}
-                                  className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 shadow-sm transition-colors"
+                                  className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--c-bg-card)] border border-[var(--c-border-light)] text-slate-400 hover:text-slate-700 hover:bg-[var(--c-bg-muted)] shadow-sm transition-colors"
                                   title="Reply"
                                 >
                                   <Reply size={11} />
@@ -938,19 +920,19 @@ export function MessagesTab({
                                 <div className="relative">
                                   <button
                                     onClick={() => setShowEmojiPickerFor(showEmojiPickerFor === msgId ? null : msgId)}
-                                    className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 shadow-sm transition-colors"
+                                    className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--c-bg-card)] border border-[var(--c-border-light)] text-slate-400 hover:text-slate-700 hover:bg-[var(--c-bg-muted)] shadow-sm transition-colors"
                                     title="React"
                                   >
                                     <SmilePlus size={11} />
                                   </button>
                                   {showEmojiPickerFor === msgId && (
-                                    <div className={`absolute ${isMe ? "right-0" : "left-0"} top-7 z-50 w-[220px] rounded-xl border border-slate-200 bg-white p-2 shadow-xl`} data-emoji-picker>
+                                    <div className={`absolute ${isMe ? "right-0" : "left-0"} top-7 z-50 w-[220px] rounded-xl neu-card p-2`} data-emoji-picker>
                                       <div className="grid grid-cols-10 gap-0.5">
                                         {REACTION_EMOJIS.map((e) => (
                                           <button
                                             key={e}
                                             onClick={() => handleReact(msgId, e)}
-                                            className="flex h-7 w-7 items-center justify-center rounded-md text-sm hover:bg-slate-100 transition-colors"
+                                            className="flex h-7 w-7 items-center justify-center rounded-md text-sm hover:bg-[var(--c-bg-muted)] transition-colors"
                                           >
                                             {e}
                                           </button>
@@ -961,21 +943,17 @@ export function MessagesTab({
                                 </div>
                                 <button
                                   onClick={() => { setMessageInfoMsg(msg); setMessageInfoTab("reactions"); }}
-                                  className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 shadow-sm transition-colors"
+                                  className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--c-bg-card)] border border-[var(--c-border-light)] text-slate-400 hover:text-slate-700 hover:bg-[var(--c-bg-muted)] shadow-sm transition-colors"
                                   title="Message info"
                                 >
                                   <Info size={11} />
                                 </button>
                               </div>
 
-                              <div className={`rounded-xl px-4 py-2.5 shadow-sm text-[11px] ${
-                                isMe
-                                  ? "bg-slate-950 text-white rounded-tr-none"
-                                  : "bg-white border border-slate-100 text-slate-800 rounded-tl-none"
-                              }`}>
+                              <div className={`rounded-xl px-4 py-2.5 text-[11px] ${ isMe ? "neu-tab-pressed rounded-tr-none" : "bg-[var(--c-bg-elevated)] border-[var(--c-border-light)] text-slate-800 rounded-tl-none" }`}>
                                 {!isMe && (
                                   <div className="flex items-center gap-1.5 mb-1">
-                                    <div className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-200 text-[7px] font-bold text-slate-600 overflow-hidden">
+                                    <div className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--c-bg-hover)] text-[7px] font-bold text-slate-600 overflow-hidden">
                                       {senderAvatar ? (
                                         <img src={String(senderAvatar)} alt="" className="h-full w-full object-cover" />
                                       ) : (
@@ -988,7 +966,7 @@ export function MessagesTab({
 
                                 {/* Quoted reply preview */}
                                 {replyToData && (
-                                  <div className={`mb-2 rounded-lg px-2.5 py-1.5 text-[9px] ${isMe ? "bg-white/10 text-white/60" : "bg-slate-100 text-slate-500"}`}>
+                                  <div className={`mb-2 rounded-lg px-2.5 py-1.5 text-[9px] ${isMe ? "bg-white/10 text-white/60" : "bg-[var(--c-bg-muted)] text-slate-500"}`}>
                                     <p className="font-semibold truncate opacity-70">{String(replyToData.sender?.name ?? "Unknown")}</p>
                                     <p className="truncate opacity-60">{String(replyToData.message ?? "")}</p>
                                   </div>
@@ -1015,11 +993,7 @@ export function MessagesTab({
                                           key={em}
                                           onClick={() => handleReact(msgId, em)}
                                           title={`Reacted by ${data.names.length > 0 ? data.names.join(", ") : `${data.count.length} user(s)`}`}
-                                          className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium transition-colors ${
-                                            data.hasMe
-                                              ? isMe ? "bg-white/20 text-white" : "bg-sky-100 text-sky-700"
-                                              : isMe ? "bg-white/10 text-white/70" : "bg-slate-100 text-slate-600"
-                                          } hover:opacity-80`}
+                                          className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium transition-colors ${ data.hasMe ? isMe ? "bg-white/20 text-white" : "bg-sky-100 text-sky-700" : isMe ? "bg-white/10 text-white/70" : "bg-[var(--c-bg-muted)] text-slate-600" } hover:opacity-80`}
                                         >
                                           {em} {data.count.length}
                                         </button>
@@ -1056,7 +1030,7 @@ export function MessagesTab({
               </div>
 
               {/* Group Chat Send Input */}
-              <div className="border-t border-slate-200 p-4">
+              <div className="border-t border-[var(--c-border-light)] p-4">
                 {replyingTo && (
                   <div className="mb-2 flex items-center gap-2 rounded-lg bg-sky-50 border border-sky-200 px-3 py-2 text-[10px]">
                     <Reply size={12} className="text-sky-500 shrink-0" />
@@ -1081,12 +1055,12 @@ export function MessagesTab({
                     placeholder="Type a message to the group..."
                     value={groupMessage}
                     onChange={(e) => setGroupMessage(e.target.value)}
-                    className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-[11px] outline-none focus:border-slate-400 focus:ring-0"
+                    className="neu-inset flex-1 rounded-xl px-4 py-2 text-[11px]"
                   />
                   <button
                     type="submit"
                     disabled={sendingGroupMessage || !groupMessage.trim()}
-                    className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-950 text-white hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                    className="neu-btn neu-btn-primary flex h-9 w-9 items-center justify-center rounded-xl"
                   >
                     <Send size={14} />
                   </button>
@@ -1098,8 +1072,8 @@ export function MessagesTab({
             <div className="flex flex-col h-full overflow-hidden">
               
               {/* Active User Header */}
-              <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 font-semibold text-slate-700 text-xs">
+              <div className="flex items-center gap-3 border-b border-[var(--c-border-light)] px-5 py-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--c-bg-hover)] font-semibold text-slate-700 text-xs">
                   {selectedMember.avatarUrl ? (
                     <img
                       src={String(selectedMember.avatarUrl)}
@@ -1125,7 +1099,7 @@ export function MessagesTab({
                 </div>
                 <button
                   onClick={() => setShowInfoModal(true)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-700 transition-colors"
                   title="User info"
                 >
                   <Info size={15} />
@@ -1135,7 +1109,7 @@ export function MessagesTab({
               {/* Chat Message History Scroll */}
               <div
                 ref={chatContainerRef}
-                className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50 scrollbar-thin"
+                className="flex-1 overflow-y-auto p-4 space-y-4 bg-[var(--c-bg-muted)]/50 scrollbar-thin"
               >
                 {loadingChat ? (
                   <div className="py-8 text-center text-xs text-slate-400">Loading conversation history...</div>
@@ -1160,7 +1134,7 @@ export function MessagesTab({
                         <div key={msgId} className="flex flex-col space-y-1">
                           {showDateHeader && (
                             <div className="my-4 flex items-center justify-center">
-                              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider bg-slate-200/60 px-3 py-1 rounded-full">
+                              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider bg-[var(--c-bg-hover)]/60 px-3 py-1 rounded-full">
                                 {getMessageDateLabel(msgCreatedAt)}
                               </span>
                             </div>
@@ -1176,7 +1150,7 @@ export function MessagesTab({
                               <div className={`absolute -top-3 ${isMe ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1"} hidden group-hover/msg:flex items-center gap-0.5 z-10`}>
                                 <button
                                   onClick={() => handleReply(msg)}
-                                  className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 shadow-sm transition-colors"
+                                  className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--c-bg-card)] border border-[var(--c-border-light)] text-slate-400 hover:text-slate-700 hover:bg-[var(--c-bg-muted)] shadow-sm transition-colors"
                                   title="Reply"
                                 >
                                   <Reply size={11} />
@@ -1184,19 +1158,19 @@ export function MessagesTab({
                                 <div className="relative">
                                   <button
                                     onClick={() => setShowEmojiPickerFor(showEmojiPickerFor === msgId ? null : msgId)}
-                                    className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 shadow-sm transition-colors"
+                                    className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--c-bg-card)] border border-[var(--c-border-light)] text-slate-400 hover:text-slate-700 hover:bg-[var(--c-bg-muted)] shadow-sm transition-colors"
                                     title="React"
                                   >
                                     <SmilePlus size={11} />
                                   </button>
                                   {showEmojiPickerFor === msgId && (
-                                    <div className={`absolute ${isMe ? "right-0" : "left-0"} top-7 z-50 w-[220px] rounded-xl border border-slate-200 bg-white p-2 shadow-xl`} data-emoji-picker>
+                                    <div className={`absolute ${isMe ? "right-0" : "left-0"} top-7 z-50 w-[220px] rounded-xl neu-card p-2`} data-emoji-picker>
                                       <div className="grid grid-cols-10 gap-0.5">
                                         {REACTION_EMOJIS.map((e) => (
                                           <button
                                             key={e}
                                             onClick={() => handleReact(msgId, e)}
-                                            className="flex h-7 w-7 items-center justify-center rounded-md text-sm hover:bg-slate-100 transition-colors"
+                                            className="flex h-7 w-7 items-center justify-center rounded-md text-sm hover:bg-[var(--c-bg-muted)] transition-colors"
                                           >
                                             {e}
                                           </button>
@@ -1208,15 +1182,11 @@ export function MessagesTab({
                               </div>
 
                               <div
-                                className={`rounded-xl px-4 py-2.5 shadow-sm text-[11px] ${
-                                  isMe
-                                    ? "bg-slate-950 text-white rounded-tr-none"
-                                    : "bg-white border border-slate-100 text-slate-800 rounded-tl-none"
-                                }`}
+                                className={`rounded-xl px-4 py-2.5 text-[11px] ${ isMe ? "neu-tab-pressed rounded-tr-none" : "bg-[var(--c-bg-elevated)] border-[var(--c-border-light)] text-slate-800 rounded-tl-none" }`}
                               >
                                 {/* Quoted reply preview */}
                                 {replyToData && (
-                                  <div className={`mb-2 rounded-lg px-2.5 py-1.5 text-[9px] ${isMe ? "bg-white/10 text-white/60" : "bg-slate-100 text-slate-500"}`}>
+                                  <div className={`mb-2 rounded-lg px-2.5 py-1.5 text-[9px] ${isMe ? "bg-white/10 text-white/60" : "bg-[var(--c-bg-muted)] text-slate-500"}`}>
                                     <p className="font-semibold truncate opacity-70">{String(replyToData.sender?.name ?? "Unknown")}</p>
                                     <p className="truncate opacity-60">{String(replyToData.message ?? "")}</p>
                                   </div>
@@ -1243,11 +1213,7 @@ export function MessagesTab({
                                           key={em}
                                           onClick={() => handleReact(msgId, em)}
                                           title={`Reacted by ${data.names.length > 0 ? data.names.join(", ") : `${data.count.length} user(s)`}`}
-                                          className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium transition-colors ${
-                                            data.hasMe
-                                              ? isMe ? "bg-white/20 text-white" : "bg-sky-100 text-sky-700"
-                                              : isMe ? "bg-white/10 text-white/70" : "bg-slate-100 text-slate-600"
-                                          } hover:opacity-80`}
+                                          className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium transition-colors ${ data.hasMe ? isMe ? "bg-white/20 text-white" : "bg-sky-100 text-sky-700" : isMe ? "bg-white/10 text-white/70" : "bg-[var(--c-bg-muted)] text-slate-600" } hover:opacity-80`}
                                         >
                                           {em} {data.count.length}
                                         </button>
@@ -1282,7 +1248,7 @@ export function MessagesTab({
               </div>
 
               {/* Chat Send Input Box */}
-              <div className="border-t border-slate-200 p-4">
+              <div className="border-t border-[var(--c-border-light)] p-4">
                 {replyingTo && (
                   <div className="mb-2 flex items-center gap-2 rounded-lg bg-sky-50 border border-sky-200 px-3 py-2 text-[10px]">
                     <Reply size={12} className="text-sky-500 shrink-0" />
@@ -1307,12 +1273,12 @@ export function MessagesTab({
                     placeholder="Type here your messages..."
                     value={chatMessage}
                     onChange={(e) => setChatMessage(e.target.value)}
-                    className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-[11px] outline-none focus:border-slate-400 focus:ring-0"
+                    className="neu-inset flex-1 rounded-xl px-4 py-2 text-[11px]"
                   />
                   <button
                     type="submit"
                     disabled={sendingChat || !chatMessage.trim()}
-                    className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-950 text-white hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                    className="neu-btn neu-btn-primary flex h-9 w-9 items-center justify-center rounded-xl"
                   >
                     <Send size={14} />
                   </button>
@@ -1322,8 +1288,8 @@ export function MessagesTab({
             </div>
           ) : (
             /* Blank state */
-            <div className="flex flex-col h-full items-center justify-center p-8 text-center bg-slate-50/20">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400 shadow-inner">
+            <div className="flex flex-col h-full items-center justify-center p-8 text-center bg-[var(--c-bg-muted)]/20">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--c-bg-muted)] text-slate-400 shadow-inner">
                 <Send size={24} />
               </div>
               <h4 className="mt-4 text-xs font-bold text-slate-800">Your Chat Board</h4>
@@ -1335,20 +1301,20 @@ export function MessagesTab({
 
           {/* User Info Modal */}
           {showInfoModal && selectedMember && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowInfoModal(false)}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay" onClick={() => setShowInfoModal(false)}>
               <div
-                className="relative w-full max-w-sm rounded-xl bg-white p-5 shadow-xl"
+                className="relative w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
                   onClick={() => setShowInfoModal(false)}
-                  className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-700"
                 >
                   <X size={15} />
                 </button>
 
                 <div className="flex flex-col items-center text-center">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-200 font-semibold text-slate-700 text-lg">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--c-bg-hover)] font-semibold text-slate-700 text-lg">
                     {(selectedMember as any).avatarUrl ? (
                       <img
                         src={String((selectedMember as any).avatarUrl)}
@@ -1376,7 +1342,7 @@ export function MessagesTab({
                   )}
                 </div>
 
-                <div className="mt-5 space-y-3 border-t border-slate-100 pt-4 text-xs">
+                <div className="mt-5 space-y-3 border-t border-[var(--c-border-light)] pt-4 text-xs">
                   <div className="flex justify-between">
                     <span className="text-slate-400">Email</span>
                     <span className="font-medium text-slate-800">{String((selectedMember as any).email)}</span>
@@ -1426,14 +1392,14 @@ export function MessagesTab({
 
           {/* Group Info Modal */}
           {showInfoModal && selectedGroup && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowInfoModal(false)}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay" onClick={() => setShowInfoModal(false)}>
               <div
-                className="relative w-full max-w-sm rounded-xl bg-white p-5 shadow-xl max-h-[80vh] overflow-y-auto"
+                className="relative w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl max-h-[80vh] overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
                   onClick={() => setShowInfoModal(false)}
-                  className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-700"
                 >
                   <X size={15} />
                 </button>
@@ -1450,12 +1416,12 @@ export function MessagesTab({
                   </p>
                 </div>
 
-                <div className="mt-5 border-t border-slate-100 pt-4">
+                <div className="mt-5 border-t border-[var(--c-border-light)] pt-4">
                   <p className="text-[10px] font-semibold uppercase text-slate-400 mb-3">Members</p>
                   <div className="space-y-2">
                     {((selectedGroup.members as AnyRecord[]) ?? []).map((member: AnyRecord) => (
-                      <div key={String(member.id ?? "")} className="flex items-center gap-3 rounded-lg p-2 hover:bg-slate-50">
-                        <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-700 overflow-hidden">
+                      <div key={String(member.id ?? "")} className="flex items-center gap-3 rounded-lg p-2 hover:bg-[var(--c-bg-muted)]">
+                        <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--c-bg-hover)] text-[10px] font-semibold text-slate-700 overflow-hidden">
                           {member.avatarUrl ? (
                             <img src={String(member.avatarUrl)} alt="" className="h-full w-full object-cover" />
                           ) : (
@@ -1486,14 +1452,14 @@ export function MessagesTab({
 
           {/* Message Info Modal */}
           {messageInfoMsg && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setMessageInfoMsg(null)}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay" onClick={() => setMessageInfoMsg(null)}>
               <div
-                className="relative w-full max-w-sm rounded-xl bg-white p-5 shadow-xl max-h-[80vh] overflow-y-auto"
+                className="relative w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl max-h-[80vh] overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
                   onClick={() => setMessageInfoMsg(null)}
-                  className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-700"
                 >
                   <X size={15} />
                 </button>
@@ -1505,21 +1471,17 @@ export function MessagesTab({
                   const infoSender = String((messageInfoMsg as any).sender?._id ?? (messageInfoMsg as any).sender ?? "");
                   const isOwnMessage = infoSender === currentUserId;
                   return (
-                    <div className="flex gap-1 mb-4 bg-slate-100 rounded-lg p-0.5">
+                    <div className="flex gap-1 mb-4 bg-[var(--c-bg-muted)] rounded-lg p-0.5">
                       <button
                         onClick={() => setMessageInfoTab("reactions")}
-                        className={`flex-1 rounded-md px-3 py-1.5 text-[10px] font-semibold transition-colors ${
-                          messageInfoTab === "reactions" || !isOwnMessage ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                        }`}
+                        className={`flex-1 rounded-md px-3 py-1.5 text-[10px] font-semibold transition-colors ${ messageInfoTab === "reactions" || !isOwnMessage ? "neu-tab-pressed" : "text-slate-500 hover:text-slate-700" }`}
                       >
                         Reactions {((messageInfoMsg as any).reactions ?? []).length > 0 && `(${(messageInfoMsg as any).reactions.length})`}
                       </button>
                       {isOwnMessage && (
                         <button
                           onClick={() => setMessageInfoTab("seen")}
-                          className={`flex-1 rounded-md px-3 py-1.5 text-[10px] font-semibold transition-colors ${
-                            messageInfoTab === "seen" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                          }`}
+                          className={`flex-1 rounded-md px-3 py-1.5 text-[10px] font-semibold transition-colors ${ messageInfoTab === "seen" ? "neu-tab-pressed" : "text-slate-500 hover:text-slate-700" }`}
                         >
                           Seen {((messageInfoMsg as any).groupReadBy ?? []).length > 0 && `(${(messageInfoMsg as any).groupReadBy.length})`}
                         </button>
@@ -1547,14 +1509,14 @@ export function MessagesTab({
                   return (
                     <div className="space-y-2">
                       {Object.values(grouped).map((group) => (
-                        <div key={group.emoji} className="rounded-lg border border-slate-100 p-2.5">
+                        <div key={group.emoji} className="rounded-lg border border-[var(--c-border-light)] p-2.5">
                           <div className="flex items-center gap-2 mb-1.5">
                             <span className="text-base">{group.emoji}</span>
                             <span className="text-[10px] font-semibold text-slate-500">{group.users.length}</span>
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {group.users.map((u) => (
-                              <span key={u.id} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-medium text-slate-700">
+                              <span key={u.id} className="inline-flex items-center gap-1 rounded-full bg-[var(--c-bg-muted)] px-2 py-0.5 text-[9px] font-medium text-slate-700">
                                 {u.name}
                               </span>
                             ))}
@@ -1602,8 +1564,8 @@ export function MessagesTab({
                         <p className="text-[11px] text-slate-400 text-center py-6 italic">No members</p>
                       ) : (
                         allUsers.map((u) => (
-                          <div key={u.id} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-slate-50">
-                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[9px] font-bold text-slate-600 overflow-hidden">
+                          <div key={u.id} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-[var(--c-bg-muted)]">
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--c-bg-hover)] text-[9px] font-bold text-slate-600 overflow-hidden">
                               {getInitials(u.name)}
                             </div>
                             <div className="flex-1 min-w-0">
@@ -1614,7 +1576,7 @@ export function MessagesTab({
                                 Seen{u.readAt ? ` ${new Date(u.readAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}
                               </span>
                             ) : (
-                              <span className="shrink-0 inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[8px] font-semibold text-slate-500">
+                              <span className="shrink-0 inline-flex items-center rounded-full bg-[var(--c-bg-muted)] px-2 py-0.5 text-[8px] font-semibold text-slate-500">
                                 Not seen yet
                               </span>
                             )}

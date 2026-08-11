@@ -55,13 +55,13 @@ export function MeetingInviteModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
+      <div className="w-full max-w-lg rounded-xl neu-card" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-[var(--c-border-light)] px-5 py-3">
           <h4 className="text-sm font-semibold text-slate-900">Schedule Meeting</h4>
-          <button onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-slate-50 hover:text-slate-700">
+          <button onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-700">
             <X size={18} />
           </button>
         </div>
@@ -69,7 +69,7 @@ export function MeetingInviteModal({
         <div className="space-y-4 p-5">
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">With</label>
-            <p className="rounded-md bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-800">
+            <p className="rounded-md bg-[var(--c-bg-muted)] px-3 py-1.5 text-xs font-medium text-slate-800">
               {String(member.name ?? "")} ({String(member.email ?? "")})
             </p>
           </div>
@@ -79,7 +79,7 @@ export function MeetingInviteModal({
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-950"
+              className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
               placeholder="Meeting title"
             />
           </div>
@@ -93,7 +93,7 @@ export function MeetingInviteModal({
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-950"
+                className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
               />
             </div>
             <div>
@@ -104,7 +104,7 @@ export function MeetingInviteModal({
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
-                className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-950"
+                className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
               />
             </div>
           </div>
@@ -114,7 +114,7 @@ export function MeetingInviteModal({
             <select
               value={duration}
               onChange={(e) => setDuration(Number(e.target.value) as MeetingDuration)}
-              className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-950"
+              className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
             >
               {MEETING_DURATION_OPTIONS.map((opt) => (
                 <option key={opt.minutes} value={opt.minutes}>{opt.label}</option>
@@ -128,16 +128,16 @@ export function MeetingInviteModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              className="w-full resize-none rounded-md border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-slate-950"
+              className="neu-inset w-full resize-none rounded-md px-3 py-1.5 text-xs"
               placeholder="Any additional details..."
             />
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-5 py-3">
+        <div className="flex items-center justify-end gap-3 border-t border-[var(--c-border-light)] px-5 py-3">
           <button
             onClick={onClose}
-            className="rounded-md border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            className="rounded-md border border-[var(--c-border-light)] px-4 py-1.5 text-xs font-semibold text-slate-600 hover:bg-[var(--c-bg-muted)]"
           >
             Cancel
           </button>

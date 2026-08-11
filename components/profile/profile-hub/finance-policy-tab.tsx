@@ -126,11 +126,11 @@ export function FinancePolicyTab({
                 <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500 flex items-center gap-1">
                   <Percent size={14} className="text-indigo-500 dark:text-indigo-400" /> Statutory Deductions
                 </h4>
-                <div className="grid grid-cols-3 gap-3 rounded-lg border border-slate-100 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-800/50 p-3">
+                <div className="grid grid-cols-3 gap-3 rounded-lg border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-muted)]/50 dark:bg-zinc-800/50 p-3">
                   <div>
                     <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 mb-1 block">PF (%)</label>
                     <input
-                      className="w-full rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold focus:border-indigo-400 focus:outline-none text-slate-900 dark:text-zinc-100"
+                      className="neu-inset w-full rounded-lg dark:border-zinc-700 dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold text-slate-900 dark:text-zinc-100"
                       type="number"
                       min="0"
                       max="100"
@@ -143,7 +143,7 @@ export function FinancePolicyTab({
                   <div>
                     <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 mb-1 block">ESIC (%)</label>
                     <input
-                      className="w-full rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold focus:border-indigo-400 focus:outline-none text-slate-900 dark:text-zinc-100"
+                      className="neu-inset w-full rounded-lg dark:border-zinc-700 dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold text-slate-900 dark:text-zinc-100"
                       type="number"
                       min="0"
                       max="100"
@@ -156,7 +156,7 @@ export function FinancePolicyTab({
                   <div>
                     <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 mb-1 block">TDS (%)</label>
                     <input
-                      className="w-full rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold focus:border-indigo-400 focus:outline-none text-slate-900 dark:text-zinc-100"
+                      className="neu-inset w-full rounded-lg dark:border-zinc-700 dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold text-slate-900 dark:text-zinc-100"
                       type="number"
                       min="0"
                       max="100"
@@ -170,7 +170,7 @@ export function FinancePolicyTab({
               </div>
 
               {/* Advance Salary */}
-              <div className="flex items-center justify-between rounded-lg border border-slate-100 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-800/50 p-3.5">
+              <div className="flex items-center justify-between rounded-lg border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-muted)]/50 dark:bg-zinc-800/50 p-3.5">
                 <div>
                   <p className="text-xs font-semibold text-slate-800 dark:text-zinc-200">Advance Salary Requests</p>
                   <p className="text-[10px] text-slate-500 dark:text-zinc-500">Allow employees to request salary advances directly</p>
@@ -178,22 +178,14 @@ export function FinancePolicyTab({
                 <div className="flex gap-1.5">
                   <button
                     type="button"
-                    className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
-                      advanceSalaryEnabled
-                        ? "bg-slate-950 dark:bg-white text-white dark:text-zinc-900 shadow-sm"
-                        : "border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800"
-                    }`}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${ advanceSalaryEnabled ? "neu-tab-pressed" : "neu-tab-raised" }`}
                     onClick={() => setAdvanceSalaryEnabled(true)}
                   >
                     Enabled
                   </button>
                   <button
                     type="button"
-                    className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
-                      !advanceSalaryEnabled
-                        ? "bg-slate-950 dark:bg-white text-white dark:text-zinc-900 shadow-sm"
-                        : "border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800"
-                    }`}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${ !advanceSalaryEnabled ? "neu-tab-pressed" : "neu-tab-raised" }`}
                     onClick={() => setAdvanceSalaryEnabled(false)}
                   >
                     Disabled
@@ -206,11 +198,11 @@ export function FinancePolicyTab({
                 <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500 flex items-center gap-1">
                   <ShieldCheck size={14} className="text-indigo-500 dark:text-indigo-400" /> Earning Breakdown Percentages (% of Basic)
                 </h4>
-                <div className="grid grid-cols-2 gap-3 rounded-lg border border-slate-100 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-800/50 p-3">
+                <div className="grid grid-cols-2 gap-3 rounded-lg border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-muted)]/50 dark:bg-zinc-800/50 p-3">
                   <div>
                     <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 mb-1 block">House Rent Allowance (%)</label>
                     <input
-                      className="w-full rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold focus:border-indigo-400 focus:outline-none text-slate-900 dark:text-zinc-100"
+                      className="neu-inset w-full rounded-lg dark:border-zinc-700 dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold text-slate-900 dark:text-zinc-100"
                       type="number"
                       min="0"
                       max="100"
@@ -223,7 +215,7 @@ export function FinancePolicyTab({
                   <div>
                     <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 mb-1 block">Conveyance Allowance (%)</label>
                     <input
-                      className="w-full rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold focus:border-indigo-400 focus:outline-none text-slate-900 dark:text-zinc-100"
+                      className="neu-inset w-full rounded-lg dark:border-zinc-700 dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold text-slate-900 dark:text-zinc-100"
                       type="number"
                       min="0"
                       max="100"
@@ -236,7 +228,7 @@ export function FinancePolicyTab({
                   <div>
                     <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 mb-1 block">Medical Allowance (%)</label>
                     <input
-                      className="w-full rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold focus:border-indigo-400 focus:outline-none text-slate-900 dark:text-zinc-100"
+                      className="neu-inset w-full rounded-lg dark:border-zinc-700 dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold text-slate-900 dark:text-zinc-100"
                       type="number"
                       min="0"
                       max="100"
@@ -249,7 +241,7 @@ export function FinancePolicyTab({
                   <div>
                     <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 mb-1 block">Special Allowance (%)</label>
                     <input
-                      className="w-full rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold focus:border-indigo-400 focus:outline-none text-slate-900 dark:text-zinc-100"
+                      className="neu-inset w-full rounded-lg dark:border-zinc-700 dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold text-slate-900 dark:text-zinc-100"
                       type="number"
                       min="0"
                       max="100"
@@ -270,7 +262,7 @@ export function FinancePolicyTab({
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                  className="neu-btn neu-btn-primary rounded-xl px-5 py-2.5 text-xs font-semibold"
                 >
                   {saving ? "Saving Changes..." : "Save Policies"}
                 </button>
@@ -295,7 +287,7 @@ export function FinancePolicyTab({
               <div className="relative">
                 <span className="absolute left-3 top-2.5 text-sm font-semibold text-slate-400 dark:text-zinc-500">₹</span>
                 <input
-                  className="w-full rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 pl-7 pr-3 py-2 text-sm font-bold text-slate-900 dark:text-zinc-100 focus:border-emerald-400 focus:outline-none"
+                  className="neu-inset w-full rounded-lg dark:border-zinc-700 dark:bg-zinc-900 pl-7 pr-3 py-2 text-sm font-bold text-slate-900 dark:text-zinc-100"
                   type="number"
                   min="0"
                   value={testGross}
@@ -305,12 +297,12 @@ export function FinancePolicyTab({
               </div>
             </div>
 
-            <div className="rounded-lg border border-slate-100 dark:border-zinc-800 bg-emerald-50/10 dark:bg-emerald-950/20 p-4 space-y-2.5">
+            <div className="rounded-lg border border-[var(--c-border-light)] dark:border-zinc-800 bg-emerald-50/10 dark:bg-emerald-950/20 p-4 space-y-2.5">
               <div className="flex justify-between text-xs text-slate-500 dark:text-zinc-400 font-medium">
                 <span>Components</span>
                 <span>Calculated Amount</span>
               </div>
-              <hr className="border-slate-100 dark:border-zinc-800" />
+              <hr className="border-[var(--c-border-light)] dark:border-zinc-800" />
               
               <div className="flex justify-between items-center text-xs">
                 <span className="font-medium text-slate-600 dark:text-zinc-400">Basic Salary Component (Derived)</span>
@@ -337,7 +329,7 @@ export function FinancePolicyTab({
                 <span className="font-bold text-slate-900 dark:text-zinc-100">₹{calcSpecial.toLocaleString("en-IN")}</span>
               </div>
 
-              <hr className="border-slate-100 dark:border-zinc-800" />
+              <hr className="border-[var(--c-border-light)] dark:border-zinc-800" />
               <div className="flex justify-between items-center text-sm font-bold text-emerald-800 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-lg">
                 <span>Sum of Components:</span>
                 <span>₹{totalSum.toLocaleString("en-IN")}</span>
@@ -347,7 +339,7 @@ export function FinancePolicyTab({
             <div className="rounded-lg bg-indigo-50/50 dark:bg-indigo-950/30 p-3 text-[11px] text-indigo-900 dark:text-indigo-300 flex gap-2">
               <Info size={16} className="shrink-0 text-indigo-600 dark:text-indigo-400 mt-0.5" />
               <div>
-                <span className="font-bold">Formula:</span> Basic Salary is derived as <code className="bg-white dark:bg-zinc-800 px-1 py-0.5 rounded font-mono text-[10px] text-indigo-800 dark:text-indigo-300">Gross / (1 + (HRA% + Conveyance% + Medical% + Special%) / 100)</code>. Other components are computed as their percentages of Basic, with Special Allowance taking the balance.
+                <span className="font-bold">Formula:</span> Basic Salary is derived as <code className="bg-[var(--c-bg-card)] dark:bg-zinc-800 px-1 py-0.5 rounded font-mono text-[10px] text-indigo-800 dark:text-indigo-300">Gross / (1 + (HRA% + Conveyance% + Medical% + Special%) / 100)</code>. Other components are computed as their percentages of Basic, with Special Allowance taking the balance.
               </div>
             </div>
           </div>

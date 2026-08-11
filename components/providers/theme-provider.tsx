@@ -6,12 +6,12 @@ import { deriveThemeTokens } from "@/lib/theme";
 
 const LS_KEY = "flowzen_companyColor";
 export const THEME_KEY = "flowzen_theme";
-export type ThemePreference = "light" | "dark" | "system";
+export type ThemePreference = "light" | "dark" | "system" | "light-neumorphism" | "dark-neumorphism";
 
 export function getThemePreference(): ThemePreference {
   try {
     const saved = localStorage.getItem(THEME_KEY);
-    if (saved === "light" || saved === "dark" || saved === "system") return saved;
+    if (saved === "light" || saved === "dark" || saved === "system" || saved === "light-neumorphism" || saved === "dark-neumorphism") return saved;
     // Migrate the old boolean preference.
     if (localStorage.getItem("flowzen_darkMode") === "true") return "dark";
   } catch {}
@@ -19,9 +19,13 @@ export function getThemePreference(): ThemePreference {
 }
 
 export function applyTheme(preference: ThemePreference) {
-  const isDark = preference === "dark" ||
+  const isDark = preference === "dark" || preference === "dark-neumorphism" ||
     (preference === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  document.documentElement.classList.toggle("dark", isDark);
+  const root = document.documentElement;
+  root.classList.toggle("dark", isDark);
+  root.classList.toggle("theme-neu", preference === "light-neumorphism" || preference === "dark-neumorphism");
+  root.classList.toggle("theme-neu-light", preference === "light-neumorphism");
+  root.classList.toggle("theme-neu-dark", preference === "dark-neumorphism");
   document.documentElement.style.colorScheme = isDark ? "dark" : "light";
 }
 

@@ -87,7 +87,7 @@ export function ProfileTab({
   const effectiveBaseSalary = inApprovedCompany ? Math.max(Number(insights?.baseSalary ?? 0), 0) : 0;
   const joinedBy = (insights?.joinedBy as AnyRecord | undefined) ?? null;
   const passwordResetRequired = Boolean(profile?.passwordResetRequired);
-  const sectionClass = "rounded-xl border border-slate-200 bg-white p-5";
+  const sectionClass = "rounded-xl neu-card p-5";
   const avatarUrl = profile?.avatarUrl ? String(profile.avatarUrl) : "";
   const displayName = profile?.name ? String(profile.name) : session?.user?.name ? String(session.user.name) : "User";
   const managerTeams = Array.isArray((insights?.manager as AnyRecord | undefined)?.teams) ? ((insights?.manager as AnyRecord).teams as AnyRecord[]) : [];
@@ -303,7 +303,7 @@ export function ProfileTab({
               </p>
             </div>
             <div className="flex gap-2">
-              <button className="rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-100"
+              <button className="rounded-lg border border-amber-200 bg-[var(--c-bg-card)] px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-100"
                 onClick={() => setup.setSetupBannerDismissed(true)} type="button">Dismiss</button>
               <button className="rounded-lg bg-amber-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-800"
                 onClick={setup.openSetupModal} type="button">Complete setup</button>
@@ -313,13 +313,13 @@ export function ProfileTab({
       ) : null}
 
       {idCardRequestStatus === "approved" ? (
-        <div className="mb-5 flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)]">
+        <div className="mb-5 flex items-center justify-between rounded-2xl neu-card p-4 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)]">
           <div>
             <p className="text-sm font-semibold text-slate-900">ID Card</p>
             <p className="text-xs text-slate-500">View and print your company identity card</p>
           </div>
           <button
-            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            className="neu-btn neu-btn-primary inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium"
             onClick={() => setShowIdCardModal(true)}
             type="button"
           >
@@ -329,7 +329,7 @@ export function ProfileTab({
       ) : null}
 
       {inApprovedCompany ? (
-        <div className="mb-5 flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)]">
+        <div className="mb-5 flex items-center justify-between rounded-2xl neu-card p-4 shadow-[0_1px_3px_0_rgb(0_0_0_/_0.04),_0_1px_2px_-1px_rgb(0_0_0_/_0.06)]">
           <div>
             <p className="text-sm font-semibold text-slate-900">Lost / Damaged ID Card</p>
             <p className="text-xs text-slate-500">Report a lost, stolen, or damaged identity card and request a replacement</p>
@@ -465,13 +465,13 @@ export function ProfileTab({
       ) : null}
 
       {showLostCardModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-3">
-          <div className="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl" style={{ maxHeight: "90vh", overflowY: "auto" }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
+          <div className="w-full max-w-lg rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl" style={{ maxHeight: "90vh", overflowY: "auto" }}>
             <h3 className="mb-3 text-sm font-semibold text-slate-900">Report Lost / Damaged ID Card</h3>
             <form onSubmit={handleReportLostCard} className="space-y-3">
               <div>
                 <label className="mb-0.5 block text-[11px] font-medium text-slate-500">Reason</label>
-                <select className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                <select className="neu-inset w-full rounded-md px-2.5 py-1.5 text-xs"
                   value={lcReason} onChange={(e) => setLcReason(e.target.value)}
                 >
                   <option value="lost">Lost</option>
@@ -483,28 +483,28 @@ export function ProfileTab({
 
               <div>
                 <label className="mb-0.5 block text-[11px] font-medium text-slate-500">Last Location Seen</label>
-                <input className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                <input className="neu-inset w-full rounded-md px-2.5 py-1.5 text-xs"
                   value={lcLastLocation} onChange={(e) => setLcLastLocation(e.target.value)} placeholder="e.g. Main Gate, Floor 3"
                 />
               </div>
 
               <div>
                 <label className="mb-0.5 block text-[11px] font-medium text-slate-500">Date & Time Lost</label>
-                <input type="datetime-local" className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                <input type="datetime-local" className="neu-inset w-full rounded-md px-2.5 py-1.5 text-xs"
                   value={lcLostDateTime} onChange={(e) => setLcLostDateTime(e.target.value)}
                 />
               </div>
 
               <div>
                 <label className="mb-0.5 block text-[11px] font-medium text-slate-500">Police Complaint Number (optional)</label>
-                <input className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                <input className="neu-inset w-full rounded-md px-2.5 py-1.5 text-xs"
                   value={lcPoliceComplaint} onChange={(e) => setLcPoliceComplaint(e.target.value)} placeholder="e.g. FIR-2026-0042"
                 />
               </div>
 
               <div>
                 <label className="mb-0.5 block text-[11px] font-medium text-slate-500">Assign to Senior Security</label>
-                <select className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                <select className="neu-inset w-full rounded-md px-2.5 py-1.5 text-xs"
                   value={lcSeniorSecurityId} onChange={(e) => setLcSeniorSecurityId(e.target.value)}
                 >
                   <option value="">Auto-assign</option>
@@ -523,7 +523,7 @@ export function ProfileTab({
 
               <div>
                 <label className="mb-0.5 block text-[11px] font-medium text-slate-500">Assign to HR</label>
-                <select className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                <select className="neu-inset w-full rounded-md px-2.5 py-1.5 text-xs"
                   value={lcHrId} onChange={(e) => setLcHrId(e.target.value)}
                 >
                   <option value="">Auto-assign</option>
@@ -552,13 +552,13 @@ export function ProfileTab({
 
               <div>
                 <label className="mb-0.5 block text-[11px] font-medium text-slate-500">Notes</label>
-                <textarea className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-xs focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                <textarea className="neu-inset w-full rounded-md px-2.5 py-1.5 text-xs"
                   rows={3} value={lcNotes} onChange={(e) => setLcNotes(e.target.value)}
                 />
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
-                <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                <button className="rounded-md border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
                   type="button" onClick={() => setShowLostCardModal(false)}>Cancel</button>
                 <button className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
                   type="submit" disabled={lcSubmitting}>
