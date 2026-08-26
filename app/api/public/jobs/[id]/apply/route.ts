@@ -38,6 +38,7 @@ export async function POST(
   const phone = String(form.get("phone") ?? "").trim();
   const currentCompany = String(form.get("currentCompany") ?? "").trim();
   const experienceYears = Number(form.get("experienceYears")) || 0;
+  const internshipExperienceMonths = Number(form.get("internshipExperienceMonths")) || 0;
   const noticePeriod = Number(form.get("noticePeriod")) || 0;
   const notes = String(form.get("notes") ?? "").trim();
   const portfolioUrl = String(form.get("portfolioUrl") ?? "").trim();
@@ -97,6 +98,7 @@ export async function POST(
     phone,
     currentCompany,
     experienceYears,
+    internshipExperienceMonths,
     noticePeriod,
     resumeUrl,
     portfolioUrl,

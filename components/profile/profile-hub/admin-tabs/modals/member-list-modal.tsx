@@ -268,13 +268,11 @@ export function MemberListModal({
                           <ActionButton variant="danger" className="px-3" type="button" disabled={revokingIdCardFor === memberId} onClick={() => revokeIdCard(memberId)}>
                             {revokingIdCardFor === memberId ? "Revoking..." : "Revoke ID Card"}
                           </ActionButton>
-                          {canEditOthersRole && !isSelf && String(member.role ?? "") === "others" ? (
+                          {canEditOthersRole && !isSelf ? (
                             <>
-                              <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenCustomRoleModal(member)}>Change Custom Role</ActionButton>
-                              <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenRoleModal(member)}>Change to Company Role</ActionButton>
+                              <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenCustomRoleModal(member)}>Custom Role</ActionButton>
+                              <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenRoleModal(member)}>Change Role</ActionButton>
                             </>
-                          ) : canEditOthersRole && !isSelf ? (
-                            <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenRoleModal(member)}>Change Role</ActionButton>
                           ) : null}
                         </div>
 

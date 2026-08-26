@@ -3,6 +3,7 @@ import { connectDb } from "@/lib/db";
 import { databaseUnavailable, jsonError, requireUserId, serializeDoc } from "@/lib/api";
 import { createJoinCode } from "@/lib/codes";
 import { generateCompanyIdentityCode } from "@/lib/company-identity";
+import { generateUniqueSlug } from "@/lib/slug";
 import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 import { Notification } from "@/models/Notification";
@@ -30,8 +31,10 @@ export async function POST(request: Request) {
   if (user.company) return jsonError("You already have a registered company.", 409);
 
   const joinCode = createJoinCode("CO");
+  const slug = await generateUniqueSlug(name);
   const company = await Company.create({
     name,
+    slug,
     owner: userId,
     joinCode,
     members: [userId],
@@ -40,7 +43,7 @@ export async function POST(request: Request) {
 
   user.company = company._id;
   user.companyStatus = "approved";
-  user.companyIdentityCode = await generateCompanyIdentityCode(company._id);
+  user.companyIdentityCode = (await generateCompanyIdentityCode(company._id)).code;
   await user.save();
 
   await Notification.create({
@@ -52,5 +55,5 @@ export async function POST(request: Request) {
   });
   emitNotification(userId);
 
-  return NextResponse.json({ company: serializeDoc(company) }, { status: 201 });
+  return NextResponse.json({ company: serializeDoc(company), slug }, { status: 201 });
 }

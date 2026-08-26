@@ -32,7 +32,7 @@ export async function POST(request: Request, { params }: Params) {
   if (!hrUser || (!HR_ROLES.includes(hrUser.role) && !isSeniorSecurity)) return jsonError("Forbidden", 403);
   if (!hrUser.company) return jsonError("No company found.", 400);
 
-  const candidate = await ATSCandidate.findOne({ _id: id, company: hrUser.company }).populate("job", "title department");
+  const candidate = await ATSCandidate.findOne({ _id: id, company: hrUser.company }).populate("job", "title department employmentType durationMonths");
   if (!candidate) return jsonError("Candidate not found.", 404);
   if (candidate.stage !== "joined") return jsonError("Candidate must be in 'Joined' stage to convert.", 400);
 
@@ -53,6 +53,23 @@ export async function POST(request: Request, { params }: Params) {
   const passwordHash = await bcrypt.hash(password, 12);
 
   const job = candidate.job as any;
+  const jobEmploymentType = String(job?.employmentType ?? "");
+  const jobDurationMonths = job?.durationMonths ?? null;
+
+  const acceptedOffer = await ATSOffer.findOne({
+    candidate: candidate._id,
+    status: "accepted",
+  }).select("offeredCTC salaryType joiningDate");
+
+  const offerJoiningDate = (acceptedOffer as any)?.joiningDate || null;
+
+  const joiningDate = offerJoiningDate ? new Date(offerJoiningDate) : new Date();
+  let employmentEndDate: Date | null = null;
+  if (jobDurationMonths && ["internship", "contract", "part-time"].includes(jobEmploymentType)) {
+    employmentEndDate = new Date(joiningDate);
+    employmentEndDate.setMonth(employmentEndDate.getMonth() + jobDurationMonths);
+  }
+
   const employee = await User.create({
     name: `${candidate.firstName} ${candidate.lastName}`.trim(),
     email: candidate.email,
@@ -66,6 +83,10 @@ export async function POST(request: Request, { params }: Params) {
     phone: candidate.phone || "",
     dob: candidate.dob || null,
     address: candidate.address || "",
+    companyJoined: joiningDate,
+    employmentEndDate,
+    employmentType: jobEmploymentType,
+    durationMonths: jobDurationMonths,
   });
 
   const loginUrl = `${process.env.NODE_ENV === "development" ? request.headers.get("origin") || (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000") : process.env.NEXT_PUBLIC_APP_URL}/login`;
@@ -95,11 +116,6 @@ export async function POST(request: Request, { params }: Params) {
     checkOut: null,
     status: "present",
   });
-
-  const acceptedOffer = await ATSOffer.findOne({
-    candidate: candidate._id,
-    status: "accepted",
-  }).select("offeredCTC salaryType");
 
   await JoinRequest.create({
     requester: employee._id,

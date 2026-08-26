@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Search, Send, Users, Check, Info, X, Calendar, Clock, Video, MapPin, MessageSquare, SmilePlus, Reply } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
-import { ActionButton, AnyRecord, formatRole, SectionHeader } from "../shared";
+import { ActionButton, AnyRecord, formatRoleWithCustom, SectionHeader } from "../shared";
 
 export function MessagesTab({
   showToast,
@@ -554,7 +554,7 @@ export function MessagesTab({
               filteredMembers.map((member) => {
                 const memberId = String(member.id ?? member._id ?? "");
                 const name = String(member.name ?? "Member");
-                const role = formatRole(String(member.role ?? "employee"), Boolean((member as any).isSeniorSecurity));
+                const role = formatRoleWithCustom(String(member.role ?? "employee"), (member as any).customRole, Boolean((member as any).isSeniorSecurity));
                 const isSelected = mode === "normal" ? selectedMember?.id === memberId || selectedMember?._id === memberId : !!bulkSelected[memberId];
                 
                 // unread message badge count
@@ -1087,7 +1087,7 @@ export function MessagesTab({
                 <div className="flex-1">
                   <h4 className="text-xs font-bold text-slate-900 capitalize">{String(selectedMember.name)}</h4>
                   <p className="text-[10px] text-slate-400">
-                    {formatRole(String(selectedMember.role), Boolean((selectedMember as any).isSeniorSecurity))} • {String(selectedMember.email)}
+                    {formatRoleWithCustom(String(selectedMember.role), (selectedMember as any).customRole, Boolean((selectedMember as any).isSeniorSecurity))} • {String(selectedMember.email)}
                   </p>
                   {(selectedMember as any).isOnline ? (
                     <p className="text-[10px] font-medium text-emerald-600 mt-0.5">Online</p>
@@ -1329,7 +1329,7 @@ export function MessagesTab({
                     {String((selectedMember as any).name)}
                   </h3>
                   <p className="text-xs text-slate-400">
-                    {formatRole(String((selectedMember as any).role), Boolean((selectedMember as any).isSeniorSecurity))}
+                    {formatRoleWithCustom(String((selectedMember as any).role), (selectedMember as any).customRole, Boolean((selectedMember as any).isSeniorSecurity))}
                   </p>
                   {(selectedMember as any).isOnline ? (
                     <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600">
@@ -1439,7 +1439,7 @@ export function MessagesTab({
                             )}
                           </p>
                           <p className="truncate text-[9px] text-slate-400">
-                            {formatRole(String(member.role ?? "employee"), false)}
+                            {formatRoleWithCustom(String(member.role ?? "employee"), (member as any).customRole, false)}
                           </p>
                         </div>
                       </div>

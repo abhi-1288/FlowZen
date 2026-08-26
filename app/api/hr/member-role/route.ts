@@ -71,9 +71,6 @@ export async function PATCH(request: Request) {
   const customRole = String((body as any).customRole ?? "").trim();
 
   if (customRole) {
-    if (String(member.role) !== "others") {
-      return jsonError("Only members with Others role can receive a custom role label.", 403);
-    }
     if (customRole.length > 80) return jsonError("Role name must be 80 characters or less.", 400);
     member.customRole = customRole;
     await member.save();

@@ -17,6 +17,8 @@ type JobInfo = {
   department: string;
   location: string;
   employmentType: string;
+  durationMonths: number | null;
+  requiredExperienceYears: number | null;
   salaryRangeMin: number;
   salaryRangeMax: number;
   description: string;
@@ -123,7 +125,7 @@ export default function CareersPage() {
                           {job.title}
                         </h3>
                         <span className="shrink-0 rounded-full bg-[var(--c-bg-muted)] dark:bg-zinc-700 px-3 py-1 text-xs font-medium text-slate-600 dark:text-zinc-400">
-                          {job.employmentType}
+                          {job.employmentType}{job.durationMonths ? ` · ${job.durationMonths} months` : ""}
                         </span>
                       </div>
                       <div className="mt-3.5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-500 dark:text-zinc-400">
@@ -142,6 +144,12 @@ export default function CareersPage() {
                         {job.salaryRangeMin > 0 && (
                           <span className="inline-flex items-center gap-1 text-sm text-slate-500 dark:text-zinc-400">
                             {CURRENCY_SYMBOLS[job.currency] || "₹"}{job.salaryRangeMin.toLocaleString()} - {CURRENCY_SYMBOLS[job.currency] || "₹"}{job.salaryRangeMax.toLocaleString()}
+                          </span>
+                        )}
+                        {job.requiredExperienceYears != null && job.requiredExperienceYears > 0 && (
+                          <span className="inline-flex items-center gap-1.5">
+                            <Briefcase size={14} className="text-slate-400 dark:text-zinc-500" />
+                            {job.requiredExperienceYears}+ years exp
                           </span>
                         )}
                       </div>

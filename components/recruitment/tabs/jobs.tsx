@@ -7,6 +7,7 @@ import { Search, Eye, Pencil, Globe, Share2, Check, Trash2, ChevronLeft, Chevron
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
 import type { EmploymentType, JobStatus, SalaryType } from "@/lib/recruitment-types";
+import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
 
 export function JobsTab() {
   const router = useRouter();
@@ -23,6 +24,11 @@ export function JobsTab() {
   const [copiedJobId, setCopiedJobId] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const totalPages = Math.ceil(totalJobs / 10) || 1;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     useRecruitmentStore.setState({ userRole: role });
@@ -56,7 +62,7 @@ export function JobsTab() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-zinc-100">Job Openings</h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">{totalJobs} jobs</p>
+          <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">{mounted ? totalJobs : "\u00A0"} jobs</p>
         </div>
         <button suppressHydrationWarning
           onClick={() => setModal({ type: "create-job" })}
@@ -93,17 +99,17 @@ export function JobsTab() {
           </div>
         </div>
 
-        {loading && jobs.length === 0 ? (
+        {mounted && loading && jobs.length === 0 ? (
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="h-40 animate-pulse rounded-xl bg-slate-200 dark:bg-zinc-700" />
             ))}
           </div>
-        ) : jobs.length === 0 ? (
+        ) : mounted && jobs.length === 0 ? (
           <div className="mt-8 text-center">
             <p className="text-slate-500 dark:text-zinc-400">No published jobs found.</p>
           </div>
-        ) : (
+        ) : mounted ? (
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {jobs.map((job) => (
               <div key={job.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-zinc-800 dark:bg-[#000000]">
@@ -124,10 +130,22 @@ export function JobsTab() {
                   <span>{job.location || "Remote"}</span>
                   <span>&middot;</span>
                   <span>{job.employmentType}</span>
+                  {job.durationMonths && (
+                    <>
+                      <span>&middot;</span>
+                      <span>{job.durationMonths} months</span>
+                    </>
+                  )}
+                  {job.requiredExperienceYears != null && job.requiredExperienceYears > 0 && (
+                    <>
+                      <span>&middot;</span>
+                      <span>{job.requiredExperienceYears}+ years exp</span>
+                    </>
+                  )}
                   {(job.salaryRangeMin > 0 || job.salaryRangeMax > 0) && (
                     <>
                       <span>&middot;</span>
-                      <span>{(job as any).currencySymbol || "?"}{job.salaryRangeMin.toLocaleString()} - {(job as any).currencySymbol || "?"}{job.salaryRangeMax.toLocaleString()}{job.salaryType === "per-month" ? "/mo" : "/yr"}</span>
+                      <span>{CURRENCY_SYMBOLS[job.currency] || "₹"}{job.salaryRangeMin.toLocaleString()} - {CURRENCY_SYMBOLS[job.currency] || "₹"}{job.salaryRangeMax.toLocaleString()}{job.salaryType === "per-month" ? "/mo" : "/yr"}</span>
                     </>
                   )}
                   {(job as any).applicantsCount !== undefined && (
@@ -195,9 +213,9 @@ export function JobsTab() {
               </div>
             ))}
           </div>
-        )}
+        ) : null}
 
-        {totalPages > 1 && (
+        {mounted && totalPages > 1 && (
           <div className="mt-6 flex items-center justify-center gap-2">
             <button suppressHydrationWarning onClick={() => setPage(1)} disabled={page === 1} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700">
               <ChevronsLeft size={16} />
@@ -270,6 +288,9 @@ function JobModals() {
       department: String(form.get("department") || ""),
       location: String(form.get("location") || ""),
       employmentType: String(form.get("employmentType") || "full-time") as EmploymentType,
+      durationMonths: form.get("durationMonths") ? Number(form.get("durationMonths")) : null,
+      requiredExperienceYears: form.get("requiredExperienceYears") ? Number(form.get("requiredExperienceYears")) : null,
+      atsScoreThreshold: form.get("atsScoreThreshold") ? Number(form.get("atsScoreThreshold")) : null,
       currency: String(form.get("currency") || "INR"),
       salaryRangeMin: Number(form.get("salaryRangeMin") || 0),
       salaryRangeMax: Number(form.get("salaryRangeMax") || 0),
@@ -320,6 +341,18 @@ function JobModals() {
                 <option value="contract">Contract</option>
                 <option value="internship">Internship</option>
               </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Duration (months)</span>
+              <input name="durationMonths" type="number" min="1" max="60" defaultValue={editingJob?.durationMonths || ""} placeholder="e.g. 6" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Required Experience (years)</span>
+              <input name="requiredExperienceYears" type="number" min="0" max="50" defaultValue={editingJob?.requiredExperienceYears || ""} placeholder="e.g. 2" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">ATS Min Score (0-100)</span>
+              <input name="atsScoreThreshold" type="number" min="0" max="100" defaultValue={editingJob?.atsScoreThreshold || ""} placeholder="e.g. 70" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Min Salary</span>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useParams } from "next/navigation";
 import { DashboardTab } from "@/components/recruitment/tabs/dashboard";
 import { JobsTab } from "@/components/recruitment/tabs/jobs";
 import { CandidatesTab } from "@/components/recruitment/tabs/candidates";
@@ -8,6 +9,7 @@ import { BoardTab } from "@/components/recruitment/tabs/board";
 import { InterviewsTab } from "@/components/recruitment/tabs/interviews";
 import { OffersTab } from "@/components/recruitment/tabs/offers";
 import { ReferralsTab } from "@/components/recruitment/tabs/referrals";
+import { useRecruitmentStore } from "@/store/recruitment-store";
 
 const TABS = [
   { key: "dashboard", component: DashboardTab },
@@ -20,24 +22,16 @@ const TABS = [
 ] as const;
 
 export function RecruitmentHub() {
-  const [pathname, setPathname] = useState(() =>
-    typeof window === "undefined" ? "/recruitment/dashboard" : window.location.pathname,
-  );
+  const params = useParams<{ tab?: string[] }>();
+  const currentTab = params?.tab?.[0] ?? "dashboard";
+  const setModal = useRecruitmentStore((s) => s.setModal);
 
   useEffect(() => {
-    const sync = () => setPathname(window.location.pathname);
-    window.addEventListener("popstate", sync);
-    window.addEventListener("flowzen:recruitment-navigation", sync);
-    return () => {
-      window.removeEventListener("popstate", sync);
-      window.removeEventListener("flowzen:recruitment-navigation", sync);
-    };
-  }, []);
-
-  const currentTab = pathname.replace("/recruitment/", "").replace(/\/$/, "") || "dashboard";
+    setModal(null);
+  }, [currentTab, setModal]);
 
   const tab = TABS.find((t) => t.key === currentTab);
   const Component = tab?.component ?? DashboardTab;
 
-  return <Component />;
+  return <Component key={currentTab} />;
 }

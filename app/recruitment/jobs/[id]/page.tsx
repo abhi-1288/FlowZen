@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { ArrowLeft, Plus, Pencil, Eye, Trash2, Globe, Archive, Share2, Check } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Eye, Trash2, Globe, Archive, Share2, Check, Cog } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
+import { apiFetch } from "@/lib/client-utils";
 import { CURRENCY_SYMBOLS, STAGE_LABELS, type Stage, type Source, type JobStatus } from "@/lib/recruitment-types";
 
 export default function JobDetailPage() {
@@ -15,18 +16,39 @@ export default function JobDetailPage() {
   const { data: session } = useSession();
   const role = session?.user?.role ?? "";
   const isAdmin = role === "admin";
+  const isHrOrAdmin = role === "admin" || role === "human-resource";
   const { activeJob, candidates, loading, fetchJob, fetchCandidates, setModal, updateJob } = useRecruitmentStore(
     useShallow((s) => ({ activeJob: s.activeJob, candidates: s.candidates, loading: s.loading, fetchJob: s.fetchJob, fetchCandidates: s.fetchCandidates, setModal: s.setModal, updateJob: s.updateJob }))
   );
   const [candidateFilter, setCandidateFilter] = useState("");
   const [copied, setCopied] = useState(false);
+  const [atsLoading, setAtsLoading] = useState(false);
+  const [atsResult, setAtsResult] = useState<{ scored: number; selected: number; rejected: number; errors: number } | null>(null);
+
+  async function handleRunAts(force: boolean) {
+    setAtsLoading(true);
+    setAtsResult(null);
+    try {
+      const result = await apiFetch<{ scored: number; selected: number; rejected: number; errors: number }>(`/api/recruitment/jobs/${id}/ats-score`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ force }) });
+      setAtsResult(result);
+      void fetchCandidates({ jobId: id });
+    } catch {
+      setAtsResult(null);
+    } finally {
+      setAtsLoading(false);
+    }
+  }
 
   useEffect(() => { void fetchJob(id); void fetchCandidates({ jobId: id }); }, [id, fetchJob, fetchCandidates]);
 
-  const filtered = useMemo(() => candidateFilter
-    ? candidates.filter((c) => c.stage === candidateFilter)
-    : candidates,
-  [candidates, candidateFilter]);
+  const filtered = useMemo(() => {
+    let list = candidates;
+    if (candidateFilter === "__ats-selected") list = list.filter((c) => c.atsStatus === "selected");
+    else if (candidateFilter === "__ats-rejected") list = list.filter((c) => c.atsStatus === "rejected");
+    else if (candidateFilter === "__ats-pending") list = list.filter((c) => c.atsScore == null);
+    else if (candidateFilter) list = list.filter((c) => c.stage === candidateFilter);
+    return list;
+  }, [candidates, candidateFilter]);
 
   if (loading && !activeJob) {
     return (
@@ -62,7 +84,7 @@ export default function JobDetailPage() {
             <h1 className="text-2xl font-semibold text-slate-900">{activeJob.title}</h1>
             <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${ activeJob.status === "open" ? "bg-emerald-50 text-emerald-700" : activeJob.status === "draft" ? "bg-amber-50 text-amber-700" : "bg-[var(--c-bg-muted)] text-slate-600" }`}>{activeJob.status}</span>
           </div>
-          <p className="mt-1 text-sm text-slate-500">{activeJob.department} &middot; {activeJob.location || "Remote"} &middot; {activeJob.employmentType}</p>
+          <p className="mt-1 text-sm text-slate-500">{activeJob.department} &middot; {activeJob.location || "Remote"} &middot; {activeJob.employmentType}{activeJob.durationMonths ? ` · ${activeJob.durationMonths} months` : ""}{activeJob.requiredExperienceYears ? ` · ${activeJob.requiredExperienceYears}+ years exp` : ""}</p>
           {activeJob.salaryRangeMin > 0 || activeJob.salaryRangeMax > 0 ? (
             <p className="text-sm text-slate-500">Salary: {CURRENCY_SYMBOLS[activeJob.currency] || "₹"}{activeJob.salaryRangeMin.toLocaleString()} - {CURRENCY_SYMBOLS[activeJob.currency] || "₹"}{activeJob.salaryRangeMax.toLocaleString()}{activeJob.salaryType === "per-month" ? " per month" : " per annum"}</p>
           ) : null}
@@ -119,6 +141,30 @@ export default function JobDetailPage() {
           >
             <Plus size={15} /> Add Candidate
           </button>
+          {isHrOrAdmin && (
+            <button
+              onClick={() => void handleRunAts(false)}
+              disabled={atsLoading}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
+            >
+              <Cog size={15} className={atsLoading ? "animate-spin" : ""} />
+              {atsLoading ? "Scoring..." : "Run ATS Score"}
+            </button>
+          )}
+          {isHrOrAdmin && (
+            <button
+              onClick={() => void handleRunAts(true)}
+              disabled={atsLoading}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 px-3 py-2 text-sm font-medium text-amber-600 hover:bg-amber-50 disabled:opacity-50"
+            >
+              {atsLoading ? "Scoring..." : "Re-score All"}
+            </button>
+          )}
+          {activeJob.atsScoreThreshold != null && (
+            <span className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700">
+              ATS Threshold: {activeJob.atsScoreThreshold}+
+            </span>
+          )}
           {activeJob.status !== "open" && (
             <button
               onClick={() => setModal({ type: "delete-job", jobId: id })}
@@ -153,11 +199,23 @@ export default function JobDetailPage() {
             onChange={(e) => setCandidateFilter(e.target.value)}
           >
             <option value="">All Stages</option>
-            {stages.map((s) => (
-              <option key={s} value={s}>{STAGE_LABELS[s as Stage]}</option>
-            ))}
+            <optgroup label="By Stage">
+              {stages.map((s) => (
+                <option key={s} value={s}>{STAGE_LABELS[s as Stage]}</option>
+              ))}
+            </optgroup>
+            <optgroup label="By ATS Status">
+              <option value="__ats-selected">ATS Selected</option>
+              <option value="__ats-rejected">ATS Rejected</option>
+              <option value="__ats-pending">Not Scored</option>
+            </optgroup>
           </select>
         </div>
+        {atsResult && (
+          <div className="mt-2 rounded-lg bg-indigo-50 p-3 text-sm text-indigo-700">
+            Scored {atsResult.scored} candidate{atsResult.scored !== 1 ? "s" : ""} — {atsResult.selected} selected, {atsResult.rejected} rejected{atsResult.errors > 0 ? `, ${atsResult.errors} error${atsResult.errors !== 1 ? "s" : ""}` : ""}
+          </div>
+        )}
 
         <div className="mt-4 space-y-3">
           {filtered.map((candidate) => (
@@ -168,6 +226,11 @@ export default function JobDetailPage() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-slate-900">{candidate.firstName} {candidate.lastName}</span>
+                  {candidate.atsScore != null && (
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${ candidate.atsStatus === "selected" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700" }`}>
+                      ATS {candidate.atsScore}
+                    </span>
+                  )}
                   {candidate.rating > 0 && (
                     <span className="text-xs text-amber-500">{'★'.repeat(candidate.rating)}{'☆'.repeat(5 - candidate.rating)}</span>
                   )}

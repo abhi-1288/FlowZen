@@ -82,6 +82,10 @@ const UserSchema = new Schema(
       default: null,
     },
 
+    employmentEndDate: { type: Date, default: null },
+    employmentType: { type: String, default: "" },
+    durationMonths: { type: Number, default: null },
+
     teamJoined: {
       type: Date,
       // default: Date.now,

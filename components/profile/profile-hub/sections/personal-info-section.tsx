@@ -310,6 +310,12 @@ export function PersonalInfoSection({
         {oldRegionLabel ? <Row label="Region" value={oldRegionLabel} /> : null}
         <Row label="Role" value={effectiveRole ? displayRole : undefined} />
         <Row label="Unique Identity" value={profile?.companyIdentityCode ? String(profile.companyIdentityCode) : undefined} />
+        {profile?.employmentEndDate ? (
+          <Row
+            label="Employment Period"
+            value={`${profile.employmentType ? String(profile.employmentType).replace(/-/g, " ") : ""}${profile.durationMonths ? ` · ${profile.durationMonths} months` : ""} · ${profile.companyJoined ? new Date(String(profile.companyJoined)).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "?"} — ${new Date(String(profile.employmentEndDate)).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`}
+          />
+        ) : null}
       </dl>
       {Array.isArray(profile?.roleHistory) && profile.roleHistory.length > 0 ? (
         <div className="mt-4 border-t border-[var(--c-border-light)] pt-3 dark:border-zinc-800/50">

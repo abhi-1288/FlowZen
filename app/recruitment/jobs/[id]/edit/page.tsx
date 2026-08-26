@@ -23,6 +23,9 @@ export default function EditJobPage() {
   const [description, setDescription] = useState("");
   const [requiredSkills, setRequiredSkills] = useState("");
   const [status, setStatus] = useState("draft");
+  const [durationMonths, setDurationMonths] = useState("");
+  const [requiredExperienceYears, setRequiredExperienceYears] = useState("");
+  const [atsScoreThreshold, setAtsScoreThreshold] = useState("");
 
   useEffect(() => { void fetchJob(id); }, [id, fetchJob]);
   useEffect(() => {
@@ -39,6 +42,9 @@ export default function EditJobPage() {
       setDescription(activeJob.description);
       setRequiredSkills(activeJob.requiredSkills.join(", "));
       setStatus(activeJob.status);
+      setDurationMonths(activeJob.durationMonths ? String(activeJob.durationMonths) : "");
+      setRequiredExperienceYears(activeJob.requiredExperienceYears ? String(activeJob.requiredExperienceYears) : "");
+      setAtsScoreThreshold(activeJob.atsScoreThreshold ? String(activeJob.atsScoreThreshold) : "");
     }
   }, [activeJob]);
 
@@ -46,6 +52,9 @@ export default function EditJobPage() {
     e.preventDefault();
     await updateJob(id, {
       title, department, location, employmentType: employmentType as any,
+      durationMonths: durationMonths ? Number(durationMonths) : null,
+      requiredExperienceYears: requiredExperienceYears ? Number(requiredExperienceYears) : null,
+      atsScoreThreshold: atsScoreThreshold ? Number(atsScoreThreshold) : null,
       salaryRangeMin: Number(salaryRangeMin), salaryRangeMax: Number(salaryRangeMax), currency,
       openings: Number(openings), autoCloseDate: autoCloseDate || null, description,
       requiredSkills: requiredSkills.split(",").map((s) => s.trim()).filter(Boolean),
@@ -82,6 +91,20 @@ export default function EditJobPage() {
               <option value="contract">Contract</option>
               <option value="internship">Internship</option>
             </select>
+          </label>
+          {employmentType !== "full-time" && (
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700">Duration (months)</span>
+              <input value={durationMonths} onChange={(e) => setDurationMonths(e.target.value)} type="number" min="1" max="60" placeholder="e.g. 6" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
+            </label>
+          )}
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-slate-700">Required Experience (years)</span>
+            <input value={requiredExperienceYears} onChange={(e) => setRequiredExperienceYears(e.target.value)} type="number" min="0" max="50" placeholder="e.g. 2" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-slate-700">ATS Min Score (0-100)</span>
+            <input value={atsScoreThreshold} onChange={(e) => setAtsScoreThreshold(e.target.value)} type="number" min="0" max="100" placeholder="e.g. 70" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Status</span>

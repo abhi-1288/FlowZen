@@ -3,6 +3,7 @@ import { Schema, model, models, type InferSchemaType } from "mongoose";
 const CompanySchema = new Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 120 },
+    slug: { type: String, unique: true, sparse: true, lowercase: true, trim: true, maxlength: 40, index: true },
     owner: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     joinCode: { type: String, required: true, unique: true, index: true },
     status: { type: String, enum: ["active", "frozen", "taken-down"], default: "active" },
@@ -42,6 +43,9 @@ const CompanySchema = new Schema(
     address: { type: String, default: "", maxlength: 500 },
     supportEmail: { type: String, default: "", trim: true },
     website: { type: String, default: "", trim: true },
+    tagline: { type: String, default: "", maxlength: 150 },
+    about: { type: String, default: "", maxlength: 2000 },
+    mission: { type: String, default: "", maxlength: 1000 },
     multiOffice: { type: Boolean, default: false },
     addressManagers: [{ type: Schema.Types.ObjectId, ref: "User" }],
     addresses: [{

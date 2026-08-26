@@ -248,7 +248,7 @@ export function MembersTab({
 
   const otherRoleOptions = useMemo(() => {
     const labels = new Set<string>();
-    members.filter((member) => String(member.role ?? "") === "others").forEach((member) => {
+    members.forEach((member) => {
       const value = String(member.customRole ?? "").trim();
       if (value) labels.add(value);
     });

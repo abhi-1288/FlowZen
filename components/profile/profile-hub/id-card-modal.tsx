@@ -684,14 +684,18 @@ export function IdCardModal({
                   <div className="idc-front-footer-item">
                     <CalendarDays size={14} className="idc-front-footer-icon" />
                     <div>
-                      <p className="idc-front-footer-label">{isVisitor ? "Valid Until" : "Valid Till"}</p>
+                      <p className="idc-front-footer-label">
+                        {isVisitor ? "Valid Until" : profile?.employmentEndDate ? "Employment Period" : "Valid Till"}
+                      </p>
                       <p
                         className="idc-front-footer-val"
                         style={{ color: PRIMARY.hex, fontWeight: 700 }}
                       >
                         {isVisitor && profile?.validUntil
                           ? formatDate(profile.validUntil)
-                          : "Active Employee"}
+                          : profile?.employmentEndDate
+                            ? `${formatDate(profile.companyJoined)} — ${formatDate(profile.employmentEndDate)}`
+                            : "Active Employee"}
                       </p>
                     </div>
                   </div>

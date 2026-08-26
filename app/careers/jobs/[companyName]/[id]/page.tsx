@@ -12,6 +12,8 @@ type JobDetail = {
   department: string;
   location: string;
   employmentType: string;
+  durationMonths: number | null;
+  requiredExperienceYears: number | null;
   salaryRangeMin: number;
   salaryRangeMax: number;
   description: string;
@@ -36,6 +38,7 @@ export default function JobDetailPage() {
   const [phone, setPhone] = useState("");
   const [currentCompany, setCurrentCompany] = useState("");
   const [experienceYears, setExperienceYears] = useState("");
+  const [internshipExperienceMonths, setInternshipExperienceMonths] = useState("");
   const [noticePeriod, setNoticePeriod] = useState("");
   const [notes, setNotes] = useState("");
   const [resumeFile, setResumeFile] = useState<File | null>(null);
@@ -95,6 +98,7 @@ export default function JobDetailPage() {
     formData.set("phone", phone);
     formData.set("currentCompany", currentCompany);
     formData.set("experienceYears", String(Number(experienceYears) || 0));
+    formData.set("internshipExperienceMonths", String(Number(internshipExperienceMonths) || 0));
     formData.set("noticePeriod", String(Number(noticePeriod) || 0));
     formData.set("notes", notes);
     formData.set("portfolioUrl", portfolioUrl);
@@ -214,6 +218,16 @@ export default function JobDetailPage() {
             <span className="inline-flex items-center gap-1.5">
               <Briefcase size={14} /> {job.employmentType}
             </span>
+            {job.durationMonths && (
+              <span className="inline-flex items-center gap-1.5">
+                <Clock size={14} /> {job.durationMonths} months
+              </span>
+            )}
+            {job.requiredExperienceYears != null && job.requiredExperienceYears > 0 && (
+              <span className="inline-flex items-center gap-1.5">
+                <Briefcase size={14} /> {job.requiredExperienceYears}+ years exp
+              </span>
+            )}
             {job.salaryRangeMin > 0 && (
               <span>
                 {CURRENCY_SYMBOLS[job.currency] || "₹"}{job.salaryRangeMin.toLocaleString()} - {CURRENCY_SYMBOLS[job.currency] || "₹"}{job.salaryRangeMax.toLocaleString()}
@@ -255,6 +269,9 @@ export default function JobDetailPage() {
               <FieldInput label="Current Company" value={currentCompany} onChange={setCurrentCompany} placeholder="Acme Inc." />
               <FieldInput label="Years of Experience" value={experienceYears} onChange={setExperienceYears} type="number" min="0" placeholder="5" />
             </div>
+            {job.employmentType === "internship" && (
+              <FieldInput label="Experience in Internship (months)" value={internshipExperienceMonths} onChange={setInternshipExperienceMonths} type="number" min="0" placeholder="6" />
+            )}
             <FieldInput label="Notice Period (days)" value={noticePeriod} onChange={setNoticePeriod} type="number" min="0" placeholder="30" />
             <div>
               <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-zinc-300">Cover Letter / Notes</label>

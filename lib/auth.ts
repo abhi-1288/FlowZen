@@ -56,10 +56,28 @@ const oauthProviders = [
     : [])
 ];
 
+function getCookieDomain(): string | undefined {
+  const base = process.env.BASE_DOMAIN;
+  if (!base || base === "localhost") return "localhost";
+  return `.${base}`;
+}
+
 export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
     maxAge: 365 * 24 * 60 * 60
+  },
+  cookies: {
+    sessionToken: {
+      name: "next-auth.session-token",
+      options: {
+        domain: getCookieDomain(),
+        path: "/",
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
   },
   pages: {
     signIn: "/login"
@@ -215,7 +233,7 @@ export const authOptions: NextAuthOptions = {
           try {
             await connectDb();
             const userDoc = await User.findById(token.sub)
-              .populate("company", "name primaryColor")
+              .populate("company", "name primaryColor slug")
               .populate("team", "name");
             if (!userDoc) return null!;
             (token as any).role = userDoc.role;
@@ -224,6 +242,7 @@ export const authOptions: NextAuthOptions = {
             const companyDoc = userDoc.company as any;
             (token as any).company = companyDoc?.name || null;
             (token as any).companyColor = companyDoc?.primaryColor || "#2563eb";
+            (token as any).companySlug = companyDoc?.slug || null;
             (token as any).team = team?.name || null;
             (token as any).teamId = team?._id ? String(team._id) : (typeof userDoc.team === "string" ? userDoc.team : null);
             (token as any).managedTeamCount = await Team.countDocuments({ manager: userDoc._id });
@@ -250,6 +269,7 @@ export const authOptions: NextAuthOptions = {
         // Read cached data from token — no DB query on every request
         session.user.company = (token as any).company || null;
         session.user.companyColor = (token as any).companyColor || null;
+        session.user.companySlug = (token as any).companySlug || null;
         session.user.team = (token as any).team || null;
         session.user.teamId = (token as any).teamId || null;
         session.user.managedTeamCount = (token as any).managedTeamCount || 0;

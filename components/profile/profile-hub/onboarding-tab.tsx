@@ -70,6 +70,8 @@ export function OnboardingTab({
   const [cancelJoinModal, setCancelJoinModal] = useState(false);
   const [cancelJoinConfirmText, setCancelJoinConfirmText] = useState("");
   const [cancellingJoin, setCancellingJoin] = useState(false);
+  const [joinLoading, setJoinLoading] = useState(false);
+  const [teamJoinLoading, setTeamJoinLoading] = useState(false);
   const [companyIconUploading, setCompanyIconUploading] = useState(false);
   const [companyIconDeleteModal, setCompanyIconDeleteModal] = useState(false);
   const [deletingCompanyIcon, setDeletingCompanyIcon] = useState(false);
@@ -89,19 +91,31 @@ export function OnboardingTab({
 
   async function createCompany(event: FormEvent) {
     event.preventDefault();
-    await apiFetch("/api/company", { method: "POST", body: JSON.stringify({ name: companyName }) });
+    const data = await apiFetch<{ slug?: string }>("/api/company", { method: "POST", body: JSON.stringify({ name: companyName }) });
     showToast("Company registered.");
+    if (data.slug) {
+      const baseDomain = process.env.BASE_DOMAIN || "localhost";
+      if (baseDomain !== "localhost") {
+        const proto = window.location.protocol;
+        const port = window.location.port ? `:${window.location.port}` : "";
+        window.location.href = `${proto}//${data.slug}.${baseDomain}${port}`;
+        return;
+      }
+    }
     await refresh();
   }
 
   async function joinCompany(event: FormEvent) {
     event.preventDefault();
+    setJoinLoading(true);
     try {
       await apiFetch("/api/company/join", { method: "POST", body: JSON.stringify({ code: companyCode }) });
       showToast("Join request sent to admin.");
       await refresh();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Unable to send join request.", "error");
+    } finally {
+      setJoinLoading(false);
     }
   }
 
@@ -286,6 +300,7 @@ export function OnboardingTab({
 
   async function joinTeam(event: FormEvent) {
     event.preventDefault();
+    setTeamJoinLoading(true);
     try {
       const normalizedCode = String(teamCode ?? "").trim().toUpperCase();
       if (!normalizedCode) { showToast("Enter a join code first.", "error"); return; }
@@ -300,6 +315,8 @@ export function OnboardingTab({
       await refresh();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Unable to send join request.", "error");
+    } finally {
+      setTeamJoinLoading(false);
     }
   }
 
@@ -329,7 +346,7 @@ export function OnboardingTab({
               </CodePanel>
             )}
             <JoinPanel title="Join company as Admin" placeholder="Admin company code" value={companyCode} onChange={setCompanyCode} onSubmit={joinCompany}
-              status={String(profile?.companyStatus ?? "none")} onCancelRequest={async () => { await apiFetch("/api/join/cancel", { method: "POST" }); await refresh(); }} />
+              loading={joinLoading} status={String(profile?.companyStatus ?? "none")} onCancelRequest={async () => { await apiFetch("/api/join/cancel", { method: "POST" }); await refresh(); }} />
           </>
         )
       ) : null}
@@ -362,8 +379,8 @@ export function OnboardingTab({
             </section>
           </>
         ) : (
-          <JoinPanel title="Join company as HR" placeholder="HR company code" value={companyCode} onChange={setCompanyCode} onSubmit={joinCompany}
-            status={profile?.companyStatus ? String(profile.companyStatus) : undefined} onCancelRequest={() => setCancelJoinModal(true)} />
+           <JoinPanel title="Join company as HR" placeholder="HR company code" value={companyCode} onChange={setCompanyCode} onSubmit={joinCompany}
+             loading={joinLoading} status={profile?.companyStatus ? String(profile.companyStatus) : undefined} onCancelRequest={() => setCancelJoinModal(true)} />
         )
       ) : null}
 
@@ -398,8 +415,8 @@ export function OnboardingTab({
             </section>
           </>
         ) : (
-          <JoinPanel title="Join company as Security" placeholder="Security code" value={companyCode} onChange={setCompanyCode} onSubmit={joinCompany}
-            status={profile?.companyStatus ? String(profile.companyStatus) : undefined} onCancelRequest={() => setCancelJoinModal(true)} />
+           <JoinPanel title="Join company as Security" placeholder="Security code" value={companyCode} onChange={setCompanyCode} onSubmit={joinCompany}
+             loading={joinLoading} status={profile?.companyStatus ? String(profile.companyStatus) : undefined} onCancelRequest={() => setCancelJoinModal(true)} />
         )
       ) : null}
 
@@ -574,8 +591,8 @@ export function OnboardingTab({
           </>
         ) : (
           <>
-            <JoinPanel title="Join company" placeholder="Company code" value={companyCode} onChange={setCompanyCode} onSubmit={joinCompany}
-              status={profile?.companyStatus ? String(profile.companyStatus) : undefined} onCancelRequest={() => setCancelJoinModal(true)} />
+             <JoinPanel title="Join company" placeholder="Company code" value={companyCode} onChange={setCompanyCode} onSubmit={joinCompany}
+               loading={joinLoading} status={profile?.companyStatus ? String(profile.companyStatus) : undefined} onCancelRequest={() => setCancelJoinModal(true)} />
             <HistoryCard title="Manager Team History" rows={toManagerHistoryRows(insights)} hint="Teams created and employee joins." />
           </>
         )
@@ -621,15 +638,15 @@ export function OnboardingTab({
               </div>
             </section>
             {teamJoinStatus !== "approved" ? (
-              <JoinPanel title="Join team using code" placeholder="TM-... code" value={teamCode} onChange={setTeamCode} onSubmit={joinTeam}
-                status={teamJoinStatus === "none" ? undefined : teamJoinStatus} onCancelRequest={() => setCancelJoinModal(true)} />
+               <JoinPanel title="Join team using code" placeholder="TM-... code" value={teamCode} onChange={setTeamCode} onSubmit={joinTeam}
+                 loading={teamJoinLoading} status={teamJoinStatus === "none" ? undefined : teamJoinStatus} onCancelRequest={() => setCancelJoinModal(true)} />
             ) : null}
             <HistoryCard title="Membership History" rows={toEmployeeHistoryRows(insights)} hint="Company/team switches and removals." />
           </>
         ) : (
           <>
-            <JoinPanel title="Join using code" placeholder="CO-... or TM-... code" value={teamCode} onChange={setTeamCode} onSubmit={joinTeam}
-              status={pendingJoinStatus} onCancelRequest={() => setCancelJoinModal(true)} />
+             <JoinPanel title="Join using code" placeholder="CO-... or TM-... code" value={teamCode} onChange={setTeamCode} onSubmit={joinTeam}
+               loading={teamJoinLoading} status={pendingJoinStatus} onCancelRequest={() => setCancelJoinModal(true)} />
             <HistoryCard title="Membership History" rows={toEmployeeHistoryRows(insights)} hint="Employee can join up to 2 teams." />
           </>
         )

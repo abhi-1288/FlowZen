@@ -19,6 +19,10 @@ const JoinRequestSchema = new Schema(
 );
 
 JoinRequestSchema.index({ requester: 1, kind: 1, status: 1 });
+JoinRequestSchema.index(
+  { requester: 1, company: 1, kind: 1, status: 1 },
+  { unique: true, partialFilterExpression: { status: "pending" } }
+);
 
 export type JoinRequestDocument = InferSchemaType<typeof JoinRequestSchema>;
 

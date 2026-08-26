@@ -20,6 +20,7 @@ const resourceLinks = [
 
 const companyLinks = [
   { label: "Careers", href: "/careers" },
+  { label: "Privacy Policy", href: "/privacy" },
   { label: "GitHub", href: "https://github.com/abhi-1288/FlowZen" },
 ];
 

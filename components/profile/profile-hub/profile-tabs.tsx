@@ -20,6 +20,7 @@ import { SetupModal } from "./modals/setup-modal";
 import { AnyRecord, formatRoleWithCustom } from "./shared";
 import { WfhAdminSection, type WfhAdminState } from "./sections/wfh-admin-section";
 import { CompanyThemeSection } from "./sections/company-theme-section";
+import { CompanyPortfolioSection } from "./sections/company-portfolio-section";
 import { CompanyAddressSection } from "./sections/company-address-section";
 import { AppearanceSection } from "./sections/appearance-section";
 import dynamic from "next/dynamic";
@@ -75,6 +76,7 @@ export function ProfileTab({
   const [lcSeniorSecurityList, setLcSeniorSecurityList] = useState<{ _id: string; name: string; email: string }[]>([]);
   const [lcHrList, setLcHrList] = useState<{ _id: string; name: string; email: string }[]>([]);
   const [lcSubmitting, setLcSubmitting] = useState(false);
+  const [adminJoinLoading, setAdminJoinLoading] = useState(false);
 
   const company = typeof profile?.company === "object" && profile.company ? (profile.company as AnyRecord) : null;
   const team = typeof profile?.team === "object" && profile.team ? (profile.team as AnyRecord) : null;
@@ -123,12 +125,15 @@ export function ProfileTab({
 
   async function joinAsAdmin(event: FormEvent) {
     event.preventDefault();
+    setAdminJoinLoading(true);
     try {
       await apiFetch("/api/company/join", { method: "POST", body: JSON.stringify({ code: adminJoinCode }) });
       showToast("Admin join request sent.");
       await refresh();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Unable to send join request.", "error");
+    } finally {
+      setAdminJoinLoading(false);
     }
   }
 
@@ -373,7 +378,7 @@ export function ProfileTab({
                 secondaryCodes={company?.joinCode ? [{ code: String(company.joinCode), label: "HR code" }] : []} />
             ) : (
               <JoinPanel title="Join company as Admin" placeholder="Admin company code" value={adminJoinCode}
-                onChange={setAdminJoinCode} onSubmit={joinAsAdmin} status={String(profile?.companyStatus ?? "none")}
+                onChange={setAdminJoinCode} onSubmit={joinAsAdmin} loading={adminJoinLoading} status={String(profile?.companyStatus ?? "none")}
                 onCancelRequest={async () => { await apiFetch("/api/join/cancel", { method: "POST" }); await refresh(); }} />
             )}
             <WfhAdminSection state={wfhAdminState} company={company} showToast={showToast} />
@@ -382,6 +387,10 @@ export function ProfileTab({
 
         {(role === "admin" || role === "human-resource") && profile?.companyStatus === "approved" ? (
           <CompanyThemeSection company={company} showToast={showToast} />
+        ) : null}
+
+        {(role === "admin" || role === "human-resource") && profile?.companyStatus === "approved" ? (
+          <CompanyPortfolioSection company={company} showToast={showToast} />
         ) : null}
 
         {["project-manager", "qa-tester", "finance", "admin"].includes(role) ? (

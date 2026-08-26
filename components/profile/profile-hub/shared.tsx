@@ -163,7 +163,7 @@ export function formatRole(role: string, isSeniorSecurity?: boolean) {
 export function formatRoleWithCustom(role: string, customRole: unknown, isSeniorSecurity?: boolean) {
   const baseRole = formatRole(role, isSeniorSecurity);
   const label = String(customRole ?? "").trim();
-  if (role === "others" && label) return `${baseRole} | ${label}`;
+  if (label) return `${baseRole} | ${label}`;
   return baseRole;
 }
 

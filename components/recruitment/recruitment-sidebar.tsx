@@ -55,8 +55,7 @@ export function RecruitmentSidebar() {
 
   const navigateToTab = (href: string) => {
     if (window.location.pathname === href) return;
-    window.history.pushState(null, "", href);
-    window.dispatchEvent(new Event("flowzen:recruitment-navigation"));
+    router.push(href);
   };
 
   useEffect(() => {

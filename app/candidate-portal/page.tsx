@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { CheckCircle, XCircle, Clock, Briefcase, Building2, MapPin, DollarSign, User, Mail, CalendarDays, FileText, StickyNote, Video, ExternalLink, Loader2 } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Briefcase, Building2, MapPin, DollarSign, User, Mail, CalendarDays, FileText, StickyNote, Video, ExternalLink, Loader2, ChevronDown, Upload, UserPlus, Send, FileCheck, FileX, ArrowRight } from "lucide-react";
 import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
 
 type CandidateData = {
@@ -81,6 +81,221 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 const STAGE_ORDER = ["applied", "screening", "technical-interview", "manager-round", "hr-round", "offer", "joined"];
+
+function TimelineAccordion({ timeline }: { timeline: TimelineEntry[] }) {
+  const [openId, setOpenId] = useState<string | null>(timeline[0]?.id ?? null);
+
+  function toggle(id: string) {
+    setOpenId((prev) => (prev === id ? null : id));
+  }
+
+  if (timeline.length === 0) {
+    return <p className="text-xs text-slate-400">No updates yet.</p>;
+  }
+
+  return (
+    <div className="space-y-0">
+      {timeline.map((entry, idx) => {
+        const isOpen = openId === entry.id;
+        const details = getTimelineDetails(entry);
+        return (
+          <div key={entry.id} className="flex gap-3">
+            <div className="flex flex-col items-center">
+              <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${ details.iconBg }`}>
+                {details.icon}
+              </div>
+              {idx < timeline.length - 1 && <div className="mt-1 w-px flex-1 bg-[var(--c-bg-hover)]" />}
+            </div>
+            <div className={`flex-1 ${idx === timeline.length - 1 ? "" : "pb-4"}`}>
+              <button
+                onClick={() => toggle(entry.id)}
+                className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition hover:bg-[var(--c-bg-muted)]"
+              >
+                <div>
+                  <p className="text-xs font-semibold text-slate-900">{details.title}</p>
+                  <p className="text-[11px] text-slate-400">
+                    {new Date(entry.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                </div>
+                <ChevronDown size={14} className={`text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+              </button>
+              {isOpen && (
+                <div className="mx-3 mt-1 mb-1 rounded-lg bg-[var(--c-bg-muted)] p-3 text-xs leading-relaxed text-slate-600">
+                  {details.description && <p>{details.description}</p>}
+                  {details.meta.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {details.meta.map((m, i) => (
+                        <div key={i} className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                          {m.icon}
+                          <span>{m.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function getTimelineDetails(entry: TimelineEntry): {
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  iconBg: string;
+  meta: Array<{ icon: React.ReactNode; label: string }>;
+} {
+  const m = (entry.metadata || {}) as Record<string, unknown>;
+  const iconProps = { size: 13 };
+
+  switch (entry.action) {
+    case "applied":
+      return {
+        title: "Application Submitted",
+        description: "Your application has been received and is under review.",
+        icon: <UserPlus {...iconProps} />,
+        iconBg: "bg-blue-100 text-blue-600",
+        meta: [
+          ...(m.source ? [{ icon: <Briefcase size={11} />, label: `Source: ${m.source}` }] : []),
+        ],
+      };
+    case "resume-uploaded":
+      return {
+        title: "Resume Uploaded",
+        description: "Your resume has been uploaded successfully.",
+        icon: <Upload {...iconProps} />,
+        iconBg: "bg-sky-100 text-sky-600",
+        meta: [
+          ...(m.fileName ? [{ icon: <FileText size={11} />, label: `File: ${m.fileName}` }] : []),
+        ],
+      };
+    case "interview-scheduled":
+      return {
+        title: m.rescheduled ? "Interview Rescheduled" : "Interview Scheduled",
+        description: m.rescheduled
+          ? `Your ${String(m.roundType || "interview")} round has been rescheduled.`
+          : `A ${String(m.roundType || "interview")} round has been scheduled for you.`,
+        icon: <CalendarDays {...iconProps} />,
+        iconBg: "bg-indigo-100 text-indigo-600",
+        meta: [
+          ...(m.roundType ? [{ icon: <Briefcase size={11} />, label: `Round: ${String(m.roundType)} round` }] : []),
+          ...(m.scheduledAt ? [{ icon: <Clock size={11} />, label: `Date: ${new Date(String(m.scheduledAt)).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` }] : []),
+          ...(m.newDate ? [{ icon: <Clock size={11} />, label: `New date: ${new Date(String(m.newDate)).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` }] : []),
+          ...(m.assignedTo ? [{ icon: <User size={11} />, label: `Interviewer: ${m.assignedTo}` }] : []),
+        ],
+      };
+    case "interview-completed":
+      return {
+        title: "Interview Completed",
+        description: m.recommendation
+          ? `Interview completed. Recommendation: ${String(m.recommendation).replace(/-/g, " ")}.`
+          : m.feedback
+            ? `Feedback submitted for the ${String(m.roundType || "")} round.`
+            : "Your interview has been completed and is being reviewed.",
+        icon: <CheckCircle {...iconProps} />,
+        iconBg: "bg-emerald-100 text-emerald-600",
+        meta: [
+          ...(m.roundType ? [{ icon: <Briefcase size={11} />, label: `Round: ${String(m.roundType)}` }] : []),
+          ...(m.recommendation ? [{ icon: <Send size={11} />, label: `Verdict: ${String(m.recommendation).replace(/-/g, " ")}` }] : []),
+        ],
+      };
+    case "stage-changed":
+      return {
+        title: "Stage Updated",
+        description: m.reason
+          ? `${String(m.reason)}`
+          : `Your application moved from ${formatStage(String(m.from || ""))} to ${formatStage(String(m.to || ""))}.`,
+        icon: <ArrowRight {...iconProps} />,
+        iconBg: "bg-violet-100 text-violet-600",
+        meta: [
+          ...(m.from && m.to ? [{ icon: <ArrowRight size={11} />, label: `${formatStage(String(m.from))} → ${formatStage(String(m.to))}` }] : []),
+        ],
+      };
+    case "offer-generated":
+      return {
+        title: "Offer Generated",
+        description: "An offer has been prepared for you. Please review the details.",
+        icon: <FileCheck {...iconProps} />,
+        iconBg: "bg-teal-100 text-teal-600",
+        meta: [
+          ...(m.offeredCTC ? [{ icon: <DollarSign size={11} />, label: `Offered CTC: ₹${Number(m.offeredCTC).toLocaleString()}/year` }] : []),
+        ],
+      };
+    case "offer-accepted":
+      return {
+        title: "Offer Accepted",
+        description: "You have accepted the offer. Welcome aboard!",
+        icon: <CheckCircle {...iconProps} />,
+        iconBg: "bg-emerald-100 text-emerald-600",
+        meta: [
+          ...(m.offeredCTC ? [{ icon: <DollarSign size={11} />, label: `CTC: ₹${Number(m.offeredCTC).toLocaleString()}/year` }] : []),
+        ],
+      };
+    case "offer-rejected":
+      return {
+        title: "Offer Declined",
+        description: "You have declined the offer.",
+        icon: <FileX {...iconProps} />,
+        iconBg: "bg-rose-100 text-rose-600",
+        meta: [],
+      };
+    case "joined":
+      return {
+        title: "Joined",
+        description: m.joinedDate
+          ? `Welcome aboard! Your joining date is ${new Date(String(m.joinedDate)).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}.`
+          : "You have been onboarded as an employee.",
+        icon: <Briefcase {...iconProps} />,
+        iconBg: "bg-emerald-100 text-emerald-600",
+        meta: [
+          ...(m.joinedDate ? [{ icon: <CalendarDays size={11} />, label: `Joining: ${new Date(String(m.joinedDate)).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}` }] : []),
+          ...(m.employeeId ? [{ icon: <User size={11} />, label: `Employee ID: ${m.employeeId}` }] : []),
+        ],
+      };
+    case "rejected":
+      return {
+        title: "Not Selected",
+        description: "Unfortunately, your application was not selected at this time. We encourage you to apply for future openings.",
+        icon: <XCircle {...iconProps} />,
+        iconBg: "bg-rose-100 text-rose-600",
+        meta: [],
+      };
+    case "note-added":
+      return {
+        title: "Note Added",
+        description: String(m.content || m.note || "A note was added to your application."),
+        icon: <StickyNote {...iconProps} />,
+        iconBg: "bg-amber-100 text-amber-600",
+        meta: [],
+      };
+    default:
+      return {
+        title: ACTION_LABELS[entry.action] || entry.action,
+        description: "",
+        icon: <Clock {...iconProps} />,
+        iconBg: "bg-[var(--c-bg-muted)] text-slate-600",
+        meta: [],
+      };
+  }
+}
+
+function formatStage(stage: string): string {
+  const labels: Record<string, string> = {
+    applied: "Applied",
+    screening: "Screening",
+    "technical-interview": "Technical Interview",
+    "manager-round": "Manager Round",
+    "hr-round": "HR Round",
+    offer: "Offer",
+    joined: "Joined",
+    rejected: "Rejected",
+  };
+  return labels[stage] || stage.replace(/-/g, " ");
+}
 
 function CandidatePortalInner() {
   const searchParams = useSearchParams();
@@ -430,38 +645,11 @@ function CandidatePortalInner() {
           )}
         </div>
 
-        {/* --- Timeline with Annotations --- */}
+        {/* --- Timeline with Accordion --- */}
         <div className="rounded-xl neu-card p-5 sm:p-6">
           <h3 className="text-xs font-semibold text-slate-900">Application Timeline</h3>
-          <div className="mt-4 space-y-0">
-            {timeline.length === 0 ? (
-              <p className="text-xs text-slate-400">No updates yet.</p>
-            ) : (
-              timeline.map((entry, idx) => {
-                const note = entry.action === "note-added" ? (entry.metadata?.note as string) : undefined;
-                const comment = !note ? (entry.metadata?.comment as string) || (entry.metadata?.note as string) : undefined;
-                const annotation = note || comment;
-                return (
-                  <div key={entry.id} className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <div className={`flex h-6 w-6 items-center justify-center rounded-full ${ entry.action === "rejected" ? "bg-rose-100 text-rose-600" : entry.action === "joined" || entry.action === "offer-accepted" ? "bg-emerald-100 text-emerald-600" : "bg-[var(--c-bg-muted)] text-slate-600" }`}>
-                        {entry.action === "note-added" ? <StickyNote size={12} /> : <Clock size={12} />}
-                      </div>
-                      {idx < timeline.length - 1 && <div className="mt-1 w-px flex-1 bg-[var(--c-bg-hover)]" />}
-                    </div>
-                    <div className={`pb-5 ${idx === timeline.length - 1 ? "pb-0" : ""}`}>
-                      <p className="text-xs font-medium text-slate-900">{ACTION_LABELS[entry.action] || entry.action}</p>
-                      <p className="text-[11px] text-slate-400">{new Date(entry.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
-                      {annotation && (
-                        <div className="mt-2 rounded-lg bg-[var(--c-bg-muted)] px-3 py-2 text-[11px] leading-relaxed text-slate-600">
-                          {annotation}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
+          <div className="mt-4">
+            <TimelineAccordion timeline={timeline} />
           </div>
         </div>
 

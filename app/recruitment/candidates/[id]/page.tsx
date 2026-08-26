@@ -342,7 +342,18 @@ export default function CandidateProfilePage() {
               </span>
               <span className="text-slate-300">|</span>
               <span className="text-xs">Source: {activeCandidate.source}</span>
+              {activeCandidate.atsScore != null && (
+                <>
+                  <span className="text-slate-300">|</span>
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${ activeCandidate.atsStatus === "selected" ? "bg-emerald-50 text-emerald-700" : activeCandidate.atsStatus === "rejected" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700" }`}>
+                    ATS {activeCandidate.atsScore}/100
+                  </span>
+                </>
+              )}
             </div>
+            {activeCandidate.atsReason && (
+              <p className="mt-2 text-xs text-slate-500 italic">ATS: {activeCandidate.atsReason}</p>
+            )}
           </div>
 
           <div className="flex items-center gap-2">

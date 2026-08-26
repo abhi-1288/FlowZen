@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/client-utils";
 import { COMPANY_PALETTE, deriveThemeTokens } from "@/lib/theme";
-import { Globe, Mail } from "lucide-react";
+import { isValidSlug } from "@/lib/slug-shared";
+import { Globe, Link as LinkIcon, Mail, AlertTriangle } from "lucide-react";
 import type { AnyRecord } from "../shared";
 
 export function CompanyThemeSection({
@@ -21,6 +22,11 @@ export function CompanyThemeSection({
   const [supportEmail, setSupportEmail] = useState(company?.supportEmail ? String(company.supportEmail) : "");
   const [website, setWebsite] = useState(company?.website ? String(company.website) : "");
 
+  const currentSlug = company?.slug ? String(company.slug) : "";
+  const [slug, setSlug] = useState(currentSlug);
+  const [slugSaving, setSlugSaving] = useState(false);
+  const [slugError, setSlugError] = useState("");
+
   useEffect(() => {
     setPreviewTokens(deriveThemeTokens(selected));
   }, [selected]);
@@ -33,6 +39,37 @@ export function CompanyThemeSection({
     if (supportEmail !== origEmail) return true;
     if (website !== origWebsite) return true;
     return false;
+  };
+
+  const baseDomain = typeof window !== "undefined"
+    ? (window.location.hostname.replace(/^[^.]+\./, "") || window.location.hostname)
+    : "localhost";
+
+  const slugChanged = slug.trim() !== currentSlug;
+  const slugValid = isValidSlug(slug.trim());
+  const slugErrorText = slug.trim() && !slugValid
+    ? "2-40 chars, lowercase letters, numbers, and hyphens only."
+    : "";
+
+  const handleSlugSave = async () => {
+    const trimmed = slug.trim().toLowerCase();
+    if (!slugValid || trimmed === currentSlug) return;
+    setSlugSaving(true);
+    setSlugError("");
+    try {
+      const data = await apiFetch<{ slug: string }>("/api/company/slug", {
+        method: "PATCH",
+        body: JSON.stringify({ slug: trimmed }),
+      });
+      setSlug(data.slug);
+      showToast("Subdomain updated successfully", "success");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to update subdomain.";
+      setSlugError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSlugSaving(false);
+    }
   };
 
   const handleSave = async () => {
@@ -157,6 +194,54 @@ export function CompanyThemeSection({
             onChange={(e) => setWebsite(e.target.value)}
           />
         </div>
+      </div>
+
+      {/* Subdomain section */}
+      <div className="mt-6 space-y-4 border-t border-[var(--c-border-light)] pt-5 dark:border-zinc-800/50">
+        <div className="flex items-center gap-2">
+          <LinkIcon size={14} className="text-slate-500 dark:text-zinc-400" />
+          <h4 className="text-sm font-semibold text-slate-700 dark:text-zinc-300">Subdomain</h4>
+        </div>
+
+        <div>
+          <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
+            Company Subdomain
+          </label>
+          <div className="flex items-center gap-0 rounded-lg overflow-hidden neu-inset">
+            <input
+              type="text"
+              className="min-w-0 flex-1 border-r border-[var(--c-border-light)] bg-transparent px-3 py-2 text-sm dark:border-zinc-700 dark:text-zinc-100"
+              placeholder="my-company"
+              value={slug}
+              onChange={(e) => { setSlug(e.target.value.toLowerCase()); setSlugError(""); }}
+            />
+            <span className="shrink-0 px-3 py-2 text-sm text-slate-400 dark:text-zinc-500 whitespace-nowrap">
+              .{baseDomain}
+            </span>
+          </div>
+          {(slugErrorText || slugError) && (
+            <p className="mt-1.5 flex items-center gap-1 text-xs text-rose-500">
+              <AlertTriangle size={12} />
+              {slugError || slugErrorText}
+            </p>
+          )}
+          {slugChanged && slugValid && !slugError && (
+            <p className="mt-1.5 text-xs text-amber-500">
+              Changing the subdomain will update your company URL. Previous links will stop working.
+            </p>
+          )}
+        </div>
+
+        {slugChanged && slugValid && (
+          <button
+            type="button"
+            disabled={slugSaving}
+            onClick={handleSlugSave}
+            className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {slugSaving ? "Updating..." : "Update Subdomain"}
+          </button>
+        )}
       </div>
 
       {/* Save / Reset */}

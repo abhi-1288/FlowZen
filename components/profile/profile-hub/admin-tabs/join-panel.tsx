@@ -8,6 +8,7 @@ export function JoinPanel({
   onChange,
   onSubmit,
   status,
+  loading,
   onCancelRequest,
 }: {
   title: string;
@@ -16,9 +17,11 @@ export function JoinPanel({
   onChange: (value: string) => void;
   onSubmit: (event: FormEvent) => void;
   status?: string;
+  loading?: boolean;
   onCancelRequest?: () => void;
 }) {
   const isPending = String(status ?? "") === "pending";
+  const isDisabled = isPending || Boolean(loading);
   return (
     <section className="rounded-xl neu-card p-5">
       <div className="mb-5 border-l-4 border-sky-400 pl-4">
@@ -26,8 +29,8 @@ export function JoinPanel({
         <p className="mt-0.5 text-sm text-slate-500">Enter the code and wait for approval.</p>
       </div>
       <form className="mt-4 space-y-3" onSubmit={onSubmit}>
-        <input className="w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2.5" placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} />
-        <ActionButton variant="primary" className="w-full" disabled={isPending}>{isPending ? "Requested" : "Request approval"}</ActionButton>
+        <input className="w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2.5" placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} disabled={isDisabled} />
+        <ActionButton variant="primary" className="w-full" disabled={isDisabled}>{loading ? "Sending..." : isPending ? "Requested" : "Request approval"}</ActionButton>
       </form>
       {isPending && onCancelRequest ? (
         <ActionButton variant="secondary" className="mt-2 w-full" type="button" onClick={onCancelRequest}>Cancel Request</ActionButton>

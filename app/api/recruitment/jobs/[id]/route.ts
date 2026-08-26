@@ -94,6 +94,9 @@ export async function PATCH(request: Request, { params }: Params) {
     if (body.department !== undefined) updates.department = String(body.department).trim();
     if (body.location !== undefined) updates.location = String(body.location).trim();
     if (body.employmentType !== undefined) updates.employmentType = body.employmentType;
+    if (body.durationMonths !== undefined) updates.durationMonths = body.durationMonths != null ? Number(body.durationMonths) : null;
+    if (body.requiredExperienceYears !== undefined) updates.requiredExperienceYears = body.requiredExperienceYears != null ? Number(body.requiredExperienceYears) : null;
+    if (body.atsScoreThreshold !== undefined) updates.atsScoreThreshold = body.atsScoreThreshold != null ? Number(body.atsScoreThreshold) : null;
     if (body.currency !== undefined) updates.currency = String(body.currency).trim();
     if (body.openings !== undefined) updates.openings = Number(body.openings);
     if (body.autoCloseDate !== undefined) updates.autoCloseDate = body.autoCloseDate ? new Date(body.autoCloseDate) : null;
@@ -261,6 +264,9 @@ export async function PATCH(request: Request, { params }: Params) {
   if (body.department !== undefined) updates.department = String(body.department).trim();
   if (body.location !== undefined) updates.location = String(body.location).trim();
   if (body.employmentType !== undefined) updates.employmentType = body.employmentType;
+  if (body.durationMonths !== undefined) updates.durationMonths = body.durationMonths != null ? Number(body.durationMonths) : null;
+  if (body.requiredExperienceYears !== undefined) updates.requiredExperienceYears = body.requiredExperienceYears != null ? Number(body.requiredExperienceYears) : null;
+  if (body.atsScoreThreshold !== undefined) updates.atsScoreThreshold = body.atsScoreThreshold != null ? Number(body.atsScoreThreshold) : null;
   if (body.salaryRangeMin !== undefined) updates.salaryRangeMin = Number(body.salaryRangeMin);
   if (body.salaryRangeMax !== undefined) updates.salaryRangeMax = Number(body.salaryRangeMax);
   if (body.salaryType !== undefined) updates.salaryType = body.salaryType;

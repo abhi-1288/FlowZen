@@ -83,6 +83,9 @@ export type ATSJob = {
   department: string;
   location: string;
   employmentType: EmploymentType;
+  durationMonths: number | null;
+  requiredExperienceYears: number | null;
+  atsScoreThreshold: number | null;
   salaryRangeMin: number;
   salaryRangeMax: number;
   salaryType: SalaryType;
@@ -113,6 +116,10 @@ export type ATSCandidate = {
   source: Source;
   stage: Stage;
   rating: number;
+  atsScore: number | null;
+  atsStatus: "pending" | "selected" | "rejected";
+  atsReason: string;
+  atsScoredAt: string | null;
   notes: string;
   resumeUrl: string;
   portfolioUrl: string;

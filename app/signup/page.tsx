@@ -113,8 +113,28 @@ export default function SignupPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ rememberMe: true }),
     });
-    router.push("/profile");
-    router.refresh();
+    let slug: string | null = null;
+    try {
+      const res = await fetch("/api/auth/session", { cache: "no-store" });
+      const session = await res.json();
+      slug = session?.user?.companySlug || null;
+    } catch {
+      // session fetch failed — fall through to default redirect
+    }
+    if (slug) {
+      const baseDomain = process.env.BASE_DOMAIN || "localhost";
+      const currentHost = window.location.hostname;
+      if (currentHost.startsWith(`${slug}.`)) {
+        router.push("/profile");
+      } else if (baseDomain === "localhost") {
+        router.push("/profile");
+      } else {
+        const port = window.location.port ? `:${window.location.port}` : "";
+        window.location.href = `//${slug}.${baseDomain}${port}/profile`;
+      }
+    } else {
+      router.push("/profile");
+    }
   }
 
   if (checking) {

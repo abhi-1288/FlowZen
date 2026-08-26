@@ -4,6 +4,7 @@ import { SessionProvider } from "@/components/providers/session-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { ToastProvider } from "@/lib/toast-context";
 import { GlobalNotificationListener } from "@/components/global-notification-listener";
+import { CookieConsentBanner } from "@/components/cookie-consent-banner";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -89,6 +90,7 @@ export default function RootLayout({
             <ToastProvider>
               <GlobalNotificationListener />
               {children}
+              <CookieConsentBanner />
             </ToastProvider>
           </ThemeProvider>
         </SessionProvider>

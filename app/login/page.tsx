@@ -1,11 +1,35 @@
 ﻿"use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2, Mail, Eye, EyeOff, ChevronDown, Database } from "lucide-react";
 import { OAuthProviderIcons } from "@/components/auth/oauth-provider-icons";
+
+function extractSubdomain(): string | null {
+  if (typeof window === "undefined") return null;
+  const host = window.location.hostname;
+  const baseDomains = ["localhost"];
+  for (const base of baseDomains) {
+    const suffix = `.${base}`;
+    if (host.endsWith(suffix)) {
+      const sub = host.slice(0, -suffix.length);
+      if (sub && !sub.includes(".")) return sub;
+    }
+  }
+  if (host !== "localhost" && host.includes(".")) {
+    const parts = host.split(".");
+    if (parts.length >= 3) return parts[0];
+  }
+  return null;
+}
+
+interface CompanyBranding {
+  name: string;
+  icon: string | null;
+  primaryColor: string;
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,6 +41,24 @@ export default function LoginPage() {
   const [seedMsg, setSeedMsg] = useState("");
   const [showDemo, setShowDemo] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [companyBranding, setCompanyBranding] = useState<CompanyBranding | null>(null);
+
+  useEffect(() => {
+    const slug = extractSubdomain();
+    if (!slug) return;
+    fetch(`/api/public/company-by-slug/${encodeURIComponent(slug)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data && data.name) setCompanyBranding(data);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (companyBranding?.primaryColor) {
+      document.documentElement.style.setProperty("--color-primary", companyBranding.primaryColor);
+    }
+  }, [companyBranding]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -42,19 +84,59 @@ export default function LoginPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ rememberMe })
     });
-    router.push("/profile");
-    router.refresh();
+    let slug: string | null = null;
+    try {
+      const res = await fetch("/api/auth/session", { cache: "no-store" });
+      const session = await res.json();
+      slug = session?.user?.companySlug || null;
+    } catch {
+      // session fetch failed — fall through to default redirect
+    }
+    if (slug) {
+      const baseDomain = process.env.BASE_DOMAIN || "localhost";
+      const currentHost = window.location.hostname;
+      if (currentHost.startsWith(`${slug}.`)) {
+        router.push("/profile");
+      } else if (baseDomain === "localhost") {
+        router.push("/profile");
+      } else {
+        const port = window.location.port ? `:${window.location.port}` : "";
+        window.location.href = `//${slug}.${baseDomain}${port}/profile`;
+      }
+    } else {
+      router.push("/profile");
+    }
   }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--c-bg)] dark:bg-[#1a1a1a] px-5 py-12">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white">
-            <CheckCircle2 size={24} />
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-zinc-100">Welcome back</h1>
-          <p className="mt-1.5 text-sm text-slate-500 dark:text-zinc-400">Sign in to your FlowZen account</p>
+          {companyBranding?.icon ? (
+            <img
+              src={companyBranding.icon}
+              alt={companyBranding.name}
+              className="mx-auto mb-4 h-12 w-12 rounded-2xl object-cover"
+            />
+          ) : (
+            <div
+              className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl text-white"
+              style={{ backgroundColor: companyBranding?.primaryColor || "#059669" }}
+            >
+              <CheckCircle2 size={24} />
+            </div>
+          )}
+          {companyBranding ? (
+            <>
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-zinc-100">{companyBranding.name}</h1>
+              <p className="mt-1.5 text-sm text-slate-500 dark:text-zinc-400">Sign in to your company account</p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-zinc-100">Welcome back</h1>
+              <p className="mt-1.5 text-sm text-slate-500 dark:text-zinc-400">Sign in to your FlowZen account</p>
+            </>
+          )}
         </div>
 
         <div className="neu-card rounded-3xl p-8">

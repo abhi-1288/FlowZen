@@ -138,15 +138,6 @@ export async function POST(request: Request) {
 
     const refreshedRequest = await JoinRequest.findById(existingPendingRequest._id);
 
-    await Notification.create({
-      user: approverId,
-      company: company._id,
-      type: "approval",
-      title: joinTitleForRole(codeRole),
-      message: `${user.name} requested approval to join ${company.name}.`
-    });
-    emitNotification(String(approverId));
-
     return NextResponse.json({
       request: serializeDoc(refreshedRequest ?? existingPendingRequest),
       status: "requested",
