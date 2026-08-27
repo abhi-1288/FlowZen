@@ -31,6 +31,7 @@ export async function extractResumeText(resumeUrl: string): Promise<string> {
 
 export async function scoreResumeWithGemini(
   resumeText: string,
+  jobTitle: string,
   jobDescription: string,
   requiredSkills: string[],
   requiredExperienceYears: number | null,
@@ -47,13 +48,21 @@ export async function scoreResumeWithGemini(
     ? `${requiredExperienceYears} years`
     : "Not specified";
 
-  const prompt = `Rate this resume 0-100 for the job. Be brief.
+  const contextMissing = !jobDescription?.trim() && (!requiredSkills || requiredSkills.length === 0);
 
-Job: ${jobDescription || "Not provided"}
-Skills: ${skillsList}
-Experience: ${expRequirement}
+  const prompt = `Rate this resume 0-100 for the job. Be brief and strict.
+
+Job Title: ${jobTitle || "Not provided"}
+Job Description: ${jobDescription || "Not provided"}
+Required Skills: ${skillsList}
+Required Experience: ${expRequirement}
 
 Resume: ${resumeText.substring(0, 4000)}
+
+Scoring rules:
+- Anchor the score strictly to the JOB TITLE and the required skills/description above.
+- A candidate whose background is clearly unrelated to the role (for example, a software-engineering resume for an HR role) MUST score LOW (typically below 30).
+${contextMissing ? "- No job description or required skills were provided. Judge ONLY on how relevant the candidate's experience, education, and skills are to the job title. Be conservative and do NOT inflate scores; if the resume does not clearly relate to the role, score it low." : "- Match the resume against the provided description and required skills. Reward matched skills and relevant experience; penalize missing or unrelated ones."}
 
 Return JSON: {"score":0-100,"reason":"brief","matchedSkills":[""],"missingSkills":[""]}`;
 

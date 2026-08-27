@@ -56,12 +56,6 @@ const oauthProviders = [
     : [])
 ];
 
-function getCookieDomain(): string | undefined {
-  const base = process.env.BASE_DOMAIN;
-  if (!base || base === "localhost") return "localhost";
-  return `.${base}`;
-}
-
 export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
@@ -71,7 +65,6 @@ export const authOptions: NextAuthOptions = {
     sessionToken: {
       name: "next-auth.session-token",
       options: {
-        domain: getCookieDomain(),
         path: "/",
         httpOnly: true,
         sameSite: "lax",
@@ -80,7 +73,8 @@ export const authOptions: NextAuthOptions = {
     },
   },
   pages: {
-    signIn: "/login"
+    signIn: "/login",
+    error: "/auth-error"
   },
   providers: [
     CredentialsProvider({
@@ -242,7 +236,6 @@ export const authOptions: NextAuthOptions = {
             const companyDoc = userDoc.company as any;
             (token as any).company = companyDoc?.name || null;
             (token as any).companyColor = companyDoc?.primaryColor || "#2563eb";
-            (token as any).companySlug = companyDoc?.slug || null;
             (token as any).team = team?.name || null;
             (token as any).teamId = team?._id ? String(team._id) : (typeof userDoc.team === "string" ? userDoc.team : null);
             (token as any).managedTeamCount = await Team.countDocuments({ manager: userDoc._id });
@@ -269,7 +262,6 @@ export const authOptions: NextAuthOptions = {
         // Read cached data from token — no DB query on every request
         session.user.company = (token as any).company || null;
         session.user.companyColor = (token as any).companyColor || null;
-        session.user.companySlug = (token as any).companySlug || null;
         session.user.team = (token as any).team || null;
         session.user.teamId = (token as any).teamId || null;
         session.user.managedTeamCount = (token as any).managedTeamCount || 0;

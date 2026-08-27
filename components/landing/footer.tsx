@@ -134,6 +134,12 @@ export function Footer() {
           <p className="text-xs text-gray-400 dark:text-gray-500">
             &copy; {new Date().getFullYear()} FlowZen. All rights reserved.
           </p>
+          <Link
+            href="/privacy"
+            className="rounded-lg border border-gray-200 dark:border-[#2a2a2a] px-4 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:border-gray-300 dark:hover:border-[#3a3a3a] transition-colors"
+          >
+            Privacy Policy
+          </Link>
           <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-2">
             Built by
             <a

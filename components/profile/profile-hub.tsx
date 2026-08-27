@@ -237,9 +237,13 @@ export function ProfileHub() {
     ...(canViewCompanyTabs ? (["calendar"] as Tab[]) : []),
   ];
 
-  const { showNotificationToast } = useNotificationToast();
+  const { showNotificationToast, showErrorToast } = useNotificationToast();
 
   const showToast = (text: string, type: "success" | "error" = "success") => {
+    if (type === "error") {
+      showErrorToast(text);
+      return;
+    }
     setToast({ text, type });
     setTimeout(() => setToast(null), 4000);
   };
@@ -469,7 +473,7 @@ export function ProfileHub() {
           } else {
             new Audio("/sound/notification_sound.mp3").play().catch((err) => console.warn("Notification sound unavailable:", err));
           }
-          apiFetch<{ notifications: AnyRecord[]; unreadCount: number }>("/api/notifications?limit=1")
+          apiFetch<{ notifications: AnyRecord[]; unreadCount: number }>("/api/notifications?limit=1", undefined, { toast: false })
             .then((res) => {
               const latest = res.notifications?.[0];
               if (latest) showNotificationToast(String(latest.title ?? "Notification"), String(latest.body ?? ""));
@@ -499,7 +503,7 @@ export function ProfileHub() {
           } catch (err) {
             showNotificationToast("New Message", "You have received a new message.");
           }
-          apiFetch<{ unreadCount: number }>("/api/messages/unread-count")
+          apiFetch<{ unreadCount: number }>("/api/messages/unread-count", undefined, { toast: false })
             .then((res) => {
               if (mounted) setMessagesCount(res.unreadCount);
             })

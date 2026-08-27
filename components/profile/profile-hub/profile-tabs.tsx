@@ -20,7 +20,6 @@ import { SetupModal } from "./modals/setup-modal";
 import { AnyRecord, formatRoleWithCustom } from "./shared";
 import { WfhAdminSection, type WfhAdminState } from "./sections/wfh-admin-section";
 import { CompanyThemeSection } from "./sections/company-theme-section";
-import { CompanyPortfolioSection } from "./sections/company-portfolio-section";
 import { CompanyAddressSection } from "./sections/company-address-section";
 import { AppearanceSection } from "./sections/appearance-section";
 import dynamic from "next/dynamic";
@@ -387,10 +386,6 @@ export function ProfileTab({
 
         {(role === "admin" || role === "human-resource") && profile?.companyStatus === "approved" ? (
           <CompanyThemeSection company={company} showToast={showToast} />
-        ) : null}
-
-        {(role === "admin" || role === "human-resource") && profile?.companyStatus === "approved" ? (
-          <CompanyPortfolioSection company={company} showToast={showToast} />
         ) : null}
 
         {["project-manager", "qa-tester", "finance", "admin"].includes(role) ? (

@@ -354,6 +354,18 @@ export default function CandidateProfilePage() {
             {activeCandidate.atsReason && (
               <p className="mt-2 text-xs text-slate-500 italic">ATS: {activeCandidate.atsReason}</p>
             )}
+            {activeCandidate.atsStatus === "rejected" &&
+              activeCandidate.stage !== "ats-rejected" &&
+              activeCandidate.stage !== "rejected" && (
+                <p className="mt-1 text-xs text-amber-600">
+                  HR is still screening this profile. This is an automated ATS score-based flag, not a final rejection — the candidate stays in the pipeline until HR decides.
+                </p>
+              )}
+            {activeCandidate.atsRejectionNote && (
+              <p className="mt-1 text-xs text-rose-600">
+                <span className="font-medium">Rejection reason:</span> {activeCandidate.atsRejectionNote}
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -510,7 +522,7 @@ export default function CandidateProfilePage() {
               Stage
             </p>
             <span
-              className={`rounded-full px-3 py-1 text-sm font-semibold ${ activeCandidate.stage === "joined" ? "bg-emerald-50 text-emerald-700" : activeCandidate.stage === "rejected" ? "bg-rose-50 text-rose-700" : "bg-indigo-50 text-indigo-700" }`}
+              className={`rounded-full px-3 py-1 text-sm font-semibold ${ activeCandidate.stage === "joined" ? "bg-emerald-50 text-emerald-700" : activeCandidate.stage === "rejected" || activeCandidate.stage === "ats-rejected" ? "bg-rose-50 text-rose-700" : "bg-indigo-50 text-indigo-700" }`}
             >
               {STAGE_LABELS[activeCandidate.stage]}
             </span>

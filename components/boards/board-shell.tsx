@@ -76,7 +76,7 @@ export function BoardShell({ boardId }: { boardId?: string }) {
 
   useEffect(() => {
     async function fetchNotificationCount() {
-      const result = await apiFetch<{ notifications: NotificationPreview[] }>("/api/notifications").catch(() => null);
+      const result = await apiFetch<{ notifications: NotificationPreview[] }>("/api/notifications", undefined, { toast: false }).catch(() => null);
       setUnreadNotifications(result?.notifications.filter((item) => !item.readAt).length ?? 0);
     }
 
@@ -140,7 +140,7 @@ export function BoardShell({ boardId }: { boardId?: string }) {
           } else {
             new Audio("/sound/notification_sound.mp3").play().catch((err) => console.warn("Notification sound unavailable:", err));
           }
-          apiFetch<{ notifications: any[] }>("/api/notifications")
+          apiFetch<{ notifications: any[] }>("/api/notifications", undefined, { toast: false })
             .then((res) => {
               const latest = res.notifications?.[0];
               if (latest) showNotificationToast(String(latest.title ?? "Notification"), String(latest.body ?? ""));

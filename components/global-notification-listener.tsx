@@ -44,7 +44,7 @@ export function GlobalNotificationListener() {
           } else {
             new Audio("/sound/notification_sound.mp3").play().catch(() => {});
           }
-          apiFetch<{ notifications: any[] }>("/api/notifications")
+          apiFetch<{ notifications: any[] }>("/api/notifications", undefined, { toast: false })
             .then((res) => {
               const latest = res.notifications?.[0];
               if (latest) showNotificationToast(String(latest.title ?? "Notification"), String(latest.body ?? ""));

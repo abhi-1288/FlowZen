@@ -9,7 +9,12 @@ const corsHeaders = {
   "Access-Control-Max-Age": "86400",
 };
 
-const RATE_LIMIT_PREFIXES = ["/api/auth/", "/api/public/", "/api/seed/"];
+// Rate-limit only high-risk write paths. The bare /api/auth/ prefix is NOT
+// limited because it includes the error endpoint (/api/auth/error) and the
+// session/csrf/providers metadata endpoints — throttling those would mask
+// NextAuth's error redirect (returning a raw 429 at /api/auth/error) and
+// break normal session polling. Brute-force protection stays on the callback.
+const RATE_LIMIT_PREFIXES = ["/api/auth/callback/", "/api/public/", "/api/seed/"];
 const RATE_LIMIT_EXACT = ["/api/version"];
 
 function isRateLimitedRoute(pathname: string) {
@@ -25,41 +30,7 @@ function getClientIp(request: NextRequest) {
   return "127.0.0.1";
 }
 
-function extractSubdomain(host: string | null): string | null {
-  if (!host) return null;
-
-  const hostname = host.split(":")[0].toLowerCase();
-  if (!hostname) return null;
-
-  const baseDomains = [
-    process.env.BASE_DOMAIN,
-    "localhost",
-  ].filter(Boolean) as string[];
-
-  for (const base of baseDomains) {
-    const suffix = `.${base}`;
-    if (hostname.endsWith(suffix)) {
-      const subdomain = hostname.slice(0, -suffix.length);
-      if (subdomain && subdomain !== "www" && !subdomain.includes(".")) {
-        return subdomain;
-      }
-    }
-  }
-
-  if (hostname === "localhost" || hostname === process.env.BASE_DOMAIN) {
-    return null;
-  }
-
-  return null;
-}
-
-const SLUG_COOKIE = "x-company-slug";
-const SLUG_HEADER = "x-company-slug";
-
 export function middleware(request: NextRequest) {
-  const host = request.headers.get("host") || request.headers.get("x-forwarded-host");
-  const companySlug = extractSubdomain(host);
-
   if (request.nextUrl.pathname.startsWith("/api")) {
     if (request.method === "OPTIONS") {
       return new NextResponse(null, { status: 204, headers: corsHeaders });
@@ -67,13 +38,7 @@ export function middleware(request: NextRequest) {
 
     let response: NextResponse;
 
-    if (companySlug) {
-      const newHeaders = new Headers(request.headers);
-      newHeaders.set(SLUG_HEADER, companySlug);
-      response = NextResponse.next({ request: { headers: newHeaders } });
-    } else {
-      response = NextResponse.next();
-    }
+    response = NextResponse.next();
 
     for (const [key, value] of Object.entries(corsHeaders)) {
       response.headers.set(key, value);
@@ -108,17 +73,6 @@ export function middleware(request: NextRequest) {
   }
 
   const response = NextResponse.next();
-
-  if (companySlug) {
-    response.cookies.set(SLUG_COOKIE, companySlug, {
-      path: "/",
-      httpOnly: false,
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 365,
-    });
-  } else {
-    response.cookies.delete(SLUG_COOKIE);
-  }
 
   return response;
 }

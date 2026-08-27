@@ -14,6 +14,7 @@ export type Stage =
   | "hr-round"
   | "offer"
   | "joined"
+  | "ats-rejected"
   | "rejected";
 
 export const STAGES: Stage[] = [
@@ -24,6 +25,7 @@ export const STAGES: Stage[] = [
   "hr-round",
   "offer",
   "joined",
+  "ats-rejected",
   "rejected",
 ];
 
@@ -35,6 +37,7 @@ export const STAGE_LABELS: Record<Stage, string> = {
   "hr-round": "HR Round",
   offer: "Offer",
   joined: "Joined",
+  "ats-rejected": "ATS Rejected",
   rejected: "Rejected",
 };
 
@@ -119,6 +122,7 @@ export type ATSCandidate = {
   atsScore: number | null;
   atsStatus: "pending" | "selected" | "rejected";
   atsReason: string;
+  atsRejectionNote: string;
   atsScoredAt: string | null;
   notes: string;
   resumeUrl: string;

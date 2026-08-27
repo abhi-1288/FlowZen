@@ -60,7 +60,7 @@ export function RecruitmentSidebar() {
 
   useEffect(() => {
     async function fetchNotificationCount() {
-      const result = await apiFetch<{ notifications: NotificationPreview[] }>("/api/notifications").catch(() => null);
+      const result = await apiFetch<{ notifications: NotificationPreview[] }>("/api/notifications", undefined, { toast: false }).catch(() => null);
       setUnreadNotifications(result?.notifications.filter((item) => !item.readAt).length ?? 0);
     }
     void fetchNotificationCount();
@@ -68,7 +68,7 @@ export function RecruitmentSidebar() {
 
   useEffect(() => {
     async function fetchCounts() {
-      const result = await apiFetch<SidebarCounts>("/api/recruitment/sidebar-counts").catch(() => null);
+      const result = await apiFetch<SidebarCounts>("/api/recruitment/sidebar-counts", undefined, { toast: false }).catch(() => null);
       if (result) setCounts(result);
     }
     void fetchCounts();
@@ -89,7 +89,7 @@ export function RecruitmentSidebar() {
         sseRef.current = new EventSource("/api/events", { withCredentials: true });
         sseRef.current.addEventListener("notification:new", () => {
           if (!mounted) return;
-          apiFetch<{ notifications: any[] }>("/api/notifications")
+          apiFetch<{ notifications: any[] }>("/api/notifications", undefined, { toast: false })
             .then((res) => {
               const latest = res.notifications?.[0];
               if (latest) showNotificationToast(String(latest.title ?? "Notification"), String(latest.body ?? ""));

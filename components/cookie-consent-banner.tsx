@@ -3,14 +3,20 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { Cookie } from "lucide-react";
 
 const CONSENT_KEY = "flowzen_cookie_consent";
 
 export function CookieConsentBanner() {
+  const { status } = useSession();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    if (status !== "authenticated") {
+      setVisible(false);
+      return;
+    }
     try {
       if (localStorage.getItem(CONSENT_KEY) !== "accepted") {
         setVisible(true);
@@ -18,7 +24,7 @@ export function CookieConsentBanner() {
     } catch {
       setVisible(true);
     }
-  }, []);
+  }, [status]);
 
   function accept() {
     try {

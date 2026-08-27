@@ -10,7 +10,7 @@ import { emitToUser } from "@/lib/socket-emit";
 
 type Params = { params: Promise<{ id: string }> };
 const HR_ROLES = ["admin", "human-resource"];
-const VALID_STAGES = ["applied", "screening", "technical-interview", "manager-round", "hr-round", "offer", "joined", "rejected"];
+const VALID_STAGES = ["applied", "screening", "technical-interview", "manager-round", "hr-round", "offer", "joined", "ats-rejected", "rejected"];
 
 export async function PATCH(request: Request, { params }: Params) {
   const { id } = await params;

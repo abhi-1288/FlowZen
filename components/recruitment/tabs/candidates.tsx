@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Search, ChevronRight, ChevronDown, Briefcase, ChevronLeft, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
-import { STAGE_LABELS, type Stage } from "@/lib/recruitment-types";
+import { STAGES, STAGE_LABELS, type Stage } from "@/lib/recruitment-types";
 
 const LIMIT = 10;
 
@@ -64,7 +64,7 @@ export function CandidatesTab() {
     });
   };
 
-  const stages = ["applied", "screening", "technical-interview", "manager-round", "hr-round", "offer", "joined", "rejected"];
+  const stages = STAGES;
 
   const handleStageChange = (value: string) => {
     setStageFilter(value);

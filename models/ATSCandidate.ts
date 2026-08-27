@@ -19,7 +19,7 @@ const ATSCandidateSchema = new Schema(
     },
     stage: {
       type: String,
-      enum: ["applied", "screening", "technical-interview", "manager-round", "hr-round", "offer", "joined", "rejected"],
+      enum: ["applied", "screening", "technical-interview", "manager-round", "hr-round", "offer", "joined", "ats-rejected", "rejected"],
       default: "applied",
       index: true,
     },
@@ -53,6 +53,7 @@ const ATSCandidateSchema = new Schema(
     atsScore: { type: Number, default: null, min: 0, max: 100 },
     atsStatus: { type: String, enum: ["pending", "selected", "rejected"], default: "pending", index: true },
     atsReason: { type: String, default: "" },
+    atsRejectionNote: { type: String, default: "" },
     atsScoredAt: { type: Date, default: null },
     magicTokenHash: { type: String, default: "", select: false },
     magicTokenExpiresAt: { type: Date, default: null },
@@ -71,6 +72,7 @@ const REFERRAL_STAGE_MAP: Record<string, string> = {
   "hr-round": "reviewed",
   offer: "reviewed",
   joined: "hired",
+  "ats-rejected": "rejected",
   rejected: "rejected",
 };
 

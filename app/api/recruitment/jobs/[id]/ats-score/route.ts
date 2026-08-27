@@ -66,6 +66,7 @@ export async function POST(request: Request, { params }: Params) {
 
       const result = await scoreResumeWithGemini(
         resumeText,
+        (job as any).title || "",
         (job as any).description || "",
         (job as any).requiredSkills || [],
         (job as any).requiredExperienceYears ?? null,
@@ -84,7 +85,7 @@ export async function POST(request: Request, { params }: Params) {
         candidate: candidate._id,
         job: job._id,
         action: "note-added",
-        metadata: { content: `ATS Score: ${result.score}/100 (${status}). ${result.reason}` },
+        metadata: { content: `ATS Score: ${result.score}/100 (${status === "rejected" ? "flagged" : status}). ${result.reason}` },
         company: user.company,
       });
 

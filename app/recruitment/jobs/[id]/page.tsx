@@ -7,7 +7,7 @@ import { ArrowLeft, Plus, Pencil, Eye, Trash2, Globe, Archive, Share2, Check, Co
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
 import { apiFetch } from "@/lib/client-utils";
-import { CURRENCY_SYMBOLS, STAGE_LABELS, type Stage, type Source, type JobStatus } from "@/lib/recruitment-types";
+import { CURRENCY_SYMBOLS, STAGES, STAGE_LABELS, type Stage, type Source, type JobStatus } from "@/lib/recruitment-types";
 
 export default function JobDetailPage() {
   const params = useParams()!;
@@ -23,17 +23,36 @@ export default function JobDetailPage() {
   const [candidateFilter, setCandidateFilter] = useState("");
   const [copied, setCopied] = useState(false);
   const [atsLoading, setAtsLoading] = useState(false);
-  const [atsResult, setAtsResult] = useState<{ scored: number; selected: number; rejected: number; errors: number } | null>(null);
+  const [atsWarn, setAtsWarn] = useState<{ open: boolean; missingDesc: boolean; missingSkills: boolean; missingThreshold: boolean; force: boolean }>({ open: false, missingDesc: false, missingSkills: false, missingThreshold: false, force: false });
+  const [atsResultData, setAtsResultData] = useState<{ scored: number; selected: number; rejected: number; errors: number; total: number } | null>(null);
+  const [atsLastResult, setAtsLastResult] = useState<{ scored: number; selected: number; rejected: number; errors: number; total: number } | null>(null);
+  const [atsDecisionPending, setAtsDecisionPending] = useState(false);
+  const [atsAction, setAtsAction] = useState<"continue" | "reject">("continue");
 
   async function handleRunAts(force: boolean) {
+    if (!activeJob) return;
+    const missingDesc = !activeJob.description?.trim();
+    const missingSkills = !activeJob.requiredSkills?.length;
+    const missingThreshold = activeJob.atsScoreThreshold == null;
+    if (missingDesc || missingSkills || missingThreshold) {
+      setAtsWarn({ open: true, missingDesc, missingSkills, missingThreshold, force });
+      return;
+    }
+    await proceedScan(force);
+  }
+
+  async function proceedScan(force: boolean) {
     setAtsLoading(true);
-    setAtsResult(null);
+    setAtsResultData(null);
     try {
-      const result = await apiFetch<{ scored: number; selected: number; rejected: number; errors: number }>(`/api/recruitment/jobs/${id}/ats-score`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ force }) });
-      setAtsResult(result);
+      const result = await apiFetch<{ scored: number; selected: number; rejected: number; errors: number; total: number }>(`/api/recruitment/jobs/${id}/ats-score`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ force }) });
+      setAtsResultData(result);
+      setAtsLastResult(result);
+      setAtsDecisionPending(true);
+      setAtsAction("continue");
       void fetchCandidates({ jobId: id });
     } catch {
-      setAtsResult(null);
+      setAtsResultData(null);
     } finally {
       setAtsLoading(false);
     }
@@ -41,14 +60,23 @@ export default function JobDetailPage() {
 
   useEffect(() => { void fetchJob(id); void fetchCandidates({ jobId: id }); }, [id, fetchJob, fetchCandidates]);
 
+  const jobCandidates = useMemo(
+    () => candidates.filter((c) => {
+      const job = c.job as unknown as { _id?: string; id?: string } | string;
+      const jobId = typeof job === "string" ? job : (job?._id || job?.id || "");
+      return jobId === id;
+    }),
+    [candidates, id],
+  );
+
   const filtered = useMemo(() => {
-    let list = candidates;
+    let list = jobCandidates;
     if (candidateFilter === "__ats-selected") list = list.filter((c) => c.atsStatus === "selected");
     else if (candidateFilter === "__ats-rejected") list = list.filter((c) => c.atsStatus === "rejected");
     else if (candidateFilter === "__ats-pending") list = list.filter((c) => c.atsScore == null);
     else if (candidateFilter) list = list.filter((c) => c.stage === candidateFilter);
     return list;
-  }, [candidates, candidateFilter]);
+  }, [jobCandidates, candidateFilter]);
 
   if (loading && !activeJob) {
     return (
@@ -62,12 +90,12 @@ export default function JobDetailPage() {
     return (
       <div className="p-6">
         <p className="text-slate-500">Job not found.</p>
-        <button onClick={() => router.push("/recruitment/jobs")} className="mt-2 text-sm text-slate-600 underline">Back to jobs</button>
+        <button onClick={() => router.push("/recruitment/jobs")} className="mt-2 text-sm text-slate-600 underline" suppressHydrationWarning>Back to jobs</button>
       </div>
     );
   }
 
-  const stages = ["applied", "screening", "technical-interview", "manager-round", "hr-round", "offer", "joined", "rejected"];
+  const stages = STAGES;
 
   return (
     <div className="p-6">
@@ -88,7 +116,7 @@ export default function JobDetailPage() {
           {activeJob.salaryRangeMin > 0 || activeJob.salaryRangeMax > 0 ? (
             <p className="text-sm text-slate-500">Salary: {CURRENCY_SYMBOLS[activeJob.currency] || "₹"}{activeJob.salaryRangeMin.toLocaleString()} - {CURRENCY_SYMBOLS[activeJob.currency] || "₹"}{activeJob.salaryRangeMax.toLocaleString()}{activeJob.salaryType === "per-month" ? " per month" : " per annum"}</p>
           ) : null}
-          <p className="text-sm text-slate-500">{activeJob.openings} opening{activeJob.openings > 1 ? "s" : ""} &middot; {candidates.length} candidate{candidates.length !== 1 ? "s" : ""}</p>
+          <p className="text-sm text-slate-500">{activeJob.openings} opening{activeJob.openings > 1 ? "s" : ""} &middot; {jobCandidates.length} candidate{jobCandidates.length !== 1 ? "s" : ""}</p>
           {activeJob.autoCloseDate && (
             <p className="text-sm text-slate-500">Auto-closes: {new Date(activeJob.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
           )}
@@ -160,6 +188,14 @@ export default function JobDetailPage() {
               {atsLoading ? "Scoring..." : "Re-score All"}
             </button>
           )}
+          {atsDecisionPending && atsLastResult && (
+            <button
+              onClick={() => setAtsResultData(atsLastResult)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50"
+            >
+              Review ATS rejections
+            </button>
+          )}
           {activeJob.atsScoreThreshold != null && (
             <span className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700">
               ATS Threshold: {activeJob.atsScoreThreshold}+
@@ -192,7 +228,7 @@ export default function JobDetailPage() {
 
       <div className="mt-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">Candidates ({candidates.length})</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Candidates ({jobCandidates.length})</h2>
           <select
             className="neu-inset rounded-lg px-3 py-1.5 text-sm"
             value={candidateFilter}
@@ -211,9 +247,9 @@ export default function JobDetailPage() {
             </optgroup>
           </select>
         </div>
-        {atsResult && (
+        {atsResultData && (
           <div className="mt-2 rounded-lg bg-indigo-50 p-3 text-sm text-indigo-700">
-            Scored {atsResult.scored} candidate{atsResult.scored !== 1 ? "s" : ""} — {atsResult.selected} selected, {atsResult.rejected} rejected{atsResult.errors > 0 ? `, ${atsResult.errors} error${atsResult.errors !== 1 ? "s" : ""}` : ""}
+            Scored {atsResultData.scored} candidate{atsResultData.scored !== 1 ? "s" : ""} — {atsResultData.selected} selected, {atsResultData.rejected} rejected{atsResultData.errors > 0 ? `, ${atsResultData.errors} error${atsResultData.errors !== 1 ? "s" : ""}` : ""}
           </div>
         )}
 
@@ -231,6 +267,9 @@ export default function JobDetailPage() {
                       ATS {candidate.atsScore}
                     </span>
                   )}
+                  {candidate.atsStatus === "rejected" && candidate.stage !== "ats-rejected" && candidate.stage !== "rejected" && (
+                    <span className="text-[10px] font-medium text-amber-600">ATS-flagged, HR reviewing</span>
+                  )}
                   {candidate.rating > 0 && (
                     <span className="text-xs text-amber-500">{'★'.repeat(candidate.rating)}{'☆'.repeat(5 - candidate.rating)}</span>
                   )}
@@ -240,9 +279,14 @@ export default function JobDetailPage() {
                   {candidate.currentCompany && <><span>&middot;</span><span>{candidate.currentCompany}</span></>}
                   {candidate.experienceYears > 0 && <><span>&middot;</span><span>{candidate.experienceYears}y exp</span></>}
                 </div>
+                {candidate.atsRejectionNote && (
+                  <p className="mt-1 line-clamp-2 text-xs text-rose-600">
+                    <span className="font-medium">Rejected:</span> {candidate.atsRejectionNote}
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${ candidate.stage === "joined" ? "bg-emerald-50 text-emerald-700" : candidate.stage === "rejected" ? "bg-rose-50 text-rose-700" : candidate.stage === "offer" ? "bg-indigo-50 text-indigo-700" : "bg-[var(--c-bg-muted)] text-slate-600" }`}>
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${ candidate.stage === "joined" ? "bg-emerald-50 text-emerald-700" : candidate.stage === "rejected" || candidate.stage === "ats-rejected" ? "bg-rose-50 text-rose-700" : candidate.stage === "offer" ? "bg-indigo-50 text-indigo-700" : "bg-[var(--c-bg-muted)] text-slate-600" }`}>
                   {STAGE_LABELS[candidate.stage]}
                 </span>
                 <button
@@ -262,6 +306,162 @@ export default function JobDetailPage() {
 
       <DeleteJobModal id={id} />
       <CandidateModal jobId={id} />
+      <AtsWarnModal
+        warn={atsWarn}
+        onCancel={() => setAtsWarn((w) => ({ ...w, open: false }))}
+        onContinue={() => {
+          const force = atsWarn.force;
+          setAtsWarn((w) => ({ ...w, open: false }));
+          void proceedScan(force);
+        }}
+      />
+      <AtsResultModal
+        result={atsResultData}
+        action={atsAction}
+        onActionChange={setAtsAction}
+        onMarkLater={() => setAtsResultData(null)}
+        onSubmit={async (action, note) => {
+          if (action === "reject") {
+            try {
+              await apiFetch(`/api/recruitment/jobs/${id}/ats-apply-rejections`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note }) });
+              void fetchCandidates({ jobId: id });
+            } catch {}
+          }
+          setAtsDecisionPending(false);
+          setAtsResultData(null);
+        }}
+      />
+    </div>
+  );
+}
+
+function AtsWarnModal({
+  warn,
+  onCancel,
+  onContinue,
+}: {
+  warn: { open: boolean; missingDesc: boolean; missingSkills: boolean; missingThreshold: boolean; force: boolean };
+  onCancel: () => void;
+  onContinue: () => void;
+}) {
+  if (!warn.open) return null;
+  const { missingDesc, missingSkills, missingThreshold } = warn;
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center neu-overlay px-4">
+      <div className="w-full max-w-md rounded-lg neu-card">
+        <div className="p-5">
+          <h2 className="text-base font-semibold text-slate-900">Before you scan</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            This job is missing details that help score resumes accurately:
+          </p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
+            {missingDesc && <li>Job description is not provided.</li>}
+            {missingSkills && <li>Required skills are not provided.</li>}
+            {missingThreshold && <li>ATS score threshold is not set (scanning is not possible without it).</li>}
+          </ul>
+          {(missingDesc || missingSkills) && (
+            <p className="mt-3 text-sm text-slate-600">
+              Candidate scores may differ because the description or required skills are not mentioned. Do you want to continue?
+            </p>
+          )}
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              onClick={onCancel}
+              className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onContinue}
+              disabled={missingThreshold}
+              className="neu-btn neu-btn-primary rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
+            >
+              {missingThreshold ? "Set threshold first" : "Continue"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AtsResultModal({
+  result,
+  action,
+  onActionChange,
+  onMarkLater,
+  onSubmit,
+}: {
+  result: { scored: number; selected: number; rejected: number; errors: number; total: number } | null;
+  action: "continue" | "reject";
+  onActionChange: (value: "continue" | "reject") => void;
+  onMarkLater: () => void;
+  onSubmit: (action: "continue" | "reject", note: string) => void;
+}) {
+  const [note, setNote] = useState("");
+  if (!result) return null;
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center neu-overlay px-4">
+      <div className="w-full max-w-md rounded-lg neu-card">
+        <div className="p-5">
+          <h2 className="text-base font-semibold text-slate-900">What do you want to do with ATS-rejected candidates?</h2>
+          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-muted)] p-3">
+              <p className="text-lg font-semibold text-slate-900">{result.total}</p>
+              <p className="text-xs text-slate-500">Total</p>
+            </div>
+            <div className="rounded-lg bg-emerald-50 p-3">
+              <p className="text-lg font-semibold text-emerald-700">{result.selected}</p>
+              <p className="text-xs text-slate-500">Approved</p>
+            </div>
+            <div className="rounded-lg bg-rose-50 p-3">
+              <p className="text-lg font-semibold text-rose-700">{result.rejected}</p>
+              <p className="text-xs text-slate-500">Rejected</p>
+            </div>
+          </div>
+          {result.errors > 0 && (
+            <p className="mt-2 text-xs text-amber-600">{result.errors} candidate(s) could not be scored due to errors.</p>
+          )}
+          <label className="mt-4 block text-sm font-medium text-slate-700">Action for rejected candidates</label>
+          <select
+            value={action}
+            onChange={(e) => onActionChange(e.target.value as "continue" | "reject")}
+            className="neu-inset mt-1 w-full rounded-lg px-3 py-2.5 text-sm"
+          >
+            <option value="continue">Continue (manual review — leave stages as-is)</option>
+            <option value="reject">Reject them (move to ATS Rejected stage)</option>
+          </select>
+          {action === "reject" && (
+            <div className="mt-3">
+              <label className="block text-sm font-medium text-slate-700">Rejection note (optional)</label>
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={3}
+                placeholder="Type a reason for rejection. If left empty, an automatic ATS-based reason will be recorded."
+                className="neu-inset mt-1 w-full resize-none rounded-lg px-3 py-2.5 text-sm"
+              />
+              <p className="mt-1 text-xs text-slate-400">
+                {note.trim() ? "A manual note will be saved." : "An auto note (score vs. threshold + ATS reason) will be saved."}
+              </p>
+            </div>
+          )}
+          <div className="mt-5 flex items-center justify-between gap-2">
+            <button
+              onClick={onMarkLater}
+              className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
+            >
+              Mark them later
+            </button>
+            <button
+              onClick={() => onSubmit(action, note.trim())}
+              className="neu-btn neu-btn-primary rounded-lg px-4 py-2 text-sm font-medium"
+            >
+              Submit
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

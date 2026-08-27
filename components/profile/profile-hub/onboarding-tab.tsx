@@ -91,17 +91,8 @@ export function OnboardingTab({
 
   async function createCompany(event: FormEvent) {
     event.preventDefault();
-    const data = await apiFetch<{ slug?: string }>("/api/company", { method: "POST", body: JSON.stringify({ name: companyName }) });
+    await apiFetch<{ slug?: string }>("/api/company", { method: "POST", body: JSON.stringify({ name: companyName }) });
     showToast("Company registered.");
-    if (data.slug) {
-      const baseDomain = process.env.BASE_DOMAIN || "localhost";
-      if (baseDomain !== "localhost") {
-        const proto = window.location.protocol;
-        const port = window.location.port ? `:${window.location.port}` : "";
-        window.location.href = `${proto}//${data.slug}.${baseDomain}${port}`;
-        return;
-      }
-    }
     await refresh();
   }
 
