@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
 import { RecruitmentKanbanBoard } from "@/components/recruitment/recruitment-kanban-board";
@@ -11,11 +11,36 @@ export function BoardTab() {
     useShallow((s) => ({ candidates: s.candidates, jobs: s.jobs, fetchCandidates: s.fetchCandidates, fetchJobs: s.fetchJobs }))
   );
   const [selectedJob, setSelectedJob] = useState<string>("all");
+  const [sidebarWidth, setSidebarWidth] = useState(240);
+  const draggingRef = useRef(false);
 
   useEffect(() => {
     if (candidates.length === 0) void fetchCandidates({ limit: "0" });
     if (jobs.length === 0) void fetchJobs({ limit: "0" });
   }, [candidates.length, jobs.length, fetchCandidates, fetchJobs]);
+
+  const startResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    draggingRef.current = true;
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+    const onMove = (ev: MouseEvent) => {
+      if (!draggingRef.current) return;
+      const next = Math.min(420, Math.max(180, startWidth + (ev.clientX - startX)));
+      setSidebarWidth(next);
+    };
+    const onUp = () => {
+      draggingRef.current = false;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, [sidebarWidth]);
 
   const candidatesByJob = useMemo(() => {
     const map: Record<string, typeof candidates> = {};
@@ -51,7 +76,18 @@ export function BoardTab() {
   return (
     <div className="flex h-screen">
       {/* Sub sidebar — job/board switcher */}
-      <aside className="hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex dark:border-zinc-800 dark:bg-[#000000]">
+      <aside
+        style={{ width: sidebarWidth }}
+        className="relative hidden shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white md:flex dark:border-zinc-800 dark:bg-[#000000]"
+      >
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          onMouseDown={startResize}
+          className="group absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize hover:bg-slate-900/10 dark:hover:bg-white/10"
+        >
+          <span className="absolute right-0 top-1/2 h-8 w-0.5 -translate-y-1/2 rounded-full bg-slate-300 opacity-0 transition group-hover:opacity-100 dark:bg-zinc-600" />
+        </div>
         <div className="border-b border-slate-200 p-4 dark:border-zinc-800">
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-zinc-100">
             <LayoutList size={16} className="text-slate-400" />
