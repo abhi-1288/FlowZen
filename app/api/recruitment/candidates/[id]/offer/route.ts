@@ -39,7 +39,15 @@ export async function POST(request: Request, { params }: Params) {
   if (!isObjectId(id)) return jsonError("Invalid candidate id.");
 
   const body = await request.json();
-  if (!body.offeredCTC) return jsonError("Offered CTC is required.");
+  if (
+    body.offeredCTC === undefined ||
+    body.offeredCTC === null ||
+    Number(body.offeredCTC) <= 0
+  ) {
+    return jsonError(
+      "Cannot generate an offer: the offered CTC must be greater than 0. Please set a salary on the job description first.",
+    );
+  }
   if (!body.designation) return jsonError("Designation is required.");
 
   await connectDb();
