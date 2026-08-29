@@ -1,25 +1,58 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
+import { apiFetch } from "@/lib/client-utils";
 
 function ScheduleInterviewModal({
   candidateId,
   assignedTeam,
+  jobLocation,
   onIvChange,
 }: {
   candidateId: string;
   assignedTeam: any[];
+  jobLocation?: string;
   onIvChange: () => void;
 }) {
-  const { setModal, createInterview } = useRecruitmentStore();
+  const { setModal, createInterview, saving } = useRecruitmentStore();
+  const [pickerRole, setPickerRole] = useState("human-resource");
+  const [pickerUsers, setPickerUsers] = useState<any[]>([]);
+  const [pickerLoading, setPickerLoading] = useState(false);
 
   const assignedOptions = assignedTeam.filter((a: any) => {
     const uid = a.user?.id || a.user?._id;
     return uid && a.status !== "completed";
   });
 
+  const isRemoteJob = !!jobLocation && /^remote$/i.test(jobLocation.trim());
+
+  useEffect(() => {
+    if (assignedOptions.length > 0) return;
+    let active = true;
+    setPickerLoading(true);
+    const region =
+      jobLocation && !isRemoteJob
+        ? `&region=${encodeURIComponent(jobLocation)}`
+        : "";
+    apiFetch<{ users: any[] }>(`/api/recruitment/users-by-role?role=${pickerRole}${region}`)
+      .then((res) => {
+        if (active) setPickerUsers(res.users ?? []);
+      })
+      .catch(() => {
+        if (active) setPickerUsers([]);
+      })
+      .finally(() => {
+        if (active) setPickerLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [assignedOptions.length, pickerRole, isRemoteJob]);
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (saving) return;
     const form = new FormData(e.currentTarget);
     await createInterview({
       candidate: candidateId,
@@ -90,18 +123,53 @@ function ScheduleInterviewModal({
                 })}
               </select>
             ) : (
-              <input
-                name="interviewer"
-                required
-                placeholder="User ID"
-                className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
-              />
-            )}
-            {assignedOptions.length === 0 && (
-              <p className="mt-1 text-xs text-amber-600">
-                No assigned interviewers. Assign one first or type a User ID
-                above.
-              </p>
+              <>
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="block">
+                    <span className="mb-1 block text-xs text-slate-500">Role</span>
+                    <select
+                      value={pickerRole}
+                      onChange={(e) => setPickerRole(e.target.value)}
+                      className="neu-inset rounded-lg px-3 py-2.5 text-sm"
+                    >
+                      <option value="project-manager">Project Manager</option>
+                      <option value="qa-tester">QA Tester</option>
+                      <option value="finance">Finance</option>
+                      <option value="human-resource">HR</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </label>
+                  <label className="block min-w-[200px] flex-1">
+                    <span className="mb-1 block text-xs text-slate-500">
+                      {pickerLoading ? "Loading interviewers..." : "Interviewer"}
+                    </span>
+                    <select
+                      name="interviewer"
+                      required
+                      className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
+                    >
+                      <option value="">Select an interviewer...</option>
+                      {pickerUsers.length === 0 && !pickerLoading && (
+                        <option value="">No users found</option>
+                      )}
+                      {pickerUsers.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.role})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <p className="mt-1 text-xs text-amber-600">
+                  No interviewer assigned yet
+                  {isRemoteJob
+                    ? " — job is remote, open to anyone"
+                    : jobLocation
+                      ? ` for region "${jobLocation}"`
+                      : ""}{" "}
+                  — pick one above.
+                </p>
+              </>
             )}
           </label>
           <label className="block">
@@ -127,9 +195,10 @@ function ScheduleInterviewModal({
           </label>
           <button
             type="submit"
-            className="neu-btn neu-btn-primary w-full rounded-full px-4 py-2.5 text-sm font-medium"
+            disabled={saving}
+            className="neu-btn neu-btn-primary w-full rounded-full px-4 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Schedule
+            {saving ? "Scheduling…" : "Schedule"}
           </button>
         </form>
       </div>
@@ -144,10 +213,11 @@ function AddFeedbackModal({
   interviewId: string;
   onIvChange: () => void;
 }) {
-  const { setModal, addFeedback } = useRecruitmentStore();
+  const { setModal, addFeedback, saving } = useRecruitmentStore();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (saving) return;
     const form = new FormData(e.currentTarget);
     await addFeedback(interviewId, {
       technicalSkills: Number(form.get("technicalSkills") || 3),
@@ -237,9 +307,10 @@ function AddFeedbackModal({
           </label>
           <button
             type="submit"
-            className="neu-btn neu-btn-primary w-full rounded-full px-4 py-2.5 text-sm font-medium"
+            disabled={saving}
+            className="neu-btn neu-btn-primary w-full rounded-full px-4 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Submit Feedback
+            {saving ? "Saving…" : "Submit Feedback"}
           </button>
         </form>
       </div>
@@ -256,11 +327,12 @@ function EditInterviewModal({
   candidateInterviews: any[];
   onIvChange: () => void;
 }) {
-  const { setModal, updateInterview } = useRecruitmentStore();
+  const { setModal, updateInterview, saving } = useRecruitmentStore();
   const interview = candidateInterviews.find((i) => i.id === interviewId);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (saving) return;
     const form = new FormData(e.currentTarget);
     const updates: Record<string, any> = {};
     const scheduledAt = String(form.get("scheduledAt") || "");
@@ -332,9 +404,10 @@ function EditInterviewModal({
           </label>
           <button
             type="submit"
-            className="neu-btn neu-btn-primary w-full rounded-full px-4 py-2.5 text-sm font-medium"
+            disabled={saving}
+            className="neu-btn neu-btn-primary w-full rounded-full px-4 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Update
+            {saving ? "Updating…" : "Update"}
           </button>
         </form>
       </div>
@@ -345,11 +418,13 @@ function EditInterviewModal({
 function InterviewModals({
   candidateId,
   assignedTeam,
+  jobLocation,
   candidateInterviews,
   onIvChange,
 }: {
   candidateId: string;
   assignedTeam: any[];
+  jobLocation?: string;
   candidateInterviews: any[];
   onIvChange: () => void;
 }) {
@@ -361,6 +436,7 @@ function InterviewModals({
       <ScheduleInterviewModal
         candidateId={candidateId}
         assignedTeam={assignedTeam}
+        jobLocation={jobLocation}
         onIvChange={onIvChange}
       />
     );

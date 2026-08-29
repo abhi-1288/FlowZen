@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Briefcase, Building2, MapPin, CheckCircle, Loader2, ArrowLeft, Upload, ExternalLink, Clock } from "lucide-react";
 import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
+import { formatJobDuration } from "@/lib/format-duration";
 
 type JobDetail = {
   id: string;
@@ -13,6 +14,7 @@ type JobDetail = {
   location: string;
   employmentType: string;
   durationMonths: number | null;
+  durationDays: number | null;
   requiredExperienceYears: number | null;
   salaryRangeMin: number;
   salaryRangeMax: number;
@@ -218,9 +220,9 @@ export default function JobDetailPage() {
             <span className="inline-flex items-center gap-1.5">
               <Briefcase size={14} /> {job.employmentType}
             </span>
-            {job.durationMonths && (
+            {formatJobDuration(job.durationMonths, job.durationDays) && (
               <span className="inline-flex items-center gap-1.5">
-                <Clock size={14} /> {job.durationMonths} months
+                <Clock size={14} /> {formatJobDuration(job.durationMonths, job.durationDays)}
               </span>
             )}
             {job.requiredExperienceYears != null && job.requiredExperienceYears > 0 && (

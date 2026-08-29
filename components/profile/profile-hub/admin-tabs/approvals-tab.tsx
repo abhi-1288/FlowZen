@@ -28,30 +28,6 @@ function getDefaultSalaryPeriod(request: AnyRecord) {
   return String(meta.salaryType ?? "") === "per-annum" ? ("yearly" as const) : ("monthly" as const);
 }
 
-function generateFallbackLetter(request: AnyRecord) {
-  const metadata = (request.metadata ?? {}) as Record<string, unknown>;
-  const letterType = String(metadata.letterType ?? "");
-  const purpose = String(metadata.purpose ?? "");
-  const customType = String(metadata.customType ?? "");
-
-  if (letterType === "resignation") {
-    const lastDayStr = metadata.resignationLastWorkingDay ? new Date(String(metadata.resignationLastWorkingDay)).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "[Date]";
-    const reasonStr = purpose ? `\n\nReason for resignation: ${purpose}` : "";
-    return `Dear HR,\n\nPlease accept this letter as formal notification that I am resigning from my position. As per my notice period, my last working day will be ${lastDayStr}.${reasonStr}\n\nThank you for the opportunities I've had during my time with the company. I wish the company continued success in the future.\n\nSincerely,\n`;
-  } else if (letterType === "internship") {
-    const startStr = metadata.internshipStart ? new Date(String(metadata.internshipStart)).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "[Start Date]";
-    const endStr = metadata.internshipEnd ? new Date(String(metadata.internshipEnd)).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "[End Date]";
-    const title = String(metadata.projectTitle ?? "");
-    const desc = String(metadata.projectDescription ?? "");
-    const achievements = String(metadata.projectAchievements ?? "");
-
-    return `Dear HR,\n\nI am writing to formally request an Internship Certificate for my work from ${startStr} to ${endStr}.\n\nDuring this time, I worked on the project "${title}". ${desc}\n${achievements ? `\nKey achievements: ${achievements}\n` : ""}\nPurpose of request: ${purpose}\n\nPlease let me know if you need any further information.\n\nSincerely,\n`;
-  } else {
-    const typeLabel = letterType === "other" && customType ? customType : (letterType.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase()) || "Document Letter");
-    return `Dear HR,\n\nI am writing to formally request a ${typeLabel}.\n\nPurpose of request: ${purpose}\n\nPlease let me know if you need any further information from my side to process this request.\n\nSincerely,\n`;
-  }
-}
-
 function quitNoticeInfo(request: AnyRecord) {
   if (String(request.kind) === "quit-company-board-transfer") {
     return { noticeDays: 0, elapsedDays: 0, remainingDays: 0, canApprove: true };
@@ -83,8 +59,6 @@ export function ApprovalsTab({
   const [approvalSalaryCurrency, setApprovalSalaryCurrency] = useState<Record<string, string>>({});
   const [rejectModalId, setRejectModalId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
-  const [viewingLetter, setViewingLetter] = useState<AnyRecord | null>(null);
-  const [letterContentDraft, setLetterContentDraft] = useState("");
   const [idCardPreviewRequest, setIdCardPreviewRequest] = useState<AnyRecord | null>(null);
   const { data: session } = useSession();
 
@@ -246,13 +220,9 @@ export function ApprovalsTab({
               <div className="flex gap-2">
                 {String(request.kind) === "document-letter" ? (
                   <ActionButton variant="secondary" className="px-3" disabled={isDeciding}
-                    onClick={() => {
-                      setViewingLetter(request);
-                      const savedDraft = String((request.metadata as AnyRecord)?.letterContent ?? "").trim();
-                      setLetterContentDraft(savedDraft ? savedDraft : generateFallbackLetter(request));
-                    }}
+                    onClick={() => window.open(`/letter/${requestId}?draft=1`, "_blank")}
                   >
-                    Preview & Edit
+                    Preview
                   </ActionButton>
                 ) : null}
                 {request.kind === "id-card" ? (
@@ -320,7 +290,7 @@ export function ApprovalsTab({
                   >
                     {isDeciding ? "Working..." : "Approve Update"}
                   </ActionButton>
-                ) : (
+                ) : String(request.kind ?? "") === "document-letter" ? null : (
                   <ActionButton variant="approve" className="px-3"
                     disabled={(() => {
                       const info = quitNoticeInfo(request);
@@ -367,34 +337,6 @@ export function ApprovalsTab({
         <textarea className="w-full rounded-md border border-[var(--c-border-light)] px-3 py-1.5 text-xs" rows={3}
           placeholder="e.g., Insufficient documentation, request doesn't meet company policy..."
           value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)}
-        />
-      </Modal>
-
-      <Modal open={!!viewingLetter} onClose={() => setViewingLetter(null)} title="Review & Edit Letter"
-        description={viewingLetter ? `${String((viewingLetter.metadata as AnyRecord)?.requesterName ?? (viewingLetter.requester as AnyRecord)?.name ?? "Employee")} · ${String((viewingLetter.metadata as AnyRecord)?.requesterRole ?? (viewingLetter.requester as AnyRecord)?.role ?? "")}` : undefined}
-        maxWidth="max-w-4xl"
-        footer={
-          <>
-            <ActionButton variant="secondary" onClick={() => setViewingLetter(null)}>Cancel</ActionButton>
-            <ActionButton variant="danger" onClick={() => {
-              if (viewingLetter) {
-                setRejectModalId(String(viewingLetter.id ?? viewingLetter._id ?? ""));
-                setRejectionReason("");
-                setViewingLetter(null);
-              }
-            }}>Reject Request</ActionButton>
-            <ActionButton variant="primary" onClick={() => {
-              if (viewingLetter) {
-                decide(String(viewingLetter.id ?? viewingLetter._id ?? ""), "approved", false, "document-letter", undefined, letterContentDraft);
-                setViewingLetter(null);
-              }
-            }}>Approve & Save Letter</ActionButton>
-          </>
-        }
-      >
-        <textarea className="neu-inset w-full min-h-[50vh] rounded-md p-4 text-xs leading-relaxed text-slate-800"
-          value={letterContentDraft} onChange={(e) => setLetterContentDraft(e.target.value)}
-          placeholder="Draft empty or not provided."
         />
       </Modal>
 

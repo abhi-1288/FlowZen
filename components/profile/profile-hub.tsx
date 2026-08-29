@@ -39,6 +39,7 @@ import { ProfileTab } from "./profile-hub/profile-tabs";
 import { TimelineTab } from "./profile-hub/timeline-tab";
 import { OnboardingTab } from "./profile-hub/onboarding-tab";
 import { DocumentsTab } from "./profile-hub/documents-tab";
+import { MyLetters } from "./profile-hub/my-letters";
 import { CareersTab } from "./profile-hub/careers-tab";
 import { CompanyCalendarTab } from "./profile-hub/company-calendar-tab";
 import { FinancePolicyTab } from "./profile-hub/finance-policy-tab";
@@ -967,12 +968,12 @@ export function ProfileHub() {
             <>
               {toast && (
                 <div
-                  className={`fixed bottom-8 left-1/2 z-[100] -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4 duration-300`}
+                  className={`fixed bottom-8 left-1/2 z-[1000] -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4 duration-300`}
                 >
                   <div
                     className={`flex items-center gap-2.5 rounded-xl px-5 py-3 shadow-lg ${toast.type === "success"
-                      ? "bg-emerald-600 text-white"
-                      : "bg-rose-600 text-white"
+                      ? "bg-emerald-600 text-white dark:bg-emerald-500"
+                      : "bg-rose-600 text-white dark:bg-rose-500"
                       }`}
                   >
                     {toast.type === "success" ? (
@@ -1071,7 +1072,12 @@ export function ProfileHub() {
                 ) : null}
 
                 {tab === "documents" && canViewCompanyTabs ? (
-                  <DocumentsTab actorRole={String(role)} showToast={showToast} />
+                  <>
+                    <DocumentsTab actorRole={String(role)} showToast={showToast} />
+                    <div className="mt-6">
+                      <MyLetters currentUserId={String(session?.user?.id ?? profile?.id ?? profile?._id ?? "")} />
+                    </div>
+                  </>
                 ) : null}
 
                 {tab === "careers" ? (

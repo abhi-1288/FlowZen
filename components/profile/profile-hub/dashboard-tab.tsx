@@ -14,6 +14,10 @@ const LETTER_LABELS: Record<string, string> = {
   relieving: "Relieving Letter",
   internship: "Internship Certificate",
   resignation: "Resignation Letter",
+  "final-settlement": "Final Settlement Letter",
+  "form-16": "Form 16",
+  noc: "NOC Paper",
+  "exit-agreement": "Exit Agreement",
   other: "Certificate",
 };
 
@@ -65,10 +69,8 @@ export function DashboardTab({
   const unreadCount = notifications.filter((n) => !n.readAt).length;
   const pendingApprovalsCount = approvals.length;
 
-  const [letterRequests, setLetterRequests] = useState<AnyRecord[]>([]);
   const [otherDocuments, setOtherDocuments] = useState<AnyRecord[]>([]);
   const [docFilter, setDocFilter] = useState<"all" | "approved" | "rejected">("all");
-  const [activeDocTab, setActiveDocTab] = useState<"other" | "my">("other");
   const [viewingRejected, setViewingRejected] = useState<AnyRecord | null>(null);
   const [missingDocs, setMissingDocs] = useState<{ name: string }[]>([]);
   const [lostCardTickets, setLostCardTickets] = useState<AnyRecord[]>([]);
@@ -105,12 +107,6 @@ export function DashboardTab({
     }
   }
 
-  function refreshLetters() {
-    apiFetch<{ requests: AnyRecord[] }>("/api/hr/document-letter")
-      .then((res) => setLetterRequests(res.requests ?? []))
-      .catch(() => { });
-  }
-
   function refreshOtherDocuments() {
     apiFetch<{ requests: AnyRecord[] }>("/api/hr/document-letter?scope=company")
       .then((res) => {
@@ -125,7 +121,6 @@ export function DashboardTab({
   }
 
   useEffect(() => {
-    refreshLetters();
     apiFetch<{
       categories: { name: string; mandatory: boolean }[];
       documents: { category: string }[];
@@ -376,23 +371,7 @@ export function DashboardTab({
       {/* Document Letters Section */}
       {["human-resource", "admin"].includes(role) ? (
         <div className="rounded-xl neu-card p-5">
-          <div className="mb-5 flex gap-2">
-            <button
-              className={`rounded-full px-5 py-2 text-sm font-medium transition-colors ${activeDocTab === "other" ? "neu-tab-pressed" : "neu-tab-raised"}`}
-              onClick={() => setActiveDocTab("other")}
-            >
-              Other
-            </button>
-            <button
-              className={`rounded-full px-5 py-2 text-sm font-medium transition-colors ${activeDocTab === "my" ? "neu-tab-pressed" : "neu-tab-raised"}`}
-              onClick={() => setActiveDocTab("my")}
-            >
-              My
-            </button>
-          </div>
-
-          {activeDocTab === "other" ? (
-            <>
+          <>
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <FileText size={16} className="text-slate-500" />
@@ -484,134 +463,7 @@ export function DashboardTab({
               ) : (
                 <p className="text-sm text-slate-500 mt-4">No documents found.</p>
               )}
-            </>
-          ) : (
-            <>
-              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
-                <FileText size={16} className="text-slate-500" />
-                My Letters
-              </h2>
-              {letterRequests.length > 0 ? (
-                <div className="space-y-2">
-                  {letterRequests.map((req) => {
-                    const letterType = String((req.metadata as any)?.letterType ?? "");
-                    const label = LETTER_LABELS[letterType] ?? letterType.replace("-", " ");
-                    const status = String(req.status ?? "");
-                    const reqId = String(req._id ?? req.id ?? "");
-                    const isApproved = status === "approved";
-                    return (
-                      <div
-                        key={reqId}
-                        className="flex items-center justify-between gap-3 rounded-lg neu-inset px-4 py-3"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-slate-900 capitalize">{label}</p>
-                          <p className="text-xs text-slate-500">
-                            {String((req as any).requester?.name ?? "")}
-                            {" · "}
-                            {req.createdAt
-                              ? new Date(String(req.createdAt)).toLocaleDateString("en-IN", {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              })
-                              : ""}
-                            <span className="ml-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider"
-                              style={{
-                                backgroundColor: status === "rejected" ? "#fee2e2" : status === "approved" ? "#dcfce7" : "#fef3c7",
-                                color: status === "rejected" ? "#991b1b" : status === "approved" ? "#166534" : "#92400e",
-                              }}
-                            >
-                              {status}
-                            </span>
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          {isApproved ? (
-                            <a
-                              href={`/letter/${reqId}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="neu-btn neu-btn-primary shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
-                            >
-                              View
-                            </a>
-                          ) : null}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-sm text-slate-500 mt-4">You have no document requests.</p>
-              )}
-            </>
-          )}
-        </div>
-      ) : letterRequests.length > 0 ? (
-        <div className="rounded-xl neu-card p-5">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
-            <FileText size={16} className="text-slate-500" />
-            My Letters
-          </h2>
-          <div className="space-y-2">
-            {letterRequests.map((req) => {
-              const letterType = String((req.metadata as any)?.letterType ?? "");
-              const label = LETTER_LABELS[letterType] ?? letterType.replace("-", " ");
-              const status = String(req.status ?? "");
-              const reqId = String(req._id ?? req.id ?? "");
-              const isApproved = status === "approved";
-              return (
-                <div
-                  key={reqId}
-                  className="flex items-center justify-between gap-3 rounded-lg neu-inset px-4 py-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-900 capitalize">{label}</p>
-                    <p className="text-xs text-slate-500">
-                      {String((req as any).requester?.name ?? "")}
-                      {" · "}
-                      {req.createdAt
-                        ? new Date(String(req.createdAt)).toLocaleDateString("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })
-                        : ""}
-                      <span className="ml-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider"
-                        style={{
-                          backgroundColor: status === "rejected" ? "#fee2e2" : status === "approved" ? "#dcfce7" : "#fef3c7",
-                          color: status === "rejected" ? "#991b1b" : status === "approved" ? "#166534" : "#92400e",
-                        }}
-                      >
-                        {status}
-                      </span>
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    {isApproved ? (
-                      <a
-                        href={`/letter/${reqId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="neu-btn neu-btn-primary shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
-                      >
-                        View
-                      </a>
-                    ) : (
-                      <button
-                        type="button"
-                        className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
-                        onClick={() => setViewingRejected(req)}
-                      >
-                        View
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+             </>
         </div>
       ) : null}
 

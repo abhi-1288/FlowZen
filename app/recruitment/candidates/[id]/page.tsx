@@ -47,6 +47,7 @@ export default function CandidateProfilePage() {
     activeCandidate,
     timeline,
     loading,
+    saving,
     fetchCandidate,
     fetchTimeline,
     updateCandidate,
@@ -59,6 +60,7 @@ export default function CandidateProfilePage() {
       activeCandidate: s.activeCandidate,
       timeline: s.timeline,
       loading: s.loading,
+      saving: s.saving,
       fetchCandidate: s.fetchCandidate,
       fetchTimeline: s.fetchTimeline,
       updateCandidate: s.updateCandidate,
@@ -74,11 +76,6 @@ export default function CandidateProfilePage() {
   >("timeline");
   const [noteText, setNoteText] = useState("");
   const [candidateList, setCandidateList] = useState<any[]>([]);
-  const [assignRole, setAssignRole] = useState("project-manager");
-  const [assignRoundType, setAssignRoundType] = useState("technical");
-  const [assignUsers, setAssignUsers] = useState<any[]>([]);
-  const [assignSelectedUser, setAssignSelectedUser] = useState("");
-  const [showAssignForm, setShowAssignForm] = useState(false);
   const [stageFeedback, setStageFeedback] = useState("suitable");
   const [submitting, setSubmitting] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
@@ -118,24 +115,10 @@ export default function CandidateProfilePage() {
     void fetchSameJobCandidates();
   }, [fetchSameJobCandidates]);
 
-  const fetchUsersByRole = useCallback(async (r: string) => {
-    try {
-      const res = await apiFetch<{ users: any[] }>(
-        `/api/recruitment/users-by-role?role=${r}`,
-      );
-      setAssignUsers(res.users || []);
-      setAssignSelectedUser(res.users?.[0]?.id || "");
-    } catch {}
-  }, []);
-
   useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
-
-  useEffect(() => {
-    if (showAssignForm) void fetchUsersByRole(assignRole);
-  }, [showAssignForm, assignRole, fetchUsersByRole]);
 
   if (loading && !activeCandidate) {
     return (
@@ -202,24 +185,6 @@ export default function CandidateProfilePage() {
       notes: { action: "add", content: noteText },
     } as any);
     setNoteText("");
-  }
-
-  async function handleAssign() {
-    if (!assignSelectedUser) return;
-    try {
-      await apiFetch(`/api/recruitment/candidates/${id}/assign-interviewer`, {
-        method: "POST",
-        body: JSON.stringify({
-          role: assignRole,
-          roundType: assignRoundType,
-          assigneeId: assignSelectedUser,
-        }),
-      });
-      setShowAssignForm(false);
-      void fetchCandidate(id);
-    } catch (e) {
-      console.error("Assign failed:", e);
-    }
   }
 
   async function handleRemoveAssignment(roleToRemove: string) {
@@ -404,6 +369,7 @@ export default function CandidateProfilePage() {
           {[1, 2, 3, 4, 5].map((star) => (
             <button
               key={star}
+              disabled={saving}
               onClick={() =>
                 void updateCandidate(id, {
                   rating: star === activeCandidate.rating ? 0 : star,
@@ -573,12 +539,7 @@ export default function CandidateProfilePage() {
               >
                 <FileText size={14} /> Generate Offer
               </button>
-              <button
-                onClick={() => setShowAssignForm(!showAssignForm)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
-              >
-                <UserPlus size={14} /> Assign Interviewer
-              </button>
+
               {activeCandidate.stage === "joined" && (
                 <button
                   onClick={() => setShowConvertModal(true)}
@@ -644,71 +605,7 @@ export default function CandidateProfilePage() {
           )}
         </div>
 
-        {/* Assign Interviewer Form */}
-        {showAssignForm && isHr && (
-          <div className="mt-4 rounded-lg neu-inset p-4">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Assign Interviewer
-            </p>
-            <div className="flex flex-wrap items-end gap-3">
-              <label className="block">
-                <span className="mb-1 block text-xs text-slate-500">Role</span>
-                <select
-                  value={assignRole}
-                  onChange={(e) => {
-                    setAssignRole(e.target.value);
-                    void fetchUsersByRole(e.target.value);
-                  }}
-                  className="neu-inset rounded-lg px-3 py-2 text-sm"
-                >
-                  <option value="project-manager">Project Manager</option>
-                  <option value="qa-tester">QA Tester</option>
-                  <option value="finance">Finance</option>
-                  <option value="human-resource">HR</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-xs text-slate-500">
-                  Round Type
-                </span>
-                <select
-                  value={assignRoundType}
-                  onChange={(e) => setAssignRoundType(e.target.value)}
-                  className="neu-inset rounded-lg px-3 py-2 text-sm"
-                >
-                  <option value="screening">Screening</option>
-                  <option value="technical">Technical</option>
-                  <option value="manager">Manager</option>
-                  <option value="hr">HR</option>
-                </select>
-              </label>
-              <label className="block min-w-[180px]">
-                <span className="mb-1 block text-xs text-slate-500">User</span>
-                <select
-                  value={assignSelectedUser}
-                  onChange={(e) => setAssignSelectedUser(e.target.value)}
-                  className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
-                >
-                  {assignUsers.length === 0 && (
-                    <option value="">No users found</option>
-                  )}
-                  {assignUsers.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name} ({u.role})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button
-                onClick={handleAssign}
-                className="neu-btn neu-btn-primary rounded-full px-4 py-2 text-xs font-medium"
-              >
-                Assign
-              </button>
-            </div>
-          </div>
-        )}
+
       </div>
 
       <div className="mt-6">
@@ -983,8 +880,12 @@ export default function CandidateProfilePage() {
       <InterviewModals
         candidateId={id}
         assignedTeam={assignedTeam}
+        jobLocation={(activeCandidate.job as any)?.location || ""}
         candidateInterviews={candidateInterviews}
-        onIvChange={() => setIvRefreshKey((k) => k + 1)}
+        onIvChange={() => {
+          setIvRefreshKey((k) => k + 1);
+          void fetchCandidate(id);
+        }}
       />
       <OfferModal candidateId={id} jobId={jobId} />
       <JobDescriptionModal />

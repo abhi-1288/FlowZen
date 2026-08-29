@@ -655,9 +655,28 @@ export async function PATCH(request: Request, { params }: Params) {
         metadata.approvedAt = new Date().toISOString();
         metadata.requesterName = requester.name;
         metadata.requesterRole = requester.role;
-        
+
         if (body.letterContent !== undefined) {
           metadata.letterContent = String(body.letterContent).trim();
+        }
+
+        const signed = Boolean(body.signed);
+        if (signed) {
+          const signer = await User.findById(userId).select("name role");
+          metadata.isSigned = true;
+          metadata.signedBy = signer?.name ?? "Unknown";
+          metadata.signedRole = signer?.role ?? "";
+          metadata.signedAt = new Date().toISOString();
+        }
+
+        if (String(metadata.letterType ?? "") === "internship") {
+          const internshipEnd = String(metadata.internshipEnd ?? "");
+          if (internshipEnd && !requester.employmentEndDate) {
+            const parsedEnd = new Date(internshipEnd);
+            if (!isNaN(parsedEnd.getTime())) {
+              requester.employmentEndDate = parsedEnd;
+            }
+          }
         }
 
         if (String(metadata.letterType ?? "") === "resignation") {

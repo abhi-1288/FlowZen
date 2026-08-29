@@ -14,7 +14,7 @@ export default function CandidateOfferPage() {
   const { data: session } = useSession();
   const role = session?.user?.role ?? "";
   const isHr = role === "admin" || role === "human-resource";
-  const { offers, fetchOffers, updateOffer, signOffer } = useRecruitmentStore();
+  const { offers, fetchOffers, updateOffer, signOffer, saving } = useRecruitmentStore();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -177,10 +177,11 @@ export default function CandidateOfferPage() {
           ) : isHr ? (
             <div className="mt-3">
               <button
-                onClick={async () => { await signOffer(offer.id); }}
-                className="neu-btn neu-btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium"
+                onClick={async () => { if (saving) return; await signOffer(offer.id); }}
+                disabled={saving}
+                className="neu-btn neu-btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <PenSquare size={16} /> Sign Offer
+                <PenSquare size={16} /> {saving ? "Signing…" : "Sign Offer"}
               </button>
             </div>
           ) : null}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Briefcase, Building2, MapPin } from "lucide-react";
 import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
+import { formatJobDuration } from "@/lib/format-duration";
 
 type CompanyInfo = {
   id: string;
@@ -18,6 +19,7 @@ type JobInfo = {
   location: string;
   employmentType: string;
   durationMonths: number | null;
+  durationDays: number | null;
   requiredExperienceYears: number | null;
   salaryRangeMin: number;
   salaryRangeMax: number;
@@ -125,7 +127,7 @@ export default function CareersPage() {
                           {job.title}
                         </h3>
                         <span className="shrink-0 rounded-full bg-[var(--c-bg-muted)] dark:bg-zinc-700 px-3 py-1 text-xs font-medium text-slate-600 dark:text-zinc-400">
-                          {job.employmentType}{job.durationMonths ? ` · ${job.durationMonths} months` : ""}
+                          {job.employmentType}{formatJobDuration(job.durationMonths, job.durationDays) ? ` · ${formatJobDuration(job.durationMonths, job.durationDays)}` : ""}
                         </span>
                       </div>
                       <div className="mt-3.5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-500 dark:text-zinc-400">

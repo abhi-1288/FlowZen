@@ -39,6 +39,7 @@ const ATSJobSchema = new Schema(
     currency: { type: String, default: "INR", trim: true },
     openings: { type: Number, default: 1, min: 1 },
     durationMonths: { type: Number, default: null, min: 1, max: 60 },
+    durationDays: { type: Number, default: null, min: 0, max: 365 },
     requiredExperienceYears: { type: Number, default: null, min: 0, max: 50 },
     atsScoreThreshold: { type: Number, default: null, min: 0, max: 100 },
     autoCloseDate: { type: Date, default: null },

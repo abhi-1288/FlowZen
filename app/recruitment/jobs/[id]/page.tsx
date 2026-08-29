@@ -8,6 +8,7 @@ import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
 import { apiFetch } from "@/lib/client-utils";
 import { CURRENCY_SYMBOLS, STAGES, STAGE_LABELS, type Stage, type Source, type JobStatus } from "@/lib/recruitment-types";
+import { formatJobDuration } from "@/lib/format-duration";
 
 export default function JobDetailPage() {
   const params = useParams()!;
@@ -112,7 +113,7 @@ export default function JobDetailPage() {
             <h1 className="text-2xl font-semibold text-slate-900">{activeJob.title}</h1>
             <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${ activeJob.status === "open" ? "bg-emerald-50 text-emerald-700" : activeJob.status === "draft" ? "bg-amber-50 text-amber-700" : "bg-[var(--c-bg-muted)] text-slate-600" }`}>{activeJob.status}</span>
           </div>
-          <p className="mt-1 text-sm text-slate-500">{activeJob.department} &middot; {activeJob.location || "Remote"} &middot; {activeJob.employmentType}{activeJob.durationMonths ? ` · ${activeJob.durationMonths} months` : ""}{activeJob.requiredExperienceYears ? ` · ${activeJob.requiredExperienceYears}+ years exp` : ""}</p>
+          <p className="mt-1 text-sm text-slate-500">{activeJob.department} &middot; {activeJob.location || "Remote"} &middot; {activeJob.employmentType}{formatJobDuration(activeJob.durationMonths, activeJob.durationDays) ? ` · ${formatJobDuration(activeJob.durationMonths, activeJob.durationDays)}` : ""}{activeJob.requiredExperienceYears ? ` · ${activeJob.requiredExperienceYears}+ years exp` : ""}</p>
           {activeJob.salaryRangeMin > 0 || activeJob.salaryRangeMax > 0 ? (
             <p className="text-sm text-slate-500">Salary: {CURRENCY_SYMBOLS[activeJob.currency] || "₹"}{activeJob.salaryRangeMin.toLocaleString()} - {CURRENCY_SYMBOLS[activeJob.currency] || "₹"}{activeJob.salaryRangeMax.toLocaleString()}{activeJob.salaryType === "per-month" ? " per month" : " per annum"}</p>
           ) : null}
@@ -468,7 +469,7 @@ function AtsResultModal({
 
 function DeleteJobModal({ id }: { id: string }) {
   const router = useRouter();
-  const { modal, setModal, deleteJob, activeJob } = useRecruitmentStore();
+  const { modal, setModal, deleteJob, activeJob, saving } = useRecruitmentStore();
   if (modal?.type !== "delete-job") return null;
 
   return (
@@ -487,10 +488,11 @@ function DeleteJobModal({ id }: { id: string }) {
               Cancel
             </button>
             <button
-              onClick={async () => { await deleteJob(id); setModal(null); router.push("/recruitment/jobs"); }}
-              className="neu-btn neu-btn-danger rounded-lg px-4 py-2 text-sm font-medium"
+              onClick={async () => { if (saving) return; await deleteJob(id); setModal(null); router.push("/recruitment/jobs"); }}
+              disabled={saving}
+              className="neu-btn neu-btn-danger rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Delete
+              {saving ? "Deleting…" : "Delete"}
             </button>
           </div>
         </div>
@@ -500,11 +502,12 @@ function DeleteJobModal({ id }: { id: string }) {
 }
 
 function CandidateModal({ jobId }: { jobId: string }) {
-  const { modal, setModal, createCandidate } = useRecruitmentStore();
+  const { modal, setModal, createCandidate, saving } = useRecruitmentStore();
   if (modal?.type !== "create-candidate") return null;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (saving) return;
     const form = new FormData(e.currentTarget);
     const data: Record<string, unknown> = {
       firstName: String(form.get("firstName") || ""),
@@ -579,8 +582,8 @@ function CandidateModal({ jobId }: { jobId: string }) {
               </select>
             </label>
           </div>
-          <button type="submit" className="neu-btn neu-btn-primary w-full rounded-full px-4 py-2.5 text-sm font-medium">
-            Add Candidate
+          <button type="submit" disabled={saving} className="neu-btn neu-btn-primary w-full rounded-full px-4 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60">
+            {saving ? "Adding…" : "Add Candidate"}
           </button>
         </form>
       </div>

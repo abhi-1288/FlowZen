@@ -23,7 +23,7 @@ export async function GET(_request: Request, { params }: Params) {
   const candidate = await ATSCandidate.findOne({ _id: id, company: user.company })
     .populate("assignedRecruiter", "name email")
     .populate("assignedTeam.user", "name email")
-    .populate("job", "title department")
+    .populate("job", "title department location")
     .populate("notes.author", "name email");
 
   if (!candidate) return jsonError("Candidate not found.", 404);

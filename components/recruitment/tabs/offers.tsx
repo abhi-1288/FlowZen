@@ -10,8 +10,8 @@ const LIMIT = 10;
 
 export function OffersTab() {
   const router = useRouter();
-  const { offers, loading, totalOffers, fetchOffers, updateOffer, signOffer } = useRecruitmentStore(
-    useShallow((s) => ({ offers: s.offers, loading: s.loading, totalOffers: s.totalOffers, fetchOffers: s.fetchOffers, updateOffer: s.updateOffer, signOffer: s.signOffer }))
+  const { offers, loading, totalOffers, fetchOffers, updateOffer, signOffer, saving } = useRecruitmentStore(
+    useShallow((s) => ({ offers: s.offers, loading: s.loading, totalOffers: s.totalOffers, fetchOffers: s.fetchOffers, updateOffer: s.updateOffer, signOffer: s.signOffer, saving: s.saving }))
   );
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState("");
@@ -145,10 +145,11 @@ export function OffersTab() {
                             <div className="flex items-center gap-2 shrink-0 ml-3">
                               {offer.status === "draft" && !offer.isSigned && (
                                 <button suppressHydrationWarning
-                                  onClick={async () => { await signOffer(offer.id); }}
-                                  className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700"
+                                  onClick={async () => { if (saving) return; await signOffer(offer.id); }}
+                                  disabled={saving}
+                                  className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
-                                  <PenSquare size={12} /> Sign
+                                  <PenSquare size={12} /> {saving ? "Signing…" : "Sign"}
                                 </button>
                               )}
                               {offer.status === "draft" && offer.isSigned && (

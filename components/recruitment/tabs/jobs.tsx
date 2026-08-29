@@ -8,6 +8,8 @@ import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
 import type { EmploymentType, JobStatus, SalaryType } from "@/lib/recruitment-types";
 import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
+import { formatJobDuration } from "@/lib/format-duration";
+import { apiFetch } from "@/lib/client-utils";
 
 export function JobsTab() {
   const router = useRouter();
@@ -130,10 +132,10 @@ export function JobsTab() {
                   <span>{job.location || "Remote"}</span>
                   <span>&middot;</span>
                   <span>{job.employmentType}</span>
-                  {job.durationMonths && (
+                  {formatJobDuration(job.durationMonths, job.durationDays) && (
                     <>
                       <span>&middot;</span>
-                      <span>{job.durationMonths} months</span>
+                      <span>{formatJobDuration(job.durationMonths, job.durationDays)}</span>
                     </>
                   )}
                   {job.requiredExperienceYears != null && job.requiredExperienceYears > 0 && (
@@ -245,6 +247,28 @@ function JobModals() {
   const editingJob = modal?.type === "edit-job" ? jobs.find((j) => j.id === modal.jobId) : null;
   const deletingJob = modal?.type === "delete-job" ? jobs.find((j) => j.id === modal.jobId) : null;
 
+  const [regions, setRegions] = useState<string[]>([]);
+  const [location, setLocation] = useState("");
+  const [useOther, setUseOther] = useState(false);
+
+  useEffect(() => {
+    setLocation(editingJob?.location || "");
+    setUseOther(false);
+    let active = true;
+    apiFetch<{ addresses: { label?: string }[]; multiOffice: boolean }>("/api/company/address")
+      .then((res) => {
+        if (!active) return;
+        const labels = (res.addresses || [])
+          .map((a) => (a.label ?? "").trim())
+          .filter(Boolean);
+        setRegions(labels);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [modal?.type, editingJob?.id]);
+
   if (!modal) return null;
 
   if (modal.type === "delete-job" && deletingJob) {
@@ -264,10 +288,11 @@ function JobModals() {
                 Cancel
               </button>
               <button suppressHydrationWarning
-                onClick={() => { void deleteJob(deletingJob.id); setModal(null); }}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                onClick={() => { if (saving) return; void deleteJob(deletingJob.id); setModal(null); }}
+                disabled={saving}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Delete
+                {saving ? "Deleting…" : "Delete"}
               </button>
             </div>
           </div>
@@ -289,6 +314,7 @@ function JobModals() {
       location: String(form.get("location") || ""),
       employmentType: String(form.get("employmentType") || "full-time") as EmploymentType,
       durationMonths: form.get("durationMonths") ? Number(form.get("durationMonths")) : null,
+      durationDays: form.get("durationDays") ? Number(form.get("durationDays")) : null,
       requiredExperienceYears: form.get("requiredExperienceYears") ? Number(form.get("requiredExperienceYears")) : null,
       atsScoreThreshold: form.get("atsScoreThreshold") ? Number(form.get("atsScoreThreshold")) : null,
       currency: String(form.get("currency") || "INR"),
@@ -331,7 +357,47 @@ function JobModals() {
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Location</span>
-              <input name="location" defaultValue={editingJob?.location || ""} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
+              {useOther ? (
+                <div className="flex gap-2">
+                  <input
+                    name="location"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="Enter location"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setUseOther(false)}
+                    className="shrink-0 rounded-lg border border-slate-200 px-3 text-sm text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400"
+                  >
+                    List
+                  </button>
+                </div>
+              ) : (
+                <select
+                  name="location"
+                  value={location}
+                  onChange={(e) => {
+                    if (e.target.value === "__other__") {
+                      setUseOther(true);
+                      setLocation("");
+                    } else {
+                      setLocation(e.target.value);
+                    }
+                  }}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800"
+                >
+                  {location && !regions.includes(location) && location !== "Remote" && (
+                    <option value={location}>{location}</option>
+                  )}
+                  {regions.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                  <option value="Remote">Remote</option>
+                  <option value="__other__">Other…</option>
+                </select>
+              )}
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Employment Type</span>
@@ -345,6 +411,10 @@ function JobModals() {
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Duration (months)</span>
               <input name="durationMonths" type="number" min="1" max="60" defaultValue={editingJob?.durationMonths || ""} placeholder="e.g. 6" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Duration (days)</span>
+              <input name="durationDays" type="number" min="0" max="365" defaultValue={editingJob?.durationDays || ""} placeholder="e.g. 15" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Required Experience (years)</span>

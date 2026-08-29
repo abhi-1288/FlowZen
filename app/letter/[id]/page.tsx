@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { apiFetch } from "@/lib/client-utils";
 
 type LetterData = {
@@ -26,6 +27,11 @@ type LetterData = {
     teamManagerRole?: string;
     resignationLastWorkingDay?: string;
     noticePeriodDays?: number;
+    letterContent?: string;
+    isSigned?: boolean;
+    signedBy?: string;
+    signedRole?: string;
+    signedAt?: string;
   };
   requester: {
     _id: string;
@@ -63,10 +69,13 @@ type PolicyInfo = {
   tdsPercentage?: number;
 };
 
-type SignatoryInfo = {
+type LetterSigner = {
   name: string;
   role: string;
+  signedAt?: string;
 };
+
+const SIGNATURE_FONT = "'Segoe Script', 'Dancing Script', cursive";
 
 function formatRole(role: string) {
   const labels: Record<string, string> = {
@@ -88,6 +97,10 @@ const LETTER_TITLES: Record<string, string> = {
   relieving: "Relieving Letter",
   internship: "Internship Certificate",
   resignation: "Resignation Letter",
+  "final-settlement": "Final Settlement Letter",
+  "form-16": "Form 16",
+  noc: "NOC Paper",
+  "exit-agreement": "Exit Agreement",
   other: "Certificate",
 };
 
@@ -95,28 +108,96 @@ function formatCurrency(amount: number): string {
   return "₹" + amount.toLocaleString("en-IN");
 }
 
+type LetterBodyVars = {
+  name: string;
+  role: string;
+  companyName: string;
+  joinDate: string;
+  date: string;
+  purpose: string;
+  customType: string;
+};
+
+function buildLetterParagraphs(v: LetterBodyVars): Record<string, string> {
+  const { name, role, companyName, joinDate, date, purpose, customType } = v;
+  return {
+    experience: `This is to certify that <strong>${name}</strong> has been employed with <strong>${companyName}</strong> in the capacity of <strong>${role}</strong> from ${joinDate} to date. During this period, they have demonstrated professionalism, dedication, and strong performance in their role.`,
+    "offer-letter": `We are pleased to offer <strong>${name}</strong> the position of <strong>${role}</strong> at <strong>${companyName}</strong>. We look forward to a successful association.`,
+    relieving: `This is to confirm that <strong>${name}</strong>, who served as <strong>${role}</strong> at <strong>${companyName}</strong> since ${joinDate}, has been relieved from their duties effective ${date}. They have completed all pending assignments and clearance formalities.`,
+    other: customType
+      ? `This is to certify that <strong>${name}</strong> has been associated with <strong>${companyName}</strong> as a <strong>${role}</strong>. Purpose: ${purpose}.`
+      : "",
+    "final-settlement": `This is to confirm that the full and final settlement of all dues for <strong>${name}</strong>, who served as <strong>${role}</strong> at <strong>${companyName}</strong> since ${joinDate}, has been processed and cleared as of ${date}. All pending settlements, dues, and statutory obligations have been accounted for and discharged.`,
+    "form-16": `This is to certify that <strong>${name}</strong>, who served as <strong>${role}</strong> at <strong>${companyName}</strong>, has been issued Form 16 for the relevant financial year. This document summarizes the salary paid and the tax deducted at source (TDS) during the period of employment.`,
+    noc: `This is to certify that <strong>${name}</strong>, who served as <strong>${role}</strong> at <strong>${companyName}</strong> since ${joinDate}, has no outstanding dues, obligations, or legal liabilities toward the company. <strong>${companyName}</strong> has no objection to any future endeavours undertaken by the employee.`,
+    "exit-agreement": `This Exit Agreement is entered into between <strong>${companyName}</strong> and <strong>${name}</strong>, who served as <strong>${role}</strong> since ${joinDate}. Both parties hereby acknowledge that the employment has been concluded effective ${date}, all dues have been settled, and each party releases the other from any further claims, obligations, or liabilities arising from the employment.`,
+  };
+}
+
+function stripHtml(html: string): string {
+  if (typeof document !== "undefined") {
+    const div = document.createElement("div");
+    div.innerHTML = html;
+    return div.textContent || "";
+  }
+  return html.replace(/<[^>]+>/g, "");
+}
+
 function isOptedOut(members: { _id?: string }[] | undefined, userId: string): boolean {
   if (!members || members.length === 0) return false;
   return members.some((m) => String(m._id ?? "") === userId);
 }
 
-function SignatureBlock({ name, role }: SignatoryInfo) {
+function LetterSignature({
+  signer,
+  className = "",
+}: {
+  signer: LetterSigner | null;
+  className?: string;
+}) {
+  if (signer && signer.name) {
+    const signedDate = signer.signedAt
+      ? new Date(signer.signedAt).toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        })
+      : "";
+    return (
+      <div className={`mt-10 print:mt-4 ${className}`}>
+        <p className="mb-6 text-[10px] font-semibold uppercase tracking-widest text-slate-400 print:mb-2">
+          Authorized Signatory
+        </p>
+        <p
+          className="mb-1 text-2xl leading-none text-slate-700 print:text-xl"
+          style={{ fontFamily: SIGNATURE_FONT }}
+        >
+          {signer.name}
+        </p>
+        <p className="text-xs capitalize text-slate-500">
+          {signer.role ? signer.role.replace(/-/g, " ") : ""}
+        </p>
+        {signedDate ? (
+          <p className="mt-1 text-[10px] text-slate-400">Signed on {signedDate}</p>
+        ) : null}
+      </div>
+    );
+  }
   return (
-    <div className="flex flex-col items-center">
-      <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400 print:text-[8px]">
-        Sign by {role}
+    <div className={`mt-10 print:mt-4 ${className}`}>
+      <p className="mb-6 text-[10px] font-semibold uppercase tracking-widest text-slate-400 print:mb-2">
+        Authorized Signatory
       </p>
-      <div className="mb-1 h-10 w-48 border-b border-slate-400 print:h-6 print:w-36" />
-      <p className="text-sm font-medium text-slate-900 print:text-[10px]">{name}</p>
-      <p className="text-xs capitalize text-slate-500 print:text-[9px]">{role}</p>
+      <div className="mb-2 h-10 w-48 border-b border-slate-400 print:h-6 print:w-36" />
+      <p className="text-xs capitalize text-slate-400">Human Resource</p>
     </div>
   );
 }
 
 function InternshipCertificateContent({
-  data, signatories,
+  data, signer,
 }: {
-  data: LetterData; signatories: SignatoryInfo[];
+  data: LetterData; signer: LetterSigner | null;
 }) {
   const name = data.metadata?.requesterName ?? data.requester?.name ?? "Employee";
   const role = data.metadata?.requesterRole ?? data.requester?.role ?? "Member";
@@ -212,12 +293,7 @@ function InternshipCertificateContent({
         </div>
       ) : null}
 
-      <div className="pt-8 print:pt-3">
-        <p className="mb-8 text-xs font-semibold uppercase tracking-wider text-slate-500 print:mb-3">Authorized Signatories</p>
-        <div className="grid grid-cols-2 gap-x-12 gap-y-10 sm:grid-cols-3 print:gap-x-6 print:gap-y-3">
-          {signatories.map((s, i) => <SignatureBlock key={i} name={s.name} role={s.role} />)}
-        </div>
-      </div>
+      <LetterSignature signer={signer} />
     </div>
   );
 }
@@ -226,12 +302,12 @@ function SalaryCertificateContent({
   data,
   salary,
   policy,
-  signatories,
+  signer,
 }: {
   data: LetterData;
   salary: SalaryInfo | null;
   policy: PolicyInfo | null;
-  signatories: SignatoryInfo[];
+  signer: LetterSigner | null;
 }) {
   const name = data.metadata?.requesterName ?? data.requester?.name ?? "Employee";
   const role = data.metadata?.requesterRole ?? data.requester?.role ?? "Member";
@@ -390,21 +466,12 @@ function SalaryCertificateContent({
         This certificate is issued upon request and verified by the company.
       </p>
 
-      <div className="pt-8 print:pt-3">
-        <p className="mb-8 text-xs font-semibold uppercase tracking-wider text-slate-500 print:mb-3">
-          Authorized Signatories
-        </p>
-        <div className="grid grid-cols-2 gap-x-12 gap-y-10 sm:grid-cols-3 print:gap-x-6 print:gap-y-3">
-          {signatories.map((s, i) => (
-            <SignatureBlock key={i} name={s.name} role={s.role} />
-          ))}
-        </div>
-      </div>
+      <LetterSignature signer={signer} />
     </div>
   );
 }
 
-function LetterBody({ data, signatories }: { data: LetterData; signatories: SignatoryInfo[] }) {
+function LetterBody({ data, signer }: { data: LetterData; signer: LetterSigner | null }) {
   const name = data.metadata?.requesterName ?? data.requester?.name ?? "Employee";
   const role = data.metadata?.requesterRole ?? data.requester?.role ?? "Member";
   const companyName = data.company?.name ?? "Company";
@@ -428,15 +495,17 @@ function LetterBody({ data, signatories }: { data: LetterData; signatories: Sign
     year: "numeric",
   });
 
-  const paragraphs: Record<string, string> = {
-    experience: `This is to certify that <strong>${name}</strong> has been employed with <strong>${companyName}</strong> in the capacity of <strong>${role}</strong> from ${joinDate} to date. During this period, they have demonstrated professionalism, dedication, and strong performance in their role.`,
-    "offer-letter": `We are pleased to offer <strong>${name}</strong> the position of <strong>${role}</strong> at <strong>${companyName}</strong>. We look forward to a successful association.`,
-    relieving: `This is to confirm that <strong>${name}</strong>, who served as <strong>${role}</strong> at <strong>${companyName}</strong> since ${joinDate}, has been relieved from their duties effective ${date}. They have completed all pending assignments and clearance formalities.`,
-    internship: `This is to certify that <strong>${name}</strong> completed their internship with <strong>${companyName}</strong> as a <strong>${role}</strong> from ${joinDate}. During this period, they exhibited enthusiasm and a strong willingness to learn.`,
-    other: customType
-      ? `This is to certify that <strong>${name}</strong> has been associated with <strong>${companyName}</strong> as a <strong>${role}</strong>. Purpose: ${purpose}.`
-      : "",
-  };
+  const paragraphs: Record<string, string> = buildLetterParagraphs({
+    name,
+    role,
+    companyName,
+    joinDate,
+    date,
+    purpose,
+    customType,
+  });
+
+  const editedBody = data.metadata?.letterContent ? String(data.metadata.letterContent) : "";
 
   return (
     <>
@@ -450,7 +519,11 @@ function LetterBody({ data, signatories }: { data: LetterData; signatories: Sign
       <br />
       <p>Dear <strong>{name}</strong>,</p>
       <br />
-      <p dangerouslySetInnerHTML={{ __html: paragraphs[type] || "" }} />
+      {editedBody ? (
+        <p>{editedBody}</p>
+      ) : (
+        <p dangerouslySetInnerHTML={{ __html: paragraphs[type] || "" }} />
+      )}
       <br />
       <p>We wish you the very best in your future endeavors.</p>
       <br />
@@ -458,21 +531,12 @@ function LetterBody({ data, signatories }: { data: LetterData; signatories: Sign
       <p className="mt-2 font-medium">{data.approver?.name ?? companyName}</p>
       <p className="text-xs capitalize text-slate-500">{data.approver?.role ? `(${data.approver.role.replace("-", " ")})` : ""}</p>
 
-      <div className="mt-10 print:mt-4">
-        <p className="mb-6 text-[10px] font-semibold uppercase tracking-widest text-slate-400 print:mb-2">
-          Sign by Human Resource
-        </p>
-        <div className="h-10 w-48 border-b border-slate-400 print:h-6" />
-        <p className="mt-1 text-sm font-medium text-slate-900">
-          {signatories.find((s) => s.role === "Human Resource")?.name ?? data.approver?.name ?? companyName}
-        </p>
-        <p className="text-xs capitalize text-slate-500">Human Resource</p>
-      </div>
+      <LetterSignature signer={signer} />
     </>
   );
 }
 
-function ResignationLetterContent({ data }: { data: LetterData }) {
+function ResignationLetterContent({ data, signer }: { data: LetterData; signer: LetterSigner | null }) {
   const name = data.metadata?.requesterName ?? data.requester?.name ?? "Employee";
   const role = data.metadata?.requesterRole ?? data.requester?.role ?? "Member";
   const companyName = data.company?.name ?? "Company";
@@ -531,6 +595,7 @@ function ResignationLetterContent({ data }: { data: LetterData }) {
       <p>{companyName}</p>
       {teamName ? <p>Team: {teamName}</p> : null}
       <p className="text-slate-500">{data.requester?.email ?? ""}</p>
+      <LetterSignature signer={signer} />
     </div>
   );
 }
@@ -538,15 +603,37 @@ function ResignationLetterContent({ data }: { data: LetterData }) {
 export default function LetterPage() {
   const params = useParams();
   const id = params?.id as string | undefined;
+  const { data: session } = useSession();
   const [data, setData] = useState<LetterData | null>(null);
   const [salary, setSalary] = useState<SalaryInfo | null>(null);
   const [policy, setPolicy] = useState<PolicyInfo | null>(null);
-  const [signatories, setSignatories] = useState<SignatoryInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isDraft, setIsDraft] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draftBody, setDraftBody] = useState("");
+  const [signed, setSigned] = useState(false);
+  const [signing, setSigning] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [justApproved, setJustApproved] = useState(false);
+  const [toast, setToast] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  const editableTypes = [
+    "experience",
+    "offer-letter",
+    "relieving",
+    "final-settlement",
+    "form-16",
+    "noc",
+    "exit-agreement",
+    "other",
+  ];
 
   useEffect(() => {
     if (!id) return;
+    const draft = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("draft") === "1";
+    setIsDraft(draft);
+
     apiFetch<{ requests: LetterData[] }>("/api/hr/document-letter")
       .then((res) => {
         const found = res.requests.find(
@@ -556,49 +643,12 @@ export default function LetterPage() {
           setError("Letter not found.");
           return;
         }
-        if (found.status !== "approved") {
+        if (found.status !== "approved" && !draft) {
           setError("This letter request has not been approved yet.");
           return;
         }
         setData(found);
-
-        const isInternship = found.metadata?.letterType === "internship";
-
-        const sigPromises: Promise<SignatoryInfo | null>[] = [];
-
-        if (isInternship) {
-          sigPromises.push(
-            apiFetch<{ users: { name: string }[] }>("/api/users?role=human-resource")
-              .then((r) => (r.users?.[0] ? { name: r.users[0].name, role: "Human Resource" } : null))
-              .catch(() => null),
-          );
-          if (found.metadata?.teamManagerName) {
-            sigPromises.push(
-              Promise.resolve({ name: found.metadata.teamManagerName, role: formatRole(found.metadata.teamManagerRole ?? "") }),
-            );
-          }
-        } else {
-          sigPromises.push(
-            apiFetch<{ users: { name: string }[] }>("/api/users?role=admin")
-              .then((r) => (r.users?.[0] ? { name: r.users[0].name, role: "Admin" } : null))
-              .catch(() => null),
-            apiFetch<{ users: { name: string }[] }>("/api/users?role=human-resource")
-              .then((r) => (r.users?.[0] ? { name: r.users[0].name, role: "Human Resource" } : null))
-              .catch(() => null),
-            apiFetch<{ users: { name: string }[] }>("/api/users?role=finance")
-              .then((r) => (r.users?.[0] ? { name: r.users[0].name, role: "Finance" } : null))
-              .catch(() => null),
-          );
-          if (found.metadata?.teamManagerName) {
-            sigPromises.push(
-              Promise.resolve({ name: found.metadata.teamManagerName, role: "Manager/Tester" }),
-            );
-          }
-        }
-
-        Promise.all(sigPromises).then((results) => {
-          setSignatories(results.filter((s): s is SignatoryInfo => s !== null));
-        });
+        setSigned(Boolean(found.metadata?.isSigned));
 
         if (found.metadata?.letterType === "salary-certificate") {
           const bs = Number(found.requester?.baseSalary ?? 0);
@@ -612,6 +662,86 @@ export default function LetterPage() {
       .catch(() => setError("Failed to load letter."))
       .finally(() => setLoading(false));
   }, [id]);
+
+  const type = data?.metadata?.letterType ?? "";
+  const canEdit = editableTypes.includes(type);
+  const approverId = data?.approver?._id;
+  const canSign =
+    Boolean(session?.user?.id) &&
+    Boolean(approverId) &&
+    String(session?.user?.id) === String(approverId);
+
+  const signerName = data?.metadata?.signedBy || (signed ? (session?.user?.name ?? "") : "");
+  const signerRole = data?.metadata?.signedRole || (signed ? (session?.user?.role ?? "") : "");
+  const signerAt = data?.metadata?.signedAt || (signed ? new Date().toISOString() : "");
+  const activeSigner: LetterSigner | null = signerName
+    ? { name: signerName, role: signerRole, signedAt: signerAt }
+    : null;
+
+  const enterEdit = useCallback(() => {
+    if (!data) return;
+    const name = data.metadata?.requesterName ?? data.requester?.name ?? "Employee";
+    const role = data.metadata?.requesterRole ?? data.requester?.role ?? "Member";
+    const companyName = data.company?.name ?? "Company";
+    const purpose = data.metadata?.purpose ?? "";
+    const customType = data.metadata?.customType ?? "";
+    const joinDate = new Date(
+      data.requester?.companyJoined ?? data.createdAt ?? Date.now(),
+    ).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+    const date = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+    const paras = buildLetterParagraphs({ name, role, companyName, joinDate, date, purpose, customType });
+    const initial = data.metadata?.letterContent
+      ? String(data.metadata.letterContent)
+      : stripHtml(paras[type] || "");
+    setDraftBody(initial);
+    setEditing(true);
+  }, [data, type]);
+
+  async function doSign() {
+    setSigning(true);
+    try {
+      setSigned(true);
+    } finally {
+      setSigning(false);
+    }
+  }
+
+  async function doApprove() {
+    if (!id) return;
+    setApproving(true);
+    try {
+      const finalBody = editing ? draftBody : data?.metadata?.letterContent || undefined;
+      await apiFetch(`/api/approvals/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "approved", signed: true, letterContent: finalBody }),
+      });
+      setJustApproved(true);
+      setData((d) =>
+        d
+          ? {
+              ...d,
+              status: "approved",
+              metadata: {
+                ...d.metadata,
+                isSigned: true,
+                signedBy: session?.user?.name ?? "",
+                signedRole: session?.user?.role ?? "",
+                signedAt: new Date().toISOString(),
+                letterContent: finalBody,
+              },
+            }
+          : d,
+      );
+      setToast({ text: "Letter approved and signed.", type: "success" });
+    } catch (err) {
+      setToast({
+        text: err instanceof Error ? err.message : "Could not approve letter.",
+        type: "error",
+      });
+    } finally {
+      setApproving(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -631,24 +761,102 @@ export default function LetterPage() {
 
   const companyName = data.company?.name ?? "Company";
   const companyIcon = data.company?.icon ?? "";
-  const type = data.metadata?.letterType ?? "";
   const title = LETTER_TITLES[type] || "Certificate";
 
-  const isInternship = type === "internship";
+  const showFinal = !isDraft || justApproved;
 
   return (
     <div className="min-h-screen bg-slate-100 print:bg-white">
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3 print:hidden">
-        <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
-        <button
-          className="rounded-lg bg-slate-950 px-5 py-2 text-sm font-medium text-white hover:bg-slate-800"
-          onClick={() => window.print()}
+      {toast ? (
+        <div
+          className={`fixed bottom-8 left-1/2 z-[60] -translate-x-1/2 rounded-xl px-5 py-3 text-sm font-semibold shadow-lg ${
+            toast.type === "success" ? "bg-emerald-600 text-white" : "bg-rose-600 text-white"
+          }`}
         >
-          Download PDF
-        </button>
+          {toast.text}
+        </div>
+      ) : null}
+
+      <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-6 py-3 print:hidden">
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
+          {isDraft && !justApproved ? (
+            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+              DRAFT · Pending approval
+            </span>
+          ) : null}
+        </div>
+        {showFinal ? (
+          <button
+            className="rounded-lg bg-slate-950 px-5 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            onClick={() => window.print()}
+          >
+            Download PDF
+          </button>
+        ) : null}
       </div>
 
+      {isDraft && !justApproved ? (
+        <div className="sticky top-[57px] z-10 flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-6 py-3 print:hidden">
+          {editing ? (
+            <button
+              onClick={() => setEditing(false)}
+              className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            >
+              Done editing
+            </button>
+          ) : canEdit ? (
+            <button
+              onClick={enterEdit}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            >
+              Edit letter
+            </button>
+          ) : null}
+
+          {canSign && !signed ? (
+            <button
+              onClick={doSign}
+              disabled={signing}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {signing ? "Signing..." : "E-Sign"}
+            </button>
+          ) : null}
+
+          {canSign && signed ? (
+            <>
+              <button
+                onClick={doApprove}
+                disabled={approving}
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {approving ? "Approving..." : "Approve"}
+              </button>
+              <button
+                onClick={() => window.close()}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+              >
+                Close
+              </button>
+            </>
+          ) : null}
+
+          {!canSign ? (
+            <p className="text-xs text-slate-500">
+              Only the assigned approver can sign and approve this request.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="mx-auto max-w-[210mm] bg-white p-10 shadow-lg print:mx-auto print:min-h-screen print:shadow-none print:p-6 print:text-[11px]">
+        {justApproved ? (
+          <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            Letter approved and signed. You can now download or print it.
+          </div>
+        ) : null}
+
         <div className="mb-8 text-center print:mb-4">
           <div className="flex items-center justify-center gap-3">
             {companyIcon ? (
@@ -682,17 +890,27 @@ export default function LetterPage() {
           </div>
         ) : null}
 
-        {type === "salary-certificate" ? (
-          <SalaryCertificateContent data={data} salary={salary} policy={policy} signatories={signatories} />
+        {editing && canEdit ? (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Edit letter body</p>
+            <textarea
+              className="w-full min-h-[40vh] rounded-md border border-slate-300 p-4 text-sm leading-relaxed text-slate-800"
+              value={draftBody}
+              onChange={(e) => setDraftBody(e.target.value)}
+            />
+            <p className="text-xs text-slate-400">Edits are saved when you approve the letter.</p>
+          </div>
+        ) : type === "salary-certificate" ? (
+          <SalaryCertificateContent data={data} salary={salary} policy={policy} signer={activeSigner} />
         ) : type === "internship" ? (
-          <InternshipCertificateContent data={data} signatories={signatories} />
+          <InternshipCertificateContent data={data} signer={activeSigner} />
         ) : type === "resignation" ? (
           <div className="space-y-4 text-sm leading-relaxed text-slate-800">
-            <ResignationLetterContent data={data} />
+            <ResignationLetterContent data={data} signer={activeSigner} />
           </div>
         ) : (
           <div className="space-y-4 text-sm leading-relaxed text-slate-800">
-            <LetterBody data={data} signatories={signatories} />
+            <LetterBody data={data} signer={activeSigner} />
           </div>
         )}
 

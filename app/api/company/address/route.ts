@@ -7,6 +7,36 @@ import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
 
+export async function GET() {
+  const userId = await requireUserId();
+  if (!userId) return jsonError("Unauthorized", 401);
+
+  try {
+    await connectDb();
+  } catch (error) {
+    const dbError = databaseUnavailable(error);
+    if (dbError) return dbError;
+    throw error;
+  }
+
+  const user = await User.findById(userId);
+  if (!user?.company) return jsonError("No company found.", 400);
+
+  const companyId =
+    typeof user.company === "object" && user.company
+      ? String((user.company as any)._id ?? "")
+      : String(user.company);
+
+  const company = (await Company.findById(companyId)
+    .select("addresses multiOffice")
+    .lean()) as any;
+
+  return NextResponse.json({
+    addresses: (company?.addresses as any[]) || [],
+    multiOffice: Boolean(company?.multiOffice),
+  });
+}
+
 export async function PATCH(request: Request) {
   const userId = await requireUserId();
   if (!userId) return jsonError("Unauthorized", 401);

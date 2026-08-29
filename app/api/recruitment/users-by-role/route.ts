@@ -11,6 +11,7 @@ export async function GET(request: Request) {
     const userId = await requireUserId();
     const { searchParams } = new URL(request.url);
     const roleFilter = searchParams.get("role") || "";
+    const regionFilter = (searchParams.get("region") || "").trim();
 
     await connectDb();
     const currentUser = await User.findById(userId);
@@ -21,6 +22,9 @@ export async function GET(request: Request) {
       filter.role = roleFilter;
     } else {
       filter.role = { $in: ALLOWED_ROLES };
+    }
+    if (regionFilter) {
+      filter.regionLabel = regionFilter;
     }
 
     const users = await User.find(filter).select("name email role").sort({ name: 1 });

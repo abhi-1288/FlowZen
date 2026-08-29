@@ -55,6 +55,7 @@ export async function POST(request: Request, { params }: Params) {
   const job = candidate.job as any;
   const jobEmploymentType = String(job?.employmentType ?? "");
   const jobDurationMonths = job?.durationMonths ?? null;
+  const jobDurationDays = job?.durationDays ?? null;
 
   const acceptedOffer = await ATSOffer.findOne({
     candidate: candidate._id,
@@ -65,9 +66,10 @@ export async function POST(request: Request, { params }: Params) {
 
   const joiningDate = offerJoiningDate ? new Date(offerJoiningDate) : new Date();
   let employmentEndDate: Date | null = null;
-  if (jobDurationMonths && ["internship", "contract", "part-time"].includes(jobEmploymentType)) {
+  if ((jobDurationMonths || jobDurationDays) && ["internship", "contract", "part-time"].includes(jobEmploymentType)) {
     employmentEndDate = new Date(joiningDate);
-    employmentEndDate.setMonth(employmentEndDate.getMonth() + jobDurationMonths);
+    if (jobDurationMonths) employmentEndDate.setMonth(employmentEndDate.getMonth() + jobDurationMonths);
+    if (jobDurationDays) employmentEndDate.setDate(employmentEndDate.getDate() + jobDurationDays);
   }
 
   const employee = await User.create({
@@ -87,6 +89,7 @@ export async function POST(request: Request, { params }: Params) {
     employmentEndDate,
     employmentType: jobEmploymentType,
     durationMonths: jobDurationMonths,
+    durationDays: jobDurationDays,
   });
 
   const loginUrl = `${process.env.NODE_ENV === "development" ? request.headers.get("origin") || (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000") : process.env.NEXT_PUBLIC_APP_URL}/login`;

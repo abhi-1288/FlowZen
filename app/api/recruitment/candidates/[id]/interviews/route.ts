@@ -67,6 +67,36 @@ export async function POST(request: Request, { params }: Params) {
     company: user.company,
   });
 
+  // Keep the candidate's assignedTeam in sync with the scheduled interviewer so
+  // the "Assigned Interviewers" panel reflects scheduling without a manual step.
+  try {
+    const interviewerUser = await User.findById(body.interviewer).select("role");
+    const teamRole = interviewerUser?.role || "project-manager";
+    const roundType = body.roundType || "screening";
+    const cand = await ATSCandidate.findById(candidate._id);
+    if (cand) {
+      const team = (cand as any).assignedTeam || [];
+      const existing = team.find((t: any) => t.role === teamRole);
+      if (existing) {
+        existing.user = body.interviewer;
+        existing.roundType = roundType;
+        existing.status = "assigned";
+      } else {
+        team.push({
+          role: teamRole,
+          user: body.interviewer,
+          roundType,
+          status: "assigned",
+          feedback: "",
+        });
+      }
+      (cand as any).assignedTeam = team;
+      await cand.save();
+    }
+  } catch (teamErr) {
+    console.error("Failed to sync assigned team on schedule:", teamErr);
+  }
+
   await ATSTimeline.create({
     candidate: candidate._id,
     job: jobId,

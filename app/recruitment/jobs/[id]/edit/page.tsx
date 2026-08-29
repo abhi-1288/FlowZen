@@ -9,7 +9,7 @@ export default function EditJobPage() {
   const params = useParams()!;
   const id = params.id as string;
   const router = useRouter();
-  const { activeJob, fetchJob, updateJob } = useRecruitmentStore();
+  const { activeJob, fetchJob, updateJob, saving } = useRecruitmentStore();
 
   const [title, setTitle] = useState("");
   const [department, setDepartment] = useState("");
@@ -24,6 +24,7 @@ export default function EditJobPage() {
   const [requiredSkills, setRequiredSkills] = useState("");
   const [status, setStatus] = useState("draft");
   const [durationMonths, setDurationMonths] = useState("");
+  const [durationDays, setDurationDays] = useState("");
   const [requiredExperienceYears, setRequiredExperienceYears] = useState("");
   const [atsScoreThreshold, setAtsScoreThreshold] = useState("");
 
@@ -43,6 +44,7 @@ export default function EditJobPage() {
       setRequiredSkills(activeJob.requiredSkills.join(", "));
       setStatus(activeJob.status);
       setDurationMonths(activeJob.durationMonths ? String(activeJob.durationMonths) : "");
+      setDurationDays(activeJob.durationDays ? String(activeJob.durationDays) : "");
       setRequiredExperienceYears(activeJob.requiredExperienceYears ? String(activeJob.requiredExperienceYears) : "");
       setAtsScoreThreshold(activeJob.atsScoreThreshold ? String(activeJob.atsScoreThreshold) : "");
     }
@@ -50,9 +52,11 @@ export default function EditJobPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (saving) return;
     await updateJob(id, {
       title, department, location, employmentType: employmentType as any,
       durationMonths: durationMonths ? Number(durationMonths) : null,
+      durationDays: durationDays ? Number(durationDays) : null,
       requiredExperienceYears: requiredExperienceYears ? Number(requiredExperienceYears) : null,
       atsScoreThreshold: atsScoreThreshold ? Number(atsScoreThreshold) : null,
       salaryRangeMin: Number(salaryRangeMin), salaryRangeMax: Number(salaryRangeMax), currency,
@@ -93,10 +97,16 @@ export default function EditJobPage() {
             </select>
           </label>
           {employmentType !== "full-time" && (
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Duration (months)</span>
-              <input value={durationMonths} onChange={(e) => setDurationMonths(e.target.value)} type="number" min="1" max="60" placeholder="e.g. 6" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
-            </label>
+            <>
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-slate-700">Duration (months)</span>
+                <input value={durationMonths} onChange={(e) => setDurationMonths(e.target.value)} type="number" min="1" max="60" placeholder="e.g. 6" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-slate-700">Duration (days)</span>
+                <input value={durationDays} onChange={(e) => setDurationDays(e.target.value)} type="number" min="0" max="365" placeholder="e.g. 15" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
+              </label>
+            </>
           )}
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Required Experience (years)</span>
@@ -149,7 +159,7 @@ export default function EditJobPage() {
           <span className="mb-1 block text-sm font-medium text-slate-700">Description</span>
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className="neu-inset w-full resize-y rounded-lg px-3 py-2.5 text-sm" />
         </label>
-        <button type="submit" className="neu-btn neu-btn-primary rounded-full px-6 py-2.5 text-sm font-medium">Save Changes</button>
+        <button type="submit" disabled={saving} className="neu-btn neu-btn-primary rounded-full px-6 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60">Save Changes</button>
       </form>
     </div>
   );

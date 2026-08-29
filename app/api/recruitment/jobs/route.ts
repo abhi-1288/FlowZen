@@ -108,6 +108,7 @@ export async function POST(request: Request) {
     location: String(body.location ?? "").trim(),
     employmentType: body.employmentType || "full-time",
     durationMonths: body.durationMonths != null ? Number(body.durationMonths) : null,
+    durationDays: body.durationDays != null ? Number(body.durationDays) : null,
     requiredExperienceYears: body.requiredExperienceYears != null ? Number(body.requiredExperienceYears) : null,
     atsScoreThreshold: body.atsScoreThreshold != null ? Number(body.atsScoreThreshold) : null,
     salaryRangeMin: Number(body.salaryRangeMin) || 0,

@@ -5,6 +5,7 @@ import { Calendar, ChevronDown, ChevronUp, ChevronLeft, ChevronsLeft, ChevronsRi
 import { useSession } from "next-auth/react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
+import { InterviewModals } from "@/app/recruitment/candidates/[id]/components/interview-modals";
 
 const LIMIT = 10;
 
@@ -163,6 +164,13 @@ export function InterviewsTab() {
           )}
         </div>
       )}
+
+      <InterviewModals
+        candidateId=""
+        assignedTeam={[]}
+        candidateInterviews={interviews}
+        onIvChange={() => load(page, statusFilter)}
+      />
     </div>
   );
 }

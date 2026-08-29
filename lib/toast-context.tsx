@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Bell, AlertTriangle } from "lucide-react";
 
 type ToastItem = {
@@ -98,23 +99,28 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         ))}
       </div>
 
-      {/* Error toasts — bottom-center */}
-      <div className="fixed bottom-8 left-1/2 z-[210] flex -translate-x-1/2 flex-col items-center gap-2 w-full max-w-md px-4 pointer-events-none">
-        {errorToasts.map((toast) => (
-          <div
-            key={toast.id}
-            className="pointer-events-auto animate-in fade-in slide-in-from-bottom-4 duration-300 w-full rounded-2xl bg-rose-950 px-5 py-4 shadow-2xl ring-1 ring-rose-500/60 text-white"
-          >
-            <div className="flex items-start gap-3">
-              <AlertTriangle size={18} className="mt-0.5 shrink-0 text-rose-400" />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold leading-tight text-white">Something went wrong</p>
-                <p className="mt-1 text-xs text-rose-200 leading-relaxed">{toast.message}</p>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* Error toasts — bottom-center, portaled above all modals */}
+      {typeof document !== "undefined"
+        ? createPortal(
+            <div className="fixed bottom-8 left-1/2 z-[9999] flex -translate-x-1/2 flex-col items-center gap-2 w-full max-w-md px-4 pointer-events-none">
+              {errorToasts.map((toast) => (
+                <div
+                  key={toast.id}
+                  className="pointer-events-auto animate-in fade-in slide-in-from-bottom-4 duration-300 w-full rounded-2xl bg-rose-600 px-5 py-4 shadow-2xl ring-1 ring-rose-700/60 text-white dark:bg-rose-500 dark:ring-rose-300/50"
+                >
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle size={18} className="mt-0.5 shrink-0 text-white" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold leading-tight text-white">Something went wrong</p>
+                      <p className="mt-1 text-xs text-white/90 leading-relaxed">{toast.message}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>,
+            document.body,
+          )
+        : null}
     </ToastContext.Provider>
   );
 }

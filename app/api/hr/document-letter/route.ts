@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     const customType = String(body.customType ?? "").trim();
     const customApproverId = String(body.approverId ?? "").trim();
 
-    const validTypes = ["experience", "salary-certificate", "offer-letter", "relieving", "internship", "resignation", "other"];
+    const validTypes = ["experience", "salary-certificate", "offer-letter", "relieving", "internship", "resignation", "final-settlement", "form-16", "noc", "exit-agreement", "other"];
     if (!validTypes.includes(letterType)) {
       return jsonError("Invalid letter type.", 400);
     }
@@ -221,13 +221,44 @@ export async function POST(request: Request) {
       metadataRecord.letterContent = letterContent;
     }
 
-    const joinRequest = await JoinRequest.create({
+    // Only one pending document-letter per requester+company+letterType is
+    // permitted by the unique index, so reuse (update) an existing pending
+    // request of the SAME type instead of failing with a duplicate-key error.
+    // A different letter type creates a separate pending request.
+    const existing = await JoinRequest.findOne({
       requester: userId,
-      approver: approverId,
       company: companyId,
       kind: "document-letter",
-      metadata: metadataRecord,
+      "metadata.letterType": letterType,
+      status: "pending",
     });
+
+    let joinRequest: Awaited<ReturnType<typeof JoinRequest.findOne>> | null = null;
+    if (existing) {
+      existing.set("approver", approverId);
+      existing.metadata = {
+        ...metadataRecord,
+        isSigned: false,
+        signedBy: "",
+        signedRole: "",
+        signedAt: "",
+      };
+      existing.markModified("metadata");
+      await existing.save();
+      joinRequest = existing;
+    } else {
+      joinRequest = await JoinRequest.create({
+        requester: userId,
+        approver: approverId,
+        company: companyId,
+        kind: "document-letter",
+        metadata: metadataRecord,
+      });
+    }
+
+    if (!joinRequest) {
+      return jsonError("Failed to create document letter request.", 500);
+    }
 
     const notificationTitle = "Document Letter Request";
     const startStr = String(body.internshipStart ?? "").trim();
@@ -246,7 +277,7 @@ export async function POST(request: Request) {
     });
     emitNotification(approverId);
 
-    return NextResponse.json({ request: joinRequest }, { status: 201 });
+    return NextResponse.json({ request: joinRequest }, { status: existing ? 200 : 201 });
   } catch (error) {
     const dbError = databaseUnavailable(error);
     if (dbError) return dbError;

@@ -25,6 +25,10 @@ const LETTER_TYPES = [
   { value: "relieving", label: "Relieving Letter" },
   { value: "internship", label: "Internship Certificate" },
   { value: "resignation", label: "Resignation Letter" },
+  { value: "final-settlement", label: "Final Settlement Letter" },
+  { value: "form-16", label: "Form 16" },
+  { value: "noc", label: "NOC Paper" },
+  { value: "exit-agreement", label: "Exit Agreement" },
   { value: "other", label: "Other" },
   { value: "id-card", label: "ID Card" },
 ];
