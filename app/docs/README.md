@@ -1906,7 +1906,7 @@ Create a new job posting.
 | employmentType | string | Optional | Type (full-time/part-time/contract/internship) |
 | salaryRangeMin | number | Optional | Minimum salary |
 | salaryRangeMax | number | Optional | Maximum salary |
-| salaryType | string | Optional | Salary type (per-annum/per-month) |
+| salaryType | string | Optional | Salary type (per-annum/per-month/per-day/per-hour) |
 | currency | string | Optional | Currency code |
 | openings | number | Optional | Number of openings |
 | description | string | Optional | Job description |
@@ -2103,7 +2103,7 @@ Get generated offer letter HTML.
 
 **Offer Statuses:** draft, sent, accepted, rejected
 
-**Salary Types:** per-annum, per-month
+**Salary Types:** per-annum, per-month, per-day, per-hour
 
 ### Recruitment Referrals
 

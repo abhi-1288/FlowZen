@@ -751,6 +751,9 @@ export default function CandidateProfilePage() {
                           Join Meeting
                         </a>
                       )}
+                      {!interview.meetingLink && interview.location && (
+                        <p className="mt-2 text-xs text-slate-500">Location: {interview.location}</p>
+                      )}
                       {interview.feedback &&
                         interview.feedback.overallRecommendation &&
                         interview.status === "completed" && (
@@ -879,7 +882,6 @@ export default function CandidateProfilePage() {
 
       <InterviewModals
         candidateId={id}
-        assignedTeam={assignedTeam}
         jobLocation={(activeCandidate.job as any)?.location || ""}
         candidateInterviews={candidateInterviews}
         onIvChange={() => {

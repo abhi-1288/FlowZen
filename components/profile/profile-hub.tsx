@@ -88,6 +88,20 @@ export type Tab =
 
 const VALID_TABS = new Set<string>(["dashboard", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers", "calendar", "visitors", "security", "finance-policy", "hr-policy"]);
 
+function formatDuration(profile: AnyRecord | null): string {
+  if (!profile) return "";
+  const years = Number(profile.durationYears ?? 0);
+  const months = Number(profile.durationMonths ?? 0);
+  const days = Number(profile.durationDays ?? 0);
+  const hours = Number(profile.durationHours ?? 0);
+  const parts: string[] = [];
+  if (years > 0) parts.push(`${years} yr${years === 1 ? "" : "s"}`);
+  if (months > 0) parts.push(`${months} mo${months === 1 ? "" : "s"}`);
+  if (days > 0) parts.push(`${days} day${days === 1 ? "" : "s"}`);
+  if (hours > 0) parts.push(`${hours} hr${hours === 1 ? "" : "s"}`);
+  return parts.length ? `${String(profile.employmentType ?? "")} \u00b7 ${parts.join(" ")}` : String(profile.employmentType ?? "");
+}
+
 
 export function ProfileHub() {
   const { data: session } = useSession();
@@ -905,6 +919,12 @@ export function ProfileHub() {
                 <span className="neu-chip inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs text-slate-500 dark:bg-zinc-700 dark:text-zinc-400">
                   <Calendar size={12} />
                   {new Date(profile.companyJoined as string | Date).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+                </span>
+              ) : null}
+              {profile?.employmentType && profile?.employmentEndDate ? (
+                <span className="neu-chip inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs text-slate-500 dark:bg-zinc-700 dark:text-zinc-400">
+                  <Clock size={12} />
+                  {formatDuration(profile)}
                 </span>
               ) : null}
               <button

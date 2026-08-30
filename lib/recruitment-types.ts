@@ -42,7 +42,7 @@ export const STAGE_LABELS: Record<Stage, string> = {
 };
 
 export type EmploymentType = "full-time" | "part-time" | "contract" | "internship";
-export type SalaryType = "per-annum" | "per-month";
+export type SalaryType = "per-annum" | "per-month" | "per-day" | "per-hour";
 export type JobStatus = "draft" | "open" | "closed";
 export type Source = "Referral" | "LinkedIn" | "Company Website" | "Naukri" | "Indeed" | "Walk-In" | "Other";
 export type RoundType = "screening" | "technical" | "manager" | "hr";
@@ -88,6 +88,8 @@ export type ATSJob = {
   employmentType: EmploymentType;
   durationMonths: number | null;
   durationDays: number | null;
+  durationHours: number | null;
+  durationYears: number | null;
   requiredExperienceYears: number | null;
   atsScoreThreshold: number | null;
   salaryRangeMin: number;
@@ -157,6 +159,7 @@ export type ATSInterview = {
   roundType: RoundType;
   scheduledAt: string;
   meetingLink: string;
+  location: string;
   status: InterviewStatus;
   feedback: {
     technicalSkills: number;

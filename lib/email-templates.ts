@@ -186,12 +186,16 @@ export function interviewScheduledEmail({
   roundType,
   scheduledAt,
   meetingLink,
+  location,
+  portalLink,
 }: {
   candidateName: string;
   jobTitle: string;
   roundType: string;
   scheduledAt: Date;
   meetingLink?: string;
+  location?: string;
+  portalLink?: string;
 }) {
   const dateStr = scheduledAt.toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
@@ -241,13 +245,21 @@ export function interviewScheduledEmail({
     </table>
 
     ${meetingLink ? emailButton(meetingLink, "Join Meeting") : ""}
+    ${!meetingLink && location ? `<p style="margin:0 0 24px;font-size:15px;color:#334155;">Location: <strong>${location}</strong></p>` : ""}
+
+    ${portalLink ? `
+      <div style="margin:0 0 24px;padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
+        <p style="margin:0 0 8px;font-size:14px;color:#64748b;">Need more details? Track your interview progress in the candidate portal:</p>
+        ${emailButton(portalLink, "Open Candidate Portal")}
+      </div>
+    ` : ""}
 
     <p style="margin:0;font-size:14px;color:#64748b;">Please be prepared and join on time. Good luck!</p>
   `, { title: "Interview Scheduled" });
 
   return {
     subject: `Interview Scheduled for ${jobTitle} (${roundType})`,
-    text: `Dear ${candidateName},\n\nYour interview for ${jobTitle} (${roundType}) has been scheduled.\n\nDate: ${dateStr}\nTime: ${timeStr}${meetingLink ? `\nMeeting: ${meetingLink}` : ""}`,
+    text: `Dear ${candidateName},\n\nYour interview for ${jobTitle} (${roundType}) has been scheduled.\n\nDate: ${dateStr}\nTime: ${timeStr}${meetingLink ? `\nMeeting: ${meetingLink}` : ""}${!meetingLink && location ? `\nLocation: ${location}` : ""}${portalLink ? `\n\nTrack your application: ${portalLink}` : ""}`,
     html,
   };
 }
@@ -260,12 +272,16 @@ export function interviewRescheduledEmail({
   roundType,
   scheduledAt,
   meetingLink,
+  location,
+  portalLink,
 }: {
   candidateName: string;
   jobTitle: string;
   roundType: string;
   scheduledAt: Date;
   meetingLink?: string;
+  location?: string;
+  portalLink?: string;
 }) {
   const dateStr = scheduledAt.toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
@@ -315,13 +331,21 @@ export function interviewRescheduledEmail({
     </table>
 
     ${meetingLink ? emailButton(meetingLink, "Join Meeting") : ""}
+    ${!meetingLink && location ? `<p style="margin:0 0 24px;font-size:15px;color:#334155;">Location: <strong>${location}</strong></p>` : ""}
+
+    ${portalLink ? `
+      <div style="margin:0 0 24px;padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
+        <p style="margin:0 0 8px;font-size:14px;color:#64748b;">Track your interview progress in the candidate portal:</p>
+        ${emailButton(portalLink, "Open Candidate Portal")}
+      </div>
+    ` : ""}
 
     <p style="margin:0;font-size:14px;color:#64748b;">Please update your calendar accordingly. Apologies for any inconvenience.</p>
   `, { title: "Interview Rescheduled" });
 
   return {
     subject: `Interview Rescheduled – ${jobTitle} (${roundType})`,
-    text: `Dear ${candidateName},\n\nYour interview for ${jobTitle} (${roundType}) has been rescheduled.\n\nNew Date: ${dateStr}\nNew Time: ${timeStr}${meetingLink ? `\nMeeting: ${meetingLink}` : ""}`,
+    text: `Dear ${candidateName},\n\nYour interview for ${jobTitle} (${roundType}) has been rescheduled.\n\nNew Date: ${dateStr}\nNew Time: ${timeStr}${meetingLink ? `\nMeeting: ${meetingLink}` : ""}${!meetingLink && location ? `\nLocation: ${location}` : ""}${portalLink ? `\n\nTrack your application: ${portalLink}` : ""}`,
     html,
   };
 }
@@ -332,10 +356,12 @@ export function interviewCancelledEmail({
   candidateName,
   jobTitle,
   roundType,
+  portalLink,
 }: {
   candidateName: string;
   jobTitle: string;
   roundType: string;
+  portalLink?: string;
 }) {
   const html = baseEmailLayout(`
     <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#dc2626;">Interview Cancelled</h2>
@@ -352,12 +378,19 @@ export function interviewCancelledEmail({
       </tr>
     </table>
 
+    ${portalLink ? `
+      <div style="margin:0 0 24px;padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
+        <p style="margin:0 0 8px;font-size:14px;color:#64748b;">Track the status of your application in the candidate portal:</p>
+        ${emailButton(portalLink, "Open Candidate Portal")}
+      </div>
+    ` : ""}
+
     <p style="margin:0;font-size:14px;color:#64748b;">We apologise for any inconvenience caused.</p>
   `, { title: "Interview Cancelled" });
 
   return {
     subject: `Interview Cancelled – ${jobTitle} (${roundType})`,
-    text: `Dear ${candidateName},\n\nYour interview for ${jobTitle} (${roundType}) has been cancelled.\n\nWe will reach out if the interview is rescheduled.`,
+    text: `Dear ${candidateName},\n\nYour interview for ${jobTitle} (${roundType}) has been cancelled.\n\nWe will reach out if the interview is rescheduled.${portalLink ? `\n\nTrack your application: ${portalLink}` : ""}`,
     html,
   };
 }
@@ -370,12 +403,14 @@ export function offerLetterContent({
   offeredCTC,
   department,
   joiningDate,
+  portalLink,
 }: {
   candidateName: string;
   designation: string;
   offeredCTC: number;
   department?: string;
   joiningDate?: Date | null;
+  portalLink?: string;
 }): { subject: string; text: string; html: string } {
   const html = baseEmailLayout(`
     <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#1e293b;">Offer Letter</h2>
@@ -431,7 +466,11 @@ export function offerLetterContent({
       ` : ""}
     </table>
 
-    <p style="margin:0 0 24px;font-size:14px;color:#64748b;">Please log in to the candidate portal using the link from your application email to view and accept your offer letter.</p>
+    ${portalLink ? `
+      <p style="margin:0 0 24px;font-size:14px;color:#64748b;">Log in to the candidate portal to view and accept your offer letter.</p>
+      ${emailButton(portalLink, "Open Candidate Portal")}
+      <p style="margin:0 0 24px;font-size:12px;color:#94a3b8;">Or open this link: <a href="${portalLink}" style="color:#10b981;text-decoration:underline;">${portalLink}</a></p>
+    ` : `<p style="margin:0 0 24px;font-size:14px;color:#64748b;">Please log in to the candidate portal using the link from your application email to view and accept your offer letter.</p>`}
 
     <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 16px;">
     <p style="margin:0;font-size:12px;color:#94a3b8;">This is a system-generated offer letter. For any queries, please contact the HR team.</p>
@@ -439,7 +478,7 @@ export function offerLetterContent({
 
   return {
     subject: `Offer Letter - ${designation} position`,
-    text: `Dear ${candidateName},\n\nWe are pleased to offer you the position of ${designation}.\n\nOffered CTC: ₹${offeredCTC.toLocaleString()}/year\n\nPlease log in to the candidate portal to view and accept your offer letter.`,
+    text: `Dear ${candidateName},\n\nWe are pleased to offer you the position of ${designation}.\n\nOffered CTC: ₹${offeredCTC.toLocaleString()}/year\n\n${portalLink ? `Log in to the candidate portal to view and accept your offer letter: ${portalLink}` : "Please log in to the candidate portal to view and accept your offer letter."}`,
     html,
   };
 }

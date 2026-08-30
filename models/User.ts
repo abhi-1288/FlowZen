@@ -69,6 +69,7 @@ const UserSchema = new Schema(
             "left-team",
             "board-invite",
             "board-remove",
+            "contract-expired",
           ],
           required: true,
         },
@@ -85,6 +86,19 @@ const UserSchema = new Schema(
     employmentEndDate: { type: Date, default: null },
     employmentType: { type: String, default: "" },
     durationMonths: { type: Number, default: null },
+    durationDays: { type: Number, default: null },
+    durationHours: { type: Number, default: null },
+    durationYears: { type: Number, default: null },
+
+    // Pay basis for finance engine. "per-annum" and "per-month" use baseSalary
+    // in the monthly payroll; "per-hour" uses hourlyRate; "per-day" uses dailyRate.
+    salaryType: {
+      type: String,
+      enum: ["per-annum", "per-month", "per-day", "per-hour"],
+      default: "per-annum",
+    },
+    hourlyRate: { type: Number, default: 0 },
+    dailyRate: { type: Number, default: 0 },
 
     teamJoined: {
       type: Date,

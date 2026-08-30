@@ -10,6 +10,7 @@ import { isObjectId, jsonError, requireUserId, serializeDocs } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
 import { sendMail } from "@/lib/mailer";
 import { interviewScheduledEmail } from "@/lib/email-templates";
+import { buildOrigin, buildPortalLink, resolveCandidatePortalToken, createUniqueGuestPassCode } from "@/lib/candidate-portal";
 
 type Params = { params: Promise<{ id: string }> };
 const ALL_ROLES = ["admin", "human-resource", "project-manager", "qa-tester", "finance"];
@@ -55,13 +56,23 @@ export async function POST(request: Request, { params }: Params) {
 
   const jobId = candidate.job && typeof candidate.job === "object" ? (candidate.job as any)._id || (candidate.job as any).id : candidate.job;
 
+  const meetingLink = String(body.meetingLink ?? "").trim();
+  const location = String(body.location ?? "").trim();
+  const isInPerson = !meetingLink && location;
+  const passCode = isInPerson ? await createUniqueGuestPassCode(String(user.company)) : "";
+  const scheduledAt = new Date(body.scheduledAt);
+
   const interview = await ATSInterview.create({
     candidate: candidate._id,
     job: jobId,
     interviewer: body.interviewer,
     roundType: body.roundType || "screening",
-    scheduledAt: new Date(body.scheduledAt),
-    meetingLink: String(body.meetingLink ?? "").trim(),
+    scheduledAt,
+    meetingLink,
+    location,
+    passCode,
+    passValidFrom: isInPerson ? new Date(scheduledAt.getTime() - 15 * 60 * 1000) : null,
+    passValidUntil: isInPerson ? new Date(scheduledAt.getTime() + 15 * 60 * 1000) : null,
     status: "scheduled",
     createdBy: userId,
     company: user.company,
@@ -101,7 +112,7 @@ export async function POST(request: Request, { params }: Params) {
     candidate: candidate._id,
     job: jobId,
     action: "interview-scheduled",
-    metadata: { roundType: body.roundType || "screening", scheduledAt: body.scheduledAt, interviewerId: body.interviewer },
+    metadata: { roundType: body.roundType || "screening", scheduledAt: body.scheduledAt, interviewerId: body.interviewer, location: String(body.location ?? "").trim() },
     actor: userId,
     company: user.company,
   });
@@ -141,7 +152,7 @@ export async function POST(request: Request, { params }: Params) {
     }
   }
 
-  const meetingInfo = body.meetingLink ? `\nMeeting Link: ${body.meetingLink}` : "";
+  const meetingInfo = body.meetingLink ? `\nMeeting Link: ${body.meetingLink}` : body.location ? `\nLocation: ${body.location}` : "";
   const ivDate = new Date(body.scheduledAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
   emitToUser(String(body.interviewer), "notification:new", {
@@ -173,17 +184,22 @@ export async function POST(request: Request, { params }: Params) {
         roundType: body.roundType || "screening",
         scheduledAt: new Date(body.scheduledAt),
         meetingLink: body.meetingLink,
+        location: String(body.location ?? "").trim(),
       });
       await sendMail({ to: interviewerUser.email, subject: interviewerEmail.subject, text: "", html: interviewerEmail.html });
     }
 
     if (candidate.email) {
+      const candidateToken = await resolveCandidatePortalToken(String(candidate._id));
+      const portalLink = buildPortalLink(buildOrigin(request), candidateToken);
       const candidateEmail = interviewScheduledEmail({
         candidateName: candidateName,
         jobTitle,
         roundType: body.roundType || "screening",
         scheduledAt: new Date(body.scheduledAt),
         meetingLink: body.meetingLink,
+        location: String(body.location ?? "").trim(),
+        portalLink,
       });
       await sendMail({ to: candidate.email, subject: candidateEmail.subject, text: "", html: candidateEmail.html });
     }

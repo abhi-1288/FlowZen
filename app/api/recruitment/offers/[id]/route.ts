@@ -10,6 +10,7 @@ import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
 import { sendMail } from "@/lib/mailer";
 import { offerLetterContent } from "@/lib/email-templates";
+import { buildOrigin, buildPortalLink, resolveCandidatePortalToken } from "@/lib/candidate-portal";
 
 type Params = { params: Promise<{ id: string }> };
 const HR_ROLES = ["admin", "human-resource"];
@@ -96,7 +97,7 @@ export async function PATCH(request: Request, { params }: Params) {
     { $set: updates },
     { new: true }
   )
-    .populate("candidate", "firstName lastName email phone")
+    .populate("candidate", "firstName lastName email phone portalAccessToken")
     .populate("job", "title")
     .populate("signedBy", "name role");
 
@@ -108,12 +109,15 @@ export async function PATCH(request: Request, { params }: Params) {
     const candidateName = `${cand.firstName} ${cand.lastName}`;
 
     try {
+      const candidateToken = await resolveCandidatePortalToken(String(cand._id));
+      const portalLink = buildPortalLink(buildOrigin(request), candidateToken);
       const emailContent = offerLetterContent({
         candidateName,
         designation: offer.designation,
         offeredCTC: Number(offer.offeredCTC),
         department: offer.department,
         joiningDate: offer.joiningDate,
+        portalLink,
       });
       await sendMail({
         to: cand.email,

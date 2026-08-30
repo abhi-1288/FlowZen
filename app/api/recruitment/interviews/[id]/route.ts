@@ -8,6 +8,7 @@ import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
 import { sendMail } from "@/lib/mailer";
 import { interviewRescheduledEmail, interviewCancelledEmail } from "@/lib/email-templates";
+import { buildOrigin, buildPortalLink, resolveCandidatePortalToken } from "@/lib/candidate-portal";
 
 type Params = { params: Promise<{ id: string }> };
 const HR_ROLES = ["admin", "human-resource"];
@@ -22,6 +23,7 @@ export async function PATCH(request: Request, { params }: Params) {
   const updates: Record<string, unknown> = {};
   if (body.scheduledAt !== undefined) updates.scheduledAt = new Date(body.scheduledAt);
   if (body.meetingLink !== undefined) updates.meetingLink = String(body.meetingLink).trim();
+  if (body.location !== undefined) updates.location = String(body.location).trim();
   if (body.status !== undefined) updates.status = body.status;
   if (body.roundType !== undefined) updates.roundType = body.roundType;
   if (body.interviewer !== undefined) updates.interviewer = body.interviewer;
@@ -40,7 +42,7 @@ export async function PATCH(request: Request, { params }: Params) {
     { new: true }
   )
     .populate("interviewer", "name email")
-    .populate("candidate", "firstName lastName email")
+    .populate("candidate", "firstName lastName email portalAccessToken")
     .populate("job", "title");
 
   if (!interview) return jsonError("Interview not found.", 404);
@@ -71,9 +73,12 @@ export async function PATCH(request: Request, { params }: Params) {
     const jobTitle = (interview.job as any)?.title ?? "Position";
     const scheduledAt = interview.scheduledAt;
     const meetingLink = interview.meetingLink || undefined;
+    const location = interview.location || undefined;
 
     if (wasCancelled) {
-      const candidateEmail = interviewCancelledEmail({ candidateName, jobTitle, roundType: interview.roundType });
+      const candidateToken = await resolveCandidatePortalToken(String((interview.candidate as any)._id));
+      const portalLink = buildPortalLink(buildOrigin(request), candidateToken);
+      const candidateEmail = interviewCancelledEmail({ candidateName, jobTitle, roundType: interview.roundType, portalLink });
       if ((interview.candidate as any)?.email) {
         await sendMail({ to: (interview.candidate as any).email, subject: candidateEmail.subject, text: "", html: candidateEmail.html });
       }
@@ -81,7 +86,9 @@ export async function PATCH(request: Request, { params }: Params) {
         await sendMail({ to: (interview.interviewer as any).email, subject: candidateEmail.subject, text: "", html: candidateEmail.html });
       }
     } else if (wasRescheduled) {
-      const email = interviewRescheduledEmail({ candidateName, jobTitle, roundType: interview.roundType, scheduledAt, meetingLink });
+      const candidateToken = await resolveCandidatePortalToken(String((interview.candidate as any)._id));
+      const portalLink = buildPortalLink(buildOrigin(request), candidateToken);
+      const email = interviewRescheduledEmail({ candidateName, jobTitle, roundType: interview.roundType, scheduledAt, meetingLink, location, portalLink });
       if ((interview.candidate as any)?.email) {
         await sendMail({ to: (interview.candidate as any).email, subject: email.subject, text: "", html: email.html });
       }

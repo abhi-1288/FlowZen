@@ -4,6 +4,8 @@ const EntryLogSchema = new Schema(
   {
     user: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
     visitorPass: { type: Schema.Types.ObjectId, ref: "VisitorPass", default: null, index: true },
+    candidate: { type: Schema.Types.ObjectId, ref: "ATSCandidate", default: null, index: true },
+    interview: { type: Schema.Types.ObjectId, ref: "ATSInterview", default: null, index: true },
     company: { type: Schema.Types.ObjectId, ref: "Company", required: true, index: true },
     type: { type: String, enum: ["entry", "exit"], required: true, index: true },
     method: { type: String, enum: ["qr-scan", "manual", "id-card"], default: "qr-scan" },

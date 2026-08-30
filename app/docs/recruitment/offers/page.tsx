@@ -186,6 +186,14 @@ export default function OffersDocsPage() {
                   <td><code>per-month</code></td>
                   <td>Monthly salary</td>
                 </tr>
+                <tr>
+                  <td><code>per-day</code></td>
+                  <td>Per-day salary</td>
+                </tr>
+                <tr>
+                  <td><code>per-hour</code></td>
+                  <td>Per-hour salary</td>
+                </tr>
               </tbody>
             </table>
           </div>

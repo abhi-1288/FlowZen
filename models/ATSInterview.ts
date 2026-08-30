@@ -28,6 +28,10 @@ const ATSInterviewSchema = new Schema(
     },
     scheduledAt: { type: Date, required: true },
     meetingLink: { type: String, default: "" },
+    location: { type: String, default: "" },
+    passCode: { type: String, default: "", index: true },
+    passValidFrom: { type: Date, default: null },
+    passValidUntil: { type: Date, default: null },
     status: {
       type: String,
       enum: ["scheduled", "completed", "cancelled", "rescheduled"],

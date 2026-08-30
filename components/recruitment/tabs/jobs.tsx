@@ -10,6 +10,7 @@ import type { EmploymentType, JobStatus, SalaryType } from "@/lib/recruitment-ty
 import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
 import { formatJobDuration } from "@/lib/format-duration";
 import { apiFetch } from "@/lib/client-utils";
+import { MarkdownTextarea } from "@/components/recruitment/markdown-textarea";
 
 export function JobsTab() {
   const router = useRouter();
@@ -132,10 +133,10 @@ export function JobsTab() {
                   <span>{job.location || "Remote"}</span>
                   <span>&middot;</span>
                   <span>{job.employmentType}</span>
-                  {formatJobDuration(job.durationMonths, job.durationDays) && (
+                  {formatJobDuration(job.durationMonths, job.durationDays, job.durationHours, job.durationYears) && (
                     <>
                       <span>&middot;</span>
-                      <span>{formatJobDuration(job.durationMonths, job.durationDays)}</span>
+                      <span>{formatJobDuration(job.durationMonths, job.durationDays, job.durationHours, job.durationYears)}</span>
                     </>
                   )}
                   {job.requiredExperienceYears != null && job.requiredExperienceYears > 0 && (
@@ -147,7 +148,7 @@ export function JobsTab() {
                   {(job.salaryRangeMin > 0 || job.salaryRangeMax > 0) && (
                     <>
                       <span>&middot;</span>
-                      <span>{CURRENCY_SYMBOLS[job.currency] || "₹"}{job.salaryRangeMin.toLocaleString()} - {CURRENCY_SYMBOLS[job.currency] || "₹"}{job.salaryRangeMax.toLocaleString()}{job.salaryType === "per-month" ? "/mo" : "/yr"}</span>
+                      <span>{CURRENCY_SYMBOLS[job.currency] || "₹"}{job.salaryRangeMin.toLocaleString()} - {CURRENCY_SYMBOLS[job.currency] || "₹"}{job.salaryRangeMax.toLocaleString()}{job.salaryType === "per-month" ? "/mo" : job.salaryType === "per-day" ? "/day" : job.salaryType === "per-hour" ? "/hr" : "/yr"}</span>
                     </>
                   )}
                   {(job as any).applicantsCount !== undefined && (
@@ -250,10 +251,28 @@ function JobModals() {
   const [regions, setRegions] = useState<string[]>([]);
   const [location, setLocation] = useState("");
   const [useOther, setUseOther] = useState(false);
+  const [durationUnit, setDurationUnit] = useState("months");
+  const [durationValue, setDurationValue] = useState("");
 
   useEffect(() => {
     setLocation(editingJob?.location || "");
     setUseOther(false);
+    if (editingJob?.durationYears) {
+      setDurationUnit("years");
+      setDurationValue(String(editingJob.durationYears));
+    } else if (editingJob?.durationMonths) {
+      setDurationUnit("months");
+      setDurationValue(String(editingJob.durationMonths));
+    } else if (editingJob?.durationDays) {
+      setDurationUnit("days");
+      setDurationValue(String(editingJob.durationDays));
+    } else if (editingJob?.durationHours) {
+      setDurationUnit("hours");
+      setDurationValue(String(editingJob.durationHours));
+    } else {
+      setDurationUnit("months");
+      setDurationValue("");
+    }
     let active = true;
     apiFetch<{ addresses: { label?: string }[]; multiOffice: boolean }>("/api/company/address")
       .then((res) => {
@@ -308,13 +327,17 @@ function JobModals() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
+    const unit = String(form.get("durationUnit") || "months");
+    const value = form.get("durationValue") ? Number(form.get("durationValue")) : null;
     const data: Record<string, unknown> = {
       title: String(form.get("title") || ""),
       department: String(form.get("department") || ""),
       location: String(form.get("location") || ""),
       employmentType: String(form.get("employmentType") || "full-time") as EmploymentType,
-      durationMonths: form.get("durationMonths") ? Number(form.get("durationMonths")) : null,
-      durationDays: form.get("durationDays") ? Number(form.get("durationDays")) : null,
+      durationMonths: unit === "months" ? value : null,
+      durationDays: unit === "days" ? value : null,
+      durationHours: unit === "hours" ? value : null,
+      durationYears: unit === "years" ? value : null,
       requiredExperienceYears: form.get("requiredExperienceYears") ? Number(form.get("requiredExperienceYears")) : null,
       atsScoreThreshold: form.get("atsScoreThreshold") ? Number(form.get("atsScoreThreshold")) : null,
       currency: String(form.get("currency") || "INR"),
@@ -409,12 +432,16 @@ function JobModals() {
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Duration (months)</span>
-              <input name="durationMonths" type="number" min="1" max="60" defaultValue={editingJob?.durationMonths || ""} placeholder="e.g. 6" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Duration (days)</span>
-              <input name="durationDays" type="number" min="0" max="365" defaultValue={editingJob?.durationDays || ""} placeholder="e.g. 15" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
+              <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Duration</span>
+              <div className="flex gap-2">
+                <select suppressHydrationWarning name="durationUnit" value={durationUnit} onChange={(e) => setDurationUnit(e.target.value)} className="w-1/3 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none dark:border-zinc-800">
+                  <option value="hours">Hours</option>
+                  <option value="days">Days</option>
+                  <option value="months">Months</option>
+                  <option value="years">Years</option>
+                </select>
+                <input name="durationValue" type="number" min="0" value={durationValue} onChange={(e) => setDurationValue(e.target.value)} placeholder="e.g. 6" className="w-2/3 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
+              </div>
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Required Experience (years)</span>
@@ -447,6 +474,8 @@ function JobModals() {
               <select suppressHydrationWarning name="salaryType" defaultValue={editingJob?.salaryType || "per-annum"} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none dark:border-zinc-800">
                 <option value="per-annum">Per Annum</option>
                 <option value="per-month">Per Month</option>
+                <option value="per-day">Per Day</option>
+                <option value="per-hour">Per Hour</option>
               </select>
             </label>
             <label className="block">
@@ -462,10 +491,10 @@ function JobModals() {
             <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Required Skills (comma separated)</span>
             <input name="requiredSkills" defaultValue={editingJob?.requiredSkills?.join(", ") || ""} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
           </label>
-          <label className="block">
+          <div>
             <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Description</span>
-            <textarea name="description" defaultValue={editingJob?.description || ""} rows={4} className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
-          </label>
+            <MarkdownTextarea name="description" defaultValue={editingJob?.description || ""} rows={5} />
+          </div>
           <button suppressHydrationWarning type="submit" disabled={saving} className="w-full rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50">
             {saving ? "Saving..." : isEdit ? "Save Changes" : "Create Job"}
           </button>

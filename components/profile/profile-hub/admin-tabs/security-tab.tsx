@@ -19,7 +19,7 @@ const SECTIONS: { key: ActiveSection; label: string }[] = [
 ];
 
 type ScanResult = {
-  type: "employee" | "visitor" | "not-found";
+  type: "employee" | "visitor" | "candidate" | "not-found";
   hasActiveEntry?: boolean;
   isProcessed?: boolean;
   data: AnyRecord | null;
@@ -109,6 +109,18 @@ type PassRecord = {
   identityCode: string;
   timeIn?: string;
   timeOut?: string;
+  kind?: "candidate" | "visitor";
+  inPremises?: boolean;
+  position?: string;
+  roundType?: string;
+  scheduledAt?: string;
+  location?: string;
+  interviewer?: string;
+  passCode?: string;
+  passValidFrom?: string;
+  passValidUntil?: string;
+  candidateId?: string;
+  interviewId?: string;
 };
 
 type EmergencyContact = {
@@ -126,6 +138,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
   const { data: session } = useSession();
   const isSenior = session?.user?.role === "admin" || session?.user?.role === "human-resource" || Boolean((session?.user as any)?.isSeniorSecurity);
   const role = String(session?.user?.role ?? "");
+  const canManageInterviewPass = role !== "employee" && (role !== "security" || isSenior);
 
   const [activeSection, setActiveSection] = useState<ActiveSection>("verify");
 
@@ -148,6 +161,8 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
   // ── Visitors ──
   const [passes, setPasses] = useState<PassRecord[]>([]);
   const [passFilter, setPassFilter] = useState("approved");
+  const [passWindowPopup, setPassWindowPopup] = useState<{ id: string; from: string; until: string } | null>(null);
+  const [savingWindow, setSavingWindow] = useState(false);
 
   // ── Entry Logs ──
   const [entryLogs, setEntryLogs] = useState<EntryLogRecord[]>([]);
@@ -337,6 +352,35 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
       setPasses(res.passes ?? []);
     } catch {
       /* ignore */
+    }
+  }
+
+  function toLocalInput(d: string): string {
+    const dt = new Date(d);
+    if (Number.isNaN(dt.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+  }
+
+  async function savePassWindow() {
+    if (!passWindowPopup) return;
+    setSavingWindow(true);
+    try {
+      await apiFetch("/api/hr/visitor/interview-pass-validity", {
+        method: "PATCH",
+        body: JSON.stringify({
+          interviewId: passWindowPopup.id,
+          validFrom: passWindowPopup.from,
+          validUntil: passWindowPopup.until,
+        }),
+      });
+      setPassWindowPopup(null);
+      showToast("Pass window updated.", "success");
+      loadPasses();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to update pass window.", "error");
+    } finally {
+      setSavingWindow(false);
     }
   }
 
@@ -627,7 +671,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
 
   function sectionLabel(s: (typeof SECTIONS)[number]) {
     let count: number | null = null;
-    if (s.key === "visitors" && passes.length) count = passes.length;
+    if (s.key === "visitors") count = passes.length;
     else if (s.key === "entry-logs" && entryLogs.length) count = entryLogs.length;
     else if (s.key === "lost-cards" && lostCards.length) count = lostCards.length;
     return count ? `${s.label} (${count})` : s.label;
@@ -650,7 +694,21 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
 
   return (
     <section className="rounded-xl neu-card p-5">
-      <SectionHeader title="Security Dashboard" description="Verify identities, manage visitors, and monitor premises." accent="indigo" />
+      <SectionHeader
+        title="Security Dashboard"
+        description="Verify identities, manage visitors, and monitor premises."
+        accent="indigo"
+        action={
+          <a
+            href="/verify-pass"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg neu-tab-raised px-3 py-1.5 text-xs font-semibold"
+          >
+            Verify Pass Page
+          </a>
+        }
+      />
       {sectionNav}
 
       {/* ═══════════════ VERIFY EMPLOYEE ═══════════════ */}
@@ -735,6 +793,47 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                             ) : null}
                           </div>
                         </div>
+                      </div>
+                      <div className="mt-4 flex gap-2">
+                        <ActionButton variant="approve" className="px-4" disabled={loggingEntry} onClick={() => logEntry("entry")}>
+                          Log Entry
+                        </ActionButton>
+                        <ActionButton variant="danger" className="px-4" disabled={loggingEntry} onClick={() => logEntry("exit")}>
+                          Log Exit
+                        </ActionButton>
+                      </div>
+                    </div>
+                  ) : scanResult.type === "candidate" ? (
+                    <div>
+                      <div>
+                        <p className="font-semibold text-slate-900">{String(scanResult.data.name ?? "")}</p>
+                        <p className="text-sm text-slate-500">{String(scanResult.data.email ?? "")}</p>
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          <span className="rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                            Interview
+                          </span>
+                          {scanResult.data.roundType ? (
+                            <span className="rounded bg-[var(--c-bg-hover)] px-2 py-0.5 text-[10px] text-slate-600">
+                              {String(scanResult.data.roundType)} · {String(scanResult.data.role ?? "Position")}
+                            </span>
+                          ) : (
+                            <span className="rounded bg-[var(--c-bg-hover)] px-2 py-0.5 text-[10px] text-slate-600">
+                              {String(scanResult.data.role ?? "Position")}
+                            </span>
+                          )}
+                        </div>
+                        {scanResult.data.scheduledAt ? (
+                          <p className="mt-1 text-xs text-slate-500">
+                            Scheduled: {new Date(String(scanResult.data.scheduledAt)).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                        ) : null}
+                        {scanResult.data.location ? (
+                          <p className="mt-1 text-xs text-slate-500">Location: {String(scanResult.data.location)}</p>
+                        ) : null}
+                        {scanResult.data.interviewer ? (
+                          <p className="mt-1 text-xs text-slate-500">Interviewer: {String(scanResult.data.interviewer)}</p>
+                        ) : null}
+                        <p className="mt-1 text-xs text-slate-400">Pass: {String(scanResult.data.passCode || "")}</p>
                       </div>
                       <div className="mt-4 flex gap-2">
                         <ActionButton variant="approve" className="px-4" disabled={loggingEntry} onClick={() => logEntry("entry")}>
@@ -887,17 +986,55 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-semibold text-slate-900">{pass.visitorName}</p>
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${pass.status === "approved" ? "bg-emerald-100 text-emerald-700" : pass.status === "pending" ? "bg-amber-100 text-amber-700" : pass.status === "active" ? "bg-blue-100 text-blue-700" : pass.status === "completed" ? "bg-[var(--c-bg-muted)] text-slate-500" : pass.status === "expired" ? "bg-[var(--c-bg-muted)] text-slate-500" : "bg-rose-100 text-rose-700"}`}>
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${pass.status === "approved" ? "bg-emerald-100 text-emerald-700" : pass.status === "pending" ? "bg-amber-100 text-amber-700" : pass.status === "active" ? "bg-blue-100 text-blue-700" : pass.status === "completed" ? "bg-[var(--c-bg-muted)] text-slate-500" : pass.status === "expired" ? "bg-[var(--c-bg-muted)] text-slate-500" : pass.status === "rejected" ? "bg-rose-100 text-rose-700" : "bg-rose-100 text-rose-700"}`}>
                           {pass.status}
                         </span>
                       </div>
                       <p className="text-xs text-slate-500">{pass.visitorEmail}</p>
-                      {pass.visitorCompany ? <p className="text-xs text-slate-400">{pass.visitorCompany}</p> : null}
-                      {pass.identityCode ? (
-                        <p className="mt-1 text-[10px] font-mono text-slate-400">Code: {pass.identityCode}</p>
-                      ) : null}
+                      {pass.kind === "candidate" ? (
+                        <>
+                          {pass.position ? <p className="text-xs text-slate-400">Position: {pass.position}</p> : null}
+                          {pass.roundType && !pass.position ? <p className="text-xs text-slate-400">Round: {pass.roundType}</p> : null}
+                          {pass.scheduledAt ? (
+                            <p className="mt-1 text-[11px] text-slate-500">
+                              {new Date(pass.scheduledAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                            </p>
+                          ) : null}
+                          {pass.location ? <p className="text-[11px] text-slate-500">Location: {pass.location}</p> : null}
+                          {pass.interviewer ? <p className="text-[11px] text-slate-400">Interviewer: {pass.interviewer}</p> : null}
+                          {pass.identityCode || pass.passCode ? (
+                            <p className="mt-1 text-[10px] font-mono text-slate-400">Pass: {pass.identityCode || pass.passCode}</p>
+                          ) : null}
+                          {canManageInterviewPass && pass.interviewId ? (
+                            <button
+                              type="button"
+                              className="mt-2 text-[11px] font-semibold text-indigo-600 hover:underline"
+                              onClick={() => setPassWindowPopup({
+                                id: String(pass.interviewId),
+                                from: toLocalInput(String(pass.passValidFrom || pass.scheduledAt || "")),
+                                until: toLocalInput(String(pass.passValidUntil || pass.scheduledAt || "")),
+                              })}
+                            >
+                              Set pass window
+                            </button>
+                          ) : null}
+                        </>
+                      ) : (
+                        <>
+                          {pass.visitorCompany ? <p className="text-xs text-slate-400">{pass.visitorCompany}</p> : null}
+                          {pass.identityCode ? (
+                            <p className="mt-1 text-[10px] font-mono text-slate-400">Code: {pass.identityCode}</p>
+                          ) : null}
+                        </>
+                      )}
                     </div>
-                    {pass.status === "active" || pass.status === "completed" ? (
+                    {pass.kind === "candidate" ? (
+                      pass.inPremises ? (
+                        <span className="px-3 py-1 text-xs text-slate-400">In Premises</span>
+                      ) : pass.status === "approved" ? (
+                        <span className="px-3 py-1 text-xs text-slate-400">Exited</span>
+                      ) : null
+                    ) : pass.status === "active" || pass.status === "completed" ? (
                       <span className="px-3 py-1 text-xs text-slate-400">{pass.status === "active" ? "In Premises" : "Exited"}</span>
                     ) : null}
                   </div>
@@ -1509,6 +1646,36 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
               </table>
             </div>
           )}
+        </div>
+      ) : null}
+
+      {/* Set Pass Window Popup */}
+      {passWindowPopup ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
+          <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl">
+            <h3 className="mb-3 text-sm font-semibold text-slate-800">Set Pass Window</h3>
+            <p className="mb-3 text-xs text-slate-500">The guest pass is valid within this window. Leave blank to fall back to interview time ± 15 min.</p>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">Valid from</label>
+            <input
+              type="datetime-local"
+              value={passWindowPopup.from}
+              onChange={(e) => setPassWindowPopup({ ...passWindowPopup, from: e.target.value })}
+              className="neu-inset mb-3 w-full rounded-md px-3 py-1.5 text-xs"
+            />
+            <label className="mb-1 block text-xs font-semibold text-slate-600">Valid until</label>
+            <input
+              type="datetime-local"
+              value={passWindowPopup.until}
+              onChange={(e) => setPassWindowPopup({ ...passWindowPopup, until: e.target.value })}
+              className="neu-inset mb-4 w-full rounded-md px-3 py-1.5 text-xs"
+            />
+            <div className="flex justify-end gap-2">
+              <ActionButton variant="secondary" onClick={() => setPassWindowPopup(null)}>Cancel</ActionButton>
+              <ActionButton variant="approve" disabled={savingWindow} onClick={savePassWindow}>
+                {savingWindow ? "Saving..." : "Save"}
+              </ActionButton>
+            </div>
+          </div>
         </div>
       ) : null}
     </section>

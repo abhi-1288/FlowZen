@@ -130,12 +130,24 @@ export async function computeSalaryBreakdown(params: {
     _id: employeeId,
     company: actorCompany,
     companyStatus: "approved",
-  }).select("_id name baseSalary companyJoined createdAt pfNumber pfDeductionAmount esicNumber esicDeductionAmount pfExempted esicExempted tdsDeductionAmount tdsExempted");
+  }).select("_id name baseSalary salaryType hourlyRate dailyRate companyJoined createdAt pfNumber pfDeductionAmount esicNumber esicDeductionAmount pfExempted esicExempted tdsDeductionAmount tdsExempted");
   if (!employee)
     return { error: "Employee not found in this company." as const };
 
+  const payBasis = String((employee as any).salaryType ?? "per-annum");
+  const hourlyRate = Math.max(0, Number((employee as any).hourlyRate ?? 0));
+  const dailyRate = Math.max(0, Number((employee as any).dailyRate ?? 0));
+
   const monthlySalary = Math.max(0, Number(employee.baseSalary ?? 0));
-  if (monthlySalary <= 0) {
+  const isRateBased = payBasis === "per-hour" || payBasis === "per-day";
+  if (isRateBased) {
+    if (payBasis === "per-hour" && hourlyRate <= 0) {
+      return { error: "Employee does not have an hourly rate assigned yet." as const };
+    }
+    if (payBasis === "per-day" && dailyRate <= 0) {
+      return { error: "Employee does not have a daily rate assigned yet." as const };
+    }
+  } else if (monthlySalary <= 0) {
     return {
       error: "Employee does not have a base salary assigned yet." as const,
     };
@@ -185,6 +197,7 @@ export async function computeSalaryBreakdown(params: {
 
   const presentDays = new Set<string>();
   const halfDayAttendance = new Set<string>();
+  let workedHours = 0;
   const companyDoc = await Company.findById(actorCompany).select("weekendDates minWorkHours");
   const minWorkHours = Math.max(1, Number((companyDoc as any)?.minWorkHours ?? 8));
   const halfDayThreshold = minWorkHours / 2;
@@ -193,6 +206,7 @@ export async function computeSalaryBreakdown(params: {
     if (record.checkIn && record.checkOut) {
       const diff = new Date(record.checkOut).getTime() - new Date(record.checkIn).getTime();
       const hours = diff / 3600000;
+      workedHours += hours;
       if (hours >= minWorkHours) {
         presentDays.add(dayKey);
       } else if (hours >= halfDayThreshold) {
@@ -285,8 +299,16 @@ export async function computeSalaryBreakdown(params: {
   );
   const totalUnpaidDays = absentDays + unpaidLeaveDays + halfDayCount * 0.5;
   const payableDays = Math.max(0, totalDays - totalUnpaidDays);
-  const leaveDeduction = roundCurrency(dailySalary * totalUnpaidDays);
-  const grossSalary = roundCurrency(dailySalary * payableDays);
+  let leaveDeduction = 0;
+  let grossSalary = 0;
+  if (payBasis === "per-hour") {
+    grossSalary = roundCurrency(hourlyRate * workedHours);
+  } else if (payBasis === "per-day") {
+    grossSalary = roundCurrency(dailyRate * payableDays);
+  } else {
+    leaveDeduction = roundCurrency(dailySalary * totalUnpaidDays);
+    grossSalary = roundCurrency(dailySalary * payableDays);
+  }
 
   const policy = await CompanyPolicy.findOne({ company: actorCompany });
   let foodDeduction = 0;
@@ -370,6 +392,10 @@ export async function computeSalaryBreakdown(params: {
       unpaidLeaveDays,
       payableDays,
       dailySalary: roundCurrency(dailySalary),
+      payBasis,
+      workedHours: Math.round(workedHours * 100) / 100,
+      hourlyRate,
+      dailyRate,
       leaveDeduction,
       pfDeduction,
       esicDeduction,

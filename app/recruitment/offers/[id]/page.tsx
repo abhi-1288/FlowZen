@@ -33,7 +33,7 @@ export default function OfferDetailPage() {
     : "Unknown";
   const jobTitle = offer.job && typeof offer.job === "object"
     ? (offer.job as any).title : "";
-  const salaryPeriodLabel = offer.salaryType === "per-month" ? "month" : "year";
+  const salaryPeriodLabel = offer.salaryType === "per-month" ? "month" : offer.salaryType === "per-day" ? "day" : offer.salaryType === "per-hour" ? "hour" : "year";
 
   return (
     <div className="p-6 max-w-2xl">

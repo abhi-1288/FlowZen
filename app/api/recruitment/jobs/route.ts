@@ -109,6 +109,8 @@ export async function POST(request: Request) {
     employmentType: body.employmentType || "full-time",
     durationMonths: body.durationMonths != null ? Number(body.durationMonths) : null,
     durationDays: body.durationDays != null ? Number(body.durationDays) : null,
+    durationHours: body.durationHours != null ? Number(body.durationHours) : null,
+    durationYears: body.durationYears != null ? Number(body.durationYears) : null,
     requiredExperienceYears: body.requiredExperienceYears != null ? Number(body.requiredExperienceYears) : null,
     atsScoreThreshold: body.atsScoreThreshold != null ? Number(body.atsScoreThreshold) : null,
     salaryRangeMin: Number(body.salaryRangeMin) || 0,

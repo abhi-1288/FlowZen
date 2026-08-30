@@ -3,15 +3,14 @@
 import { useEffect, useState } from "react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { apiFetch } from "@/lib/client-utils";
+import { InterviewLocationFields } from "@/components/recruitment/interview-location-fields";
 
 function ScheduleInterviewModal({
   candidateId,
-  assignedTeam,
   jobLocation,
   onIvChange,
 }: {
   candidateId: string;
-  assignedTeam: any[];
   jobLocation?: string;
   onIvChange: () => void;
 }) {
@@ -19,16 +18,11 @@ function ScheduleInterviewModal({
   const [pickerRole, setPickerRole] = useState("human-resource");
   const [pickerUsers, setPickerUsers] = useState<any[]>([]);
   const [pickerLoading, setPickerLoading] = useState(false);
-
-  const assignedOptions = assignedTeam.filter((a: any) => {
-    const uid = a.user?.id || a.user?._id;
-    return uid && a.status !== "completed";
-  });
+  const [meetingType, setMeetingType] = useState("online");
 
   const isRemoteJob = !!jobLocation && /^remote$/i.test(jobLocation.trim());
 
   useEffect(() => {
-    if (assignedOptions.length > 0) return;
     let active = true;
     setPickerLoading(true);
     const region =
@@ -48,7 +42,7 @@ function ScheduleInterviewModal({
     return () => {
       active = false;
     };
-  }, [assignedOptions.length, pickerRole, isRemoteJob]);
+  }, [pickerRole, isRemoteJob]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -60,6 +54,7 @@ function ScheduleInterviewModal({
       roundType: String(form.get("roundType") || "screening") as any,
       scheduledAt: String(form.get("scheduledAt") || ""),
       meetingLink: String(form.get("meetingLink") || ""),
+      location: String(form.get("location") || ""),
     });
     onIvChange();
     setModal(null);
@@ -106,70 +101,46 @@ function ScheduleInterviewModal({
             <span className="mb-1 block text-sm font-medium text-slate-700">
               Interviewer
             </span>
-            {assignedOptions.length > 0 ? (
-              <select
-                name="interviewer"
-                required
-                className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
-              >
-                <option value="">Select an interviewer...</option>
-                {assignedOptions.map((a: any) => {
-                  const uid = a.user?.id || a.user?._id;
-                  return (
-                    <option key={uid} value={uid}>
-                      {a.user.name} ({a.role} — {a.roundType})
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="block">
+                <span className="mb-1 block text-xs text-slate-500">Role</span>
+                <select
+                  value={pickerRole}
+                  onChange={(e) => setPickerRole(e.target.value)}
+                  className="neu-inset rounded-lg px-3 py-2.5 text-sm"
+                >
+                  <option value="project-manager">Project Manager</option>
+                  <option value="qa-tester">QA Tester</option>
+                  <option value="finance">Finance</option>
+                  <option value="human-resource">HR</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </label>
+              <label className="block min-w-[200px] flex-1">
+                <span className="mb-1 block text-xs text-slate-500">
+                  {pickerLoading ? "Loading interviewers..." : "Interviewer"}
+                </span>
+                <select
+                  name="interviewer"
+                  required
+                  className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
+                >
+                  <option value="">Select an interviewer...</option>
+                  {pickerUsers.length === 0 && !pickerLoading && (
+                    <option value="">No users found</option>
+                  )}
+                  {pickerUsers.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name} ({u.role})
                     </option>
-                  );
-                })}
-              </select>
-            ) : (
-              <>
-                <div className="flex flex-wrap items-end gap-3">
-                  <label className="block">
-                    <span className="mb-1 block text-xs text-slate-500">Role</span>
-                    <select
-                      value={pickerRole}
-                      onChange={(e) => setPickerRole(e.target.value)}
-                      className="neu-inset rounded-lg px-3 py-2.5 text-sm"
-                    >
-                      <option value="project-manager">Project Manager</option>
-                      <option value="qa-tester">QA Tester</option>
-                      <option value="finance">Finance</option>
-                      <option value="human-resource">HR</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                  </label>
-                  <label className="block min-w-[200px] flex-1">
-                    <span className="mb-1 block text-xs text-slate-500">
-                      {pickerLoading ? "Loading interviewers..." : "Interviewer"}
-                    </span>
-                    <select
-                      name="interviewer"
-                      required
-                      className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
-                    >
-                      <option value="">Select an interviewer...</option>
-                      {pickerUsers.length === 0 && !pickerLoading && (
-                        <option value="">No users found</option>
-                      )}
-                      {pickerUsers.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.name} ({u.role})
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <p className="mt-1 text-xs text-amber-600">
-                  No interviewer assigned yet
-                  {isRemoteJob
-                    ? " — job is remote, open to anyone"
-                    : jobLocation
-                      ? ` for region "${jobLocation}"`
-                      : ""}{" "}
-                  — pick one above.
-                </p>
-              </>
+                  ))}
+                </select>
+              </label>
+            </div>
+            {jobLocation && !isRemoteJob && (
+              <p className="mt-1 text-xs text-slate-500">
+                Interviewers shown for region "{jobLocation}".
+              </p>
             )}
           </label>
           <label className="block">
@@ -185,14 +156,32 @@ function ScheduleInterviewModal({
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">
-              Meeting Link
+              Meeting Type
             </span>
-            <input
-              name="meetingLink"
-              placeholder="https://meet.google.com/..."
+            <select
+              name="meetingType"
+              value={meetingType}
+              onChange={(e) => setMeetingType(e.target.value)}
               className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
-            />
+            >
+              <option value="online">Online (meeting link)</option>
+              <option value="in-person">In-person (location)</option>
+            </select>
           </label>
+          {meetingType === "online" ? (
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700">
+                Meeting Link
+              </span>
+              <input
+                name="meetingLink"
+                placeholder="https://meet.google.com/..."
+                className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
+              />
+            </label>
+          ) : (
+            <InterviewLocationFields jobLocation={jobLocation} />
+          )}
           <button
             type="submit"
             disabled={saving}
@@ -329,6 +318,7 @@ function EditInterviewModal({
 }) {
   const { setModal, updateInterview, saving } = useRecruitmentStore();
   const interview = candidateInterviews.find((i) => i.id === interviewId);
+  const [meetingType, setMeetingType] = useState(interview?.meetingLink ? "online" : "in-person");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -339,6 +329,8 @@ function EditInterviewModal({
     if (scheduledAt) updates.scheduledAt = scheduledAt;
     const meetingLink = String(form.get("meetingLink") || "");
     if (meetingLink) updates.meetingLink = meetingLink;
+    const location = String(form.get("location") || "");
+    if (location) updates.location = location;
     const status = String(form.get("status") || "");
     if (status) updates.status = status;
     await updateInterview(interviewId, updates);
@@ -381,14 +373,32 @@ function EditInterviewModal({
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">
-              Meeting Link
+              Meeting Type
             </span>
-            <input
-              name="meetingLink"
-              defaultValue={interview?.meetingLink || ""}
+            <select
+              name="meetingType"
+              value={meetingType}
+              onChange={(e) => setMeetingType(e.target.value)}
               className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
-            />
+            >
+              <option value="online">Online (meeting link)</option>
+              <option value="in-person">In-person (location)</option>
+            </select>
           </label>
+          {meetingType === "online" ? (
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700">
+                Meeting Link
+              </span>
+              <input
+                name="meetingLink"
+                defaultValue={interview?.meetingLink || ""}
+                className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
+              />
+            </label>
+          ) : (
+            <InterviewLocationFields jobLocation="" defaultValue={interview?.location || ""} />
+          )}
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">
               Status
@@ -417,13 +427,11 @@ function EditInterviewModal({
 
 function InterviewModals({
   candidateId,
-  assignedTeam,
   jobLocation,
   candidateInterviews,
   onIvChange,
 }: {
   candidateId: string;
-  assignedTeam: any[];
   jobLocation?: string;
   candidateInterviews: any[];
   onIvChange: () => void;
@@ -435,7 +443,6 @@ function InterviewModals({
     return (
       <ScheduleInterviewModal
         candidateId={candidateId}
-        assignedTeam={assignedTeam}
         jobLocation={jobLocation}
         onIvChange={onIvChange}
       />

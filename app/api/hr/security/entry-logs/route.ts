@@ -5,6 +5,7 @@ import { User } from "@/models/User";
 import { VisitorPass } from "@/models/VisitorPass";
 import { EntryLog } from "@/models/EntryLog";
 import { Attendance } from "@/models/Attendance";
+import { findInterviewPassByCode } from "@/lib/candidate-portal";
 
 export async function GET(request: Request) {
   const userId = await requireUserId();
@@ -55,6 +56,8 @@ export async function GET(request: Request) {
       .skip(skip)
       .limit(limit)
       .populate("user", "name email avatarUrl companyIdentityCode role")
+      .populate("candidate", "firstName lastName email")
+      .populate("interview", "roundType scheduledAt location passCode")
       .populate("recordedBy", "name")
       .lean() as Promise<Record<string, unknown>[]>,
     EntryLog.countDocuments(filter),
@@ -65,6 +68,8 @@ export async function GET(request: Request) {
       id: String(log._id),
       user: log.user,
       visitorPass: log.visitorPass,
+      candidate: log.candidate,
+      interview: log.interview,
       type: log.type,
       method: log.method,
       recordedBy: log.recordedBy,
@@ -162,6 +167,22 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true, person: String(pass.visitorName) });
+  }
+
+  // Try to find a candidate guest pass by its scannable pass code
+  const passInterview: any = await findInterviewPassByCode(actor.company, rawCode);
+  if (passInterview) {
+    const candId = String((passInterview.candidate as any)?._id);
+    await EntryLog.create({
+      candidate: candId,
+      interview: passInterview._id,
+      company: actor.company,
+      type,
+      method: "qr-scan",
+      recordedBy: userId,
+    });
+    const candidateName = `${(passInterview.candidate as any)?.firstName ?? ""} ${(passInterview.candidate as any)?.lastName ?? ""}`.trim();
+    return NextResponse.json({ success: true, person: candidateName || "Candidate" });
   }
 
   return jsonError("No match found for this code.", 404);

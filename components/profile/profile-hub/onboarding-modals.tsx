@@ -341,8 +341,18 @@ export function CompanyIconSection({
   onCropDone,
   onCropCancel,
   cropFile,
-  address,
-  onAddressChange,
+  addrLabel,
+  addrLine1,
+  addrCity,
+  addrState,
+  addrZip,
+  addrCountry,
+  onAddrLabelChange,
+  onAddrLine1Change,
+  onAddrCityChange,
+  onAddrStateChange,
+  onAddrZipChange,
+  onAddrCountryChange,
   onAddressSave,
   addressSaving,
 }: {
@@ -353,8 +363,18 @@ export function CompanyIconSection({
   onCropDone: (blob: Blob) => Promise<void>;
   onCropCancel: () => void;
   cropFile: File | null;
-  address: string;
-  onAddressChange: (v: string) => void;
+  addrLabel: string;
+  addrLine1: string;
+  addrCity: string;
+  addrState: string;
+  addrZip: string;
+  addrCountry: string;
+  onAddrLabelChange: (v: string) => void;
+  onAddrLine1Change: (v: string) => void;
+  onAddrCityChange: (v: string) => void;
+  onAddrStateChange: (v: string) => void;
+  onAddrZipChange: (v: string) => void;
+  onAddrCountryChange: (v: string) => void;
   onAddressSave: () => Promise<void>;
   addressSaving: boolean;
 }) {
@@ -384,20 +404,78 @@ export function CompanyIconSection({
         </div>
         <div className="mt-5 border-t border-[var(--c-border-light)] pt-5">
           <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">Company Address</label>
-          <textarea
-            className="neu-inset w-full rounded-lg px-3 py-2 text-sm min-h-[80px] resize-y"
-            placeholder="Enter company address"
-            value={address}
-            onChange={(e) => onAddressChange(e.target.value)}
-          />
-          <button
-            className="neu-btn neu-btn-primary mt-3 inline-flex items-center gap-1.5 rounded-lg px-5 py-2 text-sm font-medium"
-            disabled={addressSaving}
-            onClick={() => void onAddressSave()}
-            type="button"
-          >
-            {addressSaving ? "Saving..." : "Save Address"}
-          </button>
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500">Region / Office Name *</label>
+              <input
+                type="text"
+                className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
+                placeholder="e.g. Haldwani Office, North India Branch"
+                value={addrLabel}
+                onChange={(e) => onAddrLabelChange(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500">Address Line 1 *</label>
+              <input
+                type="text"
+                className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
+                placeholder="Street, building"
+                value={addrLine1}
+                onChange={(e) => onAddrLine1Change(e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-500">City</label>
+                <input
+                  type="text"
+                  className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
+                  placeholder="City"
+                  value={addrCity}
+                  onChange={(e) => onAddrCityChange(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-500">State</label>
+                <input
+                  type="text"
+                  className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
+                  placeholder="State"
+                  value={addrState}
+                  onChange={(e) => onAddrStateChange(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-500">ZIP / Postal Code</label>
+                <input
+                  type="text"
+                  className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
+                  placeholder="ZIP"
+                  value={addrZip}
+                  onChange={(e) => onAddrZipChange(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-500">Country</label>
+                <input
+                  type="text"
+                  className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
+                  placeholder="Country"
+                  value={addrCountry}
+                  onChange={(e) => onAddrCountryChange(e.target.value)}
+                />
+              </div>
+            </div>
+            <button
+              className="neu-btn neu-btn-primary mt-1 inline-flex items-center gap-1.5 rounded-lg px-5 py-2 text-sm font-medium"
+              disabled={addressSaving}
+              onClick={() => void onAddressSave()}
+              type="button"
+            >
+              {addressSaving ? "Saving..." : "Save Address"}
+            </button>
+          </div>
         </div>
       </section>
       {cropFile ? <ImageCropModal file={cropFile} aspect={1} onCancel={onCropCancel} onDone={(blob) => void onCropDone(blob)} /> : null}

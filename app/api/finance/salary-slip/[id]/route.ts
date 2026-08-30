@@ -77,7 +77,7 @@ export async function GET(request: Request, { params }: Params) {
     }
 
     const [employee, companyDoc, policy] = await Promise.all([
-      User.findById(salary.employee).select("name email role companyIdentityCode baseSalary companyJoined createdAt pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted bankAccountNumber ifscCode documents"),
+      User.findById(salary.employee).select("name email role companyIdentityCode baseSalary salaryType hourlyRate dailyRate companyJoined createdAt pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted bankAccountNumber ifscCode documents"),
       Company.findById(salary.company).select("name icon"),
       CompanyPolicy.findOne({ company: salary.company }),
     ]);
@@ -105,6 +105,9 @@ export async function GET(request: Request, { params }: Params) {
     const totalDays = inclusiveDaysBetween(effectiveStart, effectiveEnd);
     const totalDaysInMonth = new Date(year, month, 0).getDate();
     const monthlySalary = Math.max(0, Number(employee.baseSalary ?? salary.baseSalary ?? 0));
+    const payBasis = String((employee as any).salaryType ?? "per-annum");
+    const hourlyRate = Math.max(0, Number((employee as any).hourlyRate ?? 0));
+    const dailyRate = Math.max(0, Number((employee as any).dailyRate ?? 0));
     const dailySalary = monthlySalary / totalDaysInMonth;
 
     const [attendanceRecords, leaveRecords, holidays] = await Promise.all([
@@ -127,6 +130,7 @@ export async function GET(request: Request, { params }: Params) {
 
     const presentDays = new Set<string>();
     const halfDayAttendance = new Set<string>();
+    let workedHours = 0;
     const minWorkHours = Math.max(1, Number((companyDoc as any)?.minWorkHours ?? 8));
     const halfDayThreshold = minWorkHours / 2;
     for (const record of attendanceRecords as any[]) {
@@ -134,6 +138,7 @@ export async function GET(request: Request, { params }: Params) {
       if (record.checkIn && record.checkOut) {
         const diff = new Date(record.checkOut).getTime() - new Date(record.checkIn).getTime();
         const hours = diff / 3600000;
+        workedHours += hours;
         if (hours >= minWorkHours) {
           presentDays.add(dayKey);
         } else if (hours >= halfDayThreshold) {
@@ -203,8 +208,16 @@ export async function GET(request: Request, { params }: Params) {
     const unpaidLeaveDays = Array.from(unpaidLeaveMap.values()).reduce((sum, v) => sum + v, 0);
     const totalUnpaidDays = absentDays + unpaidLeaveDays + halfDayCount * 0.5;
     const payableDays = Math.max(0, totalDays - totalUnpaidDays);
-    const leaveDeduction = roundCurrency(dailySalary * totalUnpaidDays);
-    const grossSalary = roundCurrency(dailySalary * payableDays);
+    let leaveDeduction = 0;
+    let grossSalary = 0;
+    if (payBasis === "per-hour") {
+      grossSalary = roundCurrency(hourlyRate * workedHours);
+    } else if (payBasis === "per-day") {
+      grossSalary = roundCurrency(dailyRate * payableDays);
+    } else {
+      leaveDeduction = roundCurrency(dailySalary * totalUnpaidDays);
+      grossSalary = roundCurrency(dailySalary * payableDays);
+    }
 
       let foodDeduction = 0;
       let travelDeduction = 0;
@@ -319,6 +332,10 @@ export async function GET(request: Request, { params }: Params) {
         periodStart: toDateKey(effectiveStart),
         periodEnd: toDateKey(effectiveEnd),
         periodAdjusted,
+        payBasis,
+        workedHours: Math.round(workedHours * 100) / 100,
+        hourlyRate,
+        dailyRate,
         basicSalaryComponent,
         houseRentAmount,
         conveyanceAmount,

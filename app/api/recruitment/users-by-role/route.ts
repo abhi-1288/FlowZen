@@ -23,8 +23,23 @@ export async function GET(request: Request) {
     } else {
       filter.role = { $in: ALLOWED_ROLES };
     }
+
+    // Regions on user accounts are office labels, whereas a job stores a
+    // free-text location. Filter aggressively by the exact office label when it
+    // matches any user, otherwise fall back to the requesting user's own office
+    // so interviewers are never falsely hidden by a mismatched free-text string.
     if (regionFilter) {
-      filter.regionLabel = regionFilter;
+      const exact = await User.countDocuments({
+        company: currentUser.company,
+        role: filter.role,
+        regionLabel: regionFilter,
+      });
+      if (exact > 0) {
+        filter.regionLabel = regionFilter;
+      } else {
+        const myRegion = String(currentUser.regionLabel ?? "").trim();
+        if (myRegion) filter.regionLabel = myRegion;
+      }
     }
 
     const users = await User.find(filter).select("name email role").sort({ name: 1 });

@@ -64,7 +64,7 @@ export default function CandidateOfferPage() {
     ? `${(offer.candidate as any).firstName} ${(offer.candidate as any).lastName}`
     : "Unknown";
   const jobTitle = typeof offer.job === "object" ? (offer.job as any).title : "";
-  const salaryPeriodLabel = offer.salaryType === "per-month" ? "month" : "year";
+  const salaryPeriodLabel = offer.salaryType === "per-month" ? "month" : offer.salaryType === "per-day" ? "day" : offer.salaryType === "per-hour" ? "hour" : "year";
 
   return (
     <div className="p-6 max-w-2xl">

@@ -65,7 +65,7 @@ export function usePolicySettings(
       endRange: number | null;
       nextNumber: number | null;
       remaining: number | null;
-    }>("/api/hr/identity-code-settings")
+    }>("/api/hr/identity-code-settings", undefined, { toast: false })
       .then((data) => {
         setIdentityCodeDigits(data.digits);
         setIdentityCodeStartRange(data.startRange);

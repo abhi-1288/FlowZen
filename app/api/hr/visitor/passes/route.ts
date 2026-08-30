@@ -4,6 +4,8 @@ import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 import { VisitorPass } from "@/models/VisitorPass";
+import { ATSInterview } from "@/models/ATSInterview";
+import { EntryLog } from "@/models/EntryLog";
 import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
 
@@ -42,7 +44,97 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({ passes });
+  // Today's in-person candidate interviews also count as visitors for the day.
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date(todayStart.getTime() + 86400000);
+
+  const interviews = await ATSInterview.find({
+    company: actor.company,
+    status: { $in: ["scheduled", "cancelled", "completed"] },
+    location: { $ne: "" },
+    scheduledAt: { $gte: todayStart, $lt: todayEnd },
+  })
+    .sort({ scheduledAt: 1 })
+    .populate("candidate", "firstName lastName email")
+    .populate("job", "title")
+    .populate("interviewer", "name")
+    .lean() as Record<string, unknown>[];
+
+  const candidateIds = interviews
+    .map((i) => (i.candidate as any)?._id)
+    .filter(Boolean)
+    .map(String);
+
+  const todayLogs = (candidateIds.length
+    ? await EntryLog.find({
+        company: actor.company,
+        candidate: { $in: candidateIds },
+        timestamp: { $gte: todayStart, $lt: todayEnd },
+      }).lean()
+    : []
+  ) as Record<string, unknown>[];
+
+  const logsByCandidate = new Map<string, Record<string, unknown>[]>();
+  for (const log of todayLogs) {
+    const cid = String(log.candidate);
+    const arr = logsByCandidate.get(cid) ?? [];
+    arr.push(log);
+    logsByCandidate.set(cid, arr);
+  }
+
+  const candidatePasses = interviews.map((i) => {
+    const candId = String((i.candidate as any)?._id);
+    const logs = (logsByCandidate.get(candId) ?? []).sort(
+      (a, b) => new Date(String(a.timestamp)).getTime() - new Date(String(b.timestamp)).getTime()
+    );
+    const entryTimes = logs.filter((l) => l.type === "entry");
+    const exitTimes = logs.filter((l) => l.type === "exit");
+    const lastEntryAt = entryTimes.length ? new Date(String(entryTimes[entryTimes.length - 1].timestamp)).getTime() : null;
+    const lastExitAt = exitTimes.length ? new Date(String(exitTimes[exitTimes.length - 1].timestamp)).getTime() : null;
+    const scanned = lastEntryAt !== null;
+    const inPremises = scanned && (lastExitAt === null || lastExitAt < lastEntryAt);
+
+    const scheduledAt = new Date(String(i.scheduledAt));
+    const passValidFrom = i.passValidFrom
+      ? new Date(String(i.passValidFrom))
+      : new Date(scheduledAt.getTime() - 15 * 60 * 1000);
+    const passValidUntil = i.passValidUntil
+      ? new Date(String(i.passValidUntil))
+      : new Date(scheduledAt.getTime() + 15 * 60 * 1000);
+
+    let status: string;
+    if (String(i.status) === "cancelled") status = "rejected";
+    else if (scanned) status = "approved";
+    else if (now.getTime() > passValidUntil.getTime()) status = "expired";
+    else status = "pending";
+
+    return {
+      _id: i._id,
+      id: String(i._id),
+      kind: "candidate",
+      visitorName: `${(i.candidate as any)?.firstName ?? ""} ${(i.candidate as any)?.lastName ?? ""}`.trim(),
+      visitorEmail: (i.candidate as any)?.email ?? "",
+      visitorCompany: (i.job as any)?.title ?? "Position",
+      purpose: "Interview",
+      hostName: "FlowZen HR",
+      identityCode: String(i.passCode || ""),
+      passCode: String(i.passCode || ""),
+      status,
+      inPremises,
+      position: (i.job as any)?.title ?? "Position",
+      roundType: i.roundType,
+      scheduledAt: i.scheduledAt,
+      location: i.location,
+      interviewer: (i.interviewer as any)?.name ?? "",
+      passValidFrom: i.passValidFrom || passValidFrom,
+      passValidUntil: i.passValidUntil || passValidUntil,
+      candidateId: candId,
+      interviewId: String(i._id),
+    };
+  });
+
+  return NextResponse.json({ passes: [...candidatePasses, ...passes] });
 }
 
 export async function POST(request: Request) {

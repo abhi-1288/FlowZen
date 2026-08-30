@@ -36,6 +36,20 @@ type DashboardTabProps = {
   showToast: (text: string, type?: "success" | "error") => void;
 };
 
+function formatDurationText(profile: AnyRecord | null): string {
+  if (!profile) return "";
+  const years = Number(profile.durationYears ?? 0);
+  const months = Number(profile.durationMonths ?? 0);
+  const days = Number(profile.durationDays ?? 0);
+  const hours = Number(profile.durationHours ?? 0);
+  const parts: string[] = [];
+  if (years > 0) parts.push(`${years} yr${years === 1 ? "" : "s"}`);
+  if (months > 0) parts.push(`${months} mo${months === 1 ? "" : "s"}`);
+  if (days > 0) parts.push(`${days} day${days === 1 ? "" : "s"}`);
+  if (hours > 0) parts.push(`${hours} hr${hours === 1 ? "" : "s"}`);
+  return parts.join(" ");
+}
+
 export function DashboardTab({
   profile,
   insights,
@@ -152,7 +166,7 @@ export function DashboardTab({
 
   useEffect(() => {
     if (!["human-resource", "admin"].includes(role)) return;
-    apiFetch<{ remaining: number | null; endRange: number | null; nextNumber: number | null }>("/api/hr/identity-code-settings")
+    apiFetch<{ remaining: number | null; endRange: number | null; nextNumber: number | null }>("/api/hr/identity-code-settings", undefined, { toast: false })
       .then((data) => {
         setIdentityCodeRemaining(data.remaining);
         setIdentityCodeEndRange(data.endRange);
@@ -632,6 +646,16 @@ export function DashboardTab({
               </p>
               <p className="text-xs text-slate-500">Today's Attendance</p>
             </div>
+            {profile && Boolean(profile.employmentType) && (
+              <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
+                <p className="text-sm font-bold capitalize text-slate-900">
+                  {String(profile.employmentType).replace(/-/g, " ")}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {formatDurationText(profile) || "—"}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       ) : null}

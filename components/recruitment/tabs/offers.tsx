@@ -116,7 +116,7 @@ export function OffersTab() {
                         const candidateName = offer.candidate && typeof offer.candidate === "object"
                           ? `${(offer.candidate as any).firstName} ${(offer.candidate as any).lastName}`
                           : "Unknown";
-                        const salaryPeriodLabel = offer.salaryType === "per-month" ? "mo" : "yr";
+                        const salaryPeriodLabel = offer.salaryType === "per-month" ? "mo" : offer.salaryType === "per-day" ? "day" : offer.salaryType === "per-hour" ? "hr" : "yr";
 
                         return (
                           <div key={offer.id} className="flex items-center justify-between border-t border-slate-50 px-4 py-3 first:border-t-0 hover:bg-slate-50 transition">

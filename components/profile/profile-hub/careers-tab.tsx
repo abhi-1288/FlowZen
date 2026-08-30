@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client-utils";
 import { Eye, Share2, Check } from "lucide-react";
+import { stripMarkdown } from "@/components/recruitment/job-description";
 
 type CareerJob = {
   id: string;
@@ -89,7 +90,7 @@ export function CareersTab() {
                 </div>
               )}
               {job.description && (
-                <p className="mt-2 line-clamp-2 text-sm text-slate-600">{job.description}</p>
+                <p className="mt-2 line-clamp-2 text-sm text-slate-600">{stripMarkdown(job.description)}</p>
               )}
               {job.autoCloseDate && (
                 <p className="mt-2 text-xs text-slate-400">

@@ -13,7 +13,7 @@ export async function GET(
   await autoCloseOverdueJobs();
   const { id } = await params;
 
-  const job = await ATSJob.findOne({ _id: id, status: "open" }).populate("company", "name icon");
+  const job = await ATSJob.findOne({ _id: id, status: "open" }).populate("company", "name icon primaryColor");
   if (!job) return jsonError("Job not found.", 404);
 
   return NextResponse.json({ job: serializeDoc(job) });

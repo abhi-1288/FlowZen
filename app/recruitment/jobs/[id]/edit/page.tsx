@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
+import { MarkdownTextarea } from "@/components/recruitment/markdown-textarea";
 
 export default function EditJobPage() {
   const params = useParams()!;
@@ -23,8 +24,8 @@ export default function EditJobPage() {
   const [description, setDescription] = useState("");
   const [requiredSkills, setRequiredSkills] = useState("");
   const [status, setStatus] = useState("draft");
-  const [durationMonths, setDurationMonths] = useState("");
-  const [durationDays, setDurationDays] = useState("");
+  const [durationUnit, setDurationUnit] = useState("months");
+  const [durationValue, setDurationValue] = useState("");
   const [requiredExperienceYears, setRequiredExperienceYears] = useState("");
   const [atsScoreThreshold, setAtsScoreThreshold] = useState("");
 
@@ -43,8 +44,22 @@ export default function EditJobPage() {
       setDescription(activeJob.description);
       setRequiredSkills(activeJob.requiredSkills.join(", "));
       setStatus(activeJob.status);
-      setDurationMonths(activeJob.durationMonths ? String(activeJob.durationMonths) : "");
-      setDurationDays(activeJob.durationDays ? String(activeJob.durationDays) : "");
+      if (activeJob.durationYears) {
+        setDurationUnit("years");
+        setDurationValue(String(activeJob.durationYears));
+      } else if (activeJob.durationMonths) {
+        setDurationUnit("months");
+        setDurationValue(String(activeJob.durationMonths));
+      } else if (activeJob.durationDays) {
+        setDurationUnit("days");
+        setDurationValue(String(activeJob.durationDays));
+      } else if (activeJob.durationHours) {
+        setDurationUnit("hours");
+        setDurationValue(String(activeJob.durationHours));
+      } else {
+        setDurationUnit("months");
+        setDurationValue("");
+      }
       setRequiredExperienceYears(activeJob.requiredExperienceYears ? String(activeJob.requiredExperienceYears) : "");
       setAtsScoreThreshold(activeJob.atsScoreThreshold ? String(activeJob.atsScoreThreshold) : "");
     }
@@ -55,8 +70,10 @@ export default function EditJobPage() {
     if (saving) return;
     await updateJob(id, {
       title, department, location, employmentType: employmentType as any,
-      durationMonths: durationMonths ? Number(durationMonths) : null,
-      durationDays: durationDays ? Number(durationDays) : null,
+      durationMonths: durationUnit === "months" ? (durationValue ? Number(durationValue) : null) : null,
+      durationDays: durationUnit === "days" ? (durationValue ? Number(durationValue) : null) : null,
+      durationHours: durationUnit === "hours" ? (durationValue ? Number(durationValue) : null) : null,
+      durationYears: durationUnit === "years" ? (durationValue ? Number(durationValue) : null) : null,
       requiredExperienceYears: requiredExperienceYears ? Number(requiredExperienceYears) : null,
       atsScoreThreshold: atsScoreThreshold ? Number(atsScoreThreshold) : null,
       salaryRangeMin: Number(salaryRangeMin), salaryRangeMax: Number(salaryRangeMax), currency,
@@ -99,12 +116,16 @@ export default function EditJobPage() {
           {employmentType !== "full-time" && (
             <>
               <label className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">Duration (months)</span>
-                <input value={durationMonths} onChange={(e) => setDurationMonths(e.target.value)} type="number" min="1" max="60" placeholder="e.g. 6" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">Duration (days)</span>
-                <input value={durationDays} onChange={(e) => setDurationDays(e.target.value)} type="number" min="0" max="365" placeholder="e.g. 15" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
+                <span className="mb-1 block text-sm font-medium text-slate-700">Duration</span>
+                <div className="flex gap-2">
+                  <select value={durationUnit} onChange={(e) => setDurationUnit(e.target.value)} className="neu-inset w-1/3 rounded-lg px-3 py-2.5 text-sm">
+                    <option value="hours">Hours</option>
+                    <option value="days">Days</option>
+                    <option value="months">Months</option>
+                    <option value="years">Years</option>
+                  </select>
+                  <input value={durationValue} onChange={(e) => setDurationValue(e.target.value)} type="number" min="0" placeholder="e.g. 6" className="neu-inset w-2/3 rounded-lg px-3 py-2.5 text-sm" />
+                </div>
               </label>
             </>
           )}
@@ -155,10 +176,10 @@ export default function EditJobPage() {
           <span className="mb-1 block text-sm font-medium text-slate-700">Required Skills (comma separated)</span>
           <input value={requiredSkills} onChange={(e) => setRequiredSkills(e.target.value)} className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
         </label>
-        <label className="block">
+        <div>
           <span className="mb-1 block text-sm font-medium text-slate-700">Description</span>
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className="neu-inset w-full resize-y rounded-lg px-3 py-2.5 text-sm" />
-        </label>
+          <MarkdownTextarea value={description} onChange={setDescription} rows={5} />
+        </div>
         <button type="submit" disabled={saving} className="neu-btn neu-btn-primary rounded-full px-6 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60">Save Changes</button>
       </form>
     </div>

@@ -32,7 +32,7 @@ export async function POST(request: Request, { params }: Params) {
   if (!hrUser || (!HR_ROLES.includes(hrUser.role) && !isSeniorSecurity)) return jsonError("Forbidden", 403);
   if (!hrUser.company) return jsonError("No company found.", 400);
 
-  const candidate = await ATSCandidate.findOne({ _id: id, company: hrUser.company }).populate("job", "title department employmentType durationMonths");
+  const candidate = await ATSCandidate.findOne({ _id: id, company: hrUser.company }).populate("job", "title department employmentType durationMonths durationDays durationHours durationYears");
   if (!candidate) return jsonError("Candidate not found.", 404);
   if (candidate.stage !== "joined") return jsonError("Candidate must be in 'Joined' stage to convert.", 400);
 
@@ -56,6 +56,8 @@ export async function POST(request: Request, { params }: Params) {
   const jobEmploymentType = String(job?.employmentType ?? "");
   const jobDurationMonths = job?.durationMonths ?? null;
   const jobDurationDays = job?.durationDays ?? null;
+  const jobDurationHours = job?.durationHours ?? null;
+  const jobDurationYears = job?.durationYears ?? null;
 
   const acceptedOffer = await ATSOffer.findOne({
     candidate: candidate._id,
@@ -63,13 +65,20 @@ export async function POST(request: Request, { params }: Params) {
   }).select("offeredCTC salaryType joiningDate");
 
   const offerJoiningDate = (acceptedOffer as any)?.joiningDate || null;
+  const offerSalaryType = String((acceptedOffer as any)?.salaryType ?? "per-annum");
+  const offerCTC = Number((acceptedOffer as any)?.offeredCTC ?? 0);
+  const payBasis = ["per-annum", "per-month", "per-day", "per-hour"].includes(offerSalaryType)
+    ? offerSalaryType
+    : "per-annum";
 
   const joiningDate = offerJoiningDate ? new Date(offerJoiningDate) : new Date();
   let employmentEndDate: Date | null = null;
-  if ((jobDurationMonths || jobDurationDays) && ["internship", "contract", "part-time"].includes(jobEmploymentType)) {
+  if ((jobDurationMonths || jobDurationDays || jobDurationHours || jobDurationYears) && ["internship", "contract", "part-time"].includes(jobEmploymentType)) {
     employmentEndDate = new Date(joiningDate);
+    if (jobDurationYears) employmentEndDate.setFullYear(employmentEndDate.getFullYear() + jobDurationYears);
     if (jobDurationMonths) employmentEndDate.setMonth(employmentEndDate.getMonth() + jobDurationMonths);
     if (jobDurationDays) employmentEndDate.setDate(employmentEndDate.getDate() + jobDurationDays);
+    if (jobDurationHours) employmentEndDate.setHours(employmentEndDate.getHours() + jobDurationHours);
   }
 
   const employee = await User.create({
@@ -90,6 +99,11 @@ export async function POST(request: Request, { params }: Params) {
     employmentType: jobEmploymentType,
     durationMonths: jobDurationMonths,
     durationDays: jobDurationDays,
+    durationHours: jobDurationHours,
+    durationYears: jobDurationYears,
+    salaryType: payBasis,
+    hourlyRate: payBasis === "per-hour" ? offerCTC : 0,
+    dailyRate: payBasis === "per-day" ? offerCTC : 0,
   });
 
   const loginUrl = `${process.env.NODE_ENV === "development" ? request.headers.get("origin") || (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000") : process.env.NEXT_PUBLIC_APP_URL}/login`;

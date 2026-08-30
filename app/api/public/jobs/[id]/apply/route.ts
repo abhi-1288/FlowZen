@@ -170,6 +170,7 @@ export async function POST(
   await ATSCandidate.findByIdAndUpdate(candidate._id, {
     magicTokenHash: tokenHash,
     magicTokenExpiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+    portalAccessToken: token,
   });
 
   const origin =

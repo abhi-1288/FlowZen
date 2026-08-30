@@ -76,12 +76,31 @@ export function OnboardingTab({
   const [companyIconDeleteModal, setCompanyIconDeleteModal] = useState(false);
   const [deletingCompanyIcon, setDeletingCompanyIcon] = useState(false);
   const [companyIconCropFile, setCompanyIconCropFile] = useState<File | null>(null);
-  const [companyAddress, setCompanyAddress] = useState("");
   const [addressSaving, setAddressSaving] = useState(false);
+  const [addrLabel, setAddrLabel] = useState("");
+  const [addrLine1, setAddrLine1] = useState("");
+  const [addrCity, setAddrCity] = useState("");
+  const [addrState, setAddrState] = useState("");
+  const [addrZip, setAddrZip] = useState("");
+  const [addrCountry, setAddrCountry] = useState("");
 
   useEffect(() => {
-    if (company?.address) setCompanyAddress(String(company.address));
-  }, [company?.address]);
+    const addresses = Array.isArray((company as AnyRecord | null)?.addresses) ? (company?.addresses as AnyRecord[]) : [];
+    const main = addresses.find((a) => Boolean(a.isMain)) || addresses[0];
+    if (main) {
+      setAddrLabel(String(main.label ?? ""));
+      setAddrLine1(String(main.line1 ?? ""));
+      setAddrCity(String(main.city ?? ""));
+      setAddrState(String(main.state ?? ""));
+      setAddrZip(String(main.zip ?? ""));
+      setAddrCountry(String(main.country ?? ""));
+    } else if (company?.address) {
+      const legacy = String(company.address);
+      const parts = legacy.split(",").map((s) => s.trim()).filter(Boolean);
+      setAddrLabel(parts[0] ?? "");
+      setAddrLine1(parts[1] ?? "");
+    }
+  }, [company?.addresses, company?.address]);
   const createdTeamsCount = Number(managerInsight?.createdTeamsCount ?? managerTeams.length);
   const teamLimit = role === "human-resource" ? 2 : role === "admin" ? 10 : 5;
   const canCreateMoreTeams = createdTeamsCount < teamLimit;
@@ -159,9 +178,19 @@ export function OnboardingTab({
   async function saveCompanyAddress() {
     try {
       setAddressSaving(true);
+      const label = addrLabel.trim() || "Main Office";
+      const line1 = addrLine1.trim();
       await apiFetch("/api/company/address", {
         method: "PATCH",
-        body: JSON.stringify({ address: companyAddress }),
+        body: JSON.stringify({
+          mode: "set-main-address",
+          label,
+          line1,
+          city: addrCity,
+          state: addrState,
+          zip: addrZip,
+          country: addrCountry,
+        }),
       });
       showToast("Company address updated.");
       await refresh(true);
@@ -323,7 +352,9 @@ export function OnboardingTab({
             />
             <CompanyIconSection company={company} uploading={companyIconUploading} onUpload={() => {}} onDelete={() => setCompanyIconDeleteModal(true)}
               onCropDone={(blob) => { const file = new File([blob], "icon.png"); setCompanyIconCropFile(file); return Promise.resolve(); }} onCropCancel={() => setCompanyIconCropFile(null)} cropFile={companyIconCropFile}
-              address={companyAddress} onAddressChange={setCompanyAddress} onAddressSave={saveCompanyAddress} addressSaving={addressSaving}
+              addrLabel={addrLabel} addrLine1={addrLine1} addrCity={addrCity} addrState={addrState} addrZip={addrZip} addrCountry={addrCountry}
+              onAddrLabelChange={setAddrLabel} onAddrLine1Change={setAddrLine1} onAddrCityChange={setAddrCity} onAddrStateChange={setAddrState} onAddrZipChange={setAddrZip} onAddrCountryChange={setAddrCountry}
+              onAddressSave={saveCompanyAddress} addressSaving={addressSaving}
             />
           </>
         ) : (

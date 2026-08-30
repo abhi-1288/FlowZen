@@ -236,18 +236,25 @@ export async function PATCH(request: Request, { params }: Params) {
       requester.companyStatus = status;
       if (status === "approved") {
         let salaryAmount = Math.max(0, Number(body.salaryAmount ?? 0));
+        const joinMeta = (joinRequest.metadata ?? {}) as Record<string, unknown>;
+        let payBasis = "per-annum";
         if (salaryAmount === 0) {
-          const meta = (joinRequest.metadata ?? {}) as Record<string, unknown>;
-          const offeredCTC = Number(meta.offeredCTC ?? 0);
+          const offeredCTC = Number(joinMeta.offeredCTC ?? 0);
           if (offeredCTC > 0) {
-            const salaryType = String(meta.salaryType ?? "per-annum");
-            salaryAmount = salaryType === "per-annum" ? Math.round(offeredCTC / 12) : offeredCTC;
+            const salaryType = String(joinMeta.salaryType ?? "per-annum");
+            payBasis = ["per-annum", "per-month", "per-day", "per-hour"].includes(salaryType)
+              ? salaryType
+              : "per-annum";
+            salaryAmount = payBasis === "per-annum" ? Math.round(offeredCTC / 12) : offeredCTC;
           }
         }
         await cleanupQuitterBoardAssignments(requester._id);
         requester.company = joinRequest.company;
         requester.companyJoined = new Date();
-        requester.baseSalary = salaryAmount;
+        requester.salaryType = payBasis;
+        requester.hourlyRate = payBasis === "per-hour" ? Math.max(0, Number(salaryAmount ?? joinMeta.offeredCTC ?? 0)) : 0;
+        requester.dailyRate = payBasis === "per-day" ? Math.max(0, Number(salaryAmount ?? joinMeta.offeredCTC ?? 0)) : 0;
+        requester.baseSalary = payBasis === "per-day" || payBasis === "per-hour" ? 0 : salaryAmount;
         if (salaryCurrency) requester.salaryCurrency = salaryCurrency;
         if (salaryAmount > 0) {
           if (!Array.isArray(requester.salaryHistory)) requester.salaryHistory = [];

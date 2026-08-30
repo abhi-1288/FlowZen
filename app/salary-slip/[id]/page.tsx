@@ -58,6 +58,10 @@ type SlipData = {
     conveyanceAmount?: number;
     medicalAmount?: number;
     specialAllowanceAmount?: number;
+    payBasis?: string;
+    workedHours?: number;
+    hourlyRate?: number;
+    dailyRate?: number;
   };
 };
 
@@ -197,7 +201,37 @@ export default function SalarySlipPage() {
             <div className="rounded-lg border border-slate-200 p-4">
               <h2 className="mb-2 text-xs font-semibold uppercase text-emerald-600">Earnings</h2>
               <div className="space-y-1.5 text-sm">
-                {breakdown.basicSalaryComponent !== undefined ? (
+                {breakdown.payBasis === "per-hour" ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Hours Worked</span>
+                      <span className="font-medium text-slate-900">{breakdown.workedHours ?? 0} hrs</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Hourly Rate</span>
+                      <span className="font-medium text-slate-900">{formatINR(breakdown.hourlyRate ?? 0)}/hr</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Gross Pay (hr × rate)</span>
+                      <span className="font-medium text-slate-900">{formatINR(breakdown.grossSalary)}</span>
+                    </div>
+                  </>
+                ) : breakdown.payBasis === "per-day" ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Payable Days</span>
+                      <span className="font-medium text-slate-900">{breakdown.payableDays} days</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Daily Rate</span>
+                      <span className="font-medium text-slate-900">{formatINR(breakdown.dailyRate ?? 0)}/day</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Gross Pay (days × rate)</span>
+                      <span className="font-medium text-slate-900">{formatINR(breakdown.grossSalary)}</span>
+                    </div>
+                  </>
+                ) : breakdown.basicSalaryComponent !== undefined ? (
                   <>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Basic Salary</span>

@@ -130,7 +130,7 @@ export default function JobsDocsPage() {
                   <td><code>salaryType</code></td>
                   <td>string</td>
                   <td><span className="badge-optional">Optional</span></td>
-                  <td>Salary type (per-annum/per-month)</td>
+                  <td>Salary type (per-annum/per-month/per-day/per-hour)</td>
                 </tr>
                 <tr>
                   <td><code>currency</code></td>

@@ -1,13 +1,12 @@
-import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
-import { ATSCandidate } from "@/models/ATSCandidate";
 import { ATSOffer } from "@/models/ATSOffer";
 import { ATSTimeline } from "@/models/ATSTimeline";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { jsonError, serializeDoc } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
+import { findCandidateByToken } from "@/lib/candidate-portal";
 
 export async function PATCH(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -20,15 +19,9 @@ export async function PATCH(request: Request) {
     return jsonError("action must be 'accept' or 'reject'.", 400);
   }
 
-  const hash = createHash("sha256").update(token).digest("hex");
-
   await connectDb();
 
-  const candidate = await ATSCandidate.findOne({
-    magicTokenHash: hash,
-    magicTokenExpiresAt: { $gt: new Date() },
-  });
-
+  const candidate = await findCandidateByToken(token);
   if (!candidate) return jsonError("Invalid or expired link.", 401);
 
   const offer = await ATSOffer.findOne({ candidate: candidate._id, company: candidate.company })

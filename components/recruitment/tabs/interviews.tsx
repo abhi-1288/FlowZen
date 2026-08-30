@@ -167,7 +167,6 @@ export function InterviewsTab() {
 
       <InterviewModals
         candidateId=""
-        assignedTeam={[]}
         candidateInterviews={interviews}
         onIvChange={() => load(page, statusFilter)}
       />

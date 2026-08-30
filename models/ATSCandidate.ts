@@ -57,6 +57,9 @@ const ATSCandidateSchema = new Schema(
     atsScoredAt: { type: Date, default: null },
     magicTokenHash: { type: String, default: "", select: false },
     magicTokenExpiresAt: { type: Date, default: null },
+    portalTokenHash: { type: String, default: "", select: false },
+    portalTokenExpiresAt: { type: Date, default: null },
+    portalAccessToken: { type: String, default: "" },
   },
   { timestamps: true }
 );

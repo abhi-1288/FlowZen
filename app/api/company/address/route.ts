@@ -114,6 +114,30 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ requestId: String(joinRequest._id), status: "submitted" });
   }
 
+  // Owner/admin directly setting the primary (main) office address from onboarding
+  if (body.mode === "set-main-address") {
+    const label = String(body.label ?? "").trim() || "Main Office";
+    const line1 = String(body.line1 ?? "").trim();
+    const city = String(body.city ?? "").trim();
+    const state = String(body.state ?? "").trim();
+    const zip = String(body.zip ?? "").trim();
+    const country = String(body.country ?? "").trim();
+
+    const mainEntry = {
+      label,
+      line1,
+      city,
+      state,
+      zip,
+      country,
+      isMain: true,
+    };
+
+    company.addresses = [mainEntry];
+    const composed = [label, line1, city, state, zip, country].filter(Boolean).join(", ");
+    company.address = composed;
+  }
+
   if (body.address !== undefined) {
     const address = String(body.address ?? "").trim();
     if (address.length > 500) return jsonError("Address must be 500 characters or less.");

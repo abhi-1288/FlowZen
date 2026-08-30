@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Briefcase, Building2, MapPin } from "lucide-react";
 import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
 import { formatJobDuration } from "@/lib/format-duration";
+import { stripMarkdown } from "@/components/recruitment/job-description";
 
 type CompanyInfo = {
   id: string;
@@ -20,6 +21,8 @@ type JobInfo = {
   employmentType: string;
   durationMonths: number | null;
   durationDays: number | null;
+  durationHours: number | null;
+  durationYears: number | null;
   requiredExperienceYears: number | null;
   salaryRangeMin: number;
   salaryRangeMax: number;
@@ -127,7 +130,7 @@ export default function CareersPage() {
                           {job.title}
                         </h3>
                         <span className="shrink-0 rounded-full bg-[var(--c-bg-muted)] dark:bg-zinc-700 px-3 py-1 text-xs font-medium text-slate-600 dark:text-zinc-400">
-                          {job.employmentType}{formatJobDuration(job.durationMonths, job.durationDays) ? ` · ${formatJobDuration(job.durationMonths, job.durationDays)}` : ""}
+                          {job.employmentType}{formatJobDuration(job.durationMonths, job.durationDays, job.durationHours, job.durationYears) ? ` · ${formatJobDuration(job.durationMonths, job.durationDays, job.durationHours, job.durationYears)}` : ""}
                         </span>
                       </div>
                       <div className="mt-3.5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-500 dark:text-zinc-400">
@@ -168,7 +171,7 @@ export default function CareersPage() {
                         </div>
                       )}
                       {job.description && (
-                        <p className="mt-4 line-clamp-2 text-sm leading-relaxed text-slate-500 dark:text-zinc-400">{job.description}</p>
+                        <p className="mt-4 line-clamp-2 text-sm leading-relaxed text-slate-500 dark:text-zinc-400">{stripMarkdown(job.description)}</p>
                       )}
                       {job.autoCloseDate && (
                         <p className="mt-3 text-xs text-slate-400 dark:text-zinc-500">

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
+import { JobDescription } from "@/components/recruitment/job-description";
 
 export default function JobDescriptionModal() {
   const { modal, setModal, fetchJob, activeJob } = useRecruitmentStore();
@@ -102,9 +103,7 @@ export default function JobDescriptionModal() {
                     <p className="mb-1 text-xs font-medium uppercase tracking-wider text-slate-400">
                       Description
                     </p>
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
-                      {job.description}
-                    </p>
+                    <JobDescription content={job.description} />
                   </div>
                 )}
 

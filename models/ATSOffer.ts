@@ -7,7 +7,7 @@ const ATSOfferSchema = new Schema(
     offeredCTC: { type: Number, required: true },
     salaryType: {
       type: String,
-      enum: ["per-annum", "per-month"],
+      enum: ["per-annum", "per-month", "per-day", "per-hour"],
       default: "per-annum",
     },
     pfAmount: { type: Number, default: 0 },

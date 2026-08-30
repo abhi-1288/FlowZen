@@ -9,7 +9,7 @@ export async function GET() {
   await autoCloseOverdueJobs();
 
   const jobs = await ATSJob.find({ status: "open" })
-    .populate("company", "name icon")
+    .populate("company", "name icon primaryColor")
     .sort({ createdAt: -1 });
 
   const grouped: Record<string, { company: any; jobs: any[] }> = {};

@@ -9,6 +9,8 @@ import { useShallow } from "zustand/react/shallow";
 import { apiFetch } from "@/lib/client-utils";
 import { CURRENCY_SYMBOLS, STAGES, STAGE_LABELS, type Stage, type Source, type JobStatus } from "@/lib/recruitment-types";
 import { formatJobDuration } from "@/lib/format-duration";
+import { JobDescription } from "@/components/recruitment/job-description";
+import { InterviewLocationFields } from "@/components/recruitment/interview-location-fields";
 
 export default function JobDetailPage() {
   const params = useParams()!;
@@ -28,7 +30,9 @@ export default function JobDetailPage() {
   const [atsResultData, setAtsResultData] = useState<{ scored: number; selected: number; rejected: number; errors: number; total: number } | null>(null);
   const [atsLastResult, setAtsLastResult] = useState<{ scored: number; selected: number; rejected: number; errors: number; total: number } | null>(null);
   const [atsDecisionPending, setAtsDecisionPending] = useState(false);
-  const [atsAction, setAtsAction] = useState<"continue" | "reject">("continue");
+  const [atsAction, setAtsAction] = useState<"auto" | "manual">("auto");
+  const [atsApplied, setAtsApplied] = useState<{ moved: number; advanced: number } | null>(null);
+  const [bulkIvOpen, setBulkIvOpen] = useState(false);
 
   async function handleRunAts(force: boolean) {
     if (!activeJob) return;
@@ -45,12 +49,13 @@ export default function JobDetailPage() {
   async function proceedScan(force: boolean) {
     setAtsLoading(true);
     setAtsResultData(null);
+    setAtsApplied(null);
     try {
       const result = await apiFetch<{ scored: number; selected: number; rejected: number; errors: number; total: number }>(`/api/recruitment/jobs/${id}/ats-score`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ force }) });
       setAtsResultData(result);
       setAtsLastResult(result);
       setAtsDecisionPending(true);
-      setAtsAction("continue");
+      setAtsAction("auto");
       void fetchCandidates({ jobId: id });
     } catch {
       setAtsResultData(null);
@@ -113,9 +118,9 @@ export default function JobDetailPage() {
             <h1 className="text-2xl font-semibold text-slate-900">{activeJob.title}</h1>
             <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${ activeJob.status === "open" ? "bg-emerald-50 text-emerald-700" : activeJob.status === "draft" ? "bg-amber-50 text-amber-700" : "bg-[var(--c-bg-muted)] text-slate-600" }`}>{activeJob.status}</span>
           </div>
-          <p className="mt-1 text-sm text-slate-500">{activeJob.department} &middot; {activeJob.location || "Remote"} &middot; {activeJob.employmentType}{formatJobDuration(activeJob.durationMonths, activeJob.durationDays) ? ` · ${formatJobDuration(activeJob.durationMonths, activeJob.durationDays)}` : ""}{activeJob.requiredExperienceYears ? ` · ${activeJob.requiredExperienceYears}+ years exp` : ""}</p>
+          <p className="mt-1 text-sm text-slate-500">{activeJob.department} &middot; {activeJob.location || "Remote"} &middot; {activeJob.employmentType}{formatJobDuration(activeJob.durationMonths, activeJob.durationDays, activeJob.durationHours, activeJob.durationYears) ? ` · ${formatJobDuration(activeJob.durationMonths, activeJob.durationDays, activeJob.durationHours, activeJob.durationYears)}` : ""}{activeJob.requiredExperienceYears ? ` · ${activeJob.requiredExperienceYears}+ years exp` : ""}</p>
           {activeJob.salaryRangeMin > 0 || activeJob.salaryRangeMax > 0 ? (
-            <p className="text-sm text-slate-500">Salary: {CURRENCY_SYMBOLS[activeJob.currency] || "₹"}{activeJob.salaryRangeMin.toLocaleString()} - {CURRENCY_SYMBOLS[activeJob.currency] || "₹"}{activeJob.salaryRangeMax.toLocaleString()}{activeJob.salaryType === "per-month" ? " per month" : " per annum"}</p>
+            <p className="text-sm text-slate-500">Salary: {CURRENCY_SYMBOLS[activeJob.currency] || "₹"}{activeJob.salaryRangeMin.toLocaleString()} - {CURRENCY_SYMBOLS[activeJob.currency] || "₹"}{activeJob.salaryRangeMax.toLocaleString()}{activeJob.salaryType === "per-month" ? " per month" : activeJob.salaryType === "per-day" ? " per day" : activeJob.salaryType === "per-hour" ? " per hour" : " per annum"}</p>
           ) : null}
           <p className="text-sm text-slate-500">{activeJob.openings} opening{activeJob.openings > 1 ? "s" : ""} &middot; {jobCandidates.length} candidate{jobCandidates.length !== 1 ? "s" : ""}</p>
           {activeJob.autoCloseDate && (
@@ -172,6 +177,14 @@ export default function JobDetailPage() {
           </button>
           {isHrOrAdmin && (
             <button
+              onClick={() => setBulkIvOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50"
+            >
+              <Plus size={15} /> Schedule Interview
+            </button>
+          )}
+          {isHrOrAdmin && (
+            <button
               onClick={() => void handleRunAts(false)}
               disabled={atsLoading}
               className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
@@ -194,8 +207,13 @@ export default function JobDetailPage() {
               onClick={() => setAtsResultData(atsLastResult)}
               className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50"
             >
-              Review ATS rejections
+              Review ATS timelines
             </button>
+          )}
+          {atsApplied && (
+            <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
+              {atsApplied.advanced} advanced to Screening · {atsApplied.moved} moved to ATS Rejected
+            </span>
           )}
           {activeJob.atsScoreThreshold != null && (
             <span className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700">
@@ -215,7 +233,7 @@ export default function JobDetailPage() {
 
       {activeJob.description && (
         <div className="mt-4 rounded-lg neu-card p-4">
-          <p className="text-sm text-slate-600 whitespace-pre-wrap">{activeJob.description}</p>
+          <JobDescription content={activeJob.description} />
         </div>
       )}
 
@@ -322,15 +340,22 @@ export default function JobDetailPage() {
         onActionChange={setAtsAction}
         onMarkLater={() => setAtsResultData(null)}
         onSubmit={async (action, note) => {
-          if (action === "reject") {
-            try {
-              await apiFetch(`/api/recruitment/jobs/${id}/ats-apply-rejections`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note }) });
-              void fetchCandidates({ jobId: id });
-            } catch {}
-          }
+          try {
+            const res = await apiFetch<{ moved: number; advanced: number; mode: string }>(`/api/recruitment/jobs/${id}/ats-apply-rejections`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: action, note }) });
+            if (action === "auto") setAtsApplied({ moved: res.moved, advanced: res.advanced });
+            void fetchCandidates({ jobId: id });
+          } catch {}
           setAtsDecisionPending(false);
           setAtsResultData(null);
         }}
+      />
+      <BulkInterviewModal
+        open={bulkIvOpen}
+        onClose={() => setBulkIvOpen(false)}
+        jobId={id}
+        jobLocation={activeJob?.location ?? ""}
+        candidates={jobCandidates}
+        onDone={() => { void fetchCandidates({ jobId: id }); }}
       />
     </div>
   );
@@ -394,10 +419,10 @@ function AtsResultModal({
   onSubmit,
 }: {
   result: { scored: number; selected: number; rejected: number; errors: number; total: number } | null;
-  action: "continue" | "reject";
-  onActionChange: (value: "continue" | "reject") => void;
+  action: "auto" | "manual";
+  onActionChange: (value: "auto" | "manual") => void;
   onMarkLater: () => void;
-  onSubmit: (action: "continue" | "reject", note: string) => void;
+  onSubmit: (action: "auto" | "manual", note: string) => void;
 }) {
   const [note, setNote] = useState("");
   if (!result) return null;
@@ -405,7 +430,7 @@ function AtsResultModal({
     <div className="fixed inset-0 z-50 grid place-items-center neu-overlay px-4">
       <div className="w-full max-w-md rounded-lg neu-card">
         <div className="p-5">
-          <h2 className="text-base font-semibold text-slate-900">What do you want to do with ATS-rejected candidates?</h2>
+          <h2 className="text-base font-semibold text-slate-900">Update candidate timelines from ATS results?</h2>
           <div className="mt-3 grid grid-cols-3 gap-2 text-center">
             <div className="rounded-lg bg-[var(--c-bg-muted)] p-3">
               <p className="text-lg font-semibold text-slate-900">{result.total}</p>
@@ -423,18 +448,22 @@ function AtsResultModal({
           {result.errors > 0 && (
             <p className="mt-2 text-xs text-amber-600">{result.errors} candidate(s) could not be scored due to errors.</p>
           )}
-          <label className="mt-4 block text-sm font-medium text-slate-700">Action for rejected candidates</label>
+          <label className="mt-4 block text-sm font-medium text-slate-700">ATS timeline action</label>
           <select
             value={action}
-            onChange={(e) => onActionChange(e.target.value as "continue" | "reject")}
+            onChange={(e) => onActionChange(e.target.value as "auto" | "manual")}
             className="neu-inset mt-1 w-full rounded-lg px-3 py-2.5 text-sm"
           >
-            <option value="continue">Continue (manual review — leave stages as-is)</option>
-            <option value="reject">Reject them (move to ATS Rejected stage)</option>
+            <option value="auto">Auto-advance (reject ATS-failed, move approved to Screening)</option>
+            <option value="manual">Manual review (leave stages as-is)</option>
           </select>
-          {action === "reject" && (
-            <div className="mt-3">
-              <label className="block text-sm font-medium text-slate-700">Rejection note (optional)</label>
+          {action === "auto" && (
+            <p className="mt-1 text-xs text-slate-500">
+              Approved candidates still in Applied will be moved to Screening. Rejected candidates will be moved to the ATS Rejected stage. Offer and Joined stages are never auto-changed.
+            </p>
+          )}
+          <div className="mt-3">
+            <label className="block text-sm font-medium text-slate-700">Rejection note (optional)</label>
               <textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
@@ -446,7 +475,6 @@ function AtsResultModal({
                 {note.trim() ? "A manual note will be saved." : "An auto note (score vs. threshold + ATS reason) will be saved."}
               </p>
             </div>
-          )}
           <div className="mt-5 flex items-center justify-between gap-2">
             <button
               onClick={onMarkLater}
@@ -585,6 +613,210 @@ function CandidateModal({ jobId }: { jobId: string }) {
           <button type="submit" disabled={saving} className="neu-btn neu-btn-primary w-full rounded-full px-4 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60">
             {saving ? "Adding…" : "Add Candidate"}
           </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function BulkInterviewModal({
+  open,
+  onClose,
+  jobId,
+  jobLocation,
+  candidates,
+  onDone,
+}: {
+  open: boolean;
+  onClose: () => void;
+  jobId: string;
+  jobLocation?: string;
+  candidates: any[];
+  onDone: () => void;
+}) {
+  const [pickerRole, setPickerRole] = useState("human-resource");
+  const [pickerUsers, setPickerUsers] = useState<any[]>([]);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [meetingType, setMeetingType] = useState("online");
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const isRemoteJob = !!jobLocation && /^remote$/i.test(jobLocation.trim());
+
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    setPickerLoading(true);
+    const region = jobLocation && !isRemoteJob ? `&region=${encodeURIComponent(jobLocation)}` : "";
+    apiFetch<{ users: any[] }>(`/api/recruitment/users-by-role?role=${pickerRole}${region}`)
+      .then((res) => { if (active) setPickerUsers(res.users ?? []); })
+      .catch(() => { if (active) setPickerUsers([]); })
+      .finally(() => { if (active) setPickerLoading(false); });
+    return () => { active = false; };
+  }, [open, pickerRole, isRemoteJob, jobLocation]);
+
+  if (!open) return null;
+
+  const allSelected = candidates.length > 0 && candidates.every((c) => selected[String((c as any)._id || c.id)]);
+
+  function toggleAll() {
+    const next: Record<string, boolean> = {};
+    if (!allSelected) {
+      for (const c of candidates) next[String((c as any)._id || c.id)] = true;
+    }
+    setSelected(next);
+  }
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (saving) return;
+    const form = new FormData(e.currentTarget);
+    const candidateIds = candidates
+      .map((c) => String((c as any)._id || c.id))
+      .filter((cid) => selected[cid]);
+    if (candidateIds.length === 0) {
+      setError("Select at least one candidate.");
+      return;
+    }
+    const isOnline = meetingType === "online";
+    setSaving(true);
+    setError("");
+    try {
+      await apiFetch(`/api/recruitment/jobs/${jobId}/bulk-interview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          interviewer: String(form.get("interviewer") || ""),
+          roundType: String(form.get("roundType") || "screening"),
+          scheduledAt: String(form.get("scheduledAt") || ""),
+          meetingLink: isOnline ? String(form.get("meetingLink") || "") : "",
+          location: isOnline ? "" : String(form.get("location") || ""),
+          candidateIds,
+        }),
+      });
+      setSelected({});
+      onClose();
+      onDone();
+    } catch {
+      setError("Failed to schedule interviews. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center neu-overlay px-4">
+      <div className="w-full max-w-lg rounded-lg neu-card">
+        <header className="flex items-center justify-between border-b border-[var(--c-border-light)] px-5 py-4">
+          <h2 className="text-base font-semibold">Schedule Bulk Interviews</h2>
+          <button className="rounded-md p-1.5 text-slate-500 hover:bg-[var(--c-bg-muted)]" onClick={onClose} type="button">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+          </button>
+        </header>
+        <form className="space-y-4 p-5 max-h-[80vh] overflow-y-auto" onSubmit={handleSubmit}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700">Round Type</span>
+              <select name="roundType" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm">
+                <option value="screening">Screening</option>
+                <option value="technical">Technical</option>
+                <option value="manager">Manager</option>
+                <option value="hr">HR</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700">Scheduled At</span>
+              <input name="scheduledAt" type="datetime-local" required className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
+            </label>
+          </div>
+
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-slate-700">Interviewer</span>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="block">
+                <span className="mb-1 block text-xs text-slate-500">Role</span>
+                <select value={pickerRole} onChange={(e) => setPickerRole(e.target.value)} className="neu-inset rounded-lg px-3 py-2.5 text-sm">
+                  <option value="project-manager">Project Manager</option>
+                  <option value="qa-tester">QA Tester</option>
+                  <option value="finance">Finance</option>
+                  <option value="human-resource">HR</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </label>
+              <label className="block min-w-[200px] flex-1">
+                <span className="mb-1 block text-xs text-slate-500">{pickerLoading ? "Loading interviewers..." : "Interviewer"}</span>
+                <select name="interviewer" required className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm">
+                  <option value="">Select an interviewer...</option>
+                  {pickerUsers.length === 0 && !pickerLoading && <option value="">No users found</option>}
+                  {pickerUsers.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-slate-700">Meeting Type</span>
+            <select value={meetingType} onChange={(e) => setMeetingType(e.target.value)} className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm">
+              <option value="online">Online (meeting link)</option>
+              <option value="in-person">In-person (location)</option>
+            </select>
+          </label>
+          {meetingType === "online" ? (
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700">Meeting Link</span>
+              <input name="meetingLink" placeholder="https://meet.google.com/..." className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
+            </label>
+          ) : (
+            <InterviewLocationFields jobLocation={jobLocation} />
+          )}
+
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-sm font-medium text-slate-700">Candidates ({Object.values(selected).filter(Boolean).length} selected)</span>
+              <button type="button" onClick={toggleAll} className="text-xs font-medium text-indigo-600 hover:underline">
+                {allSelected ? "Clear all" : "Select all"}
+              </button>
+            </div>
+            <div className="max-h-56 overflow-y-auto rounded-lg border border-[var(--c-border-light)]">
+              {candidates.length === 0 && <p className="p-3 text-sm text-slate-400">No candidates in this job yet.</p>}
+              {candidates.map((c) => {
+                const cid = String((c as any)._id || c.id);
+                return (
+                  <label key={cid} className="flex cursor-pointer items-center gap-3 border-b border-[var(--c-border-light)] px-3 py-2 last:border-b-0 hover:bg-[var(--c-bg-muted)]">
+                    <input
+                      type="checkbox"
+                      checked={!!selected[cid]}
+                      onChange={(e) => setSelected((prev) => ({ ...prev, [cid]: e.target.checked }))}
+                      className="h-4 w-4 rounded border-slate-300 text-indigo-600"
+                    />
+                    <span className="flex-1 text-sm text-slate-700">
+                      {(c as any).firstName} {(c as any).lastName}
+                    </span>
+                    {selected[cid] && (c as any).email && (
+                      <span className="text-xs text-slate-400">{c.email}</span>
+                    )}
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                      {STAGE_LABELS[(c as any).stage as Stage] || (c as any).stage}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {error && <p className="text-sm text-rose-600">{error}</p>}
+
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={onClose} className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]">
+              Cancel
+            </button>
+            <button type="submit" disabled={saving} className="neu-btn neu-btn-primary inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60">
+              {saving ? "Scheduling…" : "Schedule Selected"}
+            </button>
+          </div>
         </form>
       </div>
     </div>
