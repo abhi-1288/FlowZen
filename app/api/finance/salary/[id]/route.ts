@@ -39,8 +39,8 @@ export async function GET(
     employeeId: String(salary.employee._id ?? salary.employee),
     periodStart,
     periodEnd,
-    allowances: 0,
-    manualDeductions: 0,
+    allowances: Number(salary.allowances ?? 0),
+    manualDeductions: Number(salary.manualDeductions ?? 0),
   });
 
   const emp = salary.employee as any;
@@ -49,11 +49,18 @@ export async function GET(
     month: salary.month,
     baseSalary: salary.baseSalary,
     allowances: salary.allowances,
+    manualDeductions: salary.manualDeductions,
     deductions: salary.deductions,
     netSalary: salary.netSalary,
     status: salary.status,
     approvedBy: salary.approvedBy,
     paidAt: salary.paidAt,
+    note: salary.note,
+    rejectionReason: salary.rejectionReason,
+    rejectedBy: salary.rejectedBy,
+    rejectedAt: salary.rejectedAt,
+    resentAt: salary.resentAt,
+    resentCount: salary.resentCount,
     createdAt: salary.createdAt,
     updatedAt: salary.updatedAt,
     employee: {

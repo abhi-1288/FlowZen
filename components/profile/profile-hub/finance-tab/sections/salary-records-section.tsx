@@ -45,6 +45,7 @@ export function SalaryRecordsSection({
   actorRole,
   month,
   onDelete,
+  onEdit,
   onStatusUpdate,
   onReject,
   onBulkStatusUpdate,
@@ -54,6 +55,7 @@ export function SalaryRecordsSection({
   actorRole: string;
   month: string;
   onDelete: (id: string, employeeName: string) => void;
+  onEdit?: (salary: AnyRecord) => void;
   onStatusUpdate: (type: "salary" | "expense" | "budget" | "bill", id: string, status: string, extra?: Record<string, string>) => void;
   onReject?: (id: string, type: "salary") => void;
   onBulkStatusUpdate?: (ids: string[], status: "approved" | "rejected") => void;
@@ -147,8 +149,12 @@ export function SalaryRecordsSection({
 
       <div className="divide-y divide-slate-200">
         {filtered.map((salary) => {
-          const isPending = String(salary.status ?? "") === "pending";
+          const status = String(salary.status ?? "");
+          const isPending = status === "pending";
+          const isRejected = status === "rejected";
+          const canEdit = (isPending || isRejected) && actorRole === "finance";
           const showBulkCheckbox = isPending && actorRole === "admin";
+          const rejectionReason = String(salary.rejectionReason ?? "").trim();
 
           return (
             <div className="flex flex-wrap items-center justify-between gap-3 py-3" key={String(salary.id)}>
@@ -163,10 +169,16 @@ export function SalaryRecordsSection({
                 ) : null}
                 <div>
                   <p className="font-medium">{displayNested(salary.employee, "name", "Employee")} - &#x20B9;{Number(salary.netSalary ?? 0).toLocaleString("en-IN")}</p>
-                  <p className="text-sm text-slate-500">{String(salary.month)} &bull; {String(salary.status)}</p>
+                  <p className="text-sm text-slate-500">{String(salary.month)} &bull; {status}</p>
+                  {isRejected && rejectionReason ? (
+                    <p className="text-xs text-rose-600">Rejected: {rejectionReason}</p>
+                  ) : null}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
+                {canEdit && onEdit ? (
+                  <ActionButton variant="secondary" className="px-3" onClick={() => onEdit(salary)}>{isRejected ? "Edit & Re-send" : "Edit & Send"}</ActionButton>
+                ) : null}
                 {isPending && actorRole === "finance" ? (
                   <ActionButton variant="danger" className="px-3" onClick={() => onDelete(String(salary.id), displayNested(salary.employee, "name", "Employee"))}>Delete</ActionButton>
                 ) : null}
@@ -176,10 +188,10 @@ export function SalaryRecordsSection({
                     <ActionButton variant="danger" className="px-3" onClick={() => onReject?.(String(salary.id), "salary")}>Reject</ActionButton>
                   </>
                 ) : null}
-                {String(salary.status) === "approved" && actorRole === "finance" ? (
+                {status === "approved" && actorRole === "finance" ? (
                   <ActionButton variant="approve" className="px-3" onClick={() => onStatusUpdate("salary", String(salary.id), "paid")}>Mark paid</ActionButton>
                 ) : null}
-                {String(salary.status) === "paid" ? (
+                {status === "paid" ? (
                   <a href={`/salary-slip/${String(salary.id)}`} target="_blank" rel="noopener noreferrer" className="neu-btn neu-btn-primary rounded-lg px-3 py-1.5 text-xs font-medium">View Slip</a>
                 ) : null}
                 {actorRole === "admin" && onViewDetail ? (

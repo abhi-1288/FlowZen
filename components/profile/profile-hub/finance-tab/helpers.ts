@@ -32,4 +32,42 @@ export function getMemberName(members: AnyRecord[], memberId: string): string {
   return member ? String(member.name) : "-";
 }
 
+export function getSalaryPeriodForMonth(
+  month: string,
+  cycle: {
+    salaryCycleDay?: number;
+    salaryCycleStartDay?: number | null;
+    salaryCycleEndDay?: number | null;
+  },
+): { start: string; end: string } {
+  const [y, m] = month.split("-").map(Number);
+  const lastDayOfCurrent = new Date(y, m, 0).getDate();
+  const prevMonthStr =
+    m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+  const [py, pm] = prevMonthStr.split("-").map(Number);
+  const lastDayOfPrev = new Date(py, pm, 0).getDate();
+
+  if (cycle.salaryCycleStartDay && cycle.salaryCycleEndDay) {
+    const s = Math.min(cycle.salaryCycleStartDay, lastDayOfPrev);
+    const e = Math.min(cycle.salaryCycleEndDay, lastDayOfCurrent);
+    return {
+      start: `${prevMonthStr}-${String(s).padStart(2, "0")}`,
+      end: `${month}-${String(e).padStart(2, "0")}`,
+    };
+  }
+
+  const cycleDay = Math.min(cycle.salaryCycleDay ?? 29, lastDayOfCurrent);
+  if (cycleDay === 1) {
+    return {
+      start: `${prevMonthStr}-01`,
+      end: `${prevMonthStr}-${String(lastDayOfPrev).padStart(2, "0")}`,
+    };
+  }
+
+  return {
+    start: `${prevMonthStr}-${String(Math.min(cycleDay, lastDayOfPrev)).padStart(2, "0")}`,
+    end: `${month}-${String(cycleDay - 1).padStart(2, "0")}`,
+  };
+}
+
 export { formatRole, formatRoleWithCustom, displayNested };

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { Bell, CheckSquare, Users, Wallet, Clock, User, Building2, ExternalLink, FileText, TrendingUp, BarChart3, DollarSign, Briefcase, UserPlus, CalendarCheck, Activity, AlertTriangle } from "lucide-react";
+import { Bell, CheckSquare, Users, Wallet, Clock, User, Building2, ExternalLink, FileText, TrendingUp, TrendingDown, BarChart3, DollarSign, Briefcase, UserPlus, CalendarCheck, Activity, AlertTriangle, type LucideIcon } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import type { AnyRecord } from "./shared";
 import { RangeExhaustionModal } from "./modals/range-exhaustion-modal";
@@ -48,6 +48,25 @@ function formatDurationText(profile: AnyRecord | null): string {
   if (days > 0) parts.push(`${days} day${days === 1 ? "" : "s"}`);
   if (hours > 0) parts.push(`${hours} hr${hours === 1 ? "" : "s"}`);
   return parts.join(" ");
+}
+
+function formatCompactINR(value: number): string {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    notation: "compact",
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+type KpiTrend = { text: string; tone: "up" | "down" | "flat"; sub?: string };
+
+function formatTimeHHMM(ms: number): string {
+  const totalMinutes = Math.max(0, Math.round(ms / 60000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes}m`;
+  return `${hours}h ${minutes}m`;
 }
 
 export function DashboardTab({
@@ -96,6 +115,8 @@ export function DashboardTab({
   const [identityCodeEndRange, setIdentityCodeEndRange] = useState<number | null>(null);
   const [identityCodeNextNumber, setIdentityCodeNextNumber] = useState<number | null>(null);
   const [rangeModalOpen, setRangeModalOpen] = useState(false);
+  const [reports, setReports] = useState<{ revenue: number; expenses: number; profit: number } | null>(null);
+  const [hiringPipelineCount, setHiringPipelineCount] = useState<number | null>(null);
 
   function generateFallbackLetter(request: AnyRecord) {
     const metadata = (request.metadata as any) ?? {};
@@ -175,6 +196,29 @@ export function DashboardTab({
       .catch(() => { });
   }, [role]);
 
+  useEffect(() => {
+    if (!company) return;
+    apiFetch<{ revenue: number; expenses: number; profit: number }>("/api/finance/reports")
+      .then(setReports)
+      .catch(() => { });
+  }, [company]);
+
+  useEffect(() => {
+    const recruitmentRoles = ["admin", "human-resource", "project-manager", "qa-tester", "finance"];
+    const isSeniorSecurity = Boolean((profile as any)?.isSeniorSecurity);
+    if (!recruitmentRoles.includes(role) && !isSeniorSecurity) return;
+
+    let cancelled = false;
+    function refresh() {
+      apiFetch<{ count: number }>("/api/recruitment/assigned-count")
+        .then((res) => { if (!cancelled) setHiringPipelineCount(res.count); })
+        .catch(() => { if (!cancelled) setHiringPipelineCount(null); });
+    }
+    refresh();
+    const interval = setInterval(refresh, 60000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [role, profile]);
+
   const attendanceRate = useMemo(() => {
     if (!attendanceHistory?.length) return "--";
     const total = attendanceHistory.length;
@@ -190,24 +234,100 @@ export function DashboardTab({
   }, [hrMembers]);
 
   const totalMembers = Number((insights?.hr as any)?.totalMembers ?? 0);
-  const pendingJoins = Number((insights?.hr as any)?.pendingJoins ?? 0);
   const totalTeams = Number((insights?.admin as any)?.totalTeams ?? (insights?.manager as any)?.teams?.length ?? 0);
   const yesterdayEntry = attendanceHistory?.[1] ?? null;
   const yesterdayCheckedIn = Boolean(yesterdayEntry?.checkIn);
-  const leaveTrendValue = checkedIn
+  const ownLeaveTrendValue = checkedIn
     ? `Present ${checkInTime ?? ""}`
     : yesterdayCheckedIn
       ? "Absent (was present yesterday)"
       : "Absent";
 
-  const kpiCards = [
+  const companyAttendance = (insights?.hr as any)?.todayAttendance as
+    | { present: number; absent: number; total: number }
+    | undefined;
+  const leaveTrendValue = companyAttendance
+    ? `${companyAttendance.present} present · ${companyAttendance.absent} absent`
+    : ownLeaveTrendValue;
+
+  const lastPresentEntry =
+    attendanceHistory?.find((a: AnyRecord) => Boolean(a.checkIn)) ?? null;
+  const lastPresentDate = lastPresentEntry
+    ? new Date(String(lastPresentEntry.checkIn)).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : null;
+  const lastPresentInTime = lastPresentEntry
+    ? new Date(String(lastPresentEntry.checkIn)).toLocaleTimeString("en-IN", {
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : null;
+  const lastPresentOutTime = lastPresentEntry?.checkOut
+    ? new Date(String(lastPresentEntry.checkOut)).toLocaleTimeString("en-IN", {
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : null;
+  const lastPresentTotal = lastPresentEntry && lastPresentEntry.checkOut
+    ? formatTimeHHMM(
+        new Date(String(lastPresentEntry.checkOut)).getTime() -
+          new Date(String(lastPresentEntry.checkIn)).getTime(),
+      )
+    : null;
+  const lastPresentTrend: KpiTrend | undefined = lastPresentEntry
+    ? {
+        text: lastPresentOutTime
+          ? `${lastPresentInTime} – ${lastPresentOutTime}`
+          : lastPresentInTime ?? "",
+        tone: "flat",
+        sub: lastPresentTotal ? `Total ${lastPresentTotal}` : undefined,
+      }
+    : undefined;
+
+  const employeeGrowthDelta = Number((insights?.hr as any)?.employeeGrowth ?? 0);
+  const hasGrowthData = (insights?.hr as any)?.joinedThisMonth != null;
+  const employeeGrowthTrend: KpiTrend | undefined = hasGrowthData
+    ? employeeGrowthDelta > 0
+      ? { text: `+${employeeGrowthDelta} this month`, tone: "up" }
+      : employeeGrowthDelta < 0
+        ? { text: `${employeeGrowthDelta} this month`, tone: "down" }
+        : { text: "No change this month", tone: "flat" }
+    : undefined;
+
+  const revenueExpensesTrend: KpiTrend | undefined = reports
+    ? reports.profit > 0
+      ? { text: `Net +${formatCompactINR(reports.profit)}`, tone: "up" }
+      : reports.profit < 0
+        ? { text: `Net ${formatCompactINR(reports.profit)}`, tone: "down" }
+        : { text: "Break-even", tone: "flat" }
+    : undefined;
+
+  const kpiCards: {
+    label: string;
+    value: string;
+    icon: LucideIcon;
+    color: string;
+    bg: string;
+    trend?: KpiTrend;
+  }[] = [
     { label: "Attendance %", value: attendanceRate, icon: CalendarCheck, color: "text-emerald-600", bg: "bg-emerald-100" },
     { label: "Salary Cost", value: totalSalaryCost ?? "—", icon: DollarSign, color: "text-[var(--color-primary)]", bg: "bg-[var(--color-primary-bg)]" },
-    { label: "Revenue vs Expenses", value: "—", icon: BarChart3, color: "text-purple-600", bg: "bg-purple-100" },
+    { label: "Revenue vs Expenses", value: reports ? `${formatCompactINR(reports.revenue)} / ${formatCompactINR(reports.expenses)}` : "—", icon: BarChart3, color: "text-purple-600", bg: "bg-purple-100", trend: revenueExpensesTrend },
     { label: "Active Projects", value: String(totalTeams || "—"), icon: Briefcase, color: "text-amber-600", bg: "bg-amber-100" },
-    { label: "Hiring Pipeline", value: String(pendingJoins || "—"), icon: UserPlus, color: "text-cyan-600", bg: "bg-cyan-100" },
+    { label: "Hiring Pipeline", value: hiringPipelineCount != null ? String(hiringPipelineCount) : "—", icon: UserPlus, color: "text-cyan-600", bg: "bg-cyan-100" },
     { label: "Leave Trends", value: leaveTrendValue, icon: Activity, color: "text-rose-600", bg: "bg-rose-100" },
-    { label: "Employee Growth", value: String(totalMembers || "—"), icon: TrendingUp, color: "text-indigo-600", bg: "bg-indigo-100" },
+    { label: "Employee Growth", value: String(totalMembers || "—"), icon: TrendingUp, color: "text-indigo-600", bg: "bg-indigo-100", trend: employeeGrowthTrend },
+    {
+      label: "Last Present",
+      value: lastPresentDate ?? "—",
+      icon: Clock,
+      color: "text-teal-600",
+      bg: "bg-teal-100",
+      trend: lastPresentTrend,
+    },
   ];
 
   return (
@@ -231,6 +351,7 @@ export function DashboardTab({
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {kpiCards.map((kpi) => {
             const Icon = kpi.icon;
+            const TrendIcon = kpi.trend?.tone === "up" ? TrendingUp : kpi.trend?.tone === "down" ? TrendingDown : null;
             return (
               <div key={kpi.label} className="flex items-center gap-3 rounded-lg neu-inset px-4 py-3">
                 <div className={`rounded-lg ${kpi.bg} p-2.5`}>
@@ -238,7 +359,20 @@ export function DashboardTab({
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-[11px] font-medium uppercase tracking-wide text-slate-500">{kpi.label}</p>
-                  <p className="text-lg font-bold text-slate-900">{kpi.value}</p>
+                  <p className="truncate text-lg font-bold text-slate-900">{kpi.value}</p>
+                  {kpi.trend ? (
+                    <div
+                      className={`text-[11px] font-medium ${
+                        kpi.trend.tone === "up" ? "text-emerald-600" : kpi.trend.tone === "down" ? "text-rose-600" : "text-slate-400"
+                      }`}
+                    >
+                      <p className="flex items-center gap-1 truncate">
+                        {TrendIcon ? <TrendIcon size={12} /> : null}
+                        {kpi.trend.text}
+                      </p>
+                      {kpi.trend.sub ? <p className="truncate">{kpi.trend.sub}</p> : null}
+                    </div>
+                  ) : null}
                 </div>
               </div>
             );

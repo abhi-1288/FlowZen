@@ -5,7 +5,7 @@ import { apiFetch } from "@/lib/client-utils";
 import { AnyRecord } from "../shared";
 import type { SalaryBreakdown, BudgetForm, ExpenseForm, InvoiceForm, RejectTarget, SalaryModalTab, PolicyData } from "./types";
 import { useFinanceData, useInvoices, useReports, useLeaveImpacts, usePolicyData, useMySalarySlips, useSalaryCycle } from "./hooks";
-import { toggleRoleInSet } from "./helpers";
+import { toggleRoleInSet, getSalaryPeriodForMonth } from "./helpers";
 import { DashboardCards } from "./sections/dashboard-cards";
 import { SalaryReminder } from "./sections/salary-reminder";
 import { FinanceSubTabs } from "./sections/sub-tabs";
@@ -30,6 +30,7 @@ import { BudgetModal } from "./modals/budget-modal";
 import { InvoiceModal } from "./modals/invoice-modal";
 import { SalaryOverviewModal } from "./modals/salary-overview-modal";
 import { SalaryDetailModal } from "./modals/salary-detail-modal";
+import { SalaryEditModal } from "./modals/salary-edit-modal";
 
 export function FinanceTab({
   actorRole,
@@ -40,7 +41,10 @@ export function FinanceTab({
   profileId: string;
   showToast: (text: string, type?: "success" | "error") => void;
 }) {
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
   const { data, load } = useFinanceData(month, showToast);
   const [salaryStep, setSalaryStep] = useState<1 | 2 | 3>(1);
   const [salaryPeriod, setSalaryPeriod] = useState({ start: "", end: "" });
@@ -66,6 +70,8 @@ export function FinanceTab({
   const [deleteSalaryEmployee, setDeleteSalaryEmployee] = useState("");
   const [salaryDetailId, setSalaryDetailId] = useState<string | null>(null);
   const [salaryDetailEmployee, setSalaryDetailEmployee] = useState("");
+  const [editTarget, setEditTarget] = useState<AnyRecord | null>(null);
+  const [editingSalary, setEditingSalary] = useState(false);
   const { invoices, setInvoices } = useInvoices(data);
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [invoiceForm, setInvoiceForm] = useState<InvoiceForm>({ boardId: "", clientName: "", clientEmail: "", amount: "", description: "" });
@@ -83,6 +89,15 @@ export function FinanceTab({
   const [pfPctInput, setPfPctInput] = useState("");
   const [esicPctInput, setEsicPctInput] = useState("");
   const [tdsPctInput, setTdsPctInput] = useState("");
+
+  useEffect(() => {
+    if (!salaryCycle) return;
+    setSalaryPeriod((prev) =>
+      prev.start && prev.end && salaryStep > 1
+        ? prev
+        : getSalaryPeriodForMonth(month, salaryCycle),
+    );
+  }, [month, salaryCycle, salaryStep]);
 
   useEffect(() => {
     if (!policyData) return;
@@ -181,6 +196,30 @@ export function FinanceTab({
       showToast(err instanceof Error ? err.message : "Failed to generate salary.", "error");
     } finally {
       setSalaryGenerating(false);
+    }
+  }
+
+  async function submitEditSalary(allowances: string, deductions: string, note: string) {
+    if (!editTarget || editingSalary) return;
+    setEditingSalary(true);
+    try {
+      await apiFetch("/api/finance", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "edit-salary",
+          salaryId: String(editTarget.id),
+          allowances,
+          deductions,
+          note,
+        }),
+      });
+      showToast("Salary revised and sent for approval.", "success");
+      setEditTarget(null);
+      await load();
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Failed to save salary.", "error");
+    } finally {
+      setEditingSalary(false);
     }
   }
 
@@ -393,7 +432,7 @@ export function FinanceTab({
           <InvoicesSection invoices={invoices} isFinanceOrAdmin={isFinanceOrAdmin} onCreateInvoice={() => setShowInvoiceForm(true)} onMarkInvoice={markInvoice} />
           <BudgetAllocateSection onAllocate={() => openBudgetModal()} />
           <BudgetListSection budgets={data.budgets} actorRole={actorRole} profileId={profileId} onEdit={openBudgetModal} onApprove={(id) => updateStatus("budget", id, "approved")} onReject={(id, type) => setRejectTarget({ id, type })} onViewExpired={() => setShowExpiredBudgets(true)} />
-          <SalaryRecordsSection salaries={data.salaries} actorRole={actorRole} month={month} onDelete={(id, name) => { setDeleteSalaryId(id); setDeleteSalaryEmployee(name); }} onStatusUpdate={updateStatus} onReject={(id, type) => setRejectTarget({ id, type })} onBulkStatusUpdate={bulkStatusUpdate} onViewDetail={(id, name) => { setSalaryDetailId(id); setSalaryDetailEmployee(name); }} />
+          <SalaryRecordsSection salaries={data.salaries} actorRole={actorRole} month={month} onDelete={(id, name) => { setDeleteSalaryId(id); setDeleteSalaryEmployee(name); }} onEdit={setEditTarget} onStatusUpdate={updateStatus} onReject={(id, type) => setRejectTarget({ id, type })} onBulkStatusUpdate={bulkStatusUpdate} onViewDetail={(id, name) => { setSalaryDetailId(id); setSalaryDetailEmployee(name); }} />
           <SalaryCycleSection salaryCycle={salaryCycle} actorRole={actorRole} profileId={profileId} adminOptions={adminOptions} onRefresh={refreshSalaryCycle} />
         </div>
       ) : null}
@@ -414,6 +453,7 @@ export function FinanceTab({
       <InvoiceModal show={showInvoiceForm} invoiceForm={invoiceForm} onFormChange={setInvoiceForm} onSubmit={createInvoice} onCancel={() => { setShowInvoiceForm(false); setInvoiceForm({ boardId: "", clientName: "", clientEmail: "", amount: "", description: "" }); }} />
       <SalaryOverviewModal show={showSalaryModal} salaryModalTab={salaryModalTab} expandedRoles={expandedRoles} salaries={data.salaries} members={data.members} memberRoleMap={memberRoleMap} onTabChange={setSalaryModalTab} onToggleRole={(role) => setExpandedRoles(toggleRoleInSet(expandedRoles, role))} onClose={() => { setShowSalaryModal(false); setExpandedRoles(new Set()); }} />
       <SalaryDetailModal salaryId={salaryDetailId} onClose={() => { setSalaryDetailId(null); setSalaryDetailEmployee(""); }} />
+      <SalaryEditModal target={editTarget} submitting={editingSalary} onClose={() => setEditTarget(null)} onSubmit={submitEditSalary} />
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { Notification } from "@/models/Notification";
 import { ProjectBudget } from "@/models/ProjectBudget";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
-import { monthKey, actorWithCompany, autoGenerateSalariesForMonth, canManageFinance, computeSalaryBreakdown } from "./helpers";
+import { monthKey, localMonthKey, actorWithCompany, autoGenerateSalariesForMonth, canManageFinance, computeSalaryBreakdown, getSalaryPeriod } from "./helpers";
 import { handleStatusUpdates } from "./status-updates";
 import { CompanyPolicy } from "@/models/CompanyPolicy";
 
@@ -102,7 +102,7 @@ export async function GET(request: Request) {
   const isCycleDay = dayOfMonth >= Math.max(1, cycleTriggerDay) && dayOfMonth <= lastDay;
 
   let monthEndGenerated = false;
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  const currentMonth = localMonthKey();
 
   if (canManage && isCycleDay && month === currentMonth) {
     monthEndGenerated = await autoGenerateSalariesForMonth({
@@ -423,7 +423,14 @@ export async function POST(request: Request) {
       );
     }
     const { breakdown, employee } = computed;
-    const month = breakdown.periodStart.slice(0, 7);
+    const month = breakdown.periodEnd.slice(0, 7);
+
+    const existingSalary = await FinanceSalary.findOne({
+      company: actor.company,
+      employee: employeeId,
+      month,
+    }).select("status");
+    const wasPaid = existingSalary?.status === "paid";
 
     const salary = await FinanceSalary.findOneAndUpdate(
       { company: actor.company, employee: employeeId, month },
@@ -432,12 +439,16 @@ export async function POST(request: Request) {
           baseSalary: breakdown.grossSalary,
           allowances,
           deductions: breakdown.totalDeductions,
+          manualDeductions,
           pfDeduction: breakdown.pfDeduction,
           esicDeduction: breakdown.esicDeduction,
           tdsDeduction: breakdown.tdsDeduction,
           netSalary: breakdown.finalSalary,
+          ...(wasPaid
+            ? {}
+            : { status: "pending" as const }),
         },
-        $setOnInsert: { status: "pending", createdBy: userId },
+        $setOnInsert: { createdBy: userId },
       },
       { new: true, upsert: true },
     );
@@ -460,6 +471,94 @@ export async function POST(request: Request) {
       salary,
       breakdown,
     });
+  }
+
+  if (action === "edit-salary") {
+    const salaryId = String(body.salaryId ?? "");
+    if (!salaryId) return jsonError("Salary record is required.", 400);
+    const salaryRecord = await FinanceSalary.findOne({
+      _id: salaryId,
+      company: actor.company,
+    }).populate("employee", "name");
+    if (!salaryRecord)
+      return jsonError("Salary record not found in this company.", 404);
+    if (
+      salaryRecord.status !== "pending" &&
+      salaryRecord.status !== "rejected"
+    )
+      return jsonError(
+        "Only pending or rejected salary records can be edited and resent.",
+        400,
+      );
+
+    const allowances = Math.max(0, Number(body.allowances ?? 0));
+    const manualDeductions = Math.max(0, Number(body.deductions ?? 0));
+    const note = String(body.note ?? "").trim();
+
+    const policy = await CompanyPolicy.findOne({ company: actor.company }).select("salaryCycleDay salaryCycleStartDay salaryCycleEndDay");
+    const { periodStart, periodEnd } = getSalaryPeriod(
+      String(salaryRecord.month),
+      policy || {},
+    );
+    const computed = await computeSalaryBreakdown({
+      actorCompany: actor.company,
+      employeeId: String(salaryRecord.employee._id ?? salaryRecord.employee),
+      periodStart,
+      periodEnd,
+      allowances,
+      manualDeductions,
+    });
+    if ("error" in computed) {
+      const errorMessage = computed.error ?? "Unknown error";
+      return jsonError(
+        errorMessage,
+        errorMessage.includes("not found") ? 404 : 400,
+      );
+    }
+    const { breakdown, employee } = computed;
+
+    const salary = await FinanceSalary.findByIdAndUpdate(
+      salaryId,
+      {
+        $set: {
+          baseSalary: breakdown.grossSalary,
+          allowances,
+          deductions: breakdown.totalDeductions,
+          manualDeductions,
+          pfDeduction: breakdown.pfDeduction,
+          esicDeduction: breakdown.esicDeduction,
+          tdsDeduction: breakdown.tdsDeduction,
+          netSalary: breakdown.finalSalary,
+          status: "pending",
+          note,
+          rejectedBy: null,
+          rejectedAt: null,
+          rejectionReason: "",
+          resentAt: new Date(),
+          resentCount: Number(salaryRecord.resentCount ?? 0) + 1,
+          updatedBy: userId,
+        },
+      },
+      { new: true },
+    );
+
+    const admins = await User.find({
+      company: actor.company,
+      role: "admin",
+      companyStatus: "approved",
+    }).select("_id");
+    const noteSuffix = note ? ` Note: ${note}` : "";
+    await Notification.insertMany(
+      admins.map((u) => ({
+        user: u._id,
+        company: actor.company,
+        type: "approval",
+        title: "Salary revised, pending approval",
+        message: `${actor.name ?? "Finance"} revised the salary for ${String(employee.name ?? "an employee")} (${String(salaryRecord.month)}) and resubmitted it for approval.${noteSuffix}`,
+      })),
+    );
+    admins.forEach((u) => emitNotification(String(u._id)));
+    return NextResponse.json({ salary });
   }
 
   if (action === "set-budget") {

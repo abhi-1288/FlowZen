@@ -3,10 +3,16 @@ import { emitNotification } from "@/lib/realtime";
 
 const FINANCE_ROLES = new Set(["finance", "admin"]);
 
+export function localMonthKey(date: Date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
 export function monthKey(value?: string | null) {
   const raw = String(value ?? "").trim();
   if (/^\d{4}-\d{2}$/.test(raw)) return raw;
-  return new Date().toISOString().slice(0, 7);
+  return localMonthKey();
 }
 
 export function previousMonth(month: string): string {
@@ -431,11 +437,14 @@ export async function autoGenerateSalariesForMonth(params: {
   policy: any;
 }): Promise<boolean> {
   const { actorCompany, userId, actorName, month, policy } = params;
-  const existingSalaries = await FinanceSalary.countDocuments({
+  const existingSalaries = await FinanceSalary.find({
     company: actorCompany,
     month,
-  });
-  if (existingSalaries > 0) return false;
+  }).select("employee status");
+  const statusByEmployee = new Map<string, string>();
+  for (const record of existingSalaries as any[]) {
+    statusByEmployee.set(String(record.employee), String(record.status ?? ""));
+  }
 
   const approvedMembers = await User.find({
     company: actorCompany,
@@ -445,6 +454,7 @@ export async function autoGenerateSalariesForMonth(params: {
   const { periodStart, periodEnd } = getSalaryPeriod(month, policy || {});
   const generatedSalaries: any[] = [];
   for (const member of approvedMembers) {
+    if (statusByEmployee.has(String(member._id))) continue;
     const computed = await computeSalaryBreakdown({
       actorCompany,
       employeeId: String(member._id),
@@ -466,8 +476,9 @@ export async function autoGenerateSalariesForMonth(params: {
           esicDeduction: breakdown.esicDeduction,
           tdsDeduction: breakdown.tdsDeduction,
           netSalary: breakdown.finalSalary,
+          status: "pending",
         },
-        $setOnInsert: { status: "pending", createdBy: userId },
+        $setOnInsert: { createdBy: userId },
       },
       { new: true, upsert: true },
     );

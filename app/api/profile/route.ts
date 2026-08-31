@@ -13,6 +13,7 @@ import { Team } from "@/models/Team";
 import { Company } from "@/models/Company";
 import { CompanyPolicy } from "@/models/CompanyPolicy";
 import { FinanceSalary } from "@/models/FinanceSalary";
+import { Attendance } from "@/models/Attendance";
 import { resolveEnrollingHr, resolveJoinedByInfo } from "@/lib/enrolling-hr";
 import "@/models/Company";
 import "@/models/Team";
@@ -227,6 +228,31 @@ export async function GET() {
     const companyEsicPct = Number(companyPolicy?.esicPercentage ?? 0.75);
     const companyTdsPct = Number(companyPolicy?.tdsPercentage ?? 0);
 
+    const now = new Date();
+    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const joinedThisMonth = members.filter(
+      (member: any) => member.companyJoined && new Date(member.companyJoined) >= startOfThisMonth,
+    ).length;
+    const leftThisMonth = await User.countDocuments({
+      membershipHistory: {
+        $elemMatch: {
+          company: companyId,
+          action: { $in: ["removed-company", "left-company", "contract-expired"] },
+          at: { $gte: startOfThisMonth },
+        },
+      },
+    });
+
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const memberIdSet = new Set(members.map((member: any) => String(member._id)));
+    const presentTodayIds = await Attendance.distinct("user", { date: todayStart });
+    const presentCount = presentTodayIds.filter((id: any) => memberIdSet.has(String(id))).length;
+    const todayAttendance = {
+      present: presentCount,
+      absent: Math.max(0, members.length - presentCount),
+      total: members.length,
+    };
+
     const multiOffice = Boolean(companyDoc?.multiOffice);
     const companyAddresses: any[] = multiOffice && Array.isArray(companyDoc?.addresses)
       ? companyDoc.addresses
@@ -301,6 +327,10 @@ export async function GET() {
       companyPfPct,
       companyEsicPct,
       companyTdsPct,
+      joinedThisMonth,
+      leftThisMonth,
+      employeeGrowth: joinedThisMonth - leftThisMonth,
+      todayAttendance,
     };
   }
 
