@@ -65,6 +65,7 @@ export default function CandidateOfferPage() {
     : "Unknown";
   const jobTitle = typeof offer.job === "object" ? (offer.job as any).title : "";
   const salaryPeriodLabel = offer.salaryType === "per-month" ? "month" : offer.salaryType === "per-day" ? "day" : offer.salaryType === "per-hour" ? "hour" : "year";
+  const currencySymbol = (({ INR: "₹", USD: "$", EUR: "€", GBP: "£", JPY: "¥" } as Record<string, string>)[String(offer.currency || "INR").toUpperCase()]) || "₹";
 
   return (
     <div className="p-6 max-w-2xl">
@@ -84,7 +85,7 @@ export default function CandidateOfferPage() {
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           <div className="rounded-lg neu-inset p-3">
             <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Offered CTC</p>
-            <p className="mt-1 text-sm font-medium text-slate-900">₹{Number(offer.offeredCTC).toLocaleString()}/{salaryPeriodLabel}</p>
+            <p className="mt-1 text-sm font-medium text-slate-900">{currencySymbol}{Number(offer.offeredCTC).toLocaleString()}/{salaryPeriodLabel}</p>
           </div>
           <div className="rounded-lg neu-inset p-3">
             <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Department</p>

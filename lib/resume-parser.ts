@@ -1,4 +1,6 @@
 import pdf from "pdf-parse/lib/pdf-parse.js";
+import { promises as fs } from "fs";
+import path from "path";
 
 export type ParsedResume = {
   name: string;
@@ -7,7 +9,15 @@ export type ParsedResume = {
   dob: string;
   address: string;
   bloodGroup: string;
+  emergencyContact: string;
 };
+
+function normalizePhone(value: string): string {
+  const cleaned = value.trim();
+  if (!cleaned) return "";
+  const digits = cleaned.replace(/[^+\d]/g, "");
+  return /^\+?\d{7,15}$/.test(digits) ? digits : "";
+}
 
 function extractName(text: string): string {
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -77,6 +87,40 @@ function extractAddress(text: string): string {
   return parts.join(", ").replace(/^[,.\s]+|[,.\s]+$/g, "");
 }
 
+function extractEmergencyContact(text: string): string {
+  const patterns = [
+    /emergency\s*(?:contact|number|phone|person)\s*:?\s*([^\n,]+)/i,
+    /emergency\s*:?\s*([^\n,]+)/i,
+    /(\b(?:father|mother|sibling|spouse|guardian)\b[^\n]*?\b(\+?\d[\d\s\-().]{7,})\b)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const raw = (match[1] || match[0] || "").replace(/[ \t]+/g, " ").trim();
+      if (!raw) continue;
+      const phoneMatch = raw.match(/(\+?\d[\d\s\-().]{7,})/);
+      const phone = phoneMatch ? normalizePhone(phoneMatch[1]) : "";
+      if (!phone) continue;
+      const name = raw.replace(phoneMatch ? phoneMatch[1] : "", "").replace(/^[:,\s]+|[:,\s]+$/g, "");
+      return [name, phone].filter(Boolean).join(" - ");
+    }
+  }
+  return "";
+}
+
+export async function parseResumeFromUrl(resumeUrl: string): Promise<ParsedResume> {
+  let buffer: Buffer;
+  if (resumeUrl.startsWith("/uploads/")) {
+    const filePath = path.join(process.cwd(), "public", resumeUrl);
+    buffer = await fs.readFile(filePath);
+  } else {
+    const response = await fetch(resumeUrl);
+    if (!response.ok) throw new Error(`Failed to fetch resume: ${response.status}`);
+    buffer = Buffer.from(await response.arrayBuffer());
+  }
+  return parseResume(buffer);
+}
+
 export async function parseResume(
   buffer: Buffer
 ): Promise<ParsedResume> {
@@ -89,5 +133,6 @@ export async function parseResume(
     dob: extractDOB(text),
     address: extractAddress(text),
     bloodGroup: extractBloodGroup(text),
+    emergencyContact: extractEmergencyContact(text),
   };
 }

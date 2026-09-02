@@ -77,6 +77,8 @@ export async function PATCH(request: Request, { params }: Params) {
   const contentFields = ["offeredCTC", "pfAmount", "esicAmount", "joiningDate", "designation", "department", "officeLocation", "perks"];
   const hasContentChanges = contentFields.some((f) => body[f] !== undefined);
   if (body.offeredCTC !== undefined) updates.offeredCTC = Number(body.offeredCTC);
+  if (body.salaryType !== undefined) updates.salaryType = ["per-annum", "per-month", "per-day", "per-hour"].includes(body.salaryType) ? body.salaryType : "per-annum";
+  if (body.currency !== undefined) updates.currency = String(body.currency).toUpperCase();
   if (body.pfAmount !== undefined) updates.pfAmount = Number(body.pfAmount);
   if (body.esicAmount !== undefined) updates.esicAmount = Number(body.esicAmount);
   if (body.joiningDate !== undefined) updates.joiningDate = body.joiningDate ? new Date(body.joiningDate) : null;

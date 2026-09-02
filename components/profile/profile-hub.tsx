@@ -18,6 +18,7 @@ import {
   ClipboardList,
   Clock,
   FileText,
+  Gamepad2,
   History,
   LayoutDashboard,
   LogOut,
@@ -41,6 +42,7 @@ import { OnboardingTab } from "./profile-hub/onboarding-tab";
 import { DocumentsTab } from "./profile-hub/documents-tab";
 import { MyLetters } from "./profile-hub/my-letters";
 import { CareersTab } from "./profile-hub/careers-tab";
+import { GamesTab } from "./profile-hub/games-tab";
 import { CompanyCalendarTab } from "./profile-hub/company-calendar-tab";
 import { FinancePolicyTab } from "./profile-hub/finance-policy-tab";
 import { HrPolicyTab } from "./profile-hub/hr-policy-tab";
@@ -83,10 +85,11 @@ export type Tab =
   | "calendar"
   | "visitors"
   | "security"
+  | "games"
   | "finance-policy"
   | "hr-policy";
 
-const VALID_TABS = new Set<string>(["dashboard", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers", "calendar", "visitors", "security", "finance-policy", "hr-policy"]);
+const VALID_TABS = new Set<string>(["dashboard", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers", "calendar", "visitors", "security", "games", "finance-policy", "hr-policy"]);
 
 function formatDuration(profile: AnyRecord | null): string {
   if (!profile) return "";
@@ -232,6 +235,7 @@ export function ProfileHub() {
   const canViewFinanceTab = hasCompany;
   const canViewSecurityTab = hasCompany && ["human-resource", "admin", "security"].includes(String(role));
   const canViewCompanyTabs = hasCompany;
+  const canViewGamesTab = hasCompany;
   const mobileTabs: Tab[] = [
     "dashboard",
     "profile",
@@ -250,6 +254,7 @@ export function ProfileHub() {
     "notifications",
     ...(canViewCompanyTabs ? (["attendance"] as Tab[]) : []),
     ...(canViewCompanyTabs ? (["calendar"] as Tab[]) : []),
+    ...(canViewGamesTab ? (["games"] as Tab[]) : []),
   ];
 
   const { showNotificationToast, showErrorToast } = useNotificationToast();
@@ -861,6 +866,14 @@ export function ProfileHub() {
               onClick={() => setTab("calendar")}
             />
           ) : null}
+          {canViewGamesTab ? (
+            <NavButton
+              active={tab === "games"}
+              icon={<Gamepad2 size={16} />}
+              label="Games"
+              onClick={() => setTab("games")}
+            />
+          ) : null}
           <NavButton
             active={tab === "notifications"}
             icon={<Bell size={16} />}
@@ -1102,6 +1115,10 @@ export function ProfileHub() {
 
                 {tab === "careers" ? (
                   <CareersTab />
+                ) : null}
+
+                {tab === "games" ? (
+                  <GamesTab />
                 ) : null}
 
                 {tab === "messages" && canViewCompanyTabs ? (

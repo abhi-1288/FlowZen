@@ -10,6 +10,7 @@ const ATSOfferSchema = new Schema(
       enum: ["per-annum", "per-month", "per-day", "per-hour"],
       default: "per-annum",
     },
+    currency: { type: String, default: "INR", trim: true, maxlength: 8 },
     pfAmount: { type: Number, default: 0 },
     esicAmount: { type: Number, default: 0 },
     joiningDate: { type: Date, default: null },

@@ -181,6 +181,7 @@ export type ATSOffer = {
   job: { id: string; title: string } | string;
   offeredCTC: number;
   salaryType: SalaryType;
+  currency: string;
   pfAmount: number;
   esicAmount: number;
   joiningDate: string | null;

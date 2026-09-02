@@ -10,7 +10,8 @@ type LetterOffer = {
   job: { title: string; department: string; location: string };
   company: { name: string; icon?: string };
   offeredCTC: number;
-  salaryType?: "per-annum" | "per-month";
+  salaryType?: "per-annum" | "per-month" | "per-day" | "per-hour";
+  currency?: string;
   pfAmount: number;
   esicAmount: number;
   joiningDate: string | null;
@@ -76,9 +77,12 @@ export default function OfferLetterPage() {
   const netTakeHome = Number(offer.offeredCTC) - pfAmt - esicAmt - foodAmt - travelAmt;
   const companyName = offer.company?.name ?? "Company";
   const companyIcon = offer.company?.icon ?? "";
-  const isMonthlySalary = offer.salaryType === "per-month";
-  const compensationPeriod = isMonthlySalary ? "Per Month" : "Per Annum";
-  const amountPeriodLabel = isMonthlySalary ? "month" : "year";
+  const salaryType = offer.salaryType || "per-annum";
+  const PAY_LABELS: Record<string, string> = { "per-annum": "Per Annum", "per-month": "Per Month", "per-day": "Per Day", "per-hour": "Per Hour" };
+  const PERIOD_LABELS: Record<string, string> = { "per-annum": "year", "per-month": "month", "per-day": "day", "per-hour": "hour" };
+  const compensationPeriod = PAY_LABELS[salaryType] || "Per Annum";
+  const amountPeriodLabel = PERIOD_LABELS[salaryType] || "year";
+  const currencySymbol = (({ INR: "₹", USD: "$", EUR: "€", GBP: "£", JPY: "¥" } as Record<string, string>)[String(offer.currency || "INR").toUpperCase()]) || "₹";
 
   return (
     <div className="min-h-screen bg-slate-100 print:bg-white">
@@ -194,35 +198,35 @@ export default function OfferLetterPage() {
                 <tbody className="divide-y divide-slate-100">
                   <tr className="bg-white">
                     <td className="px-4 py-2.5 text-slate-700 print:px-2 print:py-1">Gross CTC</td>
-                    <td className="px-4 py-2.5 text-right font-medium text-slate-900 print:px-2 print:py-1">₹{Number(offer.offeredCTC).toLocaleString()}</td>
+                    <td className="px-4 py-2.5 text-right font-medium text-slate-900 print:px-2 print:py-1">{currencySymbol}{Number(offer.offeredCTC).toLocaleString()}</td>
                   </tr>
                   {pfAmt > 0 ? (
                     <tr className="bg-white">
                       <td className="px-4 py-2.5 text-slate-600 print:px-2 print:py-1">- PF Deduction</td>
-                      <td className="px-4 py-2.5 text-right text-rose-600 print:px-2 print:py-1">- ₹{pfAmt.toLocaleString()}</td>
+                      <td className="px-4 py-2.5 text-right text-rose-600 print:px-2 print:py-1">- {currencySymbol}{pfAmt.toLocaleString()}</td>
                     </tr>
                   ) : null}
                   {esicAmt > 0 ? (
                     <tr className="bg-white">
                       <td className="px-4 py-2.5 text-slate-600 print:px-2 print:py-1">- ESIC Deduction</td>
-                      <td className="px-4 py-2.5 text-right text-rose-600 print:px-2 print:py-1">- ₹{esicAmt.toLocaleString()}</td>
+                      <td className="px-4 py-2.5 text-right text-rose-600 print:px-2 print:py-1">- {currencySymbol}{esicAmt.toLocaleString()}</td>
                     </tr>
                   ) : null}
                   {foodAmt > 0 ? (
                     <tr className="bg-white">
                       <td className="px-4 py-2.5 text-slate-600 print:px-2 print:py-1">- Food Accommodation</td>
-                      <td className="px-4 py-2.5 text-right text-rose-600 print:px-2 print:py-1">- ₹{foodAmt.toLocaleString()}</td>
+                      <td className="px-4 py-2.5 text-right text-rose-600 print:px-2 print:py-1">- {currencySymbol}{foodAmt.toLocaleString()}</td>
                     </tr>
                   ) : null}
                   {travelAmt > 0 ? (
                     <tr className="bg-white">
                       <td className="px-4 py-2.5 text-slate-600 print:px-2 print:py-1">- Travel Accommodation</td>
-                      <td className="px-4 py-2.5 text-right text-rose-600 print:px-2 print:py-1">- ₹{travelAmt.toLocaleString()}</td>
+                      <td className="px-4 py-2.5 text-right text-rose-600 print:px-2 print:py-1">- {currencySymbol}{travelAmt.toLocaleString()}</td>
                     </tr>
                   ) : null}
                   <tr className="bg-emerald-50">
                     <td className="px-4 py-2.5 font-semibold text-emerald-800 print:px-2 print:py-1">Net Take-Home (Approx)</td>
-                    <td className="px-4 py-2.5 text-right font-bold text-emerald-800 print:px-2 print:py-1">₹{netTakeHome.toLocaleString()}</td>
+                    <td className="px-4 py-2.5 text-right font-bold text-emerald-800 print:px-2 print:py-1">{currencySymbol}{netTakeHome.toLocaleString()}</td>
                   </tr>
                 </tbody>
               </table>

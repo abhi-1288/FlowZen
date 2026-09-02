@@ -34,6 +34,7 @@ export default function OfferDetailPage() {
   const jobTitle = offer.job && typeof offer.job === "object"
     ? (offer.job as any).title : "";
   const salaryPeriodLabel = offer.salaryType === "per-month" ? "month" : offer.salaryType === "per-day" ? "day" : offer.salaryType === "per-hour" ? "hour" : "year";
+  const currencySymbol = (({ INR: "₹", USD: "$", EUR: "€", GBP: "£", JPY: "¥" } as Record<string, string>)[String(offer.currency || "INR").toUpperCase()]) || "₹";
 
   return (
     <div className="p-6 max-w-2xl">
@@ -74,19 +75,19 @@ export default function OfferDetailPage() {
           <div className="space-y-0 divide-y divide-slate-100 px-5 py-3">
             <div className="flex items-center justify-between py-2">
               <span className="text-sm text-slate-600">Gross CTC</span>
-              <span className="text-sm font-semibold text-slate-900">₹{Number(offer.offeredCTC).toLocaleString()}</span>
+              <span className="text-sm font-semibold text-slate-900">{currencySymbol}{Number(offer.offeredCTC).toLocaleString()}</span>
             </div>
             <div className="flex items-center justify-between py-2">
               <span className="text-sm text-slate-600">PF Deduction</span>
-              <span className="text-sm text-rose-600">- ₹{Number(offer.pfAmount || 0).toLocaleString()}</span>
+              <span className="text-sm text-rose-600">- {currencySymbol}{Number(offer.pfAmount || 0).toLocaleString()}</span>
             </div>
             <div className="flex items-center justify-between py-2">
               <span className="text-sm text-slate-600">ESIC Deduction</span>
-              <span className="text-sm text-rose-600">- ₹{Number(offer.esicAmount || 0).toLocaleString()}</span>
+              <span className="text-sm text-rose-600">- {currencySymbol}{Number(offer.esicAmount || 0).toLocaleString()}</span>
             </div>
             <div className="flex items-center justify-between py-2">
               <span className="text-sm font-semibold text-slate-900">Net Take-Home (Approx)</span>
-              <span className="text-sm font-semibold text-emerald-600">₹{Number(offer.offeredCTC - (offer.pfAmount || 0) - (offer.esicAmount || 0)).toLocaleString()}</span>
+              <span className="text-sm font-semibold text-emerald-600">{currencySymbol}{Number(offer.offeredCTC - (offer.pfAmount || 0) - (offer.esicAmount || 0)).toLocaleString()}</span>
             </div>
           </div>
           {offer.pfAmount || offer.esicAmount ? (

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FileText, ExternalLink, ChevronRight, ChevronDown, PenSquare, Send, ChevronLeft, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
+import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
 
 const LIMIT = 10;
 
@@ -139,7 +140,7 @@ export function OffersTab() {
                               <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                                 <span>{offer.designation}</span>
                                 <span>&middot;</span>
-                                <span>?{Number(offer.offeredCTC).toLocaleString()}/{salaryPeriodLabel}</span>
+                                <span>{CURRENCY_SYMBOLS[offer.currency] || "₹"}{Number(offer.offeredCTC).toLocaleString()}/{salaryPeriodLabel}</span>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0 ml-3">

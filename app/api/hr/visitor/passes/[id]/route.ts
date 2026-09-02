@@ -9,6 +9,7 @@ import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
 import { sendMail } from "@/lib/mailer";
 import { visitorPassIdCardContent } from "@/lib/email-templates";
+import { buildOrigin } from "@/lib/candidate-portal";
 
 async function generateIdentityCode({
   companyId,
@@ -161,8 +162,7 @@ export async function PATCH(
 
     // Send email to visitor with temporary ID card
     if (pass.visitorEmail) {
-      const baseUrl =
-        process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const baseUrl = buildOrigin(request);
       const verifyUrl = `${baseUrl}/verify-visitor/${pass.identityCode}`;
       const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(verifyUrl)}`;
 

@@ -5,6 +5,7 @@ import { databaseUnavailable, jsonError } from "@/lib/api";
 import { createMagicLinkToken } from "@/lib/codes";
 import { sendMail } from "@/lib/mailer";
 import { passwordResetEmailContent } from "@/lib/email-templates";
+import { buildOrigin } from "@/lib/candidate-portal";
 import { User } from "@/models/User";
 
 export async function POST(request: Request) {
@@ -29,12 +30,7 @@ export async function POST(request: Request) {
   user.passwordResetExpiresAt = new Date(Date.now() + 1000 * 60 * 15);
   await user.save();
 
-  const origin =
-    process.env.NODE_ENV === "development"
-      ? new URL(request.url).origin
-      : process.env.NEXT_PUBLIC_APP_URL ||
-        new URL(request.url).origin ||
-        process.env.NEXTAUTH_URL;
+  const origin = buildOrigin(request);
   const magicLink = `${origin}/reset-password?token=${encodeURIComponent(token)}`;
 
   try {

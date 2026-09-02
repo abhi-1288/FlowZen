@@ -25,6 +25,8 @@ export * from "./Task";
 export * from "./Team";
 export * from "./User";
 export * from "./Message";
+export * from "./GameScore";
+export * from "./GameChallenge";
 
 // Importing the files above has the side-effect of registering mongoose models
 // with `mongoose.models`. Consumers can import from this module to ensure

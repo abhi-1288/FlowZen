@@ -46,13 +46,14 @@ export async function findInterviewPassByCode(companyId: string, code: string) {
 
 export function buildOrigin(request: Request): string {
   const urlOrigin = new URL(request.url).origin;
-  return (
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (process.env.NODE_ENV === "development" ? urlOrigin : "") ||
-    process.env.NEXTAUTH_URL ||
-    urlOrigin ||
-    "http://localhost:3000"
-  );
+  return process.env.NODE_ENV === "development"
+    ? process.env.NEXT_DEV_APP_URL?.replace(/\/+$/, "") ||
+        urlOrigin ||
+        "http://localhost:3000"
+    : process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, "") ||
+        process.env.NEXTAUTH_URL?.replace(/\/+$/, "") ||
+        urlOrigin ||
+        "http://localhost:3000";
 }
 
 /**

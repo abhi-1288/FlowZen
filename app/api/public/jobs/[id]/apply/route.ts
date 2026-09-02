@@ -17,6 +17,7 @@ import { sendMail } from "@/lib/mailer";
 import { applicationReceivedContent } from "@/lib/email-templates";
 import { autoCloseOverdueJobs } from "@/lib/recruitment-utils";
 import { parseResume } from "@/lib/resume-parser";
+import { buildOrigin } from "@/lib/candidate-portal";
 
 export async function POST(
   request: Request,
@@ -173,12 +174,7 @@ export async function POST(
     portalAccessToken: token,
   });
 
-  const origin =
-    process.env.NODE_ENV === "development"
-      ? new URL(request.url).origin
-      : process.env.NEXT_PUBLIC_APP_URL ||
-        new URL(request.url).origin ||
-        process.env.NEXTAUTH_URL;
+  const origin = buildOrigin(request);
   const portalLink = `${origin}/candidate-portal?token=${encodeURIComponent(token)}`;
 
   try {

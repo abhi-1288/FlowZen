@@ -81,6 +81,8 @@ type InterviewData = {
 type OfferData = {
   id: string;
   offeredCTC: number;
+  salaryType?: string;
+  currency?: string;
   pfAmount: number;
   esicAmount: number;
   joiningDate: string | null;
@@ -649,7 +651,7 @@ function CandidatePortalInner() {
                 <div className="mt-5 grid gap-3 sm:grid-cols-2">
                   <OfferTile accent={accent} label="Designation" value={offer.designation} />
                   <OfferTile accent={accent} label="Department" value={offer.department || "N/A"} />
-                  <OfferTile accent={accent} label="Offered CTC" value={`₹${Number(offer.offeredCTC).toLocaleString()}/year`} />
+                  <OfferTile accent={accent} label="Offered CTC" value={`${CURRENCY_SYMBOLS[offer.currency || "INR"] || "₹"}${Number(offer.offeredCTC).toLocaleString()}/${offer.salaryType === "per-month" ? "mo" : offer.salaryType === "per-day" ? "day" : offer.salaryType === "per-hour" ? "hr" : "yr"}`} />
                   {offer.joiningDate ? (
                     <OfferTile
                       accent={accent}

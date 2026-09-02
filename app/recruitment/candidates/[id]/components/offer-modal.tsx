@@ -54,9 +54,17 @@ export default function OfferModal({
   }, [modal?.type, jobId, fetchJob]);
 
   const job = activeJob;
-  const salaryType = job?.salaryType === "per-month" ? "per-month" : "per-annum";
-  const salaryLabel = salaryType === "per-month" ? "per month" : "per annum";
-  const currencySymbol = CURRENCY_SYMBOLS[job?.currency ?? "INR"] ?? "₹";
+  const ALL_SALARY_TYPES = ["per-annum", "per-month", "per-day", "per-hour"];
+  const salaryType = job && ALL_SALARY_TYPES.includes(job.salaryType) ? job.salaryType : "per-annum";
+  const SALARY_LABELS: Record<string, string> = {
+    "per-annum": "per annum",
+    "per-month": "per month",
+    "per-day": "per day",
+    "per-hour": "per hour",
+  };
+  const salaryLabel = SALARY_LABELS[salaryType] || "per annum";
+  const currency = job?.currency || "INR";
+  const currencySymbol = CURRENCY_SYMBOLS[currency] ?? "₹";
   const salaryMin = Math.max(0, Number(job?.salaryRangeMin || 0));
   const salaryMax = Math.max(salaryMin, Number(job?.salaryRangeMax || 0));
   const hasSalaryRange = salaryMax > salaryMin;
@@ -91,6 +99,7 @@ export default function OfferModal({
       candidate: candidateId,
       offeredCTC: selectedCTC,
       salaryType,
+      currency,
       pfAmount: Number(form.get("pfAmount") || 0),
       esicAmount: Number(form.get("esicAmount") || 0),
       joiningDate: String(form.get("joiningDate") || ""),

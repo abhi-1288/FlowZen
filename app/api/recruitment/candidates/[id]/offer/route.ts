@@ -64,7 +64,10 @@ export async function POST(request: Request, { params }: Params) {
     candidate: candidate._id,
     job: jobId,
     offeredCTC: Number(body.offeredCTC),
-    salaryType: body.salaryType === "per-month" ? "per-month" : "per-annum",
+    salaryType: ["per-annum", "per-month", "per-day", "per-hour"].includes(body.salaryType)
+      ? body.salaryType
+      : "per-annum",
+    currency: String(body.currency || "INR").toUpperCase(),
     pfAmount: Number(body.pfAmount || 0),
     esicAmount: Number(body.esicAmount || 0),
     joiningDate: body.joiningDate ? new Date(body.joiningDate) : null,

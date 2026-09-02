@@ -15,10 +15,21 @@ import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
 import { sendMail } from "@/lib/mailer";
 import { employeeAccountContent } from "@/lib/email-templates";
+import { buildOrigin } from "@/lib/candidate-portal";
+import { parseResumeFromUrl } from "@/lib/resume-parser";
 
 type Params = { params: Promise<{ id: string }> };
 const HR_ROLES = ["admin", "human-resource"];
 const ALLOWED_CONVERT_ROLES = ["employee", "project-manager", "qa-tester", "human-resource", "finance", "security", "others"];
+
+function parseDobString(value: string): Date | null {
+  const m = value.trim().match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (!m) return null;
+  const [, d, mo, yRaw] = m;
+  const year = Number(yRaw) < 100 ? 2000 + Number(yRaw) : Number(yRaw);
+  const date = new Date(year, Number(mo) - 1, Number(d));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
 
 export async function POST(request: Request, { params }: Params) {
   const { id } = await params;
@@ -106,7 +117,28 @@ export async function POST(request: Request, { params }: Params) {
     dailyRate: payBasis === "per-day" ? offerCTC : 0,
   });
 
-  const loginUrl = `${process.env.NODE_ENV === "development" ? request.headers.get("origin") || (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000") : process.env.NEXT_PUBLIC_APP_URL}/login`;
+  // Best-effort: auto-fill empty personal details from the candidate's resume.
+  if (candidate.resumeUrl) {
+    try {
+      const parsedResume = await parseResumeFromUrl(String(candidate.resumeUrl));
+      const hasDob = Boolean(candidate.dob);
+      if (!employee.phone && parsedResume.phone) employee.phone = parsedResume.phone;
+      if (!hasDob && parsedResume.dob) {
+        const dob = parseDobString(parsedResume.dob);
+        if (dob && !Number.isNaN(dob.getTime())) employee.dob = dob;
+      }
+      if (!employee.address && parsedResume.address) employee.address = parsedResume.address;
+      if (!employee.bloodGroup && parsedResume.bloodGroup) employee.bloodGroup = parsedResume.bloodGroup;
+      if (!employee.emergencyContact && parsedResume.emergencyContact) employee.emergencyContact = parsedResume.emergencyContact;
+      if (employee.isModified("phone") || employee.isModified("dob") || employee.isModified("address") || employee.isModified("bloodGroup") || employee.isModified("emergencyContact")) {
+        await employee.save();
+      }
+    } catch (resumeError) {
+      console.error("Resume auto-fill failed:", resumeError);
+    }
+  }
+
+  const loginUrl = `${buildOrigin(request)}/login`;
 
   try {
     const emailContent = employeeAccountContent({
@@ -146,6 +178,7 @@ export async function POST(request: Request, { params }: Params) {
       department: job?.department || "",
       offeredCTC: acceptedOffer?.offeredCTC || 0,
       salaryType: acceptedOffer?.salaryType || "per-annum",
+      currency: acceptedOffer?.currency || "INR",
     },
   });
 

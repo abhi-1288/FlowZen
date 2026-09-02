@@ -138,6 +138,8 @@ export async function PATCH(request: Request, { params }: Params) {
     const force = Boolean(body.force);
     const rejectionReason = String(body.reason ?? "").trim();
     const salaryCurrency = typeof body.salaryCurrency === "string" && body.salaryCurrency.trim() ? body.salaryCurrency.trim().toUpperCase() : undefined;
+    const employmentType = typeof body.employmentType === "string" ? body.employmentType.trim() : "";
+    const employmentEndDateRaw = typeof body.employmentEndDate === "string" ? body.employmentEndDate : "";
 
     await connectDb();
     const joinRequest = await JoinRequest.findById(id);
@@ -235,16 +237,29 @@ export async function PATCH(request: Request, { params }: Params) {
     if (joinRequest.kind === "company") {
       requester.companyStatus = status;
       if (status === "approved") {
-        let salaryAmount = Math.max(0, Number(body.salaryAmount ?? 0));
         const joinMeta = (joinRequest.metadata ?? {}) as Record<string, unknown>;
-        let payBasis = "per-annum";
+        let salaryAmount = Math.max(0, Number(body.salaryAmount ?? 0));
+        let metaSalaryType = "per-annum";
+        if (String(joinMeta.salaryType ?? "")) {
+          const st = String(joinMeta.salaryType);
+          metaSalaryType = ["per-annum", "per-month", "per-day", "per-hour"].includes(st) ? st : "per-annum";
+        }
+        const periodToBasis: Record<string, string> = {
+          yearly: "per-annum",
+          monthly: "per-month",
+          daily: "per-day",
+          hourly: "per-hour",
+          "per-annum": "per-annum",
+          "per-month": "per-month",
+          "per-day": "per-day",
+          "per-hour": "per-hour",
+        };
+        let payBasis = String(body.salaryType ?? "") && periodToBasis[String(body.salaryType)] ? periodToBasis[String(body.salaryType)] : metaSalaryType;
         if (salaryAmount === 0) {
           const offeredCTC = Number(joinMeta.offeredCTC ?? 0);
           if (offeredCTC > 0) {
-            const salaryType = String(joinMeta.salaryType ?? "per-annum");
-            payBasis = ["per-annum", "per-month", "per-day", "per-hour"].includes(salaryType)
-              ? salaryType
-              : "per-annum";
+            const providedSalaryType = String(body.salaryType ?? "");
+            if (periodToBasis[providedSalaryType]) payBasis = periodToBasis[providedSalaryType];
             salaryAmount = payBasis === "per-annum" ? Math.round(offeredCTC / 12) : offeredCTC;
           }
         }
@@ -630,6 +645,30 @@ export async function PATCH(request: Request, { params }: Params) {
       }
     }
 
+    if (joinRequest.kind === "employment-type") {
+      if (status === "approved") {
+        const meta = (joinRequest.metadata ?? {}) as Record<string, unknown>;
+        const validTypes = ["full-time", "part-time", "contract", "internship"];
+        const chosen = employmentType || String(meta.employmentType ?? "");
+        if (!validTypes.includes(chosen)) {
+          return jsonError("A valid employment type is required to approve.", 400);
+        }
+        const target = await User.findById(joinRequest.requester).select("name employmentType employmentEndDate company companyStatus");
+        if (!target) return jsonError("Requesting user not found.", 404);
+        if (String(target.company ?? "") === String(joinRequest.company)) {
+          target.employmentType = chosen;
+          const endRaw = employmentEndDateRaw || String(meta.employmentEndDate ?? "");
+          if (endRaw) {
+            const end = new Date(endRaw);
+            target.employmentEndDate = !Number.isNaN(end.getTime()) ? end : null;
+          } else {
+            target.employmentEndDate = null;
+          }
+          await target.save();
+        }
+      }
+    }
+
     if (joinRequest.kind === "quit-team") {
       if (status === "approved") {
         const teamId = joinRequest.team;
@@ -822,6 +861,13 @@ export async function PATCH(request: Request, { params }: Params) {
         status === "approved"
           ? "Your ID card has been approved. You can now view it from your profile."
           : `Your ID card request was declined.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`;
+    } else if (joinRequest.kind === "employment-type") {
+      const empType = String((joinRequest.metadata as any)?.employmentType ?? "").replace(/-/g, " ");
+      title = status === "approved" ? "Employment type approved" : "Employment type request rejected";
+      message =
+        status === "approved"
+          ? `Your employment type has been set to ${empType || "not specified"}.`
+          : `Your employment type request was rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`;
     }
 
     const notificationLink =

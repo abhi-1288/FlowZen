@@ -126,6 +126,11 @@ export function PersonalInfoSection({
   const [otpError, setOtpError] = useState("");
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  const [empReqOpen, setEmpReqOpen] = useState(false);
+  const [empReqType, setEmpReqType] = useState("");
+  const [empReqEndDate, setEmpReqEndDate] = useState("");
+  const [empReqSending, setEmpReqSending] = useState(false);
+
   const oldName = profile?.name ? String(profile.name) : "";
   const oldPhone = profile?.phone ? String(profile.phone) : "";
   const oldDob = profile?.dob ? String(profile.dob).slice(0, 10) : "";
@@ -243,6 +248,37 @@ export function PersonalInfoSection({
     }
   }
 
+  function openEmploymentRequest() {
+    setEmpReqType("");
+    setEmpReqEndDate("");
+    setEmpReqOpen(true);
+  }
+
+  async function handleEmploymentRequest(event: FormEvent) {
+    event.preventDefault();
+    if (!empReqType) {
+      showToast("Please choose an employment type.", "error");
+      return;
+    }
+    setEmpReqSending(true);
+    try {
+      await apiFetch("/api/profile/employment-type/request", {
+        method: "POST",
+        body: JSON.stringify({
+          employmentType: empReqType,
+          employmentEndDate: empReqEndDate || null,
+        }),
+      });
+      setEmpReqOpen(false);
+      showToast("Employment type request sent to HR.");
+      await refresh(true);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to send employment type request.", "error");
+    } finally {
+      setEmpReqSending(false);
+    }
+  }
+
   return (
     <section className="rounded-xl neu-card p-5 dark:bg-[#000000] dark:border-zinc-800">
       <SectionHeader title="Personal Info" description="Basic details and identity" accent="indigo" />
@@ -309,6 +345,15 @@ export function PersonalInfoSection({
         <Row label="Blood Group" value={profile?.bloodGroup ? String(profile.bloodGroup) : undefined} />
         {oldRegionLabel ? <Row label="Region" value={oldRegionLabel} /> : null}
         <Row label="Role" value={effectiveRole ? displayRole : undefined} />
+        <Row label="Employment Type" value={profile?.employmentType ? String(profile.employmentType).replace(/-/g, " ") : undefined} />
+        {!profile?.employmentType ? (
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-400">No employment type assigned</span>
+            <button className="text-xs font-medium text-indigo-600 hover:text-indigo-800 shrink-0 ml-4" onClick={openEmploymentRequest} type="button">
+              Request
+            </button>
+          </div>
+        ) : null}
         <Row label="Unique Identity" value={profile?.companyIdentityCode ? String(profile.companyIdentityCode) : undefined} />
         {profile?.employmentEndDate ? (
           <Row
@@ -574,6 +619,56 @@ export function PersonalInfoSection({
                 </button>
               </form>
             )}
+          </div>
+        </div>
+      ) : null}
+
+      {empReqOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
+          <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl">
+            <h3 className="mb-1 text-sm font-semibold text-slate-800">Request Employment Type</h3>
+            <p className="mb-4 text-xs text-slate-500">Your request will be sent to HR for approval.</p>
+            <form className="space-y-3" onSubmit={handleEmploymentRequest}>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-500">Employment Type</label>
+                <select
+                  className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
+                  value={empReqType}
+                  onChange={(e) => setEmpReqType(e.target.value)}
+                >
+                  <option value="">— Choose type —</option>
+                  <option value="full-time">Full-time</option>
+                  <option value="part-time">Part-time</option>
+                  <option value="contract">Contract</option>
+                  <option value="internship">Internship</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-500">Employment End Date <span className="text-slate-400 italic">(Optional)</span></label>
+                <input
+                  type="date"
+                  className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
+                  value={empReqEndDate}
+                  onChange={(e) => setEmpReqEndDate(e.target.value)}
+                />
+              </div>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-md border border-slate-300 px-4 py-1.5 text-xs text-slate-600 hover:bg-[var(--c-bg-muted)]"
+                  onClick={() => setEmpReqOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="neu-btn neu-btn-primary rounded-full px-4 py-1.5 text-xs font-medium"
+                  disabled={empReqSending}
+                >
+                  {empReqSending ? "Sending..." : "Send Request"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       ) : null}

@@ -29,6 +29,7 @@ export function MemberListModal({
   onRefresh,
   regionOptions = [],
   onOpenRegionModal,
+  onOpenEmploymentModal,
 }: {
   modalRole: string | null;
   members: AnyRecord[];
@@ -53,6 +54,7 @@ export function MemberListModal({
   onRefresh?: (silent?: boolean) => Promise<void>;
   regionOptions?: string[];
   onOpenRegionModal?: (member: AnyRecord) => void;
+  onOpenEmploymentModal?: (member: AnyRecord) => void;
 }) {
   const modalMembers = useMemo(() => {
     if (!modalRole) return [];
@@ -263,6 +265,11 @@ export function MemberListModal({
                           {onOpenRegionModal ? (
                             <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenRegionModal(member)}>
                               <Building2 className="mr-1 inline-block h-3.5 w-3.5" />Region
+                            </ActionButton>
+                          ) : null}
+                          {onOpenEmploymentModal ? (
+                            <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenEmploymentModal(member)}>
+                              Employment Type
                             </ActionButton>
                           ) : null}
                           <ActionButton variant="danger" className="px-3" type="button" disabled={revokingIdCardFor === memberId} onClick={() => revokeIdCard(memberId)}>

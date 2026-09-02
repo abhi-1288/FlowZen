@@ -60,7 +60,7 @@ export async function GET() {
     if (String(actor.role) === "admin" && actor.company) {
       const companyPendingRequests = await JoinRequest.find({
         company: actor.company,
-        kind: { $in: ["company", "identity-code", "quit-company", "quit-company-board-transfer", "role-transfer", "region-address"] },
+        kind: { $in: ["company", "identity-code", "quit-company", "quit-company-board-transfer", "role-transfer", "region-address", "employment-type"] },
         status: "pending",
       })
         .sort({ createdAt: -1 })

@@ -16,7 +16,8 @@ type OfferLetterCompany = {
 
 type OfferLetterOffer = {
   offeredCTC?: number;
-  salaryType?: "per-annum" | "per-month";
+  salaryType?: "per-annum" | "per-month" | "per-day" | "per-hour";
+  currency?: string;
   pfAmount?: number;
   esicAmount?: number;
   joiningDate?: Date | string | null;
@@ -45,6 +46,14 @@ export type RecruitmentOfferLetterInput = {
   dispositionFilename?: string;
 };
 
+const CURRENCY_SYMBOL: Record<string, string> = {
+  INR: "₹",
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  JPY: "¥",
+};
+
 function escapeHtml(value: unknown) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -54,8 +63,9 @@ function escapeHtml(value: unknown) {
     .replace(/'/g, "&#39;");
 }
 
-function formatCurrency(value: number) {
-  return `&#8377;${Number(value || 0).toLocaleString("en-IN")}`;
+function formatCurrency(value: number, currency: string) {
+  const sym = CURRENCY_SYMBOL[String(currency || "INR").toUpperCase()] ?? "₹";
+  return `${sym}${Number(value || 0).toLocaleString("en-IN")}`;
 }
 
 function formatDate(value: Date | string | null | undefined, options?: Intl.DateTimeFormatOptions) {
@@ -92,9 +102,22 @@ export function renderRecruitmentOfferLetterHtml(input: RecruitmentOfferLetterIn
   const signedByName = offer.signedBy?.name || "";
   const signedByRole = offer.signedBy?.role || "";
   const signedAt = formatDate(offer.signedAt, { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) || "";
-  const isMonthlySalary = offer.salaryType === "per-month";
-  const compensationPeriod = isMonthlySalary ? "Per Month" : "Per Annum";
-  const amountPeriodLabel = isMonthlySalary ? "month" : "year";
+  const salaryType = offer.salaryType || "per-annum";
+  const PAY_LABELS: Record<string, string> = {
+    "per-annum": "Per Annum",
+    "per-month": "Per Month",
+    "per-day": "Per Day",
+    "per-hour": "Per Hour",
+  };
+  const PERIOD_LABELS: Record<string, string> = {
+    "per-annum": "year",
+    "per-month": "month",
+    "per-day": "day",
+    "per-hour": "hour",
+  };
+  const compensationPeriod = PAY_LABELS[salaryType] || "Per Annum";
+  const amountPeriodLabel = PERIOD_LABELS[salaryType] || "year";
+  const currency = String(offer.currency || "INR").toUpperCase();
 
   const detailsRows = [
     ["Candidate Name", candidateName],
@@ -107,12 +130,12 @@ export function renderRecruitmentOfferLetterHtml(input: RecruitmentOfferLetterIn
   ].filter(Boolean) as string[][];
 
   const compensationRows = [
-    `<tr><td>Gross CTC</td><td class="amount strong">${formatCurrency(offeredCTC)}</td></tr>`,
-    pfAmt > 0 ? `<tr><td>- PF Deduction</td><td class="amount deduction">- ${formatCurrency(pfAmt)}</td></tr>` : "",
-    esicAmt > 0 ? `<tr><td>- ESIC Deduction</td><td class="amount deduction">- ${formatCurrency(esicAmt)}</td></tr>` : "",
-    foodAmt > 0 ? `<tr><td>- Food Accommodation</td><td class="amount deduction">- ${formatCurrency(foodAmt)}</td></tr>` : "",
-    travelAmt > 0 ? `<tr><td>- Travel Accommodation</td><td class="amount deduction">- ${formatCurrency(travelAmt)}</td></tr>` : "",
-    `<tr class="net-row"><td>Net Take-Home (Approx)</td><td class="amount">${formatCurrency(netTakeHome)}</td></tr>`,
+    `<tr><td>Gross CTC</td><td class="amount strong">${formatCurrency(offeredCTC, currency)}</td></tr>`,
+    pfAmt > 0 ? `<tr><td>- PF Deduction</td><td class="amount deduction">- ${formatCurrency(pfAmt, currency)}</td></tr>` : "",
+    esicAmt > 0 ? `<tr><td>- ESIC Deduction</td><td class="amount deduction">- ${formatCurrency(esicAmt, currency)}</td></tr>` : "",
+    foodAmt > 0 ? `<tr><td>- Food Accommodation</td><td class="amount deduction">- ${formatCurrency(foodAmt, currency)}</td></tr>` : "",
+    travelAmt > 0 ? `<tr><td>- Travel Accommodation</td><td class="amount deduction">- ${formatCurrency(travelAmt, currency)}</td></tr>` : "",
+    `<tr class="net-row"><td>Net Take-Home (Approx)</td><td class="amount">${formatCurrency(netTakeHome, currency)}</td></tr>`,
   ].join("");
 
   const statusBadge = status
@@ -236,7 +259,7 @@ export function renderRecruitmentOfferLetterHtml(input: RecruitmentOfferLetterIn
       <div class="compensation">
         <table>
           <thead>
-            <tr><th>Component</th><th class="amount">Amount (&#8377;/${amountPeriodLabel})</th></tr>
+            <tr><th>Component</th><th class="amount">Amount (${CURRENCY_SYMBOL[currency] || "₹"}/${amountPeriodLabel})</th></tr>
           </thead>
           <tbody>${compensationRows}</tbody>
         </table>

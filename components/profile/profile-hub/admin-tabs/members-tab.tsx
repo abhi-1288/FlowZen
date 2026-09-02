@@ -71,6 +71,12 @@ export function MembersTab({
   const [regionLabelValue, setRegionLabelValue] = useState("");
   const [savingRegion, setSavingRegion] = useState(false);
 
+  /* ── Employment Type Modal ── */
+  const [employmentModalMember, setEmploymentModalMember] = useState<AnyRecord | null>(null);
+  const [employmentTypeValue, setEmploymentTypeValue] = useState("");
+  const [employmentEndDateValue, setEmploymentEndDateValue] = useState("");
+  const [savingEmployment, setSavingEmployment] = useState(false);
+
   function openSalaryModal(member: AnyRecord) {
     setSalaryInput(String(Math.max(0, Number(member.baseSalary ?? 0)) > 0 ? Number(member.baseSalary) : ""));
     setSalaryPeriodType("monthly");
@@ -145,6 +151,35 @@ export function MembersTab({
       showToast(err instanceof Error ? err.message : "Unable to update region.", "error");
     } finally {
       setSavingRegion(false);
+    }
+  }
+
+  function openEmploymentModal(member: AnyRecord) {
+    setEmploymentTypeValue(String(member.employmentType ?? ""));
+    setEmploymentEndDateValue(member.employmentEndDate ? String(member.employmentEndDate).slice(0, 10) : "");
+    setEmploymentModalMember(member);
+  }
+
+  async function saveEmploymentModal() {
+    const member = employmentModalMember;
+    const memberId = String(member?.id ?? "");
+    if (!memberId) return;
+    try {
+      setSavingEmployment(true);
+      await apiFetch(`/api/hr/member-employment/${memberId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          employmentType: employmentTypeValue,
+          employmentEndDate: employmentEndDateValue || null,
+        }),
+      });
+      showToast("Employment details updated.");
+      setEmploymentModalMember(null);
+      await refresh(true);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to update employment details.", "error");
+    } finally {
+      setSavingEmployment(false);
     }
   }
 
@@ -441,6 +476,7 @@ export function MembersTab({
         onRefresh={refresh}
         regionOptions={regionOptions}
         onOpenRegionModal={openRegionModal}
+        onOpenEmploymentModal={openEmploymentModal}
       />
 
       <FireModal
@@ -537,6 +573,59 @@ export function MembersTab({
                 onClick={saveRegionModal}
               >
                 {savingRegion ? "Saving..." : "Save"}
+              </ActionButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* ── Employment Type Modal ── */}
+      {employmentModalMember ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
+          <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl">
+            <h3 className="mb-3 text-sm font-semibold text-slate-800">
+              Employment Type — {String(employmentModalMember.name ?? "")}
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-500">Employment Type</label>
+                <select
+                  className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
+                  value={employmentTypeValue}
+                  onChange={(e) => setEmploymentTypeValue(e.target.value)}
+                >
+                  <option value="">— Not specified —</option>
+                  <option value="full-time">Full-time</option>
+                  <option value="part-time">Part-time</option>
+                  <option value="contract">Contract</option>
+                  <option value="internship">Internship</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-500">Employment End Date <span className="text-slate-400 text-italic">(Optional)</span> </label>
+                <input
+                  type="date"
+                  className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
+                  value={employmentEndDateValue}
+                  onChange={(e) => setEmploymentEndDateValue(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-md border border-slate-300 px-4 py-1.5 text-xs text-slate-600 hover:bg-[var(--c-bg-muted)]"
+                onClick={() => setEmploymentModalMember(null)}
+              >
+                Cancel
+              </button>
+              <ActionButton
+                variant="primary"
+                className="px-4"
+                disabled={savingEmployment}
+                onClick={saveEmploymentModal}
+              >
+                {savingEmployment ? "Saving..." : "Save"}
               </ActionButton>
             </div>
           </div>
