@@ -7,7 +7,7 @@ import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
 import { findApprovedAdminUserId, findApprovedHrUserId } from "@/lib/join-approvers";
 
-export const VALID_EMPLOYMENT_TYPES = ["full-time", "part-time", "contract", "internship"];
+const VALID_EMPLOYMENT_TYPES = ["full-time", "part-time", "contract", "internship"];
 
 export async function POST(request: Request) {
   const userId = await requireUserId();
