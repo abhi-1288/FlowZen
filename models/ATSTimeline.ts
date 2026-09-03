@@ -14,6 +14,7 @@ const ATSTimelineSchema = new Schema(
         "offer-generated",
         "offer-accepted",
         "offer-rejected",
+        "offer-recalled",
         "stage-changed",
         "joined",
         "rejected",

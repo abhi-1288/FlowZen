@@ -94,7 +94,7 @@ export function CareersTab() {
               )}
               {job.autoCloseDate && (
                 <p className="mt-2 text-xs text-slate-400">
-                  Closes: {new Date(job.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                  Closes: {new Date(job.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} {new Date(job.autoCloseDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
                 </p>
               )}
               <div className="mt-3 flex items-center gap-2">

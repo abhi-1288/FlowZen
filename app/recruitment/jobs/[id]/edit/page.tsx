@@ -21,6 +21,7 @@ export default function EditJobPage() {
   const [currency, setCurrency] = useState("INR");
   const [openings, setOpenings] = useState("1");
   const [autoCloseDate, setAutoCloseDate] = useState("");
+  const [autoCloseTime, setAutoCloseTime] = useState("");
   const [description, setDescription] = useState("");
   const [requiredSkills, setRequiredSkills] = useState("");
   const [status, setStatus] = useState("draft");
@@ -41,6 +42,7 @@ export default function EditJobPage() {
       setCurrency(activeJob.currency || "INR");
       setOpenings(String(activeJob.openings));
       setAutoCloseDate(activeJob.autoCloseDate ? activeJob.autoCloseDate.split("T")[0] : "");
+      setAutoCloseTime(activeJob.autoCloseDate ? new Date(activeJob.autoCloseDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : "");
       setDescription(activeJob.description);
       setRequiredSkills(activeJob.requiredSkills.join(", "));
       setStatus(activeJob.status);
@@ -77,7 +79,9 @@ export default function EditJobPage() {
       requiredExperienceYears: requiredExperienceYears ? Number(requiredExperienceYears) : null,
       atsScoreThreshold: atsScoreThreshold ? Number(atsScoreThreshold) : null,
       salaryRangeMin: Number(salaryRangeMin), salaryRangeMax: Number(salaryRangeMax), currency,
-      openings: Number(openings), autoCloseDate: autoCloseDate || null, description,
+      openings: Number(openings),
+      autoCloseDate: autoCloseDate ? (autoCloseTime ? `${autoCloseDate}T${autoCloseTime}:00` : `${autoCloseDate}T23:59:59`) : null,
+      description,
       requiredSkills: requiredSkills.split(",").map((s) => s.trim()).filter(Boolean),
       status: status as any,
     });
@@ -168,8 +172,11 @@ export default function EditJobPage() {
             <input value={openings} onChange={(e) => setOpenings(e.target.value)} type="number" min="1" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
           </label>
           <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">Auto-Close Date</span>
-            <input value={autoCloseDate} onChange={(e) => setAutoCloseDate(e.target.value)} type="date" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
+            <span className="mb-1 block text-sm font-medium text-slate-700">Auto-Close Date & Time</span>
+            <div className="flex gap-2">
+              <input value={autoCloseDate} onChange={(e) => setAutoCloseDate(e.target.value)} type="date" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
+              <input value={autoCloseTime} onChange={(e) => setAutoCloseTime(e.target.value)} type="time" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
+            </div>
           </label>
         </div>
         <label className="block">

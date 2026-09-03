@@ -40,6 +40,7 @@ type LetterData = {
     role: string;
     companyIdentityCode?: string;
     companyJoined?: string;
+    employmentEndDate?: string;
     baseSalary?: number;
     pfNumber?: string;
     pfDeductionAmount?: number;
@@ -101,6 +102,7 @@ const LETTER_TITLES: Record<string, string> = {
   "form-16": "Form 16",
   noc: "NOC Paper",
   "exit-agreement": "Exit Agreement",
+  "employee-recognition": "Employee Recognition Letter",
   other: "Certificate",
 };
 
@@ -292,6 +294,93 @@ function InternshipCertificateContent({
           <p className="mt-1 text-slate-700">{purpose}</p>
         </div>
       ) : null}
+
+      <LetterSignature signer={signer} />
+    </div>
+  );
+}
+
+function EmployeeRecognitionContent({
+  data, signer,
+}: {
+  data: LetterData; signer: LetterSigner | null;
+}) {
+  const name = data.metadata?.requesterName ?? data.requester?.name ?? "Employee";
+  const role = data.metadata?.requesterRole ?? data.requester?.role ?? "Member";
+  const companyName = data.company?.name ?? "Company";
+  const purpose = data.metadata?.purpose ?? "";
+  const identityCode = data.requester?.companyIdentityCode;
+
+  const startRaw = data.requester?.companyJoined ?? data.createdAt ?? "";
+  const endRaw = data.requester?.employmentEndDate ?? "";
+
+  const formatDate = (d: string) =>
+    new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+
+  const startDate = startRaw ? formatDate(startRaw) : "";
+  const endDate = endRaw ? formatDate(endRaw) : "Present";
+
+  const date = new Date().toLocaleDateString("en-IN", {
+    day: "numeric", month: "long", year: "numeric",
+  });
+
+  return (
+    <div className="space-y-5 text-sm leading-relaxed text-slate-800 print:space-y-2">
+      <p>Date: <strong>{date}</strong></p>
+
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 print:p-2">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 print:mb-1">Employee Details</h3>
+        <table className="w-full text-sm">
+          <tbody>
+            <tr>
+              <td className="py-1 pr-4 text-slate-500 print:py-0.5 align-top">Name</td>
+              <td className="py-1 font-medium text-slate-900 print:py-0.5">{name}</td>
+            </tr>
+            {identityCode ? (
+              <tr>
+                <td className="py-1 pr-4 text-slate-500 align-top">Unique Identity</td>
+                <td className="py-1 font-medium text-slate-900">{identityCode}</td>
+              </tr>
+            ) : null}
+            <tr>
+              <td className="py-1 pr-4 text-slate-500 align-top">Designation</td>
+              <td className="py-1 font-medium text-slate-900 capitalize">{role}</td>
+            </tr>
+            <tr>
+              <td className="py-1 pr-4 text-slate-500 align-top">Company</td>
+              <td className="py-1 font-medium text-slate-900">{companyName}</td>
+            </tr>
+            <tr>
+              <td className="py-1 pr-4 text-slate-500 align-top">Employment Period</td>
+              <td className="py-1 font-medium text-slate-900">{startDate || "—"} — {endDate}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        This is to recognize that <strong>{name}</strong> has been working with <strong>{companyName}</strong> in the
+        capacity of <strong>{role}</strong> from <strong>{startDate || "—"}</strong>{" "}
+        to <strong>{endDate}</strong>.
+        {endDate === "Present" ? " During this period, they continue to remain a valued member of the organization." : ""}
+      </p>
+
+      <p>
+        Throughout their tenure, they have demonstrated exceptional dedication, professionalism, and commitment,
+        contributing meaningfully to the growth and success of the organization. Their efforts and positive spirit
+        have earned them the appreciation and recognition of the management and their peers.
+      </p>
+
+      {purpose ? (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 print:p-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Purpose</p>
+          <p className="mt-1 text-slate-700">{purpose}</p>
+        </div>
+      ) : null}
+
+      <p className="text-xs text-slate-500 print:text-[9px]">
+        This recognition is issued upon request and verified by the company.
+      </p>
 
       <LetterSignature signer={signer} />
     </div>
@@ -908,6 +997,8 @@ export default function LetterPage() {
           <div className="space-y-4 text-sm leading-relaxed text-slate-800">
             <ResignationLetterContent data={data} signer={activeSigner} />
           </div>
+        ) : type === "employee-recognition" ? (
+          <EmployeeRecognitionContent data={data} signer={activeSigner} />
         ) : (
           <div className="space-y-4 text-sm leading-relaxed text-slate-800">
             <LetterBody data={data} signer={activeSigner} />

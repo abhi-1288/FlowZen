@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import {
   Briefcase, Users, Calendar, FileText, CheckCircle, TrendingUp,
   CalendarCheck, Activity, BarChart3,
-  UserPlus, UserCheck, ArrowRight, XCircle, Send,
+  UserPlus, UserCheck, ArrowRight, XCircle, Send, Undo2,
 } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { STAGE_LABELS, type Stage } from "@/lib/recruitment-types";
@@ -54,6 +54,7 @@ const ACTION_LABELS: Record<string, string> = {
   "offer-generated": "Offer generated",
   "offer-accepted": "Offer accepted",
   "offer-rejected": "Offer rejected",
+  "offer-recalled": "Offer re-called",
   "stage-changed": "Stage changed",
   joined: "Joined the company",
   rejected: "Rejected",
@@ -68,6 +69,7 @@ const ACTION_ICONS: Record<string, React.ComponentType<{ size?: number }>> = {
   "offer-generated": Send,
   "offer-accepted": CheckCircle,
   "offer-rejected": XCircle,
+  "offer-recalled": Undo2,
   "stage-changed": ArrowRight,
   joined: UserCheck,
   rejected: XCircle,

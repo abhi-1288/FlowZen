@@ -187,3 +187,47 @@ export async function PATCH(request: Request, { params }: Params) {
 
   return NextResponse.json({ offer: serializeDoc(offer) });
 }
+
+export async function DELETE(_request: Request, { params }: Params) {
+  const { id } = await params;
+  const userId = await requireUserId();
+  if (!userId) return jsonError("Unauthorized", 401);
+  if (!isObjectId(id)) return jsonError("Invalid offer id.");
+
+  await connectDb();
+  const user = await User.findById(userId);
+  if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  if (!user.company) return jsonError("No company found.", 400);
+
+  const offer = await ATSOffer.findOne({ _id: id, company: user.company });
+  if (!offer) return jsonError("Offer not found.", 404);
+
+  if (offer.status === "accepted") {
+    return jsonError("Accepted offers cannot be re-called. Please contact an admin.", 400);
+  }
+
+  const candId = String(offer.candidate);
+  const jobId = String(offer.job);
+
+  await ATSTimeline.create({
+    candidate: candId,
+    job: jobId,
+    action: "offer-recalled",
+    metadata: { offerId: id, status: offer.status },
+    actor: userId,
+    company: user.company,
+  });
+
+  await ATSAuditLog.create({
+    actor: userId,
+    action: "delete-offer",
+    entityType: "ATSOffer",
+    entityId: offer._id,
+    metadata: { status: offer.status },
+    company: user.company,
+  });
+
+  await offer.deleteOne();
+
+  return NextResponse.json({ ok: true });
+}

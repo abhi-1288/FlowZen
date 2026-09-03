@@ -23,6 +23,7 @@ type ModalState =
   | { type: "edit-interview"; interviewId: string }
   | { type: "add-feedback"; interviewId: string }
   | { type: "generate-offer"; candidateId: string }
+  | { type: "edit-offer"; offerId: string }
   | { type: "view-offer"; offerId: string }
   | { type: "view-job-description"; jobId: string }
   | { type: "delete-job"; jobId: string }
@@ -92,6 +93,7 @@ type RecruitmentStore = {
   fetchReferrals: (params?: Record<string, string>) => Promise<void>;
   createReferral: (data: { candidateId: string; referralBonusEligible: boolean }) => Promise<void>;
   signOffer: (id: string) => Promise<void>;
+  deleteOffer: (id: string) => Promise<void>;
 
   uploadResume: (candidateId: string, file: File) => Promise<void>;
 };
@@ -497,6 +499,18 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
       set((state) => ({
         offers: state.offers.map((o) => (o.id === id ? offer : o)),
       }));
+    } finally {
+      set({ saving: false });
+    }
+  },
+
+  deleteOffer: async (id) => {
+    set({ saving: true, error: null });
+    try {
+      await apiFetch<{ ok: true }>(`/api/recruitment/offers/${id}`, {
+        method: "DELETE",
+      });
+      set((state) => ({ offers: state.offers.filter((o) => o.id !== id) }));
     } finally {
       set({ saving: false });
     }

@@ -175,7 +175,7 @@ export default function CareersPage() {
                       )}
                       {job.autoCloseDate && (
                         <p className="mt-3 text-xs text-slate-400 dark:text-zinc-500">
-                          Closes: {new Date(job.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                          Closes: {new Date(job.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} {new Date(job.autoCloseDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
                         </p>
                       )}
                       <span className="neu-btn neu-btn-primary mt-5 block w-full rounded-full px-5 py-2.5 text-center text-sm font-medium transition-all duration-200 group-">

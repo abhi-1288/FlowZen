@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, FileText, ExternalLink, PenSquare, Send, CheckCircle } from "lucide-react";
+import { ArrowLeft, FileText, ExternalLink, PenSquare, Send, CheckCircle, Undo2 } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useSession } from "next-auth/react";
 import type { ATSOffer } from "@/lib/recruitment-types";
+import EditOfferModal from "@/components/recruitment/edit-offer-modal";
 
 export default function CandidateOfferPage() {
   const params = useParams()!;
@@ -14,9 +15,10 @@ export default function CandidateOfferPage() {
   const { data: session } = useSession();
   const role = session?.user?.role ?? "";
   const isHr = role === "admin" || role === "human-resource";
-  const { offers, fetchOffers, updateOffer, signOffer, saving } = useRecruitmentStore();
+  const { offers, fetchOffers, updateOffer, signOffer, deleteOffer, saving, setModal } = useRecruitmentStore();
 
   const [loading, setLoading] = useState(true);
+  const [recalling, setRecalling] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -137,6 +139,30 @@ export default function CandidateOfferPage() {
           >
             <FileText size={16} /> View Offer Letter
           </a>
+          {offer.status !== "accepted" && (
+            <button
+              onClick={() => setModal({ type: "edit-offer", offerId: offer.id })}
+              className="neu-btn inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium"
+            >
+              <PenSquare size={16} /> Edit Offer
+            </button>
+          )}
+          {offer.status !== "accepted" && (
+            <button
+              onClick={async () => {
+                if (recalling) return;
+                if (!window.confirm("Re-call this offer? This will remove the offer letter from the candidate.")) return;
+                setRecalling(true);
+                await deleteOffer(offer.id);
+                setRecalling(false);
+                router.push("/recruitment/offers");
+              }}
+              disabled={recalling}
+              className="neu-btn inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Undo2 size={16} /> {recalling ? "Re-calling…" : "Re-call Offer"}
+            </button>
+          )}
           <button
             onClick={() => router.push("/recruitment/offers")}
             className="inline-flex items-center gap-2 rounded-lg border border-[var(--c-border-light)] px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
@@ -197,6 +223,7 @@ export default function CandidateOfferPage() {
           </button>
         </div>
       </div>
+      <EditOfferModal />
     </div>
   );
 }

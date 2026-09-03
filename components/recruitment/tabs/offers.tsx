@@ -2,21 +2,23 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, ExternalLink, ChevronRight, ChevronDown, PenSquare, Send, ChevronLeft, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { FileText, ExternalLink, ChevronRight, ChevronDown, PenSquare, Send, ChevronLeft, ChevronsLeft, ChevronsRight, Undo2 } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
 import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
+import EditOfferModal from "@/components/recruitment/edit-offer-modal";
 
 const LIMIT = 10;
 
 export function OffersTab() {
   const router = useRouter();
-  const { offers, loading, totalOffers, fetchOffers, updateOffer, signOffer, saving } = useRecruitmentStore(
-    useShallow((s) => ({ offers: s.offers, loading: s.loading, totalOffers: s.totalOffers, fetchOffers: s.fetchOffers, updateOffer: s.updateOffer, signOffer: s.signOffer, saving: s.saving }))
+  const { offers, loading, totalOffers, fetchOffers, updateOffer, signOffer, deleteOffer, saving, setModal } = useRecruitmentStore(
+    useShallow((s) => ({ offers: s.offers, loading: s.loading, totalOffers: s.totalOffers, fetchOffers: s.fetchOffers, updateOffer: s.updateOffer, signOffer: s.signOffer, deleteOffer: s.deleteOffer, saving: s.saving, setModal: s.setModal }))
   );
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
+  const [recallId, setRecallId] = useState<string | null>(null);
   const totalPages = Math.ceil(totalOffers / LIMIT) || 1;
 
   const load = useCallback((pg: number, status: string) => {
@@ -144,35 +146,78 @@ export function OffersTab() {
                               </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0 ml-3">
-                              {offer.status === "draft" && !offer.isSigned && (
-                                <button suppressHydrationWarning
-                                  onClick={async () => { if (saving) return; await signOffer(offer.id); }}
-                                  disabled={saving}
-                                  className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                  <PenSquare size={12} /> {saving ? "Signing…" : "Sign"}
-                                </button>
+                              {recallId === offer.id ? (
+                                <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5">
+                                  <span className="text-xs font-medium text-rose-700">Re-call this offer?</span>
+                                  <button
+                                    suppressHydrationWarning
+                                    onClick={async () => {
+                                      if (saving) return;
+                                      await deleteOffer(offer.id);
+                                      setRecallId(null);
+                                    }}
+                                    disabled={saving}
+                                    className="rounded-md bg-rose-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-rose-700 disabled:opacity-60"
+                                  >
+                                    {saving ? "Re-calling…" : "Yes, Re-call"}
+                                  </button>
+                                  <button
+                                    suppressHydrationWarning
+                                    onClick={() => setRecallId(null)}
+                                    className="rounded-md border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-100"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <>
+                                  {offer.status !== "accepted" && (
+                                    <button suppressHydrationWarning
+                                      onClick={() => setModal({ type: "edit-offer", offerId: offer.id })}
+                                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                                    >
+                                      <FileText size={12} /> Edit
+                                    </button>
+                                  )}
+                                  {offer.status !== "accepted" && (
+                                    <button suppressHydrationWarning
+                                      onClick={() => setRecallId(offer.id)}
+                                      className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50"
+                                    >
+                                      <Undo2 size={12} /> Re-call
+                                    </button>
+                                  )}
+                                  {offer.status === "draft" && !offer.isSigned && (
+                                    <button suppressHydrationWarning
+                                      onClick={async () => { if (saving) return; await signOffer(offer.id); }}
+                                      disabled={saving}
+                                      className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      <PenSquare size={12} /> {saving ? "Signing…" : "Sign"}
+                                    </button>
+                                  )}
+                                  {offer.status === "draft" && offer.isSigned && (
+                                    <button suppressHydrationWarning
+                                      onClick={async () => { await updateOffer(offer.id, { status: "sent" }); }}
+                                      className="inline-flex items-center gap-1 rounded-full bg-slate-950 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800"
+                                    >
+                                      <Send size={12} /> Send
+                                    </button>
+                                  )}
+                                  <button suppressHydrationWarning
+                                    onClick={() => router.push(`/recruitment/offers/${offer.id}/letter`)}
+                                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                                  >
+                                    <ExternalLink size={12} /> Letter
+                                  </button>
+                                  <button suppressHydrationWarning
+                                    onClick={() => router.push(`/recruitment/offers/${offer.id}`)}
+                                    className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                                  >
+                                    Details
+                                  </button>
+                                </>
                               )}
-                              {offer.status === "draft" && offer.isSigned && (
-                                <button suppressHydrationWarning
-                                  onClick={async () => { await updateOffer(offer.id, { status: "sent" }); }}
-                                  className="inline-flex items-center gap-1 rounded-full bg-slate-950 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800"
-                                >
-                                  <Send size={12} /> Send
-                                </button>
-                              )}
-                              <button suppressHydrationWarning
-                                onClick={() => router.push(`/recruitment/offers/${offer.id}/letter`)}
-                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                              >
-                                <ExternalLink size={12} /> Letter
-                              </button>
-                              <button suppressHydrationWarning
-                                onClick={() => router.push(`/recruitment/offers/${offer.id}`)}
-                                className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                              >
-                                Details
-                              </button>
                             </div>
                           </div>
                         );
@@ -203,6 +248,7 @@ export function OffersTab() {
           )}
         </div>
       )}
+      <EditOfferModal />
     </div>
   );
 }

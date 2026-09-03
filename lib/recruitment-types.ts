@@ -75,6 +75,7 @@ export type TimelineAction =
   | "offer-generated"
   | "offer-accepted"
   | "offer-rejected"
+  | "offer-recalled"
   | "stage-changed"
   | "joined"
   | "rejected"

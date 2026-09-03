@@ -40,7 +40,7 @@ export async function GET(request: Request) {
 
     const requests = await JoinRequest.find(filter)
       .sort({ createdAt: -1 })
-      .populate("requester", "name email role companyIdentityCode companyJoined baseSalary pfNumber pfDeductionAmount esicNumber esicDeductionAmount pfExempted esicExempted tdsExempted")
+      .populate("requester", "name email role companyIdentityCode companyJoined employmentEndDate baseSalary pfNumber pfDeductionAmount esicNumber esicDeductionAmount pfExempted esicExempted tdsExempted")
       .populate("approver", "name role")
       .populate("company", "name icon")
       .lean();
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     const customType = String(body.customType ?? "").trim();
     const customApproverId = String(body.approverId ?? "").trim();
 
-    const validTypes = ["experience", "salary-certificate", "offer-letter", "relieving", "internship", "resignation", "final-settlement", "form-16", "noc", "exit-agreement", "other"];
+    const validTypes = ["experience", "salary-certificate", "offer-letter", "relieving", "internship", "resignation", "final-settlement", "form-16", "noc", "exit-agreement", "employee-recognition", "other"];
     if (!validTypes.includes(letterType)) {
       return jsonError("Invalid letter type.", 400);
     }

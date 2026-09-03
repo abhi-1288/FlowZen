@@ -160,7 +160,7 @@ export function JobsTab() {
                   {job.autoCloseDate && (
                     <>
                       <span>&middot;</span>
-                      <span>Closes: {new Date(job.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
+                      <span>Closes: {new Date(job.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} {new Date(job.autoCloseDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}</span>
                     </>
                   )}
                 </div>
@@ -345,7 +345,11 @@ function JobModals() {
       salaryRangeMax: Number(form.get("salaryRangeMax") || 0),
       salaryType: String(form.get("salaryType") || "per-annum") as SalaryType,
       openings: Number(form.get("openings") || 1),
-      autoCloseDate: String(form.get("autoCloseDate") || ""),
+      autoCloseDate: (() => {
+        const d = String(form.get("autoCloseDate") || "");
+        const t = String(form.get("autoCloseTime") || "");
+        return d ? (t ? `${d}T${t}:00` : `${d}T23:59:59`) : "";
+      })(),
       description: String(form.get("description") || ""),
       requiredSkills: String(form.get("requiredSkills") || "").split(",").map((s) => s.trim()).filter(Boolean),
       status: "draft" as JobStatus,
@@ -483,8 +487,11 @@ function JobModals() {
               <input name="openings" type="number" min="1" defaultValue={editingJob?.openings || 1} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
             </label>
             <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Auto-Close Date</span>
-              <input name="autoCloseDate" type="date" defaultValue={editingJob?.autoCloseDate ? editingJob.autoCloseDate.split("T")[0] : ""} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
+              <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Auto-Close Date & Time</span>
+              <div className="flex gap-2">
+                <input name="autoCloseDate" type="date" defaultValue={editingJob?.autoCloseDate ? editingJob.autoCloseDate.split("T")[0] : ""} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
+                <input name="autoCloseTime" type="time" defaultValue={editingJob?.autoCloseDate ? new Date(editingJob.autoCloseDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : ""} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
+              </div>
             </label>
           </div>
           <label className="block">

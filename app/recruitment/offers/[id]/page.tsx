@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ExternalLink, FileText, PenSquare } from "lucide-react";
+import { ArrowLeft, ExternalLink, FileText, PenSquare, Undo2 } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useSession } from "next-auth/react";
+import EditOfferModal from "@/components/recruitment/edit-offer-modal";
 
 export default function OfferDetailPage() {
   const params = useParams()!;
@@ -13,7 +14,8 @@ export default function OfferDetailPage() {
   const { data: session } = useSession();
   const role = session?.user?.role ?? "";
   const isHr = role === "admin" || role === "human-resource";
-  const { offers, fetchOffers, updateOffer, signOffer, saving } = useRecruitmentStore();
+  const { offers, fetchOffers, updateOffer, signOffer, deleteOffer, saving, setModal } = useRecruitmentStore();
+  const [recalling, setRecalling] = useState(false);
 
   useEffect(() => { void fetchOffers(); }, [fetchOffers]);
 
@@ -107,6 +109,30 @@ export default function OfferDetailPage() {
           >
             <FileText size={16} /> View Offer Letter
           </a>
+          {offer.status !== "accepted" && (
+            <button
+              onClick={() => setModal({ type: "edit-offer", offerId: offer.id })}
+              className="neu-btn inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium"
+            >
+              <PenSquare size={16} /> Edit Offer
+            </button>
+          )}
+          {offer.status !== "accepted" && (
+            <button
+              onClick={async () => {
+                if (recalling) return;
+                if (!window.confirm("Re-call this offer? This will remove the offer letter from the candidate.")) return;
+                setRecalling(true);
+                await deleteOffer(offer.id);
+                setRecalling(false);
+                setModal(null);
+              }}
+              disabled={recalling}
+              className="neu-btn inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Undo2 size={16} /> {recalling ? "Re-calling…" : "Re-call Offer"}
+            </button>
+          )}
         </div>
 
         <div className="mt-6 rounded-xl neu-card p-6">
@@ -142,6 +168,7 @@ export default function OfferDetailPage() {
           ) : null}
         </div>
       </div>
+      <EditOfferModal />
     </div>
   );
 }

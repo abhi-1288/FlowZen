@@ -218,7 +218,7 @@ export default function JobDetailPage() {
     { icon: Clock, label: "Duration", value: formatJobDuration(job.durationMonths, job.durationDays, job.durationHours, job.durationYears) || "Not specified" },
     { icon: ShieldCheck, label: "Experience", value: job.requiredExperienceYears && job.requiredExperienceYears > 0 ? `${job.requiredExperienceYears}+ years` : "Not specified" },
     { icon: Users, label: "Openings", value: job.openings ? String(job.openings) : "1" },
-    { icon: CalendarClock, label: "Closes", value: job.autoCloseDate ? new Date(job.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "Rolling" },
+    { icon: CalendarClock, label: "Closes", value: job.autoCloseDate ? `${new Date(job.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} ${new Date(job.autoCloseDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}` : "Rolling" },
   ].filter((f) => f.value !== null && f.value !== "" && f.value !== "Not specified");
 
   const scrollToApply = () => {
@@ -283,7 +283,7 @@ export default function JobDetailPage() {
                   {job.autoCloseDate && (
                     <span className="inline-flex items-center gap-1.5">
                       <CalendarClock size={15} /> Applications close{" "}
-                      {new Date(job.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                      {new Date(job.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} {new Date(job.autoCloseDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
                     </span>
                   )}
                 </div>

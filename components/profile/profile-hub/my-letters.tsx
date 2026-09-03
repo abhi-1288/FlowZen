@@ -15,6 +15,7 @@ const LETTER_LABELS: Record<string, string> = {
   "form-16": "Form 16",
   noc: "NOC Paper",
   "exit-agreement": "Exit Agreement",
+  "employee-recognition": "Employee Recognition Letter",
   other: "Certificate",
 };
 

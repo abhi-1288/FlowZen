@@ -29,6 +29,7 @@ const LETTER_TYPES = [
   { value: "form-16", label: "Form 16" },
   { value: "noc", label: "NOC Paper" },
   { value: "exit-agreement", label: "Exit Agreement" },
+  { value: "employee-recognition", label: "Employee Recognition Letter" },
   { value: "other", label: "Other" },
   { value: "id-card", label: "ID Card" },
 ];
@@ -280,6 +281,10 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
 
           {letterType === "id-card" ? (
             <p className="text-sm text-slate-600">{isJuniorSecurity ? "Select a senior security member to review and approve your ID card request." : "Select an HR to review and approve your ID card request."} No additional details are needed.</p>
+          ) : null}
+
+          {letterType === "employee-recognition" ? (
+            <p className="text-sm text-slate-600">The employment period (from your joining date to your end date, or <em>Present</em> if currently employed) will be taken from your employment records.</p>
           ) : null}
 
           {letterType === "other" ? (

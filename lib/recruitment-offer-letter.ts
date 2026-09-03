@@ -191,6 +191,8 @@ export function renderRecruitmentOfferLetterHtml(input: RecruitmentOfferLetterIn
     .signatures-label { margin-bottom: 32px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0; color: #64748b; }
     .signature-signed { display: flex; flex-direction: column; align-items: center; }
     .signature-box { border: 1px solid #94a3b8; border-radius: 8px; padding: 10px 20px; text-align: left; min-width: 240px; }
+    .signature-box.script { font-family: "Segoe Script", "Dancing Script", cursive; font-size: 18px; color: #334155; }
+    .signature-box.script .signature-box-text { font-weight: 500; }
     .signature-box-text { margin: 0; font-size: 14px; font-weight: 600; color: #0f172a; line-height: 1.6; }
     .signature-sep { border-top: 1px solid #cbd5e1; margin: 4px 0; width: 50%; }
     .signature-rule { width: 192px; border-top: 1px solid #94a3b8; margin: 16px 0 8px; }
@@ -216,6 +218,7 @@ export function renderRecruitmentOfferLetterHtml(input: RecruitmentOfferLetterIn
       .signatures { margin-top: 24px; }
       .signatures-label { margin-bottom: 16px; }
       .signature-box { padding: 6px 14px; min-width: 180px; }
+      .signature-box.script { font-size: 15px; }
       .signature-rule { width: 144px; margin: 12px 0 4px; }
       .signature-company { font-size: 11px; }
       .signature-mono { font-size: 9px; }
@@ -274,7 +277,7 @@ export function renderRecruitmentOfferLetterHtml(input: RecruitmentOfferLetterIn
       <p class="signatures-label">Authorized Signatories</p>
       ${isSigned ? `
       <div class="signature-signed">
-        <div class="signature-box">
+        <div class="signature-box script">
           <p class="signature-box-text">${escapeHtml(signedByName)}</p>
           <div class="signature-sep"></div>
           <p class="signature-box-text">${escapeHtml(signedByRole)}</p>
