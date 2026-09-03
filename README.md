@@ -1,6 +1,6 @@
 # FlowZen
 
-FlowZen is a full-stack team productivity platform built with Next.js App Router, Tailwind CSS, Zustand, NextAuth, MongoDB, SSE (Server-Sent Events), Socket.IO, and `@dnd-kit/core`. It combines kanban project management, attendance tracking, finance & invoicing, HR tools, recruitment, real-time chat, and role-based access into one unified workspace.
+FlowZen is a full-stack team productivity platform built with Next.js App Router, Tailwind CSS, Zustand, NextAuth, MongoDB, SSE (Server-Sent Events), Socket.IO, and `@dnd-kit/core`. It combines kanban project management, attendance tracking, finance & invoicing, HR tools, recruitment, real-time chat, an internal IT support helpdesk, and role-based access into one unified workspace.
 
 ## Key Features
 
@@ -11,7 +11,8 @@ FlowZen is a full-stack team productivity platform built with Next.js App Router
 - **HR Management** — Member role changes, employee termination, company policy management (including food & travel accommodation amounts), HR messages/broadcasts, and meeting invites.
 - **Recruitment & Hiring** — Full recruitment lifecycle: job posting, candidate applications with magic-link portal, interview scheduling & feedback (with email notifications to candidate and interviewer), structured notes (author/timestamp/deletable), auto-close overdue jobs with candidate stats notifications, pipeline conversion funnel with drop-off analytics, resume PDF parsing (DOB/address extraction), offer letter generation (with CTC, perks, food/travel allowances), candidate portal for offer acceptance/rejection, and convert-to-employee with welcome email.
 - **Chat & Messaging** — Real-time messaging with read/delivery receipt ticks (single grey ✓ sent, double grey ✓✓ received, double green ✓✓ read). Online presence indicators (green dot, "Online" / "Last online" text) in chat header and member sidebar. Info modal with user personal details (name, role, email, phone, DOB, employee ID, team, join date).
-- **Role-Based Access** — 8 user roles (Employee, Project Manager, QA Tester, Human Resource, Finance, Admin, Security, Others) with granular board-level permissions. Profile hub tabs gated by company status and role.
+- **Role-Based Access** — 10 user roles (Employee, Project Manager, QA Tester, Human Resource, Finance, Admin, Security, IT Admin, IT Administration, Others) with granular board-level permissions. Profile hub tabs gated by company status and role.
+- **IT Support Helpdesk** — Internal IT support board (`/it`) with a full ticket lifecycle (PENDING → ASSIGNED → QUEUED → IN_PROGRESS → WAITING_FOR_USER → AWAITING_CONFIRMATION → RESOLVED / CANCELLED). Backend-validated status transitions, priorities, categories, assignees (IT Admin / IT Administration), embedded comments, attachments, and an activity log. Includes dynamic `IT-XXXX-XXXX` join-code generation for onboarding IT Support staff, and an account-provisioning workflow where IT Admin reviews HR requests and creates employee accounts (with welcome email) for converted candidates.
 - **Multi-Step Approval Workflows** — Join requests (HR → Admin), leave requests (HR → Manager), and quit requests with replacement tracking.
 - **Company & Team Management** — Company registration with identity codes, team creation with invite codes, freeze/takedown company, kick/quit team, and approval-based onboarding.
 - **Authentication** — Email/password with 6-digit OTP verification, magic-link password reset, and 5 social OAuth providers (Google, Azure AD / Microsoft, Apple, GitHub, Discord). "Remember me" session persistence control. Email change with current password verification + OTP to new email.
@@ -106,6 +107,8 @@ Run `npm run seed:demo` after setting `MONGODB_URI` to create or refresh these v
 | QA Tester | `tester@flowzen.com` | `tester@flowzen` |
 | Employee | `employee@flowzen.com` | `employee@flowzen` |
 | Finance | `finance@flowzen.com` | `finance@flowzen` |
+| IT Admin Manager | `it_admin@flowzen.com` | `it_admin@flowzen` |
+| IT Support Professional | `it_support@flowzen.com` | `it_support@flowzen` |
 | Others | `other@flowzen.com` | `other@flowzen` |
 
 ## Scripts
@@ -124,11 +127,12 @@ Run `npm run seed:demo` after setting `MONGODB_URI` to create or refresh these v
 - `/join?code=` — join company or team by invitation code
 - `/forgot-password` — request magic-link password reset email
 - `/reset-password?token=` — set new password via magic link
-- `/profile/[[...tab]]` — 13-tab profile hub (dashboard, profile, timeline, onboarding, members, careers, documents, messages, finance, approvals, attendance, notifications, admin)
+- `/profile/[[...tab]]` — multi-tab profile hub (dashboard, profile, timeline, onboarding, members, careers, documents, messages, finance, approvals, attendance, notifications, calendar, visitors, security, games, finance policy, hr policy)
 - `/api/profile/email/verify` — POST: validates current password, sends OTP to new email
 - `/api/profile/email/confirm` — POST: validates OTP and updates email
 - `/board` — board list / workspace selector
 - `/board/[id]` — individual board workspace with real-time collaboration
+- `/it` — internal IT support helpdesk (ticket board, join-code management, and account provisioning)
 - `/invoice/[id]` — printable client invoice PDF
 - `/recruitment/candidates` — candidate list with pipeline stages
 - `/recruitment/candidates/[id]` — candidate profile with timeline, interviews, offer, stage management
@@ -151,6 +155,15 @@ Run `npm run seed:demo` after setting `MONGODB_URI` to create or refresh these v
 7. **Leave requests** follow a separate multi-step chain (HR → Manager).
 8. **Quit requests** require HR to identify a replacement before final approval.
 
+### IT Role Onboarding
+
+The IT hierarchy mirrors the Security hierarchy (`HR → IT Admin → IT Administration`):
+
+1. An **IT Admin** joins the company via the standard HR company join code (role derived server-side from the code), exactly like a Senior Security member. Escalation (`IT Administration` → `IT Admin`) is impossible.
+2. Once approved into the company, an **IT Admin** can generate dynamic `IT-XXXX-XXXX` join codes from `/it` (with expiry, max uses, and usage tracking).
+3. **IT Administration** (support staff) join via those dynamic IT codes, which server-side set their role to `IT Administration` and route their approval to the code's creator (an IT Admin).
+4. **HR** can also create provisioning requests (from the convert-to-employee flow) which **IT Admin** reviews and fulfills by creating the employee account.
+
 ## Recruitment Flow
 
 1. **HR/Admin** creates job postings from the recruitment dashboard with title, description, salary range, required skills, and employment type.
@@ -165,37 +178,41 @@ Run `npm run seed:demo` after setting `MONGODB_URI` to create or refresh these v
 10. **HR** converts `joined` candidates to employees by setting a password — a welcome email with credentials is sent automatically. Resume-extracted DOB/address is copied to the new employee profile.
 11. Throughout the process, the candidate portal provides a timeline of all events, interview history, and the latest offer status.
 
-## User Roles (8)
+## User Roles (10)
 
 | Role | Capabilities |
 |------|-------------|
 | **Admin** | Full access — manage company, teams, all boards, member roles, freeze/takedown company |
-| **Human Resource** | Approve/reject join & leave requests, manage policies, fire employees, send HR messages & meeting invites |
+| **Human Resource** | Approve/reject join & leave requests, manage policies, fire employees, send HR messages & meeting invites, create provisioning requests |
 | **Project Manager** | Create/manage teams, create/manage boards, assign tasks, manage team members |
 | **Finance** | Manage salaries, expense requests & bills, client invoices, project budgets, resource requests |
 | **QA Tester** | Access boards as tester role, test and verify tasks |
 | **Security** | Scan identity codes for entry/exit, manage entry logs, emergency contacts, lost cards |
-| **Employee** | View assigned tasks, check-in/check-out, request leave, view attendance & finance data |
+| **IT Admin** | Senior IT authority — manage all tickets, assign work, review provisioning requests, generate `IT-XXXX-XXXX` join codes for IT Support, create employee accounts |
+| **IT Administration** | IT support staff — view and progress assigned/team tickets, resolve, request information, confirm resolution |
+| **Employee** | View assigned tasks, check-in/check-out, request leave, view attendance & finance data, file & confirm IT tickets |
 | **Others** | Fallback role with basic board access |
 
 ## Project Structure
 
-- `app/api` — 70+ API route handlers for auth, boards, columns, tasks, comments, attachments, company, team, profile (including `profile/email/verify` and `profile/email/confirm`), approvals, attendance, finance, HR, recruitment (jobs, candidates, interviews, offers, letters, auto-close, notes), events, notifications, messages, and more.
+- `app/api` — 190+ API route handlers for auth, boards, columns, tasks, comments, attachments, company, team, profile (including `profile/email/verify` and `profile/email/confirm`), approvals, attendance, finance, HR, recruitment (jobs, candidates, interviews, offers, letters, auto-close, notes), events, notifications, messages, and IT support (tickets, join codes, team, provisioning).
 - `app/board/[id]` — board workspace and task collaboration route.
+- `app/it` — internal IT support helpdesk page.
 - `app/profile/[[...tab]]` — multi-tab profile hub with dashboard, settings, company, teams, boards, attendance, leave, finance, admin, members, documents, messages, approvals, careers, notifications, and onboarding.
 - `app/invoice/[id]` — printable client invoice PDF.
-- `app/join` — company/team join via invitation code.
+- `app/join` — company/team/IT join via invitation code.
 - `app/recruitment` — full recruitment dashboard: candidate pipeline, job management, offer management, and candidate detail pages.
 - `app/careers` — public career listings with job detail pages and candidate application.
 - `app/candidate-portal` — magic-link authenticated candidate dashboard with timeline, interviews, and offer acceptance.
 - `components/boards` — board canvas, columns, task cards, modals, and board UI.
+- `components/it` — IT helpdesk UI: ticket modal, kanban board, and IT shell (codes + provisioning panels).
 - `components/profile` — profile hub tabs, attendance, finance, admin tools, WFH assignment, and members management.
 - `components/recruitment` — recruitment-specific components: candidate cards, interview forms, offer modals, convert-to-employee.
 - `components/landing` — landing page UI.
 - `store/board-store.ts` — Zustand store for boards, columns, tasks, modals, and backend sync.
 - `store/message-store.ts` — Zustand store for chat messages, conversations, unread counts, and typing indicators.
 - `store/recruitment-store.ts` — Zustand store for recruitment state: jobs, candidates, filters, offer generation.
-- `models` — 20+ Mongoose models for User, Board, Column, Task, Company, Team, JoinRequest, Notification, LeaveRequest, Attendance, Holiday, FinanceSalary, ClientInvoice, ExpenseRequest, ExpenseBill, ProjectBudget, ResourceRequest, ATSJob, ATSCandidate, ATSOffer, ATSInterview, CompanyPolicy, and Message.
-- `lib` — shared database, auth, API, realtime (EventHub SSE + Socket.IO), mailer, code generators, board access, recruitment utilities (`recruitment-utils.ts`), resume parser (`resume-parser.ts`), email templates (`email-templates.ts`), and type utilities.
+- `models` — 39 Mongoose models for User, Board, Column, Task, Company, Team, JoinRequest, Notification, LeaveRequest, Attendance, Holiday, FinanceSalary, ClientInvoice, ExpenseRequest, ExpenseBill, ProjectBudget, ResourceRequest, ATSJob, ATSCandidate, ATSOffer, ATSInterview, CompanyPolicy, Message, ITTicket, ITJoiningCode, and ITProvisioningRequest.
+- `lib` — shared database, auth, API, realtime (EventHub SSE + Socket.IO), mailer, code generators, board access, IT support utilities (`lib/it.ts`), join approver resolution (`lib/join-approvers.ts`), recruitment utilities (`recruitment-utils.ts`), resume parser (`resume-parser.ts`), email templates (`email-templates.ts`), and type utilities.
 - `types` — TypeScript type declarations for NextAuth, Socket.IO, recruitment types, and module shims.
 - `pages/api/socket.ts` — legacy Socket.IO server (Pages Router) for real-time events.

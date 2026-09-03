@@ -21,6 +21,8 @@ function roleForCompanyCode(company: any, code: string, baseCode: string) {
   if (matches(company.financeJoinCode)) return "finance";
   if (matches(company.employeeJoinCode)) return "employee";
   if (matches(company.securityJoinCode) || matches(company.juniorSecurityJoinCode)) return "security";
+  if (matches(company.itAdminJoinCode)) return "it-admin";
+  if (matches(company.itSupportJoinCode)) return "it-administration";
   if (matches(company.otherJoinCode)) return "others";
   if (matches(company.hrJoinCode) || matches(company.joinCode)) return "human-resource";
   return null;
@@ -39,6 +41,8 @@ function joinTitleForRole(role: string) {
   if (role === "qa-tester") return "Tester join request";
   if (role === "finance") return "Finance join request";
   if (role === "security") return "Security join request";
+  if (role === "it-admin") return "IT Admin join request";
+  if (role === "it-administration") return "IT Administration join request";
   if (role === "employee") return "Employee join request";
   return "Others join request";
 }
@@ -76,6 +80,8 @@ export async function POST(request: Request) {
         { otherJoinCode: withoutHrSuffix },
         { securityJoinCode: withoutHrSuffix },
         { juniorSecurityJoinCode: withoutHrSuffix },
+        { itAdminJoinCode: withoutHrSuffix },
+        { itSupportJoinCode: withoutHrSuffix },
         { adminJoinCode: withoutHrSuffix },
       ]
     })
@@ -108,10 +114,11 @@ export async function POST(request: Request) {
       ? await findApprovedHrUserIdByInviteSuffix(company._id, hrSuffix)
       : null;
   const approverId = invitedHrId ?? (await resolveCompanyJoinApproverId(company, codeRole));
-  const approvalNotifier: "hr" | "admin" | "security" =
+  const approvalNotifier: "hr" | "admin" | "security" | "it-admin" =
     codeRole === "admin" ? "admin" :
     approverId === String(company.owner) ? "admin" :
-    codeRole === "security" ? "security" : "hr";
+    codeRole === "security" ? "security" :
+    codeRole === "it-administration" ? "it-admin" : "hr";
   const enrollingHrId =
     invitedHrId ?? (codeRole !== "admin" && approvalNotifier === "hr" ? approverId : null);
 
@@ -137,6 +144,15 @@ export async function POST(request: Request) {
     );
 
     const refreshedRequest = await JoinRequest.findById(existingPendingRequest._id);
+
+    await Notification.create({
+      user: approverId,
+      company: company._id,
+      type: "approval",
+      title: joinTitleForRole(codeRole),
+      message: `${user.name} requested approval to join ${company.name}.`,
+    });
+    emitNotification(String(approverId));
 
     return NextResponse.json({
       request: serializeDoc(refreshedRequest ?? existingPendingRequest),

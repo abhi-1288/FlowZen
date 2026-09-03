@@ -12,16 +12,22 @@ export async function POST(request: Request, { params }: Params) {
   if (!userId) return jsonError("Unauthorized", 401);
   if (!isObjectId(memberId)) return jsonError("Invalid member id.");
 
-  let body: { baseSalary?: number; currency?: string };
+  let body: { baseSalary?: number; amount?: number; currency?: string; salaryType?: string };
   try {
     body = await request.json();
   } catch (err) {
     return jsonError("Invalid JSON", 400);
   }
 
-  const salaryAmount = Math.max(0, Number(body.baseSalary ?? 0));
-  if (!Number.isFinite(salaryAmount) || salaryAmount <= 0) {
-    return jsonError("Enter a valid base salary.");
+  const salaryType =
+    typeof body.salaryType === "string" &&
+    ["per-annum", "per-month", "per-day", "per-hour"].includes(body.salaryType)
+      ? body.salaryType
+      : "per-month";
+
+  const rawAmount = Math.max(0, Number(body.amount ?? body.baseSalary ?? 0));
+  if (!Number.isFinite(rawAmount) || rawAmount <= 0) {
+    return jsonError("Enter a valid salary amount.");
   }
 
   const currency = typeof body.currency === "string" && body.currency.trim() ? body.currency.trim().toUpperCase() : undefined;
@@ -52,19 +58,48 @@ export async function POST(request: Request, { params }: Params) {
     }
   }
 
-  const oldSalary = Math.max(0, Number(member.baseSalary ?? 0));
-  member.baseSalary = salaryAmount;
+  const oldSalary = Math.max(
+    0,
+    Number(
+      salaryType === "per-hour"
+        ? member.hourlyRate ?? 0
+        : salaryType === "per-day"
+          ? member.dailyRate ?? 0
+          : member.baseSalary ?? 0,
+    ),
+  );
+
+  if (salaryType === "per-hour") {
+    member.salaryType = "per-hour";
+    member.hourlyRate = rawAmount;
+    member.dailyRate = 0;
+    member.baseSalary = 0;
+  } else if (salaryType === "per-day") {
+    member.salaryType = "per-day";
+    member.dailyRate = rawAmount;
+    member.hourlyRate = 0;
+    member.baseSalary = 0;
+  } else {
+    const baseSalary =
+      salaryType === "per-annum" ? Math.round(rawAmount / 12) : rawAmount;
+    member.salaryType = salaryType;
+    member.baseSalary = baseSalary;
+    member.hourlyRate = 0;
+    member.dailyRate = 0;
+  }
+
   if (currency) member.salaryCurrency = currency;
   if (!Array.isArray(member.salaryHistory)) member.salaryHistory = [];
   member.salaryHistory.push({
-    amount: salaryAmount,
+    amount: rawAmount,
     date: new Date(),
-    type: salaryAmount >= oldSalary ? "increment" : "decrement",
+    type: rawAmount >= oldSalary ? "increment" : "decrement",
   });
   await member.save();
 
   return NextResponse.json({
     ok: true,
-    baseSalary: salaryAmount,
+    salaryType,
+    amount: rawAmount,
   });
 }

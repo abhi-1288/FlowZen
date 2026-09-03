@@ -43,7 +43,7 @@ export function MembersTab({
   const [selectedOtherRole, setSelectedOtherRole] = useState("all");
   const [salaryModalMember, setSalaryModalMember] = useState<AnyRecord | null>(null);
   const [salaryInput, setSalaryInput] = useState("");
-  const [salaryPeriodType, setSalaryPeriodType] = useState<"monthly" | "yearly">("monthly");
+  const [salaryPeriodType, setSalaryPeriodType] = useState<"monthly" | "yearly" | "hourly" | "daily">("monthly");
   const [salaryCurrency, setSalaryCurrency] = useState("INR");
   const [savingSalaryModal, setSavingSalaryModal] = useState(false);
   const [roleModalMember, setRoleModalMember] = useState<AnyRecord | null>(null);
@@ -78,8 +78,25 @@ export function MembersTab({
   const [savingEmployment, setSavingEmployment] = useState(false);
 
   function openSalaryModal(member: AnyRecord) {
-    setSalaryInput(String(Math.max(0, Number(member.baseSalary ?? 0)) > 0 ? Number(member.baseSalary) : ""));
-    setSalaryPeriodType("monthly");
+    const st = String(member.salaryType ?? "per-month");
+    const period: "monthly" | "yearly" | "hourly" | "daily" =
+      st === "per-hour"
+        ? "hourly"
+        : st === "per-day"
+          ? "daily"
+          : st === "per-annum"
+            ? "yearly"
+            : "monthly";
+    const current =
+      period === "hourly"
+        ? Math.max(0, Number(member.hourlyRate ?? 0))
+        : period === "daily"
+          ? Math.max(0, Number(member.dailyRate ?? 0))
+          : period === "yearly"
+            ? Math.max(0, Number(member.baseSalary ?? 0)) * 12
+            : Math.max(0, Number(member.baseSalary ?? 0));
+    setSalaryInput(current > 0 ? String(current) : "");
+    setSalaryPeriodType(period);
     setSalaryCurrency(String(member.salaryCurrency ?? "INR"));
     setSalaryModalMember(member);
   }
@@ -188,21 +205,28 @@ export function MembersTab({
     const memberId = String(member?.id ?? "");
     const rawSalary = Number(salaryInput);
     if (!memberId || !(rawSalary > 0)) {
-      showToast("Enter a valid base salary.", "error");
+      showToast("Enter a valid salary amount.", "error");
       return;
     }
-    const baseSalary = salaryPeriodType === "yearly" ? Math.round(rawSalary / 12) : rawSalary;
+    const salaryType =
+      salaryPeriodType === "hourly"
+        ? "per-hour"
+        : salaryPeriodType === "daily"
+          ? "per-day"
+          : salaryPeriodType === "yearly"
+            ? "per-annum"
+            : "per-month";
     try {
       setSavingSalaryModal(true);
       await apiFetch(`/api/hr/member-salary/${memberId}`, {
         method: "POST",
-        body: JSON.stringify({ baseSalary, currency: salaryCurrency }),
+        body: JSON.stringify({ amount: rawSalary, salaryType, currency: salaryCurrency }),
       });
-      showToast("Base salary saved.");
+      showToast("Salary saved.");
       setSalaryModalMember(null);
       await refresh(true);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Unable to save base salary.", "error");
+      showToast(err instanceof Error ? err.message : "Unable to save salary.", "error");
     } finally {
       setSavingSalaryModal(false);
     }

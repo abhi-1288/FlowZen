@@ -29,7 +29,7 @@ export function Cta() {
           </h2>
           <p className="text-2xl text-gray-500 dark:text-gray-400 mb-12 max-w-2xl mx-auto">
             Join the high-performing teams that are already managing
-            boards, attendance, finance, HR, and recruitment with FlowZen.
+            boards, attendance, finance, HR, recruitment, and IT support with FlowZen.
           </p>
           <MagneticButton strength={0.3}>
             <a

@@ -8,6 +8,8 @@ import { Notification } from "@/models/Notification";
 import { Team } from "@/models/Team";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
+import { generateFinalSettlement } from "@/app/api/finance/helpers";
+import { CompanyPolicy } from "@/models/CompanyPolicy";
 
 async function cleanupBoardsForUser(userId: any) {
   const boards = await Board.find({ "members.user": userId });
@@ -66,6 +68,22 @@ export async function POST(request: Request) {
   }
   if (String(member.role ?? "") === "admin") {
     return jsonError("You cannot fire an admin.", 403);
+  }
+
+  // Auto-generate a final settlement salary covering any outstanding unpaid
+  // tenure, before the member is removed from the company.
+  const policy = await CompanyPolicy.findOne({ company: actor.company });
+  if (policy?.settlementEnabled !== false) {
+    if (!member.employmentEndDate) {
+      member.employmentEndDate = new Date();
+    }
+    await generateFinalSettlement({
+      company: actor.company,
+      userId,
+      member,
+      policy: policy || {},
+      reason: "terminated",
+    });
   }
 
   // If they are a manager/tester, delete their managed teams (same rules as quit-company approval).

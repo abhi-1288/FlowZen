@@ -11,6 +11,7 @@ const productLinks = [
   { label: "Finance", href: "/profile" },
   { label: "HR Module", href: "/profile" },
   { label: "Recruitment", href: "/recruitment" },
+  { label: "IT Support", href: "/it" },
   { label: "Chat", href: "/profile" },
 ];
 
@@ -51,7 +52,7 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-xs leading-relaxed">
-              The all-in-one workflow platform for modern teams. Manage boards, attendance, finance, HR, and recruitment in one workspace.
+              The all-in-one workflow platform for modern teams. Manage boards, attendance, finance, HR, recruitment, and IT support in one workspace.
             </p>
             <div className="flex items-center gap-3">
               {socialLinks.map((social) => (

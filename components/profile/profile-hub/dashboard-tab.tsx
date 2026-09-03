@@ -51,6 +51,15 @@ function formatDurationText(profile: AnyRecord | null): string {
   return parts.join(" ");
 }
 
+function formatRight(ms: number): string {
+  const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  if (days > 0) return `${days} day${days === 1 ? "" : "s"} ${hours} hr${hours === 1 ? "" : "s"}`;
+  const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+  if (hours > 0) return `${hours} hr${hours === 1 ? "" : "s"} ${mins} min${mins === 1 ? "" : "s"}`;
+  return `${Math.max(1, mins)} min${mins === 1 ? "" : "s"}`;
+}
+
 function formatCompactINR(value: number): string {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -287,6 +296,64 @@ export function DashboardTab({
         sub: lastPresentTotal ? `Total ${lastPresentTotal}` : undefined,
       }
     : undefined;
+
+  const ownExitMs: number | null = (() => {
+    if (!profile?.employmentEndDate) return null;
+    const end = new Date(String(profile.employmentEndDate));
+    if (isNaN(end.getTime())) return null;
+    return end.getTime() - Date.now();
+  })();
+  const ownExitDate = profile?.employmentEndDate
+    ? new Date(String(profile.employmentEndDate)).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : null;
+
+  const hrUpcomingExits = (() => {
+    if (!insights?.hr) return [];
+    const list = Array.isArray((insights.hr as any).members) ? (insights.hr as any).members : [];
+    const now = Date.now();
+    return list
+      .filter((m: AnyRecord) => {
+        if (!m.employmentEndDate) return false;
+        const end = new Date(String(m.employmentEndDate));
+        if (isNaN(end.getTime())) return false;
+        return end.getTime() >= now;
+      })
+      .map((m: AnyRecord) => ({
+        name: String(m.name ?? "Member"),
+        type: String(m.employmentType ?? "").replace(/-/g, " "),
+        ms: Math.max(0, new Date(String(m.employmentEndDate)).getTime() - now),
+        end: new Date(String(m.employmentEndDate)),
+        overdue: false,
+      }))
+      .sort((a: { ms: number }, b: { ms: number }) => a.ms - b.ms)
+      .slice(0, 10);
+  })();
+
+  const hrOverdueExits = (() => {
+    if (!insights?.hr) return [];
+    const list = Array.isArray((insights.hr as any).members) ? (insights.hr as any).members : [];
+    const now = Date.now();
+    return list
+      .filter((m: AnyRecord) => {
+        if (!m.employmentEndDate) return false;
+        const end = new Date(String(m.employmentEndDate));
+        if (isNaN(end.getTime())) return false;
+        return end.getTime() < now;
+      })
+      .map((m: AnyRecord) => ({
+        name: String(m.name ?? "Member"),
+        type: String(m.employmentType ?? "").replace(/-/g, " "),
+        ms: Math.max(0, now - new Date(String(m.employmentEndDate)).getTime()),
+        end: new Date(String(m.employmentEndDate)),
+        overdue: true,
+      }))
+      .sort((a: { ms: number }, b: { ms: number }) => b.ms - a.ms)
+      .slice(0, 10);
+  })();
 
   const employeeGrowthDelta = Number((insights?.hr as any)?.employeeGrowth ?? 0);
   const hasGrowthData = (insights?.hr as any)?.joinedThisMonth != null;
@@ -691,6 +758,64 @@ export function DashboardTab({
         </div>
       ) : null}
 
+      {role === "human-resource" && insights?.hr && (hrUpcomingExits.length > 0 || hrOverdueExits.length > 0) ? (
+        <div className="space-y-4">
+          {hrUpcomingExits.length > 0 ? (
+            <div className="rounded-xl neu-card p-5">
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
+                <CalendarCheck size={16} className="text-amber-600" />
+                Upcoming Exits
+              </h2>
+              <div className="space-y-2">
+                {hrUpcomingExits.map((m: { name: string; type: string; ms: number; end: Date }) => (
+                  <div key={m.name} className="flex items-center justify-between gap-3 rounded-lg neu-inset px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-900">{m.name}</p>
+                      <p className="text-xs text-slate-500 capitalize">{m.type || "—"}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-semibold text-amber-700">
+                        {formatRight(m.ms)} left
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {m.end.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {hrOverdueExits.length > 0 ? (
+            <div className="rounded-xl border border-rose-200 bg-gradient-to-br from-rose-50 to-red-50 p-5 shadow-sm dark:border-rose-800/60 dark:from-rose-950/40 dark:to-red-950/30">
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-rose-800 dark:text-rose-200">
+                <AlertTriangle size={16} className="text-rose-600 dark:text-rose-300" />
+                Overdue Exits
+              </h2>
+              <div className="space-y-2">
+                {hrOverdueExits.map((m: { name: string; type: string; ms: number; end: Date }) => (
+                  <div key={m.name} className="flex items-center justify-between gap-3 rounded-lg border border-rose-100 bg-[var(--c-bg-card)] px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-900">{m.name}</p>
+                      <p className="text-xs text-slate-500 capitalize">{m.type || "—"}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-semibold text-rose-700">
+                        {formatRight(m.ms)} ago
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {m.end.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {role === "finance" ? (
         <div className="rounded-xl neu-card p-5">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
@@ -794,6 +919,49 @@ export function DashboardTab({
           </div>
         </div>
       ) : null}
+
+      {(() => {
+        if (ownExitMs == null) return null;
+        if (ownExitMs >= 0) {
+          return (
+            <div className="rounded-xl border border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50 p-5 shadow-sm dark:border-amber-800/60 dark:from-amber-950/40 dark:to-orange-950/30">
+              <div className="flex items-start gap-4">
+                <div className="rounded-lg bg-amber-100 p-3 dark:bg-amber-900/40">
+                  <Clock size={22} className="text-amber-600 dark:text-amber-300" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">Time Until Exit</p>
+                  <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-zinc-100">
+                    {formatRight(ownExitMs)} left
+                  </p>
+                  <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
+                    Employment ends on <span className="font-semibold">{ownExitDate}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        }
+        const elapsed = formatRight(Math.abs(ownExitMs));
+        return (
+          <div className="rounded-xl border border-rose-300 bg-gradient-to-br from-rose-50 to-red-50 p-5 shadow-sm dark:border-rose-800/60 dark:from-rose-950/40 dark:to-red-950/30">
+            <div className="flex items-start gap-4">
+              <div className="rounded-lg bg-rose-100 p-3 dark:bg-rose-900/40">
+                <Clock size={22} className="text-rose-600 dark:text-rose-300" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-rose-800 dark:text-rose-200">Employment Ended</p>
+                <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-zinc-100">
+                  {elapsed} ago
+                </p>
+                <p className="mt-1 text-sm text-rose-700 dark:text-rose-300">
+                  Employment ended on <span className="font-semibold">{ownExitDate}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {viewingRejected ? (
         <div

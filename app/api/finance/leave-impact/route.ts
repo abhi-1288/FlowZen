@@ -43,6 +43,7 @@ export async function GET(request: Request) {
       company: actor.company,
       employee: empId,
       month,
+      kind: "monthly",
     }).select("netSalary");
 
     if (!salary) {

@@ -14,7 +14,7 @@ type PolicyData = {
 };
 
 type MemberAttendance = {
-  member: { id: string; name: string; email: string; role: string; baseSalary?: number };
+  member: { id: string; name: string; email: string; role: string; baseSalary?: number; salaryType?: string; hourlyRate?: number; dailyRate?: number };
   month: string;
   salary: { netSalary: number; baseSalary: number } | null;
   calendar: {
@@ -67,6 +67,7 @@ export function FinanceMembersView({
 
   const [isEditingSalary, setIsEditingSalary] = useState(false);
   const [newSalary, setNewSalary] = useState("");
+  const [salaryPeriodType, setSalaryPeriodType] = useState<"hourly" | "daily" | "monthly" | "yearly">("monthly");
   const [savingSalary, setSavingSalary] = useState(false);
 
   const [modalRole, setModalRole] = useState<string | null>(null);
@@ -129,6 +130,15 @@ export function FinanceMembersView({
       return;
     }
 
+    const salaryType =
+      salaryPeriodType === "hourly"
+        ? "per-hour"
+        : salaryPeriodType === "daily"
+          ? "per-day"
+          : salaryPeriodType === "yearly"
+            ? "per-annum"
+            : "per-month";
+
     setSavingSalary(true);
 
     try {
@@ -140,7 +150,8 @@ export function FinanceMembersView({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            baseSalary: amount,
+            amount,
+            salaryType,
           }),
         }
       );
@@ -159,7 +170,8 @@ export function FinanceMembersView({
           String(m.id) === String(selectedMemberId)
             ? {
               ...m,
-              baseSalary: amount,
+              baseSalary: salaryType === "per-hour" || salaryType === "per-day" ? 0 : amount,
+              salaryType,
             }
             : m
         )
@@ -172,7 +184,8 @@ export function FinanceMembersView({
             ...prev,
             member: {
               ...prev.member,
-              baseSalary: amount,
+              baseSalary: salaryType === "per-hour" || salaryType === "per-day" ? 0 : amount,
+              salaryType,
             },
           }
           : prev
@@ -367,49 +380,111 @@ export function FinanceMembersView({
                   <h5 className="font-semibold text-lg text-slate-800">Salary Information</h5>
                   {!isEditingSalary ? (
                     <button
-                      onClick={() => { setIsEditingSalary(true); setNewSalary(String(data.member.baseSalary || 0)); }}
+                      onClick={() => {
+                        const st = String(data.member.salaryType ?? "per-month");
+                        const period: "hourly" | "daily" | "monthly" | "yearly" =
+                          st === "per-hour"
+                            ? "hourly"
+                            : st === "per-day"
+                              ? "daily"
+                              : st === "per-annum"
+                                ? "yearly"
+                                : "monthly";
+                        const current =
+                          period === "hourly"
+                            ? Math.max(0, Number(data.member.hourlyRate ?? 0))
+                            : period === "daily"
+                              ? Math.max(0, Number(data.member.dailyRate ?? 0))
+                              : period === "yearly"
+                                ? Math.max(0, Number(data.member.baseSalary ?? 0)) * 12
+                                : Math.max(0, Number(data.member.baseSalary ?? 0));
+                        setSalaryPeriodType(period);
+                        setNewSalary(current > 0 ? String(current) : "");
+                        setIsEditingSalary(true);
+                      }}
                       className="text-sm font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition"
                     >
-                      Edit Base Salary
+                      Edit Salary
                     </button>
                   ) : null}
                 </div>
 
                 {isEditingSalary ? (
-                  <div className="mb-6 bg-[var(--c-bg-card)] p-5 rounded-xl border border-[var(--c-border-light)] shadow-sm flex items-end gap-4">
-                    <div className="flex-1">
-                      <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">New Base Salary (₹)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={newSalary}
-                        onChange={(e) => setNewSalary(e.target.value)}
-                        className="w-full border-[var(--c-border-light)] rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                        placeholder="e.g. 50000"
-                        disabled={savingSalary}
-                      />
+                  <div className="mb-6 bg-[var(--c-bg-card)] p-5 rounded-xl border border-[var(--c-border-light)] shadow-sm">
+                    <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Pay Period</label>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {([
+                        ["hourly", "Per Hour (/hr)"],
+                        ["daily", "Per Day (/day)"],
+                        ["monthly", "Per Month (/mo)"],
+                        ["yearly", "Per Year (/yr)"],
+                      ] as const).map(([id, label]) => (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => setSalaryPeriodType(id)}
+                          disabled={savingSalary}
+                          className={`flex-1 min-w-[90px] rounded-lg border px-2 py-2 text-xs font-medium transition ${salaryPeriodType === id ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-600 border-[var(--c-border-light)] hover:bg-indigo-50"}`}
+                        >
+                          {label}
+                        </button>
+                      ))}
                     </div>
-                    <div className="flex gap-2">
-                      <ActionButton
-                        variant="secondary"
-                        onClick={() => setIsEditingSalary(false)}
-                        disabled={savingSalary}
-                      >
-                        Cancel
-                      </ActionButton>
-                      <button
-                        onClick={handleUpdateSalary}
-                        disabled={savingSalary}
-                        className="neu-btn neu-btn-primary px-4 py-2.5 rounded-lg font-medium"
-                      >
-                        {savingSalary ? "Requesting..." : "Request Update"}
-                      </button>
+                    <div className="flex items-end gap-4">
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">
+                          {salaryPeriodType === "hourly" ? "Hourly Rate (₹)" : salaryPeriodType === "daily" ? "Daily Rate (₹)" : salaryPeriodType === "yearly" ? "Yearly Salary (₹)" : "Monthly Base Salary (₹)"}
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={newSalary}
+                          onChange={(e) => setNewSalary(e.target.value)}
+                          className="w-full border border-[var(--c-border-light)] rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                          placeholder={salaryPeriodType === "hourly" ? "e.g. 300" : salaryPeriodType === "daily" ? "e.g. 2000" : "e.g. 50000"}
+                          disabled={savingSalary}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <ActionButton
+                          variant="secondary"
+                          onClick={() => setIsEditingSalary(false)}
+                          disabled={savingSalary}
+                        >
+                          Cancel
+                        </ActionButton>
+                        <button
+                          onClick={handleUpdateSalary}
+                          disabled={savingSalary}
+                          className="neu-btn neu-btn-primary px-4 py-2.5 rounded-lg font-medium"
+                        >
+                          {savingSalary ? "Requesting..." : "Request Update"}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ) : (
                   <div className="mb-6 bg-[var(--c-bg-card)] p-5 rounded-xl border border-[var(--c-border-light)] shadow-sm">
-                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Current Base Salary</p>
-                    <p className="text-3xl font-bold text-slate-900 mt-1">₹{(data.member.baseSalary || 0).toLocaleString("en-IN")}</p>
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Current Salary</p>
+                    <p className="text-3xl font-bold text-slate-900 mt-1">
+                      ₹{
+                        (String(data.member.salaryType ?? "") === "per-hour"
+                          ? Number(data.member.hourlyRate ?? 0)
+                          : String(data.member.salaryType ?? "") === "per-day"
+                            ? Number(data.member.dailyRate ?? 0)
+                            : String(data.member.salaryType ?? "") === "per-annum"
+                              ? Math.max(0, Number(data.member.baseSalary ?? 0)) * 12
+                              : Number(data.member.baseSalary ?? 0)
+                        ).toLocaleString("en-IN")
+                      }
+                      {String(data.member.salaryType ?? "") === "per-hour"
+                        ? "/hr"
+                        : String(data.member.salaryType ?? "") === "per-day"
+                          ? "/day"
+                          : String(data.member.salaryType ?? "") === "per-annum"
+                            ? "/yr"
+                            : "/mo"}
+                    </p>
                   </div>
                 )}
 

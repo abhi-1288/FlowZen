@@ -11,6 +11,8 @@ import { User } from "@/models/User";
 import { Task } from "@/models/Task";
 import { emitNotification } from "@/lib/realtime";
 import { ensureCompanyIdentityCode } from "@/lib/company-identity";
+import { generateFinalSettlement } from "@/app/api/finance/helpers";
+import { CompanyPolicy } from "@/models/CompanyPolicy";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -388,10 +390,30 @@ export async function PATCH(request: Request, { params }: Params) {
         const metadata = joinRequest.metadata || {};
         const targetUser = await User.findById(metadata.targetUser);
         if (targetUser) {
-          const oldSalary = targetUser.baseSalary || 0;
-          const newSalary = Number(metadata.newBaseSalary) || 0;
-          
-          targetUser.baseSalary = newSalary;
+          const moneyType = String(metadata.salaryType ?? "per-month");
+          const isRateBasis = moneyType === "per-hour" || moneyType === "per-day";
+          const oldSalary = isRateBasis
+            ? (moneyType === "per-hour" ? targetUser.hourlyRate ?? 0 : targetUser.dailyRate ?? 0)
+            : targetUser.baseSalary || 0;
+          const newSalary = Number(metadata.newBaseSalary ?? metadata.amount) || 0;
+
+          if (moneyType === "per-hour") {
+            targetUser.salaryType = "per-hour";
+            targetUser.hourlyRate = newSalary;
+            targetUser.dailyRate = 0;
+            targetUser.baseSalary = 0;
+          } else if (moneyType === "per-day") {
+            targetUser.salaryType = "per-day";
+            targetUser.dailyRate = newSalary;
+            targetUser.hourlyRate = 0;
+            targetUser.baseSalary = 0;
+          } else {
+            targetUser.salaryType = moneyType;
+            targetUser.baseSalary = moneyType === "per-annum" ? Math.round(newSalary / 12) : newSalary;
+            targetUser.hourlyRate = 0;
+            targetUser.dailyRate = 0;
+          }
+
           if (!Array.isArray(targetUser.salaryHistory)) targetUser.salaryHistory = [];
           targetUser.salaryHistory.push({
             amount: newSalary,
@@ -399,13 +421,13 @@ export async function PATCH(request: Request, { params }: Params) {
             type: newSalary >= oldSalary ? "increment" : "decrement"
           });
           await targetUser.save();
-          
+
           await Notification.create({
             user: targetUser._id,
             company: joinRequest.company,
             type: "info",
             title: "Salary Updated",
-            message: `your salary has been ${newSalary >= oldSalary ? "incremented" : "decremented"} by ${Math.abs(newSalary - oldSalary)}. Your current salary is ${newSalary}`
+            message: `your salary has been ${newSalary >= oldSalary ? "incremented" : "decremented"}. Current ${moneyType.replace("per-", "").replace("annum", "annual")} salary is ${newSalary}`
           });
           emitNotification(String(targetUser._id));
         }
@@ -419,7 +441,7 @@ export async function PATCH(request: Request, { params }: Params) {
         const currentMonth = new Date().toISOString().slice(0, 7);
 
         await FinanceSalary.findOneAndUpdate(
-          { company: joinRequest.company, employee: requester._id, month: currentMonth },
+          { company: joinRequest.company, employee: requester._id, month: currentMonth, kind: "monthly" },
           {
             $set: {
               baseSalary: 0,
@@ -481,6 +503,21 @@ export async function PATCH(request: Request, { params }: Params) {
     if (joinRequest.kind === "quit-company") {
       if (status === "approved") {
         const activeTeamIds = Array.isArray(requester.activeTeams) ? [...requester.activeTeams] : [];
+
+        // Auto-generate a final settlement salary (if applicable) so the member
+        // is paid for any outstanding unpaid tenure before removal.
+        if (requester.employmentEndDate && requester.company) {
+          const policy = await CompanyPolicy.findOne({ company: joinRequest.company });
+          if (policy?.settlementEnabled !== false) {
+            await generateFinalSettlement({
+              company: joinRequest.company,
+              userId,
+              member: requester,
+              policy: policy || {},
+              reason: "quit-approval",
+            });
+          }
+        }
 
         // If they are a manager/tester, transfer managed teams when replacement is provided.
         if (["project-manager", "qa-tester"].includes(String(requester.role))) {

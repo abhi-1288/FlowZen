@@ -89,8 +89,20 @@ export async function GET(request: Request, { params }: Params) {
     const monthStr = salary.month;
     const year = Number(monthStr.slice(0, 4));
     const month = Number(monthStr.slice(5, 7));
-    const periodStart = new Date(year, month - 1, 1);
-    const periodEnd = new Date(year, month, 0);
+
+    let periodStart: Date;
+    let periodEnd: Date;
+    if (salary.kind === "settlement" && salary.periodStart && salary.periodEnd) {
+      periodStart = new Date(String(salary.periodStart) + "T00:00:00");
+      periodEnd = new Date(String(salary.periodEnd) + "T00:00:00");
+      if (Number.isNaN(periodStart.getTime()) || Number.isNaN(periodEnd.getTime())) {
+        periodStart = new Date(year, month - 1, 1);
+        periodEnd = new Date(year, month, 0);
+      }
+    } else {
+      periodStart = new Date(year, month - 1, 1);
+      periodEnd = new Date(year, month, 0);
+    }
 
     const joinedRef = employee.companyJoined ?? employee.createdAt;
     const companyJoined = joinedRef ? startOfDay(new Date(joinedRef)) : null;
@@ -287,6 +299,8 @@ export async function GET(request: Request, { params }: Params) {
       slip: {
         id: salary._id,
         month: salary.month,
+        kind: salary.kind ?? "monthly",
+        settlementReason: salary.settlementReason ?? "",
         status: salary.status,
         paidAt: salary.paidAt,
         baseSalary: salary.baseSalary,

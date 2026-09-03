@@ -9,10 +9,11 @@ const highlights = [
   "Finance module: salaries, expenses, budgets, invoices, and automated payroll",
   "Full recruitment pipeline: jobs, candidates, interviews, offers, and hiring",
   "Multi-step approval workflows for joins, leaves, and quits",
-  "Eight user roles with granular board-level permissions",
+  "Ten user roles with granular board-level permissions",
   "HR tools: policies, broadcasts, meeting invites, and role changes",
   "Real-time chat with read receipts, online presence, and delivery tracking",
   "Security & visitor management with entry/exit scanning and QR passes",
+  "IT Support helpdesk: ticket lifecycle, assignments, and account provisioning",
 ];
 
 export function Highlight() {

@@ -169,7 +169,12 @@ export function SalaryRecordsSection({
                 ) : null}
                 <div>
                   <p className="font-medium">{displayNested(salary.employee, "name", "Employee")} - &#x20B9;{Number(salary.netSalary ?? 0).toLocaleString("en-IN")}</p>
-                  <p className="text-sm text-slate-500">{String(salary.month)} &bull; {status}</p>
+                  <p className="text-sm text-slate-500">
+                    {String(salary.kind ?? "") === "settlement" ? (
+                      <span className="mr-1 inline-block rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">Final settlement</span>
+                    ) : null}
+                    {String(salary.month)} &bull; {status}
+                  </p>
                   {isRejected && rejectionReason ? (
                     <p className="text-xs text-rose-600">Rejected: {rejectionReason}</p>
                   ) : null}

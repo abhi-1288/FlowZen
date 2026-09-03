@@ -429,11 +429,12 @@ export async function POST(request: Request) {
       company: actor.company,
       employee: employeeId,
       month,
+      kind: "monthly",
     }).select("status");
     const wasPaid = existingSalary?.status === "paid";
 
     const salary = await FinanceSalary.findOneAndUpdate(
-      { company: actor.company, employee: employeeId, month },
+      { company: actor.company, employee: employeeId, month, kind: "monthly" },
       {
         $set: {
           baseSalary: breakdown.grossSalary,

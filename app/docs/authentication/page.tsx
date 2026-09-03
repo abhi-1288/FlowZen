@@ -171,7 +171,7 @@ export default function AuthDocsPage() {
                   <td><code>role</code></td>
                   <td>string</td>
                   <td>Optional</td>
-                  <td>Role (employee, project-manager, qa-tester, human-resource, finance, admin, others). Default: employee</td>
+                  <td>Role (employee, project-manager, qa-tester, human-resource, finance, admin, security, it-admin, it-administration, others). Default: employee</td>
                 </tr>
               </tbody>
             </table>

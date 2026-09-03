@@ -1,6 +1,48 @@
 export type Role = "admin" | "manager" | "employee" | "tester" | "others";
-export type UserRole = "employee" | "project-manager" | "qa-tester" | "human-resource" | "finance" | "admin" | "security" | "others";
+export type UserRole = "employee" | "project-manager" | "qa-tester" | "human-resource" | "finance" | "admin" | "security" | "it-admin" | "it-administration" | "others";
 export type Priority = "low" | "medium" | "high";
+
+export type ITTicketStatus =
+  | "PENDING"
+  | "ASSIGNED"
+  | "QUEUED"
+  | "IN_PROGRESS"
+  | "WAITING_FOR_USER"
+  | "AWAITING_CONFIRMATION"
+  | "RESOLVED"
+  | "CANCELLED";
+
+export type ITTicketCategory =
+  | "ACCOUNT_LOGIN"
+  | "ACCESS_PERMISSION"
+  | "HARDWARE"
+  | "SOFTWARE"
+  | "NETWORK"
+  | "EMAIL"
+  | "PRINTER_PERIPHERAL"
+  | "SECURITY"
+  | "ACCOUNT_CREATION"
+  | "OTHER";
+
+export type ITPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+
+export type ITResolutionType =
+  | "ACCESS_CORRECTED"
+  | "HARDWARE_REPAIRED"
+  | "SOFTWARE_INSTALLED"
+  | "CONFIGURATION_CHANGED"
+  | "PASSWORD_ACCOUNT_FIXED"
+  | "NETWORK_ISSUE_FIXED"
+  | "USER_GUIDEANCE"
+  | "OTHER";
+
+export type ITProvisioningStatus =
+  | "PENDING"
+  | "UNDER_REVIEW"
+  | "APPROVED"
+  | "ACCOUNT_CREATED"
+  | "COMPLETED"
+  | "REJECTED";
 
 export type Board = {
   id: string;

@@ -17,6 +17,7 @@ function normalizeCode(raw: string | null) {
 function kindFromCode(code: string) {
   if (code.startsWith("CO-")) return "company";
   if (code.startsWith("TM-")) return "team";
+  if (code.startsWith("IT-")) return "it-join";
   return "unknown";
 }
 
@@ -71,14 +72,16 @@ export default function JoinPage() {
     setMessage("");
     try {
       if (kind === "company") {
-        const data = await apiFetch<{ approvalNotifier?: "hr" | "admin" }>("/api/company/join", {
+        const data = await apiFetch<{ approvalNotifier?: "hr" | "admin" | "it-admin" }>("/api/company/join", {
           method: "POST",
           body: JSON.stringify({ code })
         });
         setMessage(
           data.approvalNotifier === "hr"
             ? "Join request sent to HR for approval."
-            : "Join request sent to company admin for approval."
+            : data.approvalNotifier === "it-admin"
+              ? "Join request sent to IT Admin for approval."
+              : "Join request sent to company admin for approval."
         );
         setJoinState("requested");
       } else if (kind === "team") {
@@ -90,6 +93,17 @@ export default function JoinPage() {
           data.approvalNotifier === "hr"
             ? "Join request sent to HR for approval."
             : "Join request sent to team manager for approval."
+        );
+        setJoinState("requested");
+      } else if (kind === "it-join") {
+        const data = await apiFetch<{ creatorName?: string }>("/api/it/join", {
+          method: "POST",
+          body: JSON.stringify({ code })
+        });
+        setMessage(
+          data.creatorName
+            ? `Join request sent to ${data.creatorName} for approval.`
+            : "Join request sent to the IT admin for approval."
         );
         setJoinState("requested");
       } else {
@@ -108,11 +122,11 @@ export default function JoinPage() {
       <section className="neu-card w-full max-w-xl rounded-2xl p-8">
         <div className="mb-6 flex items-center gap-3">
           <div className="grid h-11 w-11 place-items-center rounded-lg bg-emerald-600 text-white">
-            {kind === "company" ? <Building2 size={22} /> : <Users size={22} />}
+            {kind === "company" ? <Building2 size={22} /> : kind === "team" ? <Users size={22} /> : <Building2 size={22} />}
           </div>
           <div>
             <h1 className="text-2xl font-semibold text-slate-950">
-              {kind === "company" ? "Join Company" : kind === "team" ? "Join Team" : "Join Workspace"}
+              {kind === "company" ? "Join Company" : kind === "team" ? "Join Team" : "Join IT Team"}
             </h1>
             <p className="text-sm text-slate-500">Use invite code to request access.</p>
           </div>

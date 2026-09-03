@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/client-utils";
 import type { AnyRecord } from "./shared";
 import { PolicyQuotasSection } from "./sections/policy-quotas-section";
 import { PolicyConfigSection } from "./sections/policy-config-section";
+import { ExitSettlementSection } from "./sections/exit-settlement-section";
 import { usePolicySettings } from "./hooks/use-policy-settings";
 import { useWfh } from "./hooks/use-wfh";
 
@@ -112,6 +113,8 @@ export function HrPolicyTab({
           onApplyBulkImport={policy.applyBulkImport}
         />
       ) : null}
+
+      <ExitSettlementSection canEdit={canEdit} showToast={showToast} />
 
       <PolicyQuotasSection company={company} policyInfo={policyInfo} salaryCycle={salaryCycle} profile={profile} session={session as { user?: { id?: string } } | null} />
     </div>

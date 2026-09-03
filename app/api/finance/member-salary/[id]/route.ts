@@ -27,15 +27,26 @@ export async function POST(request: Request, { params }: Params) {
   const member = await User.findOne({ _id: memberId, company: actor.company, companyStatus: "approved" });
   if (!member) return jsonError("Member not found.", 404);
 
-  let body: { baseSalary?: number };
+  let body: { baseSalary?: number; amount?: number; salaryType?: string };
   try {
     body = await request.json();
   } catch (err) {
     return jsonError("Invalid JSON", 400);
   }
 
-  if (typeof body.baseSalary !== "number" || body.baseSalary < 0) {
-    return jsonError("Invalid baseSalary", 400);
+  if (typeof body.baseSalary !== "number" && typeof body.amount !== "number") {
+    return jsonError("Invalid salary amount", 400);
+  }
+
+  const salaryType =
+    typeof body.salaryType === "string" &&
+    ["per-annum", "per-month", "per-day", "per-hour"].includes(body.salaryType)
+      ? body.salaryType
+      : "per-month";
+
+  const rawAmount = Math.max(0, Number(body.amount ?? body.baseSalary ?? 0));
+  if (!Number.isFinite(rawAmount) || rawAmount < 0) {
+    return jsonError("Invalid salary amount", 400);
   }
 
   // Find the HR who enrolled the user
@@ -81,9 +92,37 @@ export async function POST(request: Request, { params }: Params) {
     await existing.save();
   }
 
-  const salaryAmount = body.baseSalary;
-  const oldSalary = Math.max(0, Number(member.baseSalary ?? 0));
-  member.baseSalary = salaryAmount;
+  const salaryAmount = rawAmount;
+  const oldSalary = Math.max(
+    0,
+    Number(
+      salaryType === "per-hour"
+        ? member.hourlyRate ?? 0
+        : salaryType === "per-day"
+          ? member.dailyRate ?? 0
+          : member.baseSalary ?? 0,
+    ),
+  );
+
+  if (salaryType === "per-hour") {
+    member.salaryType = "per-hour";
+    member.hourlyRate = salaryAmount;
+    member.dailyRate = 0;
+    member.baseSalary = 0;
+  } else if (salaryType === "per-day") {
+    member.salaryType = "per-day";
+    member.dailyRate = salaryAmount;
+    member.hourlyRate = 0;
+    member.baseSalary = 0;
+  } else {
+    const baseSalary =
+      salaryType === "per-annum" ? Math.round(salaryAmount / 12) : salaryAmount;
+    member.salaryType = salaryType;
+    member.baseSalary = baseSalary;
+    member.hourlyRate = 0;
+    member.dailyRate = 0;
+  }
+
   if (!Array.isArray(member.salaryHistory)) member.salaryHistory = [];
   member.salaryHistory.push({
     amount: salaryAmount,
@@ -93,17 +132,20 @@ export async function POST(request: Request, { params }: Params) {
   await member.save();
 
   const currentMonth = new Date().toISOString().slice(0, 7);
+  const recordUpdate: Record<string, any> = {
+    allowances: 0,
+    deductions: 0,
+    netSalary: salaryAmount,
+    status: "pending",
+  };
+  if (salaryType === "per-hour" || salaryType === "per-day") {
+    recordUpdate.baseSalary = 0;
+  } else {
+    recordUpdate.baseSalary = salaryAmount;
+  }
   await FinanceSalary.findOneAndUpdate(
-    { company: actor.company, employee: member._id, month: currentMonth },
-    {
-      $set: {
-        baseSalary: salaryAmount,
-        allowances: 0,
-        deductions: 0,
-        netSalary: salaryAmount,
-        status: "pending",
-      },
-    },
+    { company: actor.company, employee: member._id, month: currentMonth, kind: "monthly" },
+    { $set: recordUpdate },
     { upsert: true },
   );
 
@@ -116,8 +158,9 @@ export async function POST(request: Request, { params }: Params) {
     metadata: {
       targetUser: memberId,
       targetUserName: member.name,
-      newBaseSalary: body.baseSalary,
-      oldBaseSalary: oldSalary
+      newBaseSalary: salaryAmount,
+      oldBaseSalary: oldSalary,
+      salaryType,
     }
   });
 
@@ -126,9 +169,9 @@ export async function POST(request: Request, { params }: Params) {
     company: actor.company,
     type: "approval",
     title: "Salary Update Approval Required",
-    message: `Finance (${actor.name}) requested a salary update for ${member.name} to ₹${body.baseSalary.toLocaleString("en-IN")}.`,
+    message: `Finance (${actor.name}) requested a salary update for ${member.name} to ₹${salaryAmount.toLocaleString("en-IN")}/${salaryType.replace("per-", "").replace("annum", "year")}.`,
   });
   emitNotification(String(approverId));
 
-  return NextResponse.json({ success: true, baseSalary: salaryAmount });
+  return NextResponse.json({ success: true, salaryType, amount: salaryAmount });
 }

@@ -5,6 +5,10 @@ const FinanceSalarySchema = new Schema(
     company: { type: Schema.Types.ObjectId, ref: "Company", required: true, index: true },
     employee: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     month: { type: String, required: true, index: true },
+    kind: { type: String, enum: ["monthly", "settlement"], default: "monthly", index: true },
+    periodStart: { type: String, default: null },
+    periodEnd: { type: String, default: null },
+    settlementReason: { type: String, default: "" },
     baseSalary: { type: Number, default: 0 },
     allowances: { type: Number, default: 0 },
     deductions: { type: Number, default: 0 },
@@ -29,7 +33,8 @@ const FinanceSalarySchema = new Schema(
   { timestamps: true },
 );
 
-FinanceSalarySchema.index({ company: 1, employee: 1, month: 1 }, { unique: true });
+FinanceSalarySchema.index({ company: 1, employee: 1, month: 1, kind: 1 }, { unique: true });
+FinanceSalarySchema.index({ company: 1, employee: 1, status: 1 });
 
 export type FinanceSalaryDocument = InferSchemaType<typeof FinanceSalarySchema>;
 

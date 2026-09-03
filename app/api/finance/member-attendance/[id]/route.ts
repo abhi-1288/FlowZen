@@ -19,7 +19,7 @@ export async function GET(request: Request, { params }: Params) {
   const actor = await User.findById(userId).select("role company companyStatus");
   if (!actor || !actor.company || actor.companyStatus !== "approved") return jsonError("Approved company access is required.", 403);
   if (String(actor.role) !== "finance") return jsonError("Only finance can view member attendance.", 403);
-  const member = await User.findOne({ _id: memberId, company: actor.company, companyStatus: "approved" }).select("name email role baseSalary companyJoined createdAt");
+  const member = await User.findOne({ _id: memberId, company: actor.company, companyStatus: "approved" }).select("name email role baseSalary salaryType hourlyRate dailyRate companyJoined createdAt");
   if (!member) return jsonError("Member not found.", 404);
 
   const url = new URL(request.url);
@@ -49,7 +49,7 @@ export async function GET(request: Request, { params }: Params) {
       endDate: { $gte: monthStart },
     }).sort({ startDate: 1 }),
     Holiday.find({ company: actor.company, startDate: { $lt: monthEnd }, endDate: { $gte: monthStart } }).sort({ startDate: 1 }),
-    FinanceSalary.findOne({ company: actor.company, employee: memberId, month }).select("netSalary baseSalary"),
+    FinanceSalary.findOne({ company: actor.company, employee: memberId, month, kind: "monthly" }).select("netSalary baseSalary"),
     Company.findById(actor.company).select("weekendDates minWorkHours"),
   ]);
 
@@ -174,7 +174,7 @@ export async function GET(request: Request, { params }: Params) {
   }
 
   return NextResponse.json({
-    member: { id: String(member._id), name: member.name, email: member.email, role: member.role, baseSalary: member.baseSalary },
+    member: { id: String(member._id), name: member.name, email: member.email, role: member.role, baseSalary: member.baseSalary, salaryType: member.salaryType, hourlyRate: member.hourlyRate, dailyRate: member.dailyRate },
     month,
     salary: salary ? { netSalary: salary.netSalary, baseSalary: salary.baseSalary } : null,
     calendar,

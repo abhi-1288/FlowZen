@@ -24,6 +24,24 @@ const policySchema = new mongoose.Schema({
   salaryCycleChangeApprover: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   salaryCycleChangeRequestedAt: { type: Date, default: null },
   advanceSalaryEnabled: { type: Boolean, default: false },
+  // Exit & final settlement policy.
+  settlementEnabled: { type: Boolean, default: true },
+  settlementHourDays: { type: Number, default: 1, min: 0, max: 30 },
+  settlementDayDays: { type: Number, default: 2, min: 0, max: 30 },
+  settlementMonthDays: { type: Number, default: 10, min: 0, max: 90 },
+  // Per-employment-type notice rule (read-only reference for record/display).
+  // part-time = no notice; internship/contract/permanent = serves notice.
+  settlementNoticeRule: {
+    type: Map,
+    of: Boolean,
+    default: {
+      "part-time": false,
+      internship: true,
+      contract: true,
+      permanent: true,
+      "full-time": true,
+    },
+  },
 }, { timestamps: true });
 
 if (process.env.NODE_ENV === "development") {

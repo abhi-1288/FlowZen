@@ -10,6 +10,7 @@ const COMPANY_JOIN_ROLES_USING_HR = new Set([
   "employee",
   "others",
   "security",
+  "it-admin",
 ]);
 
 /**
@@ -78,6 +79,34 @@ export async function resolveSeniorSecurityApprover(
     if (ssId) return ssId;
   }
   return defaultApproverId;
+}
+
+export async function findApprovedItAdminUserId(
+  companyId: Types.ObjectId | string,
+  excludeUserId?: string,
+): Promise<string | null> {
+  const filter: Record<string, unknown> = {
+    company: companyId,
+    role: "it-admin",
+    companyStatus: "approved",
+  };
+  if (excludeUserId) filter._id = { $ne: excludeUserId };
+  const itAdmin = await User.findOne(filter)
+    .select("_id")
+    .sort({ createdAt: 1 });
+
+  return itAdmin ? String(itAdmin._id) : null;
+}
+
+export async function listApprovedItAdminUserIds(
+  companyId: Types.ObjectId | string,
+): Promise<string[]> {
+  const itAdmins = await User.find({
+    company: companyId,
+    role: "it-admin",
+    companyStatus: "approved",
+  }).select("_id");
+  return itAdmins.map((a) => String(a._id));
 }
 
 export async function findApprovedHrUserId(
@@ -176,8 +205,19 @@ export async function resolveCompanyJoinApproverId(
       const ssId = await findApprovedSeniorSecurityUserId(company._id);
       if (ssId) return ssId;
     }
+    if (codeRole === "it-admin") {
+      const itAdminId = await findApprovedItAdminUserId(company._id);
+      if (itAdminId) return itAdminId;
+    }
     const hrId = await findApprovedHrUserId(company._id);
     if (hrId) return hrId;
+  }
+  if (codeRole === "it-administration") {
+    const itAdminId = await findApprovedItAdminUserId(company._id);
+    if (itAdminId) return itAdminId;
+    const hrId = await findApprovedHrUserId(company._id);
+    if (hrId) return hrId;
+    return String(company.owner);
   }
   return String(company.owner);
 }

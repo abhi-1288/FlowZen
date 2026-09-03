@@ -28,6 +28,7 @@ import {
   Users,
   Wallet,
   CalendarDays,
+  Wrench,
 } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import { useNotificationToast } from "@/lib/toast-context";
@@ -103,6 +104,26 @@ function formatDuration(profile: AnyRecord | null): string {
   if (days > 0) parts.push(`${days} day${days === 1 ? "" : "s"}`);
   if (hours > 0) parts.push(`${hours} hr${hours === 1 ? "" : "s"}`);
   return parts.length ? `${String(profile.employmentType ?? "")} \u00b7 ${parts.join(" ")}` : String(profile.employmentType ?? "");
+}
+
+function exitStateLabel(
+  endDate: string | Date | null | undefined,
+): { tone: "future" | "today" | "ended"; label: string } | null {
+  if (!endDate) return null;
+  const end = new Date(String(endDate));
+  if (isNaN(end.getTime())) return null;
+  const now = new Date();
+  const diff = end.getTime() - now.getTime();
+  if (diff < 0) {
+    return { tone: "ended", label: "Exit passed" };
+  }
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days > 1) return { tone: "future", label: `Exit in ${days} days` };
+  if (days === 1) return { tone: "future", label: "Exit in Tomorrow" };
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  if (hours >= 1) return { tone: "today", label: `Exit in ${hours} hr${hours === 1 ? "" : "s"}` };
+  const mins = Math.max(1, Math.floor(diff / (1000 * 60)));
+  return { tone: "today", label: `Exit in ${mins} min${mins === 1 ? "" : "s"}` };
 }
 
 
@@ -806,6 +827,14 @@ export function ProfileHub() {
               onClick={() => router.push("/recruitment/candidates")}
             />
           ) : null}
+          {canViewCompanyTabs && (["it-admin", "it-administration", "admin", "human-resource"].includes(String(role)) || actorIsSeniorSecurity) ? (
+            <NavButton
+              active={pathname?.startsWith("/it") ?? false}
+              icon={<Wrench size={16} />}
+              label="IT"
+              onClick={() => router.push("/it")}
+            />
+          ) : null}
           {canViewCompanyTabs ? (
             <NavButton
               active={tab === "documents"}
@@ -940,6 +969,25 @@ export function ProfileHub() {
                   {formatDuration(profile)}
                 </span>
               ) : null}
+              {(() => {
+                const endDateRaw = profile?.employmentEndDate;
+                if (!endDateRaw) return null;
+                const endDate = new Date(String(endDateRaw));
+                const endLabel = endDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+                const state = exitStateLabel(String(endDateRaw));
+                if (!state) return null;
+                const isEnded = state.tone === "ended";
+                const chipCls = isEnded
+                  ? "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
+                  : "text-amber-700 dark:text-amber-300";
+                return (
+                  <span title={`Employment end date: ${endLabel}`}
+                    className={`neu-chip inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold ${chipCls}`}>
+                    <Clock size={12} />
+                    {state.label}
+                  </span>
+                );
+              })()}
               <button
                 className="neu-btn inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 dark:border dark:border-zinc-800 dark:bg-transparent dark:text-zinc-400 dark:hover:bg-zinc-700"
                 onClick={() => signOut({ callbackUrl: "/login" })}

@@ -81,6 +81,12 @@ export async function GET() {
       if (!company.otherJoinCode) {
         company.otherJoinCode = createRoleJoinCode(String(company.joinCode));
       }
+      if (!company.itAdminJoinCode) {
+        company.itAdminJoinCode = `${company.joinCode}-ITADMIN`;
+      }
+      if (!company.itSupportJoinCode) {
+        company.itSupportJoinCode = `${company.joinCode}-ITSUPPORT`;
+      }
       await company.save();
       user.company = company;
     }
@@ -217,7 +223,7 @@ export async function GET() {
     const companyId = typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
     const [members, teams, companyPolicy, companyDoc] = await Promise.all([
       User.find({ company: companyId, companyStatus: "approved" })
-        .select("name email role customRole isSeniorSecurity team teamStatus activeTeams membershipHistory companyJoined employmentEndDate employmentType durationMonths durationDays durationHours durationYears salaryType baseSalary salaryCurrency companyIdentityCode regionLabel phone dob address emergencyContact bloodGroup pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted")
+        .select("name email role customRole isSeniorSecurity team teamStatus activeTeams membershipHistory companyJoined employmentEndDate employmentType durationMonths durationDays durationHours durationYears salaryType baseSalary hourlyRate dailyRate salaryCurrency companyIdentityCode regionLabel phone dob address emergencyContact bloodGroup pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted")
         .populate("membershipHistory.inviter", "name role")
         .sort({ role: 1, name: 1 }),
       Team.find({ company: companyId }).select("name manager employees"),
@@ -355,11 +361,35 @@ export async function GET() {
     }
   }
 
+  if (safeRole === "it-admin" && user.company && user.companyStatus === "approved") {
+    const companyId = typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
+    const company = await Company.findById(companyId);
+    if (company && !company.itAdminJoinCode) {
+      company.itAdminJoinCode = `${company.joinCode}-ITADMIN`;
+    }
+    if (company && !company.itSupportJoinCode) {
+      company.itSupportJoinCode = `${company.joinCode}-ITSUPPORT`;
+    }
+    if (company) {
+      await company.save();
+      user.company = company;
+    }
+  }
+
   if (safeRole === "admin" && user.company && user.companyStatus === "approved") {
     const company = await Company.findById(userCompanyId);
-    if (company && !company.adminJoinCode) {
-      company.adminJoinCode = createRoleJoinCode(String(company.joinCode));
+    if (company) {
+      if (!company.adminJoinCode) {
+        company.adminJoinCode = createRoleJoinCode(String(company.joinCode));
+      }
+      if (!company.itAdminJoinCode) {
+        company.itAdminJoinCode = `${company.joinCode}-ITADMIN`;
+      }
+      if (!company.itSupportJoinCode) {
+        company.itSupportJoinCode = `${company.joinCode}-ITSUPPORT`;
+      }
       await company.save();
+      user.company = company;
     }
   }
 
@@ -402,6 +432,51 @@ export async function GET() {
         };
       })
     };
+  }
+
+  if (
+    (safeRole === "it-admin" || safeRole === "it-administration") &&
+    user.company &&
+    user.companyStatus === "approved"
+  ) {
+    const companyId = typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
+    const { ITTicket } = await import("@/models/ITTicket");
+    const { ITJoiningCode } = await import("@/models/ITJoiningCode");
+    const { ITProvisioningRequest } = await import("@/models/ITProvisioningRequest");
+    const { ticketVisibilityFilter } = await import("@/lib/it");
+
+    const filter = await ticketVisibilityFilter({ role: safeRole, _id: user._id }, companyId);
+    const openCount = await ITTicket.countDocuments({ ...filter, status: { $in: ["PENDING", "ASSIGNED", "QUEUED", "IN_PROGRESS", "WAITING_FOR_USER", "AWAITING_CONFIRMATION"] } });
+    const resolvedThisMonth = await ITTicket.countDocuments({
+      ...filter,
+      status: "RESOLVED",
+      resolvedAt: { $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
+    });
+    const unassigned = await ITTicket.countDocuments({ ...filter, status: "PENDING" });
+
+    const itInsights: Record<string, unknown> = {
+      openCount,
+      resolvedThisMonth,
+      unassigned,
+      pendingRequester: safeRole === "it-administration" ? "assigned" : "all",
+    };
+
+    if (safeRole === "it-admin") {
+      const [itAdminCount, itStaffCount, pendingProvisioning, activeCodes] = await Promise.all([
+        User.countDocuments({ company: companyId, role: "it-admin", companyStatus: "approved" }),
+        User.countDocuments({ company: companyId, role: "it-administration", companyStatus: "approved" }),
+        ITProvisioningRequest.countDocuments({
+          company: companyId,
+          status: { $in: ["PENDING", "UNDER_REVIEW", "APPROVED"] },
+        }),
+        ITJoiningCode.countDocuments({ company: companyId, status: "active", expiresAt: { $gt: new Date() } }),
+      ]);
+      itInsights.itAdminCount = itAdminCount;
+      itInsights.itStaffCount = itStaffCount;
+      itInsights.pendingProvisioning = pendingProvisioning;
+      itInsights.activeCodes = activeCodes;
+    }
+    insights.it = itInsights;
   }
 
   const serializedUser = serializeDoc(user);

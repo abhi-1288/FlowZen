@@ -1,9 +1,21 @@
 import "next-auth";
 import "next-auth/jwt";
 
+export type AppUserRole =
+  | "employee"
+  | "project-manager"
+  | "qa-tester"
+  | "human-resource"
+  | "finance"
+  | "admin"
+  | "security"
+  | "it-admin"
+  | "it-administration"
+  | "others";
+
 declare module "next-auth" {
   interface User {
-    role?: "employee" | "project-manager" | "qa-tester" | "human-resource" | "finance" | "admin" | "security" | "others";
+    role?: AppUserRole;
     passwordResetRequired?: boolean;
     rememberMe?: boolean;
     isSeniorSecurity?: boolean;
@@ -12,7 +24,7 @@ declare module "next-auth" {
   interface Session {
     user: {
       id: string;
-      role?: "employee" | "project-manager" | "qa-tester" | "human-resource" | "finance" | "admin" | "security" | "others";
+      role?: AppUserRole;
       name?: string | null;
       email?: string | null;
       image?: string | null;
@@ -30,7 +42,7 @@ declare module "next-auth" {
 
 declare module "next-auth/jwt" {
   interface JWT {
-    role?: "employee" | "project-manager" | "qa-tester" | "human-resource" | "finance" | "admin" | "security" | "others";
+    role?: AppUserRole;
     passwordResetRequired?: boolean;
     rememberMe?: boolean;
     isSeniorSecurity?: boolean;

@@ -1,4 +1,5 @@
 import type { NextAuthOptions } from "next-auth";
+import type { AppUserRole } from "@/types/next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import AzureADProvider from "next-auth/providers/azure-ad";
@@ -255,7 +256,7 @@ export const authOptions: NextAuthOptions = {
       }
       if (session.user) {
         session.user.id = token.sub;
-        session.user.role = token.role as "employee" | "project-manager" | "qa-tester" | "human-resource" | "finance" | "admin" | "security" | "others" | undefined;
+        session.user.role = token.role as AppUserRole | undefined;
         session.user.passwordResetRequired = Boolean(token.passwordResetRequired);
         if (typeof token.rememberMe !== "undefined") session.user.rememberMe = token.rememberMe;
 

@@ -12,6 +12,8 @@ const demoUsers = [
   { name: "FlowZen Finance", email: "finance@flowzen.com", role: "finance" },
   { name: "FlowZen Sr. Security", email: "s_security@flowzen.com", role: "security", isSeniorSecurity: true },
   { name: "FlowZen Jr. Security", email: "j_security@flowzen.com", role: "security" },
+  { name: "FlowZen IT Admin", email: "it_admin@flowzen.com", role: "it-admin" },
+  { name: "FlowZen IT Support", email: "it_support@flowzen.com", role: "it-administration" },
   { name: "FlowZen Other", email: "other@flowzen.com", role: "others" },
 ];
 

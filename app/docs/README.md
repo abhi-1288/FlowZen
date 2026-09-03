@@ -93,7 +93,7 @@ Create a new user account. Sends a 6-digit OTP to the provided email for verific
 | name | string | Required | Full name |
 | email | string | Required | Email address |
 | password | string | Required | Password (min 8 chars) |
-| role | string | Optional | Role (employee, project-manager, qa-tester, human-resource, finance, admin, others). Default: employee |
+| role | string | Optional | Role (employee, project-manager, qa-tester, human-resource, finance, admin, security, it-admin, it-administration, others). Default: employee |
 
 **Response (200):**
 ```json

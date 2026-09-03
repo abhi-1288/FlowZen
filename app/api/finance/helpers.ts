@@ -440,6 +440,7 @@ export async function autoGenerateSalariesForMonth(params: {
   const existingSalaries = await FinanceSalary.find({
     company: actorCompany,
     month,
+    kind: "monthly",
   }).select("employee status");
   const statusByEmployee = new Map<string, string>();
   for (const record of existingSalaries as any[]) {
@@ -466,7 +467,7 @@ export async function autoGenerateSalariesForMonth(params: {
     if ("error" in computed) continue;
     const { breakdown } = computed;
     const salary = await FinanceSalary.findOneAndUpdate(
-      { company: actorCompany, employee: member._id, month },
+      { company: actorCompany, employee: member._id, month, kind: "monthly" },
       {
         $set: {
           baseSalary: breakdown.grossSalary,
@@ -540,4 +541,193 @@ export async function autoGenerateSalariesForMonth(params: {
   emitNotification(userId);
 
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Exit & final settlement helpers
+// ---------------------------------------------------------------------------
+
+export function getSettlementGapDays(salaryType: string, policy: any): number {
+  const basis = String(salaryType ?? "");
+  if (basis === "per-hour") return Math.max(0, Number(policy?.settlementHourDays ?? 1));
+  if (basis === "per-day") return Math.max(0, Number(policy?.settlementDayDays ?? 2));
+  return Math.max(0, Number(policy?.settlementMonthDays ?? 10));
+}
+
+export function addDaysToDate(date: Date, days: number): Date {
+  const d = startOfDay(new Date(date));
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+export async function hasSettlementForMonth(params: {
+  company: any;
+  employeeId: string;
+  month: string;
+}): Promise<boolean> {
+  const existing = await FinanceSalary.findOne({
+    company: params.company,
+    employee: params.employeeId,
+    month: params.month,
+    kind: "settlement",
+  }).select("_id");
+  return Boolean(existing);
+}
+
+export async function generateFinalSettlement(params: {
+  company: any;
+  userId: string;
+  member: any;
+  policy: any;
+  reason: string;
+}): Promise<{ created: boolean; salaryId?: string; error?: string }> {
+  const { company: companyId, userId, member, policy, reason } = params;
+
+  const memberDoc = await User.findOne({
+    _id: member._id,
+    company: companyId,
+    companyStatus: "approved",
+  }).select(
+    "_id name companyJoined employmentEndDate salaryType baseSalary hourlyRate dailyRate",
+  );
+  if (!memberDoc) return { created: false, error: "Employee not found." };
+
+  // Prefer the in-memory end date when the caller set one before saving (e.g.
+  // on immediate termination), otherwise fall back to the persisted value.
+  const employmentEnd =
+    member?.employmentEndDate ?? memberDoc.employmentEndDate;
+  if (!employmentEnd) return { created: false, error: "No employment end date set." };
+
+  // Determine the last monthly salary period-end so we only pay what hasn't been paid.
+  const lastSalary = await FinanceSalary.findOne({
+    company: companyId,
+    employee: String(memberDoc._id),
+    kind: "monthly",
+  })
+    .sort({ updatedAt: -1 })
+    .select("periodEnd month");
+
+  const companyJoined = memberDoc.companyJoined
+    ? startOfDay(new Date(memberDoc.companyJoined))
+    : null;
+
+  let settlementPeriodStart: string;
+  if (lastSalary?.periodEnd) {
+    const nextDay = new Date(lastSalary.periodEnd + "T00:00:00");
+    nextDay.setDate(nextDay.getDate() + 1);
+    settlementPeriodStart = toDateKey(nextDay);
+  } else if (companyJoined) {
+    settlementPeriodStart = toDateKey(companyJoined);
+  } else {
+    return { created: false, error: "Cannot determine settlement period start." };
+  }
+
+  const settlementPeriodEnd = toDateKey(startOfDay(new Date(employmentEnd)));
+  if (settlementPeriodStart > settlementPeriodEnd) {
+    return { created: false, error: "Settlement period is empty (already fully paid)." };
+  }
+
+  // Guard against duplicate: if a settlement already exists for the end-date month, skip.
+  const endMonth = settlementPeriodEnd.slice(0, 7);
+  if (await hasSettlementForMonth({ company: companyId, employeeId: String(memberDoc._id), month: endMonth })) {
+    return { created: false, error: "Settlement already generated for this period." };
+  }
+
+  const computed = await computeSalaryBreakdown({
+    actorCompany: companyId,
+    employeeId: String(memberDoc._id),
+    periodStart: settlementPeriodStart,
+    periodEnd: settlementPeriodEnd,
+    allowances: 0,
+    manualDeductions: 0,
+  });
+  if ("error" in computed) {
+    return { created: false, error: computed.error };
+  }
+
+  const { breakdown } = computed;
+  const settlementMonth = endMonth;
+
+  const salary = await FinanceSalary.findOneAndUpdate(
+    {
+      company: companyId,
+      employee: memberDoc._id,
+      month: settlementMonth,
+      kind: "settlement",
+    },
+    {
+      $set: {
+        baseSalary: breakdown.grossSalary,
+        allowances: 0,
+        deductions: breakdown.totalDeductions,
+        manualDeductions: 0,
+        pfDeduction: breakdown.pfDeduction,
+        esicDeduction: breakdown.esicDeduction,
+        tdsDeduction: breakdown.tdsDeduction,
+        netSalary: breakdown.finalSalary,
+        kind: "settlement",
+        periodStart: breakdown.periodStart,
+        periodEnd: settlementPeriodEnd,
+        settlementReason: reason,
+        status: "pending",
+      },
+      $setOnInsert: { createdBy: userId },
+    },
+    { new: true, upsert: true },
+  );
+
+  // Notify admins for approval (same pattern as autoGenerateSalariesForMonth).
+  const admins = await User.find({
+    company: companyId,
+    role: "admin",
+    companyStatus: "approved",
+  }).select("_id");
+
+  if (admins.length > 0) {
+    // Assign to least-loaded admin.
+    const counts = await Promise.all(
+      admins.map(async (a) => {
+        const count = await JoinRequest.countDocuments({
+          approver: a._id,
+          company: companyId,
+          kind: "salary",
+          status: "pending",
+        });
+        return { id: String(a._id), count };
+      }),
+    );
+    counts.sort((a, b) => a.count - b.count);
+    const targetAdminId = counts[0]?.id;
+    if (targetAdminId) {
+      await Notification.create({
+        user: targetAdminId,
+        company: companyId,
+        type: "approval",
+        title: "Final settlement pending approval",
+        message: `Final settlement salary for ${String(memberDoc.name ?? "an employee")} (${settlementPeriodStart} to ${settlementPeriodEnd}) has been auto-generated. Reason: ${reason}.`,
+      });
+      emitNotification(targetAdminId);
+    }
+  }
+
+  // Notify finance users.
+  const financeUsers = await User.find({
+    company: companyId,
+    role: "finance",
+    companyStatus: "approved",
+  }).select("_id");
+  if (financeUsers.length > 0) {
+    await Notification.insertMany(
+      financeUsers.map((u) => ({
+        user: u._id,
+        company: companyId,
+        type: "info",
+        title: "Final settlement generated",
+        message: `A final settlement salary for ${String(memberDoc.name ?? "an employee")} (${settlementPeriodStart} to ${settlementPeriodEnd}) has been auto-generated and is pending admin approval.`,
+      })),
+    );
+    financeUsers.forEach((u) => emitNotification(String(u._id)));
+  }
+
+  return { created: true, salaryId: String(salary._id) };
 }

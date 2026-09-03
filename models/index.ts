@@ -27,6 +27,9 @@ export * from "./User";
 export * from "./Message";
 export * from "./GameScore";
 export * from "./GameChallenge";
+export * from "./ITJoiningCode";
+export * from "./ITTicket";
+export * from "./ITProvisioningRequest";
 
 // Importing the files above has the side-effect of registering mongoose models
 // with `mongoose.models`. Consumers can import from this module to ensure

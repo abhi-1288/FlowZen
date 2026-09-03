@@ -40,8 +40,10 @@ export async function GET(request: Request) {
         { adminJoinCode: code },
         { securityJoinCode: code },
         { juniorSecurityJoinCode: code },
+        { itAdminJoinCode: code },
+        { itSupportJoinCode: code },
       ]
-    }).select("name joinCode hrJoinCode managerJoinCode testerJoinCode financeJoinCode employeeJoinCode otherJoinCode adminJoinCode securityJoinCode juniorSecurityJoinCode members");
+    }).select("name joinCode hrJoinCode managerJoinCode testerJoinCode financeJoinCode employeeJoinCode otherJoinCode adminJoinCode securityJoinCode juniorSecurityJoinCode itAdminJoinCode itSupportJoinCode members");
     if (!company) return jsonError("Invalid company code.", 404);
     const joinState = userId ? await getCompanyJoinState(userId, company) : { status: "available" };
     const codeInfo = companyCodeInfo(company, code, baseCode);
@@ -97,6 +99,46 @@ export async function GET(request: Request) {
     });
   }
 
+  if (code.startsWith("IT-")) {
+    const ITJoiningCode = (await import("@/models/ITJoiningCode")).ITJoiningCode;
+    const joinCode = await ITJoiningCode.findOne({ code })
+      .populate("createdBy", "name")
+      .populate("company", "name");
+    if (!joinCode) return jsonError("Invalid or expired IT joining code.", 404);
+    const now = new Date();
+    if (joinCode.expiresAt < now || joinCode.status !== "active" || joinCode.usedCount >= joinCode.maxUses) {
+      return jsonError("Invalid or expired IT joining code.", 404);
+    }
+    const joinState = userId ? await getItJoinState(userId, joinCode) : { status: "available" };
+    const creatorName =
+      typeof joinCode.createdBy === "object" && joinCode.createdBy && "name" in joinCode.createdBy
+        ? String((joinCode.createdBy as { name?: string }).name ?? "")
+        : "";
+    const companyName =
+      typeof joinCode.company === "object" && joinCode.company && "name" in joinCode.company
+        ? String((joinCode.company as { name?: string }).name ?? "")
+        : "";
+    return NextResponse.json({
+      kind: "it-join",
+      fromRole: "it-admin",
+      toRole: "it-administration",
+      joinState,
+      code: {
+        id: String(joinCode._id),
+        code: joinCode.code,
+        intendedRole: joinCode.intendedRole,
+        organization: joinCode.organization,
+        expiresAt: joinCode.expiresAt,
+        maxUses: joinCode.maxUses,
+        usedCount: joinCode.usedCount,
+        creatorName,
+      },
+      company: {
+        name: companyName,
+      },
+    });
+  }
+
   return jsonError("Invalid join code format.", 400);
 }
 
@@ -121,6 +163,12 @@ function companyCodeInfo(company: any, code: string, baseCode: string) {
   }
   if (String(company.juniorSecurityJoinCode ?? "") === code) {
     return { fromRole: "security", toRole: "security", joinCode: company.juniorSecurityJoinCode };
+  }
+  if (String(company.itAdminJoinCode ?? "") === code) {
+    return { fromRole: "hr", toRole: "it-admin", joinCode: company.itAdminJoinCode };
+  }
+  if (String(company.itSupportJoinCode ?? "") === code) {
+    return { fromRole: "it-admin", toRole: "it-administration", joinCode: company.itSupportJoinCode };
   }
   if (String(company.otherJoinCode ?? "") === code) {
     return { fromRole: "hr", toRole: "others", joinCode: company.otherJoinCode };
@@ -172,6 +220,17 @@ async function getTeamJoinState(userId: string, team: any) {
     return { status: "joined" };
   }
   if (pendingRequest || (String(user?.team ?? "") === String(team._id) && user?.teamStatus === "pending")) {
+    return { status: "requested" };
+  }
+  return { status: "available" };
+}
+
+async function getItJoinState(userId: string, joinCode: any) {
+  const user = await User.findById(userId).select("company companyStatus");
+  if (user?.company && String(user.company) === String(joinCode.company) && user.companyStatus === "approved") {
+    return { status: "joined" };
+  }
+  if (user?.company && String(user.company) === String(joinCode.company) && user.companyStatus === "pending") {
     return { status: "requested" };
   }
   return { status: "available" };

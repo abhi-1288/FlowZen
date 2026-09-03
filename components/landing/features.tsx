@@ -11,6 +11,7 @@ import {
   Lock,
   MessageCircle,
   Shield,
+  Wrench,
 } from "lucide-react";
 
 const features = [
@@ -53,7 +54,7 @@ const features = [
   {
     icon: Lock,
     title: "Role-based Access",
-    desc: "Eight user roles with granular board-level permissions: Admin, HR, Finance, PM, QA, Security, Employee, and more.",
+    desc: "Ten user roles with granular board-level permissions: Admin, HR, Finance, PM, QA, IT Admin, IT Support, Security, Employee, and more.",
     color: "cyan",
   },
   {
@@ -68,6 +69,12 @@ const features = [
     desc: "Entry/exit scanning, QR-based visitor passes, lost card workflows, emergency contacts, and building access logs.",
     color: "orange",
   },
+  {
+    icon: Wrench,
+    title: "IT Support & Helpdesk",
+    desc: "Internal IT support board with ticket lifecycle (pending → resolved), assignees, comments, attachments, and account provisioning with join codes.",
+    color: "lime",
+  },
 ] as const;
 
 const featureStyles = {
@@ -80,6 +87,7 @@ const featureStyles = {
   violet: { icon: "bg-violet-50 dark:bg-violet-950/30 text-violet-600 dark:text-violet-400", border: "hover:border-violet-300 dark:hover:border-violet-700" },
   teal: { icon: "bg-teal-50 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400", border: "hover:border-teal-300 dark:hover:border-teal-700" },
   orange: { icon: "bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400", border: "hover:border-orange-300 dark:hover:border-orange-700" },
+  lime: { icon: "bg-lime-50 dark:bg-lime-950/30 text-lime-600 dark:text-lime-400", border: "hover:border-lime-300 dark:hover:border-lime-700" },
 } as const;
 
 export function Features() {

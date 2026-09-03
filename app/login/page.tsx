@@ -123,6 +123,8 @@ export default function LoginPage() {
                 ["Finance", "finance@flowzen.com", "finance@flowzen"],
                 ["Sr. Security", "s_security@flowzen.com", "s_security@flowzen"],
                 ["Jr. Security", "j_security@flowzen.com", "j_security@flowzen"],
+                ["IT Admin", "it_admin@flowzen.com", "it_admin@flowzen"],
+                ["IT Support", "it_support@flowzen.com", "it_support@flowzen"],
                 ["Others", "other@flowzen.com", "other@flowzen"],
               ].map(([role, mail, pass]) => (
                 <div key={mail} className="neu-inset flex items-center justify-between rounded-xl px-4 py-2.5 transition-colors">

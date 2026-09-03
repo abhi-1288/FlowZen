@@ -325,8 +325,8 @@ export function OnboardingTab({
       const normalizedCode = String(teamCode ?? "").trim().toUpperCase();
       if (!normalizedCode) { showToast("Enter a join code first.", "error"); return; }
       if (normalizedCode.startsWith("CO-") || normalizedCode.startsWith("SC-")) {
-        const data = await apiFetch<{ approvalNotifier?: "hr" | "admin" | "security" }>("/api/company/join", { method: "POST", body: JSON.stringify({ code: normalizedCode }) });
-        const msg = data.approvalNotifier === "security" ? "Join request sent to senior security." : data.approvalNotifier === "hr" ? "Join request sent to HR." : "Join request sent to admin.";
+        const data = await apiFetch<{ approvalNotifier?: "hr" | "admin" | "security" | "it-admin" }>("/api/company/join", { method: "POST", body: JSON.stringify({ code: normalizedCode }) });
+        const msg = data.approvalNotifier === "security" ? "Join request sent to senior security." : data.approvalNotifier === "it-admin" ? "Join request sent to IT Admin." : data.approvalNotifier === "hr" ? "Join request sent to HR." : "Join request sent to admin.";
         showToast(msg);
       } else if (normalizedCode.startsWith("TM-")) {
         const data = await apiFetch<{ approvalNotifier?: "hr" | "manager" | "tester" }>("/api/team/join", { method: "POST", body: JSON.stringify({ code: normalizedCode }) });
@@ -348,7 +348,10 @@ export function OnboardingTab({
         profile?.companyStatus === "approved" ? (
           <>
             <CodePanel title="Onboarding" code={company?.adminJoinCode ? String(company.adminJoinCode) : undefined} label="Admin code" empty="Register a company to generate onboarding codes." showToast={showToast}
-              secondaryCodes={company?.joinCode ? [{ code: String(company.joinCode), label: "HR code" }] : []}
+              secondaryCodes={[
+                company?.joinCode ? { code: String(company.joinCode), label: "HR code" } : null,
+                company?.itAdminJoinCode ? { code: String(company.itAdminJoinCode), label: "IT Admin code" } : null,
+              ].filter(Boolean) as { code: string; label: string }[]}
             />
             <CompanyIconSection company={company} uploading={companyIconUploading} onUpload={() => {}} onDelete={() => setCompanyIconDeleteModal(true)}
               onCropDone={(blob) => { const file = new File([blob], "icon.png"); setCompanyIconCropFile(file); return Promise.resolve(); }} onCropCancel={() => setCompanyIconCropFile(null)} cropFile={companyIconCropFile}
@@ -384,6 +387,7 @@ export function OnboardingTab({
                 company?.employeeJoinCode ? { code: `${String(company.employeeJoinCode)}${hrSuffix}`, label: "Employee code" } : null,
                 company?.securityJoinCode ? { code: `${String(company.securityJoinCode)}${hrSuffix}`, label: "Senior Security code" } : null,
                 company?.otherJoinCode ? { code: `${String(company.otherJoinCode)}${hrSuffix}`, label: "Others code" } : null,
+                company?.itAdminJoinCode ? { code: `${String(company.itAdminJoinCode)}${hrSuffix}`, label: "IT Admin code" } : null,
               ].filter(Boolean) as { code: string; label: string }[]}
               empty="Generating HR staff onboarding codes. Refresh once if they do not appear."
             />
@@ -441,6 +445,48 @@ export function OnboardingTab({
              loading={joinLoading} status={profile?.companyStatus ? String(profile.companyStatus) : undefined} onCancelRequest={() => setCancelJoinModal(true)} />
         )
       ) : null}
+
+      {role === "it-admin" && company?.status !== "taken-down" ? (        profile?.companyStatus === "approved" ? (
+          <>
+            <CodePanel title="IT Admin Onboarding" code={company?.itSupportJoinCode ? String(company.itSupportJoinCode) : undefined} label="IT Support code"
+              empty="Ask an admin or HR to generate the onboarding code." showToast={showToast} />
+            <section className={sectionBase}>
+              <div className="mb-5 border-l-4 border-indigo-500 pl-4">
+                <h3 className="text-base font-semibold text-slate-900">IT Admin Membership</h3>
+                <p className="mt-0.5 text-sm text-slate-500">You are currently assigned to a company.</p>
+              </div>
+              <div className="rounded-lg border border-[var(--c-border-light)] p-4">
+                <div className="flex justify-between gap-4"><span className="text-slate-500">Company</span><span className="font-medium">{company?.name ? String(company.name) : "Not assigned"}</span></div>
+                <div className="mt-3 flex justify-between gap-4"><span className="text-slate-500">Role</span><span className="font-medium">IT Admin</span></div>
+                <div className="mt-3 flex justify-between gap-4"><span className="text-slate-500">Status</span><span className="font-medium capitalize text-emerald-600">{String(profile?.companyStatus)}</span></div>
+              </div>
+            </section>
+          </>
+        ) : (
+          <JoinPanel title="Join company as IT Admin" placeholder="IT Admin code" value={companyCode} onChange={setCompanyCode} onSubmit={joinCompany}
+            loading={joinLoading} status={profile?.companyStatus ? String(profile.companyStatus) : undefined} onCancelRequest={() => setCancelJoinModal(true)} />
+        )
+      ) : null}
+
+      {role === "it-administration" && company?.status !== "taken-down" ? (
+        profile?.companyStatus === "approved" ? (
+          <section className={sectionBase}>
+            <div className="mb-5 border-l-4 border-indigo-500 pl-4">
+              <h3 className="text-base font-semibold text-slate-900">IT Support Membership</h3>
+              <p className="mt-0.5 text-sm text-slate-500">You are assigned to a company.</p>
+            </div>
+            <div className="rounded-lg border border-[var(--c-border-light)] p-4">
+              <div className="flex justify-between gap-4"><span className="text-slate-500">Company</span><span className="font-medium">{company?.name ? String(company.name) : "Not assigned"}</span></div>
+              <div className="mt-3 flex justify-between gap-4"><span className="text-slate-500">Role</span><span className="font-medium">IT Support</span></div>
+              <div className="mt-3 flex justify-between gap-4"><span className="text-slate-500">Status</span><span className="font-medium capitalize text-emerald-600">{String(profile?.companyStatus)}</span></div>
+            </div>
+          </section>
+        ) : (
+          <JoinPanel title="Join company as IT Support" placeholder="IT Support code" value={companyCode} onChange={setCompanyCode} onSubmit={joinCompany}
+            loading={joinLoading} status={profile?.companyStatus ? String(profile.companyStatus) : undefined} onCancelRequest={() => setCancelJoinModal(true)} />
+        )
+      ) : null}
+
 
       <HrQuitModal open={hrQuitModal} candidates={replacementHrCandidates} selectedHrId={replacementHrId} onSelectHr={setReplacementHrId} loading={requestingHrQuit}
         onClose={() => setHrQuitModal(false)} onConfirm={requestHrQuit} />

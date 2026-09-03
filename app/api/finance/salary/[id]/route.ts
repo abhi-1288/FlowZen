@@ -32,7 +32,17 @@ export async function GET(
 
   const month = salary.month;
   const policy = await CompanyPolicy.findOne({ company: actor.company }).select("salaryCycleDay salaryCycleStartDay salaryCycleEndDay");
-  const { periodStart, periodEnd } = getSalaryPeriod(month, policy || {});
+
+  let periodStart: string;
+  let periodEnd: string;
+  if (salary.kind === "settlement" && salary.periodStart && salary.periodEnd) {
+    periodStart = salary.periodStart;
+    periodEnd = salary.periodEnd;
+  } else {
+    const period = getSalaryPeriod(month, policy || {});
+    periodStart = period.periodStart;
+    periodEnd = period.periodEnd;
+  }
 
   const computed = await computeSalaryBreakdown({
     actorCompany: actor.company,
@@ -47,6 +57,10 @@ export async function GET(
   const detail = {
     id: String(salary._id),
     month: salary.month,
+    kind: salary.kind ?? "monthly",
+    periodStart,
+    periodEnd,
+    settlementReason: salary.settlementReason ?? "",
     baseSalary: salary.baseSalary,
     allowances: salary.allowances,
     manualDeductions: salary.manualDeductions,
