@@ -143,6 +143,7 @@ export function ProfileTab({
       await apiFetch("/api/hr/security/lost-cards", {
         method: "POST",
         body: JSON.stringify({
+          userId: profile?.companyIdentityCode || undefined,
           reason: lcReason,
           lastLocation: lcLastLocation,
           lostDateTime: lcLostDateTime || null,

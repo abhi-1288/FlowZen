@@ -47,6 +47,7 @@ import { GamesTab } from "./profile-hub/games-tab";
 import { CompanyCalendarTab } from "./profile-hub/company-calendar-tab";
 import { FinancePolicyTab } from "./profile-hub/finance-policy-tab";
 import { HrPolicyTab } from "./profile-hub/hr-policy-tab";
+import { ItTicketsView } from "@/components/it/it-tickets-view";
 import { AnyRecord, AvatarBadge, formatRoleWithCustom } from "./profile-hub/shared";
 
 type ProfileHubCache = {
@@ -88,9 +89,10 @@ export type Tab =
   | "security"
   | "games"
   | "finance-policy"
-  | "hr-policy";
+  | "hr-policy"
+  | "it";
 
-const VALID_TABS = new Set<string>(["dashboard", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers", "calendar", "visitors", "security", "games", "finance-policy", "hr-policy"]);
+const VALID_TABS = new Set<string>(["dashboard", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers", "calendar", "visitors", "security", "games", "finance-policy", "hr-policy", "it"]);
 
 function formatDuration(profile: AnyRecord | null): string {
   if (!profile) return "";
@@ -276,6 +278,7 @@ export function ProfileHub() {
     ...(canViewCompanyTabs ? (["attendance"] as Tab[]) : []),
     ...(canViewCompanyTabs ? (["calendar"] as Tab[]) : []),
     ...(canViewGamesTab ? (["games"] as Tab[]) : []),
+    ...(canViewCompanyTabs ? (["it"] as Tab[]) : []),
   ];
 
   const { showNotificationToast, showErrorToast } = useNotificationToast();
@@ -827,12 +830,19 @@ export function ProfileHub() {
               onClick={() => router.push("/recruitment/candidates")}
             />
           ) : null}
-          {canViewCompanyTabs && (["it-admin", "it-administration", "admin", "human-resource"].includes(String(role)) || actorIsSeniorSecurity) ? (
+          {canViewCompanyTabs ? (
             <NavButton
-              active={pathname?.startsWith("/it") ?? false}
+              active={(tab === "it") || (pathname?.startsWith("/it") ?? false)}
               icon={<Wrench size={16} />}
               label="IT"
-              onClick={() => router.push("/it")}
+              onClick={() => {
+                const isItStaff = ["it-admin", "it-administration"].includes(String(role));
+                if (isItStaff) {
+                  router.push("/it/board");
+                } else {
+                  setTab("it");
+                }
+              }}
             />
           ) : null}
           {canViewCompanyTabs ? (
@@ -1223,6 +1233,10 @@ export function ProfileHub() {
 
                 {tab === "visitors" && canViewVisitorsTab ? (
                   <VisitorsTab company={company} showToast={showToast} />
+                ) : null}
+
+                {tab === "it" && canViewCompanyTabs ? (
+                  <ItTicketsView />
                 ) : null}
               </>}
             </>

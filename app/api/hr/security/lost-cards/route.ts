@@ -172,8 +172,8 @@ export async function POST(request: Request) {
   let reportedByEmployee = false;
 
   if (isHrOrSecurity) {
-    // HR/Security/Admin — can report for any employee
-    const identityCode = String(body.userId ?? "").trim();
+    // HR/Security/Admin — can report for any employee, or self when userId omitted
+    const identityCode = String(body.userId ?? "").trim() || String(actor.companyIdentityCode ?? "").trim();
     if (!identityCode) return jsonError("userId is required.", 400);
     const targetUser = await User.findOne({ companyIdentityCode: identityCode, company: actor.company }).select("_id");
     if (!targetUser) return jsonError("User not found in your company.", 404);

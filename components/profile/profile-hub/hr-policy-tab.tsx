@@ -7,6 +7,7 @@ import type { AnyRecord } from "./shared";
 import { PolicyQuotasSection } from "./sections/policy-quotas-section";
 import { PolicyConfigSection } from "./sections/policy-config-section";
 import { ExitSettlementSection } from "./sections/exit-settlement-section";
+import { WfhAdminSection, type WfhAdminState } from "./sections/wfh-admin-section";
 import { usePolicySettings } from "./hooks/use-policy-settings";
 import { useWfh } from "./hooks/use-wfh";
 
@@ -62,6 +63,23 @@ export function HrPolicyTab({
   const canUseEmptyCompanyControls = actorRole === "admin" && Boolean(company) && approvedMembersBesidesAdmin === 0;
   const canEdit = (actorRole === "human-resource" || canUseEmptyCompanyControls) && profile?.companyStatus === "approved";
 
+  const wfhAdminState: WfhAdminState = {
+    ...wfh,
+    wfhDates: wfh.wfhDates,
+    setWfhDates: wfh.setWfhDates,
+    showWfhAssignModal: wfh.showWfhAssignModal,
+    setShowWfhAssignModal: wfh.setShowWfhAssignModal,
+    showManageWfhModal: wfh.showManageWfhModal,
+    setShowManageWfhModal: wfh.setShowManageWfhModal,
+    loadWfh: wfh.loadWfh,
+    wfhMode: wfh.wfhMode,
+    setWfhMode: wfh.setWfhMode,
+    updateWfhMode: wfh.updateWfhMode,
+    wfhLoading: wfh.wfhLoading,
+  };
+
+  const canManageWfh = (actorRole === "admin" || actorRole === "human-resource") && profile?.companyStatus === "approved";
+
   return (
     <div className="space-y-6">
       {canEdit ? (
@@ -112,6 +130,10 @@ export function HrPolicyTab({
           onPreviewBulkImport={policy.previewBulkImport}
           onApplyBulkImport={policy.applyBulkImport}
         />
+      ) : null}
+
+      {canManageWfh ? (
+        <WfhAdminSection state={wfhAdminState} company={company} showToast={showToast} />
       ) : null}
 
       <ExitSettlementSection canEdit={canEdit} showToast={showToast} />
