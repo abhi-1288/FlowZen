@@ -84,9 +84,6 @@ export async function GET() {
       if (!company.itAdminJoinCode) {
         company.itAdminJoinCode = `${company.joinCode}-ITADMIN`;
       }
-      if (!company.itSupportJoinCode) {
-        company.itSupportJoinCode = `${company.joinCode}-ITSUPPORT`;
-      }
       await company.save();
       user.company = company;
     }
@@ -367,9 +364,6 @@ export async function GET() {
     if (company && !company.itAdminJoinCode) {
       company.itAdminJoinCode = `${company.joinCode}-ITADMIN`;
     }
-    if (company && !company.itSupportJoinCode) {
-      company.itSupportJoinCode = `${company.joinCode}-ITSUPPORT`;
-    }
     if (company) {
       await company.save();
       user.company = company;
@@ -384,9 +378,6 @@ export async function GET() {
       }
       if (!company.itAdminJoinCode) {
         company.itAdminJoinCode = `${company.joinCode}-ITADMIN`;
-      }
-      if (!company.itSupportJoinCode) {
-        company.itSupportJoinCode = `${company.joinCode}-ITSUPPORT`;
       }
       await company.save();
       user.company = company;

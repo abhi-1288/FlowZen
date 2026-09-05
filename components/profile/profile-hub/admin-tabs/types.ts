@@ -18,6 +18,8 @@ export const HR_MEMBER_ROLE_KEYS = [
   "qa-tester",
   "finance",
   "admin",
+  "it-admin",
+  "it-administration",
   "employee",
   "others",
 ] as const;

@@ -22,7 +22,6 @@ function roleForCompanyCode(company: any, code: string, baseCode: string) {
   if (matches(company.employeeJoinCode)) return "employee";
   if (matches(company.securityJoinCode) || matches(company.juniorSecurityJoinCode)) return "security";
   if (matches(company.itAdminJoinCode)) return "it-admin";
-  if (matches(company.itSupportJoinCode)) return "it-administration";
   if (matches(company.otherJoinCode)) return "others";
   if (matches(company.hrJoinCode) || matches(company.joinCode)) return "human-resource";
   return null;
@@ -81,7 +80,6 @@ export async function POST(request: Request) {
         { securityJoinCode: withoutHrSuffix },
         { juniorSecurityJoinCode: withoutHrSuffix },
         { itAdminJoinCode: withoutHrSuffix },
-        { itSupportJoinCode: withoutHrSuffix },
         { adminJoinCode: withoutHrSuffix },
       ]
     })
@@ -118,7 +116,7 @@ export async function POST(request: Request) {
     codeRole === "admin" ? "admin" :
     approverId === String(company.owner) ? "admin" :
     codeRole === "security" ? "security" :
-    codeRole === "it-administration" ? "it-admin" : "hr";
+    codeRole === "it-admin" ? "it-admin" : "hr";
   const enrollingHrId =
     invitedHrId ?? (codeRole !== "admin" && approvalNotifier === "hr" ? approverId : null);
 

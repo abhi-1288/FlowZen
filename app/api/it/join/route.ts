@@ -94,14 +94,6 @@ export async function POST(request: Request) {
     { new: true, upsert: true },
   );
 
-  // Consume one use of the code.
-  joinCode.usedCount += 1;
-  joinCode.usedBy.push({ user: userId, usedAt: new Date() });
-  if (joinCode.usedCount >= joinCode.maxUses) {
-    joinCode.status = "expired";
-  }
-  await joinCode.save();
-
   await Notification.create({
     user: creatorId,
     company: joinCode.company,

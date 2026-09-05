@@ -4,7 +4,6 @@ import { apiFetch } from "@/lib/client-utils";
 import { CodePanel, JoinPanel } from "./admin-tabs";
 import { DocumentLetterModal } from "./document-letter-modal";
 import { ImageCropModal } from "./image-crop-modal";
-import { useWfh } from "./hooks/use-wfh";
 import { useSetupWizard } from "./hooks/use-setup-wizard";
 import { PersonalInfoSection } from "./sections/personal-info-section";
 import { CompanyTeamSection } from "./sections/company-team-section";
@@ -18,7 +17,6 @@ import { MonthlyCheckBox } from "./monthly-check-box";
 import { ConfirmActionModal } from "./modals/confirm-action-modal";
 import { SetupModal } from "./modals/setup-modal";
 import { AnyRecord, formatRoleWithCustom } from "./shared";
-import { WfhAdminSection, type WfhAdminState } from "./sections/wfh-admin-section";
 import { CompanyThemeSection } from "./sections/company-theme-section";
 import { CompanyAddressSection } from "./sections/company-address-section";
 import { AppearanceSection } from "./sections/appearance-section";
@@ -100,7 +98,6 @@ export function ProfileTab({
   }).length;
   const canUseEmptyCompanyControls = role === "admin" && Boolean(company) && approvedMembersBesidesAdmin === 0;
 
-  const wfh = useWfh(company, refresh, showToast);
   const setup = useSetupWizard(profile, showToast, refresh);
 
   useEffect(() => {
@@ -277,21 +274,6 @@ export function ProfileTab({
       }).catch(() => {});
   }, [inApprovedCompany]);
 
-  const wfhAdminState: WfhAdminState = {
-    ...wfh,
-    wfhDates: wfh.wfhDates,
-    setWfhDates: wfh.setWfhDates,
-    showWfhAssignModal: wfh.showWfhAssignModal,
-    setShowWfhAssignModal: wfh.setShowWfhAssignModal,
-    showManageWfhModal: wfh.showManageWfhModal,
-    setShowManageWfhModal: wfh.setShowManageWfhModal,
-    loadWfh: wfh.loadWfh,
-    wfhMode: wfh.wfhMode,
-    setWfhMode: wfh.setWfhMode,
-    updateWfhMode: wfh.updateWfhMode,
-    wfhLoading: wfh.wfhLoading,
-  };
-
   return (
     <>
       {setup.showSetupBanner ? (
@@ -381,7 +363,6 @@ export function ProfileTab({
                 onChange={setAdminJoinCode} onSubmit={joinAsAdmin} loading={adminJoinLoading} status={String(profile?.companyStatus ?? "none")}
                 onCancelRequest={async () => { await apiFetch("/api/join/cancel", { method: "POST" }); await refresh(); }} />
             )}
-            <WfhAdminSection state={wfhAdminState} company={company} showToast={showToast} />
           </>
         ) : null}
 

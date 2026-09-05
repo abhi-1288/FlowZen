@@ -53,10 +53,7 @@ export function ItShell() {
   const [selectedTicket, setSelectedTicket] = useState<ItTicket | null>(null);
 
   const [team, setTeam] = useState<{ itAdmins: ItTeamMember[]; itStaff: ItTeamMember[] }>({ itAdmins: [], itStaff: [] });
-  const assignees = useMemo(
-    () => [...team.itAdmins, ...team.itStaff],
-    [team],
-  );
+  const assignees = useMemo(() => [...team.itStaff], [team]);
 
   const [statusFilter, setStatusFilter] = useState<ItTicketStatus | "">("");
   const [priorityFilter, setPriorityFilter] = useState<ItTicketPriority | "">("");

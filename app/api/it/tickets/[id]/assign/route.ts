@@ -9,8 +9,6 @@ import { isItAdminRole, pushItActivity } from "@/lib/it";
 
 type Params = { params: Promise<{ id: string }> };
 
-const ASSIGNABLE_ROLES = new Set(["it-admin", "it-administration", "admin", "human-resource"]);
-
 export async function POST(request: Request, { params }: Params) {
   const userId = await requireUserId();
   if (!userId) return jsonError("Unauthorized", 401);
@@ -48,7 +46,7 @@ export async function POST(request: Request, { params }: Params) {
     _id: assigneeId,
     company: companyId,
     companyStatus: "approved",
-    role: { $in: ["it-administration", "it-admin", "admin", "human-resource"] },
+    role: { $in: ["it-administration"] },
   }).select("name email role companyStatus");
   if (!assignee) return jsonError("Assignee not found in your company.", 404);
 

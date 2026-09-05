@@ -318,6 +318,22 @@ export async function PATCH(request: Request, { params }: Params) {
           at: new Date(),
         });
         await Company.updateOne({ _id: joinRequest.company }, { $addToSet: { members: requester._id } });
+
+        // Consume the IT joining code only on approval, so a rejected request
+        // does not burn a single-use invitation.
+        const joinMetaCode = String(joinMeta.itJoinCode ?? "").trim();
+        if (joinMetaCode) {
+          const { ITJoiningCode } = await import("@/models/ITJoiningCode");
+          const itJoinCode = await ITJoiningCode.findOne({ code: joinMetaCode, company: joinRequest.company });
+          if (itJoinCode && itJoinCode.status === "active" && itJoinCode.expiresAt >= new Date()) {
+            itJoinCode.usedCount += 1;
+            itJoinCode.usedBy.push({ user: requester._id, usedAt: new Date() });
+            if (itJoinCode.usedCount >= itJoinCode.maxUses) {
+              itJoinCode.status = "expired";
+            }
+            await itJoinCode.save();
+          }
+        }
       } else {
         requester.company = null;
         requester.companyJoined = null;

@@ -6,7 +6,7 @@ import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
 
-const VALID_ROLES = ["employee", "project-manager", "qa-tester", "human-resource", "finance", "admin", "security", "others"];
+const VALID_ROLES = ["employee", "project-manager", "qa-tester", "human-resource", "finance", "admin", "security", "it-admin", "it-administration", "others"];
 const ROLE_LABELS = [
   "Intern",
   "Trainee",
