@@ -43,7 +43,7 @@ export async function GET() {
 
       const lastMessage = await Message.findOne({ group: team._id })
         .sort({ createdAt: -1 })
-        .select("message createdAt sender");
+        .select("message createdAt sender attachment");
 
       const unreadCount = await Message.countDocuments({
         group: team._id,
@@ -84,6 +84,7 @@ export async function GET() {
               message: lastMessage.message,
               createdAt: lastMessage.createdAt,
               sender: String(lastMessage.sender),
+              attachment: lastMessage.attachment || null,
             }
           : null,
         unreadCount,

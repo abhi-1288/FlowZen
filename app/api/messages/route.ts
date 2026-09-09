@@ -5,6 +5,9 @@ import { User } from "@/models/User";
 import { Message } from "@/models/Message";
 import { Team } from "@/models/Team";
 import { emitToUser, isUserOnline } from "@/lib/socket-emit";
+import { computeExpiresAt, deriveKind } from "@/lib/message-attachments";
+
+const MAX_MESSAGE_LENGTH = 1000;
 
 export async function GET() {
   const userId = await requireUserId();
@@ -47,7 +50,7 @@ export async function GET() {
         ]
       })
         .sort({ createdAt: -1 })
-        .select("message createdAt sender receivedAt readAt");
+        .select("message createdAt sender receivedAt readAt attachment");
 
       return {
         ...m.toObject(),
@@ -59,6 +62,7 @@ export async function GET() {
           sender: String(lastMessage.sender),
           receivedAt: lastMessage.receivedAt,
           readAt: lastMessage.readAt,
+          attachment: lastMessage.attachment || null,
         } : null
       };
     })
@@ -87,8 +91,13 @@ export async function POST(request: Request) {
   const groupId = String(body.groupId ?? "");
   const replyToId = String(body.replyTo ?? "");
   const message = String(body.message ?? "").trim();
-  if (!message) return jsonError("Message is required.");
-  if (message.length > 1000) return jsonError("Message must be 1000 characters or less.");
+
+  const rawAttachment = body.attachment && typeof body.attachment === "object" ? body.attachment : null;
+  const hasAttachment = Boolean(rawAttachment?.fileId && rawAttachment?.url && rawAttachment?.name && rawAttachment?.mimeType);
+  const hasMessage = Boolean(message);
+
+  if (!hasMessage && !hasAttachment) return jsonError("Message or attachment is required.");
+  if (hasMessage && message.length > MAX_MESSAGE_LENGTH) return jsonError(`Message must be ${MAX_MESSAGE_LENGTH} characters or less.`);
   if (!recipientId && !groupId) return jsonError("recipientId or groupId is required.");
 
   try {
@@ -104,6 +113,27 @@ export async function POST(request: Request) {
   if (!sender.company || sender.companyStatus !== "approved") {
     return jsonError("Join a company before sending messages.", 403);
   }
+
+  const attachmentData = hasAttachment
+    ? {
+        provider: String(rawAttachment.provider || "local"),
+        fileId: String(rawAttachment.fileId),
+        name: String(rawAttachment.name),
+        url: String(rawAttachment.url),
+        size: Number(rawAttachment.size) || 0,
+        mimeType: String(rawAttachment.mimeType),
+        kind: deriveKind(String(rawAttachment.mimeType)),
+        expiresAt: computeExpiresAt(),
+        isExpired: false,
+      }
+    : undefined;
+
+  const socketPayload = {
+    senderId: String(sender._id),
+    senderName: sender.name,
+    message,
+    attachment: attachmentData || null,
+  };
 
   if (groupId) {
     const team = await Team.findById(groupId).select("company manager employees");
@@ -122,6 +152,7 @@ export async function POST(request: Request) {
       company: sender.company,
       group: team._id,
       message,
+      attachment: attachmentData,
       ...(replyToId ? { replyTo: replyToId } : {}),
     });
 
@@ -133,9 +164,7 @@ export async function POST(request: Request) {
     for (const memberId of memberIds) {
       if (isUserOnline(memberId)) {
         emitToUser(memberId, "message:new", {
-          senderId: String(sender._id),
-          senderName: sender.name,
-          message,
+          ...socketPayload,
           groupId: String(team._id),
           groupName: team.name,
           createdAt: newMessage.createdAt,
@@ -160,6 +189,7 @@ export async function POST(request: Request) {
     recipient: recipient._id,
     company: sender.company,
     message,
+    attachment: attachmentData,
     ...(replyToId ? { replyTo: replyToId } : {}),
   });
 
@@ -169,9 +199,7 @@ export async function POST(request: Request) {
   }
 
   emitToUser(String(recipient._id), "message:new", {
-    senderId: String(sender._id),
-    senderName: sender.name,
-    message,
+    ...socketPayload,
     createdAt: newMessage.createdAt,
     receivedAt: newMessage.receivedAt,
     ...(replyToId ? { replyTo: replyToId } : {}),

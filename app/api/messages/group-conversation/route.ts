@@ -4,6 +4,7 @@ import { databaseUnavailable, jsonError, requireUserId, serializeDocs } from "@/
 import { Message } from "@/models/Message";
 import { Team } from "@/models/Team";
 import { User } from "@/models/User";
+import { deleteMessageAttachment } from "@/lib/message-attachments";
 
 export async function GET(request: Request) {
   const userId = await requireUserId();
@@ -36,6 +37,28 @@ export async function GET(request: Request) {
     String(team.manager) === userId ||
     team.employees.some((id: any) => String(id) === userId);
   if (!isMember) return jsonError("You are not a member of this team.", 403);
+
+  // Lazy expiry cleanup
+  const now = new Date();
+  const expiredMessages = await Message.find({
+    group: teamId,
+    "attachment.expiresAt": { $lte: now },
+    "attachment.isExpired": false,
+    "attachment.fileId": { $exists: true, $ne: "" },
+  }).select("attachment").lean();
+
+  for (const msg of expiredMessages) {
+    const att = msg.attachment as any;
+    if (att?.fileId && att?.provider) {
+      await deleteMessageAttachment({ provider: att.provider, fileId: att.fileId, url: att.url });
+    }
+  }
+  if (expiredMessages.length > 0) {
+    await Message.updateMany(
+      { _id: { $in: expiredMessages.map((m: any) => m._id) } },
+      { $set: { "attachment.isExpired": true, "attachment.url": "", "attachment.fileId": "" } }
+    );
+  }
 
   const messages = await Message.find({ group: teamId })
     .sort({ createdAt: 1 })
