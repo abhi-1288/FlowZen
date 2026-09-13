@@ -9,6 +9,7 @@ export const CURRENCY_SYMBOLS: Record<string, string> = {
 export type Stage =
   | "applied"
   | "screening"
+  | "assessment"
   | "technical-interview"
   | "manager-round"
   | "hr-round"
@@ -20,6 +21,7 @@ export type Stage =
 export const STAGES: Stage[] = [
   "applied",
   "screening",
+  "assessment",
   "technical-interview",
   "manager-round",
   "hr-round",
@@ -32,6 +34,7 @@ export const STAGES: Stage[] = [
 export const STAGE_LABELS: Record<Stage, string> = {
   applied: "Applied",
   screening: "Screening",
+  assessment: "Assessment",
   "technical-interview": "Technical Interview",
   "manager-round": "Manager Round",
   "hr-round": "HR Round",
@@ -79,7 +82,10 @@ export type TimelineAction =
   | "stage-changed"
   | "joined"
   | "rejected"
-  | "note-added";
+  | "note-added"
+  | "assessment-started"
+  | "assessment-submitted"
+  | "assessment-graded";
 
 export type ATSJob = {
   id: string;
@@ -103,6 +109,9 @@ export type ATSJob = {
   requiredSkills: string[];
   status: JobStatus;
   workflow: Workflow;
+  assessment: boolean;
+  assessmentDate: string | null;
+  assessmentDurationMinutes: number | null;
   createdBy: string;
   company: string;
   createdAt: string;
@@ -128,6 +137,13 @@ export type ATSCandidate = {
   atsReason: string;
   atsRejectionNote: string;
   atsScoredAt: string | null;
+  assessmentScore: number | null;
+  assessmentStatus: "pending" | "selected" | "rejected";
+  assessmentReason: string;
+  assessmentRejectionNote: string;
+  assessmentStartedAt: string | null;
+  assessmentSubmittedAt: string | null;
+  assessmentAnswers: Array<{ questionIndex: number; selectedOption: number }>;
   notes: string;
   resumeUrl: string;
   portfolioUrl: string;
@@ -223,6 +239,30 @@ export type ATSReferral = {
   company: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type ATSAssessmentQuestion = {
+  text: string;
+  options: string[];
+  correctIndex: number;
+};
+
+export type ATSAssessment = {
+  id: string;
+  job: string;
+  passScore: number;
+  questions: ATSAssessmentQuestion[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AssessmentStats = {
+  inAssessment: number;
+  started: number;
+  submitted: number;
+  passed: number;
+  failed: number;
+  pending: number;
 };
 
 export type DashboardData = {

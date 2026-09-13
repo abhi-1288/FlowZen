@@ -51,6 +51,11 @@ export async function POST(
   if (!email) return jsonError("Email is required.");
   if (!resumeFile || resumeFile.size === 0) return jsonError("Resume is required.", 400);
 
+  const duplicate = await ATSCandidate.findOne({ job: id, email }).select("firstName lastName").lean();
+  if (duplicate) {
+    return jsonError("You have already applied for this position.", 409);
+  }
+
   let resumeUrl = "";
   let parsedDob: string | null = null;
   let parsedAddress: string | null = null;

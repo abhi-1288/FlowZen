@@ -102,6 +102,13 @@ export async function POST(request: Request) {
   if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
   if (!user.company) return jsonError("No company found.", 400);
 
+  // Validate assessment date > closing date
+  if (body.assessment && body.assessmentDate && body.autoCloseDate) {
+    if (new Date(body.assessmentDate) <= new Date(body.autoCloseDate)) {
+      return jsonError("Assessment date must be after the job closing date.", 400);
+    }
+  }
+
   const job = await ATSJob.create({
     title: String(body.title).trim(),
     department: String(body.department).trim(),
@@ -119,6 +126,9 @@ export async function POST(request: Request) {
     currency: String(body.currency || "INR").trim(),
     openings: Number(body.openings) || 1,
     autoCloseDate: body.autoCloseDate ? new Date(body.autoCloseDate) : null,
+    assessment: body.assessment === true,
+    assessmentDate: body.assessment ? (body.assessmentDate ? new Date(body.assessmentDate) : null) : null,
+    assessmentDurationMinutes: body.assessmentDurationMinutes != null ? Number(body.assessmentDurationMinutes) : null,
     description: String(body.description ?? "").trim(),
     requiredSkills: Array.isArray(body.requiredSkills) ? body.requiredSkills.map(String) : [],
     status: body.status || "draft",

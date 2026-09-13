@@ -89,7 +89,7 @@ export async function POST(request: Request, { params }: Params) {
     company: user.company,
   });
 
-  const stageOrder = ["applied", "screening", "technical-interview", "manager-round", "hr-round", "offer", "joined", "rejected"];
+  const stageOrder = ["applied", "screening", "assessment", "technical-interview", "manager-round", "hr-round", "offer", "joined", "rejected"];
   const currentStage = candidate.stage;
   const targetStage = "offer";
   const currentIdx = stageOrder.indexOf(currentStage);

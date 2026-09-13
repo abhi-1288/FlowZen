@@ -29,6 +29,9 @@ export default function EditJobPage() {
   const [durationValue, setDurationValue] = useState("");
   const [requiredExperienceYears, setRequiredExperienceYears] = useState("");
   const [atsScoreThreshold, setAtsScoreThreshold] = useState("");
+  const [assessment, setAssessment] = useState(false);
+  const [assessmentDate, setAssessmentDate] = useState("");
+  const [assessmentTime, setAssessmentTime] = useState("");
 
   useEffect(() => { void fetchJob(id); }, [id, fetchJob]);
   useEffect(() => {
@@ -64,6 +67,9 @@ export default function EditJobPage() {
       }
       setRequiredExperienceYears(activeJob.requiredExperienceYears ? String(activeJob.requiredExperienceYears) : "");
       setAtsScoreThreshold(activeJob.atsScoreThreshold ? String(activeJob.atsScoreThreshold) : "");
+      setAssessment(activeJob.assessment || false);
+      setAssessmentDate(activeJob.assessmentDate ? activeJob.assessmentDate.split("T")[0] : "");
+      setAssessmentTime(activeJob.assessmentDate ? new Date(activeJob.assessmentDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : "");
     }
   }, [activeJob]);
 
@@ -78,6 +84,8 @@ export default function EditJobPage() {
       durationYears: durationUnit === "years" ? (durationValue ? Number(durationValue) : null) : null,
       requiredExperienceYears: requiredExperienceYears ? Number(requiredExperienceYears) : null,
       atsScoreThreshold: atsScoreThreshold ? Number(atsScoreThreshold) : null,
+      assessment,
+      assessmentDate: assessment && assessmentDate ? (assessmentTime ? `${assessmentDate}T${assessmentTime}:00` : `${assessmentDate}T00:00:00`) : null,
       salaryRangeMin: Number(salaryRangeMin), salaryRangeMax: Number(salaryRangeMax), currency,
       openings: Number(openings),
       autoCloseDate: autoCloseDate ? (autoCloseTime ? `${autoCloseDate}T${autoCloseTime}:00` : `${autoCloseDate}T23:59:59`) : null,
@@ -141,6 +149,28 @@ export default function EditJobPage() {
             <span className="mb-1 block text-sm font-medium text-slate-700">ATS Min Score (0-100)</span>
             <input value={atsScoreThreshold} onChange={(e) => setAtsScoreThreshold(e.target.value)} type="number" min="0" max="100" placeholder="e.g. 70" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
           </label>
+          <div className="sm:col-span-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={assessment}
+                onChange={(e) => setAssessment(e.currentTarget.checked)}
+                className="h-4 w-4 rounded border-slate-300"
+              />
+              <span className="text-sm font-medium text-slate-700">Enable Online Assessment (after Screening)</span>
+            </label>
+            {assessment && (
+              <div className="mt-2">
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium text-slate-700">Assessment Date & Time</span>
+                  <div className="flex gap-2">
+                    <input value={assessmentDate} onChange={(e) => setAssessmentDate(e.target.value)} type="date" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
+                    <input value={assessmentTime} onChange={(e) => setAssessmentTime(e.target.value)} type="time" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
+                  </div>
+                </label>
+              </div>
+            )}
+          </div>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Status</span>
             <select value={status} onChange={(e) => setStatus(e.target.value)} className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm">

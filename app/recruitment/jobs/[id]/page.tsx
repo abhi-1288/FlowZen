@@ -11,6 +11,9 @@ import { CURRENCY_SYMBOLS, STAGES, STAGE_LABELS, type Stage, type Source, type J
 import { formatJobDuration } from "@/lib/format-duration";
 import { JobDescription } from "@/components/recruitment/job-description";
 import { InterviewLocationFields } from "@/components/recruitment/interview-location-fields";
+import { AssessmentManagerModal } from "@/components/recruitment/assessment-manager";
+import { AssessmentResultsModal } from "@/components/recruitment/assessment-results-modal";
+import { assessmentResultsUnlocked } from "@/lib/assessment";
 
 export default function JobDetailPage() {
   const params = useParams()!;
@@ -33,6 +36,11 @@ export default function JobDetailPage() {
   const [atsAction, setAtsAction] = useState<"auto" | "manual">("auto");
   const [atsApplied, setAtsApplied] = useState<{ moved: number; advanced: number } | null>(null);
   const [bulkIvOpen, setBulkIvOpen] = useState(false);
+  const [assessmentManagerOpen, setAssessmentManagerOpen] = useState(false);
+  const [assessmentResultsOpen, setAssessmentResultsOpen] = useState(false);
+  const [assessmentStats, setAssessmentStats] = useState<{ total: number; passed: number; failed: number } | null>(null);
+  const [assessmentApplied, setAssessmentApplied] = useState<{ moved: number; advanced: number } | null>(null);
+  const [assessmentStatsData, setAssessmentStatsData] = useState<{ inAssessment: number; started: number; submitted: number; passed: number; failed: number; pending: number } | null>(null);
 
   async function handleRunAts(force: boolean) {
     if (!activeJob) return;
@@ -64,7 +72,18 @@ export default function JobDetailPage() {
     }
   }
 
-  useEffect(() => { void fetchJob(id); void fetchCandidates({ jobId: id }); }, [id, fetchJob, fetchCandidates]);
+  async function loadAssessmentStats() {
+    try {
+      const res = await fetch(`/api/recruitment/jobs/${id}/assessment`);
+      const data = await res.json();
+      setAssessmentStatsData(data.stats || null);
+      if (data.stats) {
+        setAssessmentStats({ total: data.stats.submitted + data.stats.failed + data.stats.passed, passed: data.stats.passed, failed: data.stats.failed });
+      }
+    } catch { /* ignore */ }
+  }
+
+  useEffect(() => { void fetchJob(id); void fetchCandidates({ jobId: id }); void loadAssessmentStats(); }, [id, fetchJob, fetchCandidates]);
 
   const jobCandidates = useMemo(
     () => candidates.filter((c) => {
@@ -80,6 +99,9 @@ export default function JobDetailPage() {
     if (candidateFilter === "__ats-selected") list = list.filter((c) => c.atsStatus === "selected");
     else if (candidateFilter === "__ats-rejected") list = list.filter((c) => c.atsStatus === "rejected");
     else if (candidateFilter === "__ats-pending") list = list.filter((c) => c.atsScore == null);
+    else if (candidateFilter === "__assessment-passed") list = list.filter((c) => (c as any).assessmentStatus === "selected");
+    else if (candidateFilter === "__assessment-failed") list = list.filter((c) => (c as any).assessmentStatus === "rejected");
+    else if (candidateFilter === "__assessment-pending") list = list.filter((c) => (c as any).assessmentScore == null);
     else if (candidateFilter) list = list.filter((c) => c.stage === candidateFilter);
     return list;
   }, [jobCandidates, candidateFilter]);
@@ -126,8 +148,22 @@ export default function JobDetailPage() {
           {activeJob.autoCloseDate && (
             <p className="text-sm text-slate-500">Auto-closes: {new Date(activeJob.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} {new Date(activeJob.autoCloseDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}</p>
           )}
+          {activeJob.assessment && activeJob.assessmentDate && (
+            <p className="text-sm text-teal-700">
+              Assessment on: {new Date(activeJob.assessmentDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} {new Date(activeJob.assessmentDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
+              {activeJob.assessmentDurationMinutes ? ` · ${activeJob.assessmentDurationMinutes}min` : ""}
+            </p>
+          )}
         </div>
-        <div className="flex gap-2">
+<div className="flex flex-wrap items-center gap-2">
+          {activeJob.status === "draft" && isAdmin && (
+            <button
+              onClick={() => { void updateJob(id, { status: "open" as JobStatus }); }}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white hover:bg-emerald-700"
+            >
+              <Globe size={15} /> Publish
+            </button>
+          )}
           {activeJob.status === "open" && (
             <button
               onClick={() => {
@@ -136,49 +172,41 @@ export default function JobDetailPage() {
                 const url = slug ? `${window.location.origin}/careers/jobs/${slug}/${id}` : "";
                 if (url) navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
               }}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 text-sm font-medium text-indigo-600 hover:bg-indigo-50"
             >
               {copied ? <Check size={15} /> : <Share2 size={15} />} {copied ? "Copied" : "Share"}
-            </button>
-          )}
-          {activeJob.status === "draft" && isAdmin && (
-            <button
-              onClick={() => { void updateJob(id, { status: "open" as JobStatus }); }}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50"
-            >
-              <Globe size={15} /> Publish
             </button>
           )}
           {activeJob.status === "open" && isAdmin && (
             <button
               onClick={() => { void updateJob(id, { status: "closed" as JobStatus }); }}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 text-sm font-medium text-rose-600 hover:bg-rose-50"
             >
               <Archive size={15} /> Close
             </button>
           )}
           <button
             onClick={() => router.push(`/recruitment/jobs/${id}/edit`)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 text-sm font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
           >
             <Pencil size={15} /> Edit
           </button>
           <button
             onClick={() => router.push(`/recruitment/jobs/${id}/board`)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 text-sm font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
           >
             <Eye size={15} /> Kanban
           </button>
           <button
             onClick={() => setModal({ type: "create-candidate", jobId: id })}
-            className="neu-btn neu-btn-primary inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium"
+            className="neu-btn neu-btn-primary inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium"
           >
             <Plus size={15} /> Add Candidate
           </button>
           {isHrOrAdmin && (
             <button
               onClick={() => setBulkIvOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-emerald-200 px-3 text-sm font-medium text-emerald-600 hover:bg-emerald-50"
             >
               <Plus size={15} /> Schedule Interview
             </button>
@@ -187,7 +215,7 @@ export default function JobDetailPage() {
             <button
               onClick={() => void handleRunAts(false)}
               disabled={atsLoading}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-indigo-200 px-3 text-sm font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
             >
               <Cog size={15} className={atsLoading ? "animate-spin" : ""} />
               {atsLoading ? "Scoring..." : "Run ATS Score"}
@@ -197,7 +225,7 @@ export default function JobDetailPage() {
             <button
               onClick={() => void handleRunAts(true)}
               disabled={atsLoading}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 px-3 py-2 text-sm font-medium text-amber-600 hover:bg-amber-50 disabled:opacity-50"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-amber-200 px-3 text-sm font-medium text-amber-600 hover:bg-amber-50 disabled:opacity-50"
             >
               {atsLoading ? "Scoring..." : "Re-score All"}
             </button>
@@ -205,37 +233,71 @@ export default function JobDetailPage() {
           {atsDecisionPending && atsLastResult && (
             <button
               onClick={() => setAtsResultData(atsLastResult)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-rose-200 px-3 text-sm font-medium text-rose-600 hover:bg-rose-50"
             >
               Review ATS timelines
             </button>
           )}
-          {atsApplied && (
-            <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
-              {atsApplied.advanced} advanced to Screening · {atsApplied.moved} moved to ATS Rejected
-            </span>
+          {isHrOrAdmin && activeJob.assessment && (
+            <button
+              onClick={() => { setAssessmentManagerOpen(true); }}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-teal-200 px-3 text-sm font-medium text-teal-600 hover:bg-teal-50"
+            >
+              <Cog size={15} /> Manage Assessment
+            </button>
           )}
-          {activeJob.atsScoreThreshold != null && (
-            <span className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700">
-              ATS Threshold: {activeJob.atsScoreThreshold}+
-            </span>
+          {isHrOrAdmin && activeJob.assessment && assessmentStats && assessmentStats.total > 0 && (
+            <button
+              onClick={() => { void loadAssessmentStats(); setAssessmentResultsOpen(true); }}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-violet-200 px-3 text-sm font-medium text-violet-600 hover:bg-violet-50"
+            >
+              Review Assessment Results
+            </button>
           )}
           {activeJob.status !== "open" && (
             <button
               onClick={() => setModal({ type: "delete-job", jobId: id })}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-red-200 px-3 text-sm font-medium text-red-600 hover:bg-red-50"
             >
               <Trash2 size={15} /> Delete
             </button>
           )}
         </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {activeJob.assessment && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-3 py-1 text-xs font-medium text-teal-700">
+              {activeJob.assessmentDate
+                ? `Assessment: ${new Date(activeJob.assessmentDate).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })} ${new Date(activeJob.assessmentDate).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })}`
+                : "Assessment"}
+              {activeJob.assessmentDurationMinutes ? ` · ${activeJob.assessmentDurationMinutes}min` : ""}
+            </span>
+          )}
+          {activeJob.atsScoreThreshold != null && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
+              ATS Threshold: {activeJob.atsScoreThreshold}+
+            </span>
+          )}
+          {assessmentApplied && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+              {assessmentApplied.advanced} advanced to Technical Interview · {assessmentApplied.moved} moved to ATS Rejected
+            </span>
+          )}
+{atsApplied && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+              {atsApplied.advanced} advanced to Screening · {atsApplied.moved} moved to ATS Rejected
+            </span>
+          )}
+        </div>
       </div>
 
-      {activeJob.description && (
-        <div className="mt-4 rounded-lg neu-card p-4">
+<div className="mt-4 rounded-lg neu-card p-4">
+        <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Description</h3>
+        {activeJob.description ? (
           <JobDescription content={activeJob.description} />
-        </div>
-      )}
+        ) : (
+          <p className="text-sm text-slate-400">No description provided.</p>
+        )}
+      </div>
 
       {activeJob.requiredSkills?.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
@@ -264,6 +326,13 @@ export default function JobDetailPage() {
               <option value="__ats-rejected">ATS Rejected</option>
               <option value="__ats-pending">Not Scored</option>
             </optgroup>
+            {activeJob.assessment && (
+              <optgroup label="By Assessment Status">
+                <option value="__assessment-passed">Assessment Passed</option>
+                <option value="__assessment-failed">Assessment Failed</option>
+                <option value="__assessment-pending">Not Assessed</option>
+              </optgroup>
+            )}
           </select>
         </div>
         {atsResultData && (
@@ -284,6 +353,11 @@ export default function JobDetailPage() {
                   {candidate.atsScore != null && (
                     <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${ candidate.atsStatus === "selected" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700" }`}>
                       ATS {candidate.atsScore}
+                    </span>
+                  )}
+                  {(candidate as any).assessmentStatus && (candidate as any).assessmentStatus !== "pending" && activeJob.assessment && (
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${(candidate as any).assessmentStatus === "selected" ? "bg-teal-50 text-teal-700" : "bg-rose-50 text-rose-700"}`}>
+                      Assessment {(candidate as any).assessmentScore ?? ""}
                     </span>
                   )}
                   {candidate.atsStatus === "rejected" && candidate.stage !== "ats-rejected" && candidate.stage !== "rejected" && (
@@ -357,6 +431,25 @@ export default function JobDetailPage() {
         candidates={jobCandidates}
         onDone={() => { void fetchCandidates({ jobId: id }); }}
       />
+      {assessmentManagerOpen && <AssessmentManagerModal jobId={id} onClose={() => { setAssessmentManagerOpen(false); void loadAssessmentStats(); }} />}
+      {assessmentResultsOpen && (
+        <AssessmentResultsModal
+          data={assessmentStats}
+          onClose={() => setAssessmentResultsOpen(false)}
+          onSubmit={async (mode, note) => {
+            const res = await fetch(`/api/recruitment/jobs/${id}/assessment-apply-rejections`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ mode, note }),
+            });
+            const data = await res.json();
+            if (mode === "auto") setAssessmentApplied({ moved: data.moved, advanced: data.advanced });
+            setAssessmentResultsOpen(false);
+            void fetchCandidates({ jobId: id });
+            void loadAssessmentStats();
+          }}
+        />
+      )}
     </div>
   );
 }

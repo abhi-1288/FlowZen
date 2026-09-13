@@ -37,6 +37,7 @@ import { jsPDF } from "jspdf";
 import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
 import { JobDescription } from "@/components/recruitment/job-description";
 import { DEFAULT_ACCENT, hexToRgba, salarySuffix } from "@/lib/accent";
+import { AssessmentPanel } from "@/components/candidate-portal/assessment-panel";
 
 type CandidateData = {
   id: string;
@@ -56,6 +57,9 @@ type CandidateData = {
     currency: string;
     description: string;
     requiredSkills: string[];
+    assessment?: boolean;
+    assessmentDate?: string | null;
+    assessmentDurationMinutes?: number | null;
   };
   company: { name: string; icon?: string; primaryColor?: string };
   createdAt: string;
@@ -95,6 +99,7 @@ type OfferData = {
 const STAGE_LABELS: Record<string, string> = {
   applied: "Application Submitted",
   screening: "Screening",
+  assessment: "Assessment",
   "technical-interview": "Technical Interview",
   "manager-round": "Manager Round",
   "hr-round": "HR Round",
@@ -115,9 +120,12 @@ const ACTION_LABELS: Record<string, string> = {
   joined: "Joined",
   rejected: "Not Selected",
   "note-added": "Note Added",
+  "assessment-started": "Assessment Started",
+  "assessment-submitted": "Assessment Submitted",
+  "assessment-graded": "Assessment Result",
 };
 
-const STAGE_ORDER = ["applied", "screening", "technical-interview", "manager-round", "hr-round", "offer", "joined"];
+const STAGE_ORDER = ["applied", "screening", "assessment", "technical-interview", "manager-round", "hr-round", "offer", "joined"];
 
 function TimelineAccordion({ timeline, accent }: { timeline: TimelineEntry[]; accent: string }) {
   const [openId, setOpenId] = useState<string | null>(timeline[0]?.id ?? null);
@@ -314,6 +322,12 @@ function getTimelineDetails(entry: TimelineEntry): {
         iconBg: "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400",
         meta: [],
       };
+    case "assessment-started":
+      return { title: "Assessment Started", description: "You have started the online assessment.", icon: <Clock {...iconProps} />, iconBg: "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400", meta: [] };
+    case "assessment-submitted":
+      return { title: "Assessment Submitted", description: "Your assessment has been submitted successfully.", icon: <Send {...iconProps} />, iconBg: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400", meta: [] };
+    case "assessment-graded":
+      return { title: "Assessment Result", description: m.content ? String(m.content) : "Your assessment result is available.", icon: <CheckCircle {...iconProps} />, iconBg: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400", meta: [] };
     default:
       return {
         title: ACTION_LABELS[entry.action] || entry.action,
@@ -329,6 +343,7 @@ function formatStage(stage: string): string {
   const labels: Record<string, string> = {
     applied: "Applied",
     screening: "Screening",
+    assessment: "Assessment",
     "technical-interview": "Technical Interview",
     "manager-round": "Manager Round",
     "hr-round": "HR Round",
@@ -350,6 +365,7 @@ function formatEmploymentType(type?: string | null): string {
 function CandidatePortalInner() {
   const searchParams = useSearchParams();
   const token = searchParams?.get("token") ?? null;
+  const isTestLink = searchParams?.get("test") === "true";
 
   const [candidate, setCandidate] = useState<CandidateData | null>(null);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
@@ -361,6 +377,8 @@ function CandidatePortalInner() {
   const [offerActionError, setOfferActionError] = useState("");
   const [confirmAction, setConfirmAction] = useState<"accept" | "reject" | null>(null);
   const [activePass, setActivePass] = useState<InterviewData | null>(null);
+  const [assessmentData, setAssessmentData] = useState<any>(null);
+  const assessmentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!token) { setError("No access token provided."); setLoading(false); return; }
@@ -369,10 +387,16 @@ function CandidatePortalInner() {
         if (!r.ok) { const d = await r.json(); throw new Error(d.error || "Invalid link."); }
         return r.json();
       })
-      .then((data) => { setCandidate(data.candidate); setTimeline(data.timeline ?? []); setInterviews(data.interviews ?? []); setOffer(data.offer ?? null); })
+      .then((data) => { setCandidate(data.candidate); setTimeline(data.timeline ?? []); setInterviews(data.interviews ?? []); setOffer(data.offer ?? null); setAssessmentData(data.assessment ?? null); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [token]);
+
+  useEffect(() => {
+    if (isTestLink && !loading && assessmentData && assessmentData.enabled) {
+      setTimeout(() => assessmentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+    }
+  }, [isTestLink, loading, assessmentData]);
 
   async function handleOfferAction(action: "accept" | "reject") {
     if (!token) return;
@@ -397,6 +421,7 @@ function CandidatePortalInner() {
         setCandidate(refreshData.candidate);
         setTimeline(refreshData.timeline ?? []);
         setInterviews(refreshData.interviews ?? []);
+        setAssessmentData(refreshData.assessment ?? null);
       }
     } catch (e: any) {
       setOfferActionError(e.message);
@@ -563,6 +588,28 @@ function CandidatePortalInner() {
                 </div>
               )}
             </div>
+
+            {/* Online assessment */}
+            {assessmentData && assessmentData.enabled && (
+              <div className="mt-4" ref={assessmentRef}>
+                <AssessmentPanel
+                  token={token!}
+                  assessment={assessmentData}
+                  accent={accent}
+                  onRefresh={() => {
+                    if (!token) return;
+                    fetch(`/api/public/candidate/me?token=${encodeURIComponent(token)}`)
+                      .then((r) => r.json())
+                      .then((d) => {
+                        setCandidate(d.candidate);
+                        setTimeline(d.timeline ?? []);
+                        setAssessmentData(d.assessment ?? null);
+                      })
+                      .catch(() => {});
+                  }}
+                />
+              </div>
+            )}
 
             {/* Job profile */}
             {candidate.job && (

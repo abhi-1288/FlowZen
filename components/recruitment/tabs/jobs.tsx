@@ -164,54 +164,56 @@ export function JobsTab() {
                     </>
                   )}
                 </div>
-                <div className="mt-4 flex items-center gap-2">
+                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 dark:border-zinc-800">
                   <button suppressHydrationWarning
                     onClick={() => router.push(`/recruitment/jobs/${job.id}`)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                    className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
                   >
                     <Eye size={14} /> View
                   </button>
                   <button suppressHydrationWarning
                     onClick={() => { setModal({ type: "edit-job", jobId: job.id }); }}
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                    className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
                   >
                     <Pencil size={14} /> Edit
                   </button>
-                  {job.status === "draft" && isAdmin && (
-                    <button suppressHydrationWarning
-                      onClick={() => { void updateJob(job.id, { status: "open" as JobStatus }); }}
-                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50 dark:border-zinc-800 dark:hover:bg-emerald-950"
-                    >
-                      <Globe size={14} /> Publish
-                    </button>
-                  )}
-                  {job.status === "open" && (
-                    <button suppressHydrationWarning
-                      onClick={() => {
-                        const c = typeof job.company === "object" ? (job.company as any)?.name || "" : "";
-                        const slug = c.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-                        const url = slug ? `${window.location.origin}/careers/jobs/${slug}/${job.id}` : "";
-                        if (url) navigator.clipboard.writeText(url).then(() => { setCopiedJobId(job.id); setTimeout(() => setCopiedJobId(null), 2000); });
-                      }}
-                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:border-zinc-800 dark:hover:bg-indigo-950"
-                    >
-                      {copiedJobId === job.id ? <Check size={14} /> : <Share2 size={14} />} {copiedJobId === job.id ? "Copied" : "Share"}
-                    </button>
-                  )}
-                  {job.status === "open" && isAdmin && (
-                    <button suppressHydrationWarning
-                      onClick={() => { void updateJob(job.id, { status: "closed" as JobStatus }); }}
-                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:border-zinc-800 dark:hover:bg-rose-950"
-                    >
-                      <Globe size={14} /> Close
-                    </button>
-                  )}
+                  <div className="ml-auto flex flex-wrap items-center gap-2">
+                    {job.status === "draft" && isAdmin && (
+                      <button suppressHydrationWarning
+                        onClick={() => { void updateJob(job.id, { status: "open" as JobStatus }); }}
+                        className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-medium text-white hover:bg-emerald-700"
+                      >
+                        <Globe size={14} /> Publish
+                      </button>
+                    )}
+                    {job.status === "open" && (
+                      <button suppressHydrationWarning
+                        onClick={() => {
+                          const c = typeof job.company === "object" ? (job.company as any)?.name || "" : "";
+                          const slug = c.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                          const url = slug ? `${window.location.origin}/careers/jobs/${slug}/${job.id}` : "";
+                          if (url) navigator.clipboard.writeText(url).then(() => { setCopiedJobId(job.id); setTimeout(() => setCopiedJobId(null), 2000); });
+                        }}
+                        className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-indigo-200 px-3 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:border-indigo-900 dark:text-indigo-400 dark:hover:bg-indigo-950"
+                      >
+                        {copiedJobId === job.id ? <Check size={14} /> : <Share2 size={14} />} {copiedJobId === job.id ? "Copied" : "Share"}
+                      </button>
+                    )}
+                    {job.status === "open" && isAdmin && (
+                      <button suppressHydrationWarning
+                        onClick={() => { void updateJob(job.id, { status: "closed" as JobStatus }); }}
+                        className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-rose-200 px-3 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:border-rose-900 dark:text-rose-400 dark:hover:bg-rose-950"
+                      >
+                        <Globe size={14} /> Close
+                      </button>
+                    )}
                     {(job.status === "closed" || job.status === "draft") && <button suppressHydrationWarning
                       onClick={() => setModal({ type: "delete-job", jobId: job.id })}
-                      className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-red-200 px-3 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
                     >
                       <Trash2 size={14} /> Delete
                     </button>}
+                  </div>
                 </div>
               </div>
             ))}
@@ -352,6 +354,13 @@ function JobModals() {
       })(),
       description: String(form.get("description") || ""),
       requiredSkills: String(form.get("requiredSkills") || "").split(",").map((s) => s.trim()).filter(Boolean),
+      assessment: Boolean(form.get("assessment")),
+      assessmentDate: (() => {
+        if (!form.get("assessment")) return null;
+        const d = String(form.get("assessmentDate") || "");
+        const t = String(form.get("assessmentTime") || "");
+        return d ? (t ? `${d}T${t}:00` : `${d}T00:00:00`) : null;
+      })(),
       status: "draft" as JobStatus,
     };
     if (isEdit && editingJob) {
@@ -372,7 +381,7 @@ function JobModals() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
         </div>
-        <form className="space-y-4 p-5 max-h-[80vh] overflow-y-auto" onSubmit={handleSubmit}>
+        <form className="space-y-4 p-5 max-h-[80vh] overflow-y-auto overflow-x-hidden" onSubmit={handleSubmit}>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block sm:col-span-2">
               <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Title *</span>
@@ -438,13 +447,13 @@ function JobModals() {
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Duration</span>
               <div className="flex gap-2">
-                <select suppressHydrationWarning name="durationUnit" value={durationUnit} onChange={(e) => setDurationUnit(e.target.value)} className="w-1/3 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none dark:border-zinc-800">
+                <select suppressHydrationWarning name="durationUnit" value={durationUnit} onChange={(e) => setDurationUnit(e.target.value)} className="w-28 shrink-0 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none dark:border-zinc-800">
                   <option value="hours">Hours</option>
                   <option value="days">Days</option>
                   <option value="months">Months</option>
                   <option value="years">Years</option>
                 </select>
-                <input name="durationValue" type="number" min="0" value={durationValue} onChange={(e) => setDurationValue(e.target.value)} placeholder="e.g. 6" className="w-2/3 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
+                <input name="durationValue" type="number" min="0" value={durationValue} onChange={(e) => setDurationValue(e.target.value)} placeholder="e.g. 6" className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
               </div>
             </label>
             <label className="block">
@@ -489,10 +498,34 @@ function JobModals() {
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Auto-Close Date & Time</span>
               <div className="flex gap-2">
-                <input name="autoCloseDate" type="date" defaultValue={editingJob?.autoCloseDate ? editingJob.autoCloseDate.split("T")[0] : ""} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
-                <input name="autoCloseTime" type="time" defaultValue={editingJob?.autoCloseDate ? new Date(editingJob.autoCloseDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : ""} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
+                <input name="autoCloseDate" type="date" defaultValue={editingJob?.autoCloseDate ? editingJob.autoCloseDate.split("T")[0] : ""} className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
+                <input name="autoCloseTime" type="time" defaultValue={editingJob?.autoCloseDate ? new Date(editingJob.autoCloseDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : ""} className="w-28 shrink-0 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
               </div>
             </label>
+            <div className="sm:col-span-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="assessment"
+                  defaultChecked={editingJob?.assessment || false}
+                  onChange={(e) => {
+                    const el = document.getElementById("assessment-fields");
+                    if (el) el.style.display = e.currentTarget.checked ? "block" : "none";
+                  }}
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+                <span className="text-sm font-medium text-slate-700 dark:text-zinc-300">Enable Online Assessment (after Screening)</span>
+              </label>
+              <div id="assessment-fields" className="mt-2" style={{ display: editingJob?.assessment ? "block" : "none" }}>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Assessment Date & Time</span>
+                  <div className="flex gap-2">
+                    <input name="assessmentDate" type="date" defaultValue={editingJob?.assessmentDate ? editingJob.assessmentDate.split("T")[0] : ""} className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
+                    <input name="assessmentTime" type="time" defaultValue={editingJob?.assessmentDate ? new Date(editingJob.assessmentDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : ""} className="w-28 shrink-0 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
+                  </div>
+                </label>
+              </div>
+            </div>
           </div>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Required Skills (comma separated)</span>

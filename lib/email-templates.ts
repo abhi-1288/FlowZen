@@ -264,6 +264,64 @@ export function interviewScheduledEmail({
   };
 }
 
+// ── Assessment Invitation ─────────────────────────────────────
+
+export function assessmentInvitationEmail({
+  candidateName,
+  jobTitle,
+  dateStr,
+  durationMinutes,
+  portalLink,
+}: {
+  candidateName: string;
+  jobTitle: string;
+  dateStr: string;
+  durationMinutes?: number | null;
+  portalLink?: string;
+}) {
+  const html = baseEmailLayout(`
+    <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#1e293b;">Online Assessment Available</h2>
+    <p style="margin:0 0 20px;font-size:14px;color:#64748b;">${jobTitle}</p>
+
+    <p style="margin:0 0 8px;font-size:15px;color:#334155;">Dear ${candidateName},</p>
+    <p style="margin:0 0 24px;font-size:15px;color:#334155;">Your online assessment for <strong>${jobTitle}</strong> is now available.</p>
+
+    <table role="presentation" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:4px 16px;width:100%;margin:0 0 24px;">
+      <tr>
+        <td style="padding:12px 0;border-bottom:1px solid #e2e8f0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;width:100px;">Date</td>
+              <td style="font-size:15px;font-weight:600;color:#1e293b;">${dateStr}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      ${durationMinutes ? `
+      <tr>
+        <td style="padding:12px 0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;width:100px;">Duration</td>
+              <td style="font-size:15px;font-weight:600;color:#1e293b;">${durationMinutes} minutes</td>
+            </tr>
+          </table>
+        </td>
+      </tr>` : ""}
+    </table>
+
+    ${portalLink ? emailButton(portalLink, "Start Assessment") : ""}
+
+    <p style="margin:0;font-size:14px;color:#64748b;">Complete the test before the time limit. It will auto-submit when the time is up. Good luck!</p>
+  `, { title: "Online Assessment Available" });
+
+  return {
+    subject: `Online Assessment Available for ${jobTitle}`,
+    text: `Dear ${candidateName},\n\nYour online assessment for ${jobTitle} is now available.\n\nDate: ${dateStr}${durationMinutes ? `\nDuration: ${durationMinutes} minutes` : ""}${portalLink ? `\n\nStart Assessment: ${portalLink}` : ""}`,
+    html,
+  };
+}
+
 // ── Interview Rescheduled ────────────────────────────────────
 
 export function interviewRescheduledEmail({

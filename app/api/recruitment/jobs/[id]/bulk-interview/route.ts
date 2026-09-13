@@ -23,7 +23,7 @@ const ROUND_TO_STAGE: Record<string, string> = {
   manager: "manager-round",
   hr: "hr-round",
 };
-const STAGE_ORDER = ["applied", "screening", "technical-interview", "manager-round", "hr-round", "offer", "joined", "rejected"];
+const STAGE_ORDER = ["applied", "screening", "assessment", "technical-interview", "manager-round", "hr-round", "offer", "joined", "rejected"];
 
 export async function POST(request: Request, { params }: Params) {
   const { id } = await params;

@@ -132,7 +132,7 @@ export async function POST(request: Request, { params }: Params) {
     manager: "manager-round",
     hr: "hr-round",
   };
-  const stageOrder = ["applied", "screening", "technical-interview", "manager-round", "hr-round", "offer", "joined", "rejected"];
+  const stageOrder = ["applied", "screening", "assessment", "technical-interview", "manager-round", "hr-round", "offer", "joined", "rejected"];
   const currentStage = candidate.stage;
   const targetStage = roundToStage[body.roundType || "screening"];
   if (targetStage) {

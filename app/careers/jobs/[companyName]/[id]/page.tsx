@@ -41,9 +41,16 @@ type JobDetail = {
   requiredSkills: string[];
   currency: string;
   autoCloseDate: string | null;
+  assessment?: boolean | null;
+  assessmentDate?: string | null;
+  assessmentDurationMinutes?: number | null;
   openings?: number | null;
   company: { id: string; name: string; icon: string; primaryColor?: string };
 };
+
+function formatAssessmentDate(date: string): string {
+  return `${new Date(date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} ${new Date(date).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}`;
+}
 
 function formatEmploymentType(type: string): string {
   return type
@@ -80,6 +87,29 @@ export default function JobDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [emailChecking, setEmailChecking] = useState(false);
+  const [emailDuplicate, setEmailDuplicate] = useState<{ firstName: string; lastName: string; stage: string } | null>(null);
+
+  useEffect(() => {
+    const emailValue = email.trim().toLowerCase();
+    if (!emailValue || !job) {
+      setEmailDuplicate(null);
+      setEmailChecking(false);
+      return;
+    }
+    setEmailChecking(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/public/jobs/${job.id}/check-email?email=${encodeURIComponent(emailValue)}`);
+        setEmailDuplicate(res.ok ? (await res.json()).candidate ?? null : null);
+      } catch {
+        setEmailDuplicate(null);
+      } finally {
+        setEmailChecking(false);
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [email, job]);
 
   useEffect(() => {
     fetch(`/api/public/jobs/${id}`)
@@ -219,7 +249,8 @@ export default function JobDetailPage() {
     { icon: ShieldCheck, label: "Experience", value: job.requiredExperienceYears && job.requiredExperienceYears > 0 ? `${job.requiredExperienceYears}+ years` : "Not specified" },
     { icon: Users, label: "Openings", value: job.openings ? String(job.openings) : "1" },
     { icon: CalendarClock, label: "Closes", value: job.autoCloseDate ? `${new Date(job.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} ${new Date(job.autoCloseDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}` : "Rolling" },
-  ].filter((f) => f.value !== null && f.value !== "" && f.value !== "Not specified");
+    { icon: Clock, label: "Assessment", value: job.assessment ? (job.assessmentDate ? `${formatAssessmentDate(job.assessmentDate)}${job.assessmentDurationMinutes ? ` · ${job.assessmentDurationMinutes}min` : ""}` : "Scheduled") : "Not required" },
+  ].filter((f) => f.value !== null && f.value !== "" && f.value !== "Not required" && f.value !== "Not specified");
 
   const scrollToApply = () => {
     document.getElementById("apply")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -284,6 +315,12 @@ export default function JobDetailPage() {
                     <span className="inline-flex items-center gap-1.5">
                       <CalendarClock size={15} /> Applications close{" "}
                       {new Date(job.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} {new Date(job.autoCloseDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                    </span>
+                  )}
+                  {job.assessment && job.assessmentDate && (
+                    <span className="inline-flex items-center gap-1.5" style={{ color: accent }}>
+                      <Clock size={15} /> Assessment: {formatAssessmentDate(job.assessmentDate)}
+                      {job.assessmentDurationMinutes ? ` · ${job.assessmentDurationMinutes}min` : ""}
                     </span>
                   )}
                 </div>
@@ -361,10 +398,18 @@ export default function JobDetailPage() {
 
               <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <FieldInput label="First Name" value={firstName} onChange={setFirstName} required placeholder="John" />
+<FieldInput label="First Name" value={firstName} onChange={setFirstName} required placeholder="John" />
                   <FieldInput label="Last Name" value={lastName} onChange={setLastName} placeholder="Doe" />
+                  <div className="sm:col-span-2">
+                    <FieldInput label="Email" value={email} onChange={setEmail} type="email" required placeholder="you@email.com" />
+                    {emailChecking && <p className="mt-1.5 text-xs text-slate-400 dark:text-zinc-500">Checking if you have already applied...</p>}
+                    {!emailChecking && emailDuplicate && (
+                      <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">
+                        An application with this email already exists for this position. Contact the hiring team if you need to update anything.
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <FieldInput label="Email" value={email} onChange={setEmail} type="email" required placeholder="you@email.com" />
                 <FieldInput label="Phone" value={phone} onChange={setPhone} placeholder="+1 (555) 000-0000" />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <FieldInput label="Current Company" value={currentCompany} onChange={setCurrentCompany} placeholder="Acme Inc." />
@@ -522,6 +567,14 @@ export default function JobDetailPage() {
                 <SideRow accent={accent} icon={Briefcase} label="Position" value={job.title} />
                 {job.department && <SideRow accent={accent} icon={Building2} label="Department" value={job.department} />}
                 <SideRow accent={accent} icon={Users} label="Openings" value={job.openings ? String(job.openings) : "1"} />
+                {job.assessment && (
+                  <SideRow
+                    accent={accent}
+                    icon={Clock}
+                    label="Assessment"
+                    value={job.assessmentDate ? `${formatAssessmentDate(job.assessmentDate)}${job.assessmentDurationMinutes ? ` · ${job.assessmentDurationMinutes}min` : ""}` : "Scheduled"}
+                  />
+                )}
                 {job.salaryRangeMin > 0 && (
                   <SideRow
                     accent={accent}

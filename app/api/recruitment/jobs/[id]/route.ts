@@ -104,6 +104,9 @@ export async function PATCH(request: Request, { params }: Params) {
     if (body.currency !== undefined) updates.currency = String(body.currency).trim();
     if (body.openings !== undefined) updates.openings = Number(body.openings);
     if (body.autoCloseDate !== undefined) updates.autoCloseDate = body.autoCloseDate ? new Date(body.autoCloseDate) : null;
+    if (body.assessment !== undefined) updates.assessment = body.assessment === true;
+    if (body.assessmentDate !== undefined) updates.assessmentDate = body.assessment ? (body.assessmentDate ? new Date(body.assessmentDate) : null) : null;
+    if (body.assessmentDurationMinutes !== undefined) updates.assessmentDurationMinutes = body.assessmentDurationMinutes != null ? Number(body.assessmentDurationMinutes) : null;
     if (body.description !== undefined) updates.description = String(body.description).trim();
     if (body.requiredSkills !== undefined) updates.requiredSkills = Array.isArray(body.requiredSkills) ? body.requiredSkills.map(String) : [];
     if (body.salaryRangeMin !== undefined) updates.salaryRangeMin = Number(body.salaryRangeMin);
@@ -280,6 +283,9 @@ export async function PATCH(request: Request, { params }: Params) {
   if (body.currency !== undefined) updates.currency = String(body.currency).trim();
   if (body.openings !== undefined) updates.openings = Number(body.openings);
   if (body.autoCloseDate !== undefined) updates.autoCloseDate = body.autoCloseDate ? new Date(body.autoCloseDate) : null;
+  if (body.assessment !== undefined) updates.assessment = body.assessment === true;
+  if (body.assessmentDate !== undefined) updates.assessmentDate = body.assessment ? (body.assessmentDate ? new Date(body.assessmentDate) : null) : null;
+  if (body.assessmentDurationMinutes !== undefined) updates.assessmentDurationMinutes = body.assessmentDurationMinutes != null ? Number(body.assessmentDurationMinutes) : null;
   if (body.description !== undefined) updates.description = String(body.description).trim();
   if (body.requiredSkills !== undefined) updates.requiredSkills = Array.isArray(body.requiredSkills) ? body.requiredSkills.map(String) : [];
   const wasPublished = body.status === "open" && user.role === "admin";

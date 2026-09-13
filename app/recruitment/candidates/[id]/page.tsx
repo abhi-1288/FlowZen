@@ -18,6 +18,9 @@ import {
   ChevronDown,
   Trash2,
   UserCheck,
+  Cog,
+  ExternalLink,
+  Link2,
 } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
@@ -92,6 +95,40 @@ export default function CandidateProfilePage() {
 
   const [candidateInterviews, setCandidateInterviews] = useState<any[]>([]);
   const [ivRefreshKey, setIvRefreshKey] = useState(0);
+  const [testLink, setTestLink] = useState("");
+  const [testLinkLoading, setTestLinkLoading] = useState(false);
+  const [testLinkError, setTestLinkError] = useState("");
+  const [testLinkCopied, setTestLinkCopied] = useState(false);
+
+  async function getTestLink() {
+    if (!activeCandidate || !["screening", "assessment"].includes(activeCandidate.stage)) return;
+    setTestLinkLoading(true);
+    setTestLinkError("");
+    try {
+      const res = await apiFetch<{ url: string }>(
+        `/api/recruitment/candidates/${id}/test-link`
+      );
+      if (res.url) {
+        setTestLink(res.url);
+        window.open(res.url, "_blank", "noopener,noreferrer");
+      }
+    } catch (e: any) {
+      setTestLinkError(e.message || "Failed to generate test link.");
+    } finally {
+      setTestLinkLoading(false);
+    }
+  }
+
+  async function copyTestLink() {
+    if (!testLink) return;
+    try {
+      await navigator.clipboard.writeText(testLink);
+      setTestLinkCopied(true);
+      setTimeout(() => setTestLinkCopied(false), 2000);
+    } catch {
+      // clipboard may be blocked
+    }
+  }
 
   useEffect(() => {
     apiFetch<{ interviews: any[] }>(
@@ -154,6 +191,9 @@ export default function CandidateProfilePage() {
     joined: "Joined",
     rejected: "Not Selected",
     "note-added": "Note Added",
+    "assessment-started": "Assessment Started",
+    "assessment-submitted": "Assessment Submitted",
+    "assessment-graded": "Assessment Graded",
   };
 
   const timelineIcons: Record<string, any> = {
@@ -168,6 +208,9 @@ export default function CandidateProfilePage() {
     joined: Briefcase,
     rejected: XCircle,
     "note-added": MessageSquare,
+    "assessment-started": Calendar,
+    "assessment-submitted": Send,
+    "assessment-graded": CheckCircle,
   };
 
   async function handleStageChange(newStage: string) {
@@ -519,6 +562,117 @@ export default function CandidateProfilePage() {
           )}
         </div>
 
+        {/* Assessment Info */}
+        {activeCandidate.stage === "screening" || activeCandidate.stage === "assessment" || (activeCandidate as any).assessmentScore != null ? (
+          <div className="mt-4 rounded-lg bg-[var(--c-bg-muted)] p-4">
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Assessment</p>
+            <div className="flex flex-wrap items-center gap-3">
+              {(activeCandidate as any).assessmentStartedAt && (
+                <span className="text-xs text-slate-600">
+                  Started: {new Date((activeCandidate as any).assessmentStartedAt).toLocaleString("en-IN")}
+                </span>
+              )}
+              {(activeCandidate as any).assessmentSubmittedAt && (
+                <span className="text-xs text-slate-600">
+                  Submitted: {new Date((activeCandidate as any).assessmentSubmittedAt).toLocaleString("en-IN")}
+                </span>
+              )}
+              {(activeCandidate as any).assessmentScore != null && (
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${(activeCandidate as any).assessmentStatus === "selected" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
+                  Score: {(activeCandidate as any).assessmentScore}/100
+                </span>
+              )}
+              {(activeCandidate as any).assessmentStatus && (activeCandidate as any).assessmentStatus !== "pending" && (
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${(activeCandidate as any).assessmentStatus === "selected" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
+                  {(activeCandidate as any).assessmentStatus === "selected" ? "Passed" : "Failed"}
+                </span>
+              )}
+              {!(activeCandidate as any).assessmentStartedAt && activeCandidate.stage === "assessment" && (
+                <span className="text-xs text-slate-400 italic">Waiting to start assessment...</span>
+              )}
+            </div>
+            {(activeCandidate as any).assessmentReason && (
+              <p className="mt-2 text-xs text-slate-500">{(activeCandidate as any).assessmentReason}</p>
+            )}
+            {(activeCandidate as any).assessmentRejectionNote && (
+              <p className="mt-1 text-xs text-rose-600 font-medium">Rejection: {(activeCandidate as any).assessmentRejectionNote}</p>
+            )}
+            {isHr && activeCandidate.stage === "screening" && (
+              <div className="mt-3 border-t border-[var(--c-border-light)] pt-3">
+                <p className="text-xs text-slate-500 mb-2">
+                  Candidate is eligible for the online assessment. Generate the test link and share it with the candidate.
+                </p>
+                <button
+                  onClick={() => void getTestLink()}
+                  disabled={testLinkLoading}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                >
+                  <ExternalLink size={13} /> {testLinkLoading ? "Generating..." : "Get Test Link"}
+                </button>
+                {testLink && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      readOnly
+                      value={testLink}
+                      className="w-full min-w-0 flex-1 rounded-lg border border-[var(--c-border-light)] bg-[var(--c-bg-card)] px-2.5 py-1.5 text-[11px] text-slate-500"
+                    />
+                    <button
+                      onClick={() => void copyTestLink()}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--c-border-light)] px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-card)]"
+                    >
+                      <Link2 size={12} /> {testLinkCopied ? "Copied" : "Copy"}
+                    </button>
+                    <a
+                      href={testLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-teal-200 px-2.5 py-1.5 text-xs font-medium text-teal-600 hover:bg-teal-50"
+                    >
+                      <ExternalLink size={12} /> Open
+                    </a>
+                  </div>
+                )}
+                {testLinkError && <p className="mt-1.5 text-xs text-rose-600">{testLinkError}</p>}
+              </div>
+            )}
+            {activeCandidate.stage === "assessment" && !(activeCandidate as any).assessmentSubmittedAt && isHr && (
+              <div className="mt-3 border-t border-[var(--c-border-light)] pt-3">
+                <button
+                  onClick={() => void getTestLink()}
+                  disabled={testLinkLoading}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                >
+                  <ExternalLink size={13} /> {testLinkLoading ? "Generating..." : "Get Test Link"}
+                </button>
+                {testLink && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      readOnly
+                      value={testLink}
+                      className="w-full min-w-0 flex-1 rounded-lg border border-[var(--c-border-light)] bg-[var(--c-bg-card)] px-2.5 py-1.5 text-[11px] text-slate-500"
+                    />
+                    <button
+                      onClick={() => void copyTestLink()}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--c-border-light)] px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-card)]"
+                    >
+                      <Link2 size={12} /> {testLinkCopied ? "Copied" : "Copy"}
+                    </button>
+                    <a
+                      href={testLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-teal-200 px-2.5 py-1.5 text-xs font-medium text-teal-600 hover:bg-teal-50"
+                    >
+                      <ExternalLink size={12} /> Open
+                    </a>
+                  </div>
+                )}
+                {testLinkError && <p className="mt-1.5 text-xs text-rose-600">{testLinkError}</p>}
+              </div>
+            )}
+          </div>
+        ) : null}
+
         {/* Actions */}
         <div className="mt-4 flex flex-wrap gap-2">
           {isHr && (
@@ -539,6 +693,15 @@ export default function CandidateProfilePage() {
               >
                 <FileText size={14} /> Generate Offer
               </button>
+
+              {isHr && activeCandidate.stage === "screening" && (
+                <button
+                  onClick={() => { if (confirm("Move this candidate to the Assessment stage?")) void handleStageChange("assessment"); }}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 px-3 py-2 text-sm font-medium text-teal-600 hover:bg-teal-50"
+                >
+                  <Cog size={15} /> Give Assessment
+                </button>
+              )}
 
               {activeCandidate.stage === "joined" && (
                 <button
