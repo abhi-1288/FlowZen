@@ -1172,7 +1172,7 @@ export function ProfileHub() {
                 ) : null}
 
                 {tab === "careers" ? (
-                  <CareersTab />
+                  <CareersTab identityCode={String(profile?.companyIdentityCode ?? "")} />
                 ) : null}
 
                 {tab === "games" ? (

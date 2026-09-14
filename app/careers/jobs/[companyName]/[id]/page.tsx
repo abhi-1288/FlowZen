@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Briefcase,
@@ -63,6 +63,7 @@ function formatEmploymentType(type: string): string {
 export default function JobDetailPage() {
   const params = useParams()!;
   const id = params.id as string;
+  const searchParams = useSearchParams();
 
   const [job, setJob] = useState<JobDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -119,6 +120,14 @@ export default function JobDetailPage() {
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    const refCode = searchParams?.get("ref");
+    if (refCode) {
+      setReferralId(refCode);
+      setKnowEmployee(true);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!knowEmployee || !referralId.trim() || !job) {

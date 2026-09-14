@@ -21,12 +21,13 @@ type CareerJob = {
   company: { id: string; name: string };
 };
 
-function jobUrl(job: CareerJob) {
+function jobUrl(job: CareerJob, ref?: string) {
   const slug = job.company.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  return `${window.location.origin}/careers/jobs/${slug}/${job.id}`;
+  const base = `${window.location.origin}/careers/jobs/${slug}/${job.id}`;
+  return ref ? `${base}?ref=${encodeURIComponent(ref)}` : base;
 }
 
-export function CareersTab() {
+export function CareersTab({ identityCode }: { identityCode?: string }) {
   const [jobs, setJobs] = useState<CareerJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -107,7 +108,7 @@ export function CareersTab() {
                 </a>
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(jobUrl(job)).then(() => { setCopiedId(job.id); setTimeout(() => setCopiedId(null), 2000); });
+                    navigator.clipboard.writeText(jobUrl(job, identityCode)).then(() => { setCopiedId(job.id); setTimeout(() => setCopiedId(null), 2000); });
                   }}
                   className="inline-flex items-center gap-1 rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
                 >
