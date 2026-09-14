@@ -41,12 +41,20 @@ export async function POST() {
     return jsonError("Already checked in for today.");
   }
 
-  const attendance = await Attendance.create({
-    user: userId,
-    date: today,
-    checkIn: new Date(),
-    status: "present"
-  });
+  let attendance;
+  try {
+    attendance = await Attendance.create({
+      user: userId,
+      date: today,
+      checkIn: new Date(),
+      status: "present"
+    });
+  } catch (err: any) {
+    if (err?.code === 11000) {
+      return jsonError("Already checked in for today.");
+    }
+    throw err;
+  }
 
   return NextResponse.json({ attendance });
 }

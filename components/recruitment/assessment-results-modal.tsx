@@ -2,22 +2,55 @@
 
 import { useState } from "react";
 
+type EssayReview = {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  score: number | null;
+  answers: { questionIndex: number; questionText: string; textAnswer: string }[];
+};
+
 type Props = {
   data: {
     total: number;
     passed: number;
     failed: number;
+    essayReviews?: EssayReview[];
   } | null;
+  jobId: string;
   onClose: () => void;
   onSubmit: (mode: "auto" | "manual", note: string) => Promise<void>;
 };
 
-export function AssessmentResultsModal({ data, onClose, onSubmit }: Props) {
+export function AssessmentResultsModal({ data, jobId, onClose, onSubmit }: Props) {
   const [action, setAction] = useState<"auto" | "manual">("auto");
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
+  const [essayList, setEssayList] = useState<EssayReview[]>(data?.essayReviews ?? []);
+  const [gradingCandidate, setGradingCandidate] = useState("");
+  const [gradeError, setGradeError] = useState("");
 
   if (!data) return null;
+
+  async function gradeEssay(candidateId: string, status: "selected" | "rejected") {
+    setGradingCandidate(candidateId);
+    setGradeError("");
+    try {
+      const res = await fetch(`/api/recruitment/jobs/${jobId}/assessment/grade-essay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidateId, status }),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || "Failed to grade.");
+      setEssayList((prev) => prev.filter((c) => c._id !== candidateId));
+    } catch (e: any) {
+      setGradeError(e.message || "Failed to grade this candidate.");
+    } finally {
+      setGradingCandidate("");
+    }
+  }
 
   async function handleSubmit() {
     setLoading(true);
@@ -48,6 +81,43 @@ export function AssessmentResultsModal({ data, onClose, onSubmit }: Props) {
               <p className="text-xs text-rose-600">Failed</p>
             </div>
           </div>
+
+          {essayList.length > 0 && (
+            <div className="mt-4 rounded-lg border border-violet-200 bg-violet-50/40 dark:border-violet-900/40">
+              <div className="border-b border-violet-100 px-4 py-3 dark:border-violet-900/40">
+                <p className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Essay answers — manual review</p>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-zinc-400">
+                  {essayList.length} candidate{essayList.length === 1 ? " submitted" : "s submitted"} essay answer{essayList.length === 1 ? "" : "s"}. Read them and mark pass/fail, then use the action below to advance their timelines.
+                </p>
+              </div>
+              <div className="max-h-64 space-y-3 overflow-y-auto p-4">
+                {essayList.map((c) => (
+                  <div key={c._id} className="rounded-lg border border-slate-200 p-3 dark:border-zinc-800">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-slate-900 dark:text-zinc-100">{c.firstName} {c.lastName}</p>
+                        <p className="truncate text-xs text-slate-500">{c.email}{c.score != null ? ` · MCQ score ${c.score}/100` : ""}</p>
+                      </div>
+                      <div className="flex shrink-0 gap-1.5">
+                        <button onClick={() => void gradeEssay(c._id, "selected")} disabled={!!gradingCandidate} className="rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50">Pass</button>
+                        <button onClick={() => void gradeEssay(c._id, "rejected")} disabled={!!gradingCandidate} className="rounded-md bg-rose-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-rose-500 disabled:opacity-50">Fail</button>
+                      </div>
+                    </div>
+                    <div className="mt-2 space-y-2">
+                      {c.answers.map((a, i) => (
+                        <div key={i}>
+                          <p className="text-xs font-medium text-slate-600 dark:text-zinc-300">{a.questionText}</p>
+                          <p className="whitespace-pre-wrap rounded-md bg-slate-50 px-2.5 py-2 text-xs text-slate-700 dark:bg-zinc-900 dark:text-zinc-300">{a.textAnswer}</p>
+                        </div>
+                      ))}
+                    </div>
+                    {gradingCandidate === c._id && <p className="mt-1 text-xs text-slate-400">Saving...</p>}
+                  </div>
+                ))}
+              </div>
+              {gradeError && <p className="px-4 pb-3 text-xs text-rose-600">{gradeError}</p>}
+            </div>
+          )}
 
           <div className="mt-4">
             <label className="block">

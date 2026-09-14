@@ -63,6 +63,7 @@ export async function POST(request: Request) {
     index: idx,
     text: q.text,
     options: q.options,
+    type: q.type === "essay" ? "essay" : "mcq",
   }));
 
   return NextResponse.json({

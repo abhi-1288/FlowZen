@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   if (!(candidate as any).assessmentStartedAt) return jsonError("You must start the assessment before submitting.", 400);
 
   const body = await request.json();
-  const answers: Array<{ questionIndex: number; selectedOption: number }> = Array.isArray(body.answers) ? body.answers : [];
+  const answers: Array<{ questionIndex: number; selectedOption?: number; textAnswer?: string }> = Array.isArray(body.answers) ? body.answers : [];
 
   if (!answers.length) return jsonError("No answers provided.", 400);
 
@@ -32,16 +32,22 @@ export async function POST(request: Request) {
   const assessment = await ATSAssessment.findOne({ job: job._id, company: candidate.company });
   if (!assessment || !assessment.questions.length) return jsonError("Assessment not available.", 400);
 
-  // Auto-grade
+  // Auto-grade only multiple-choice questions; essays are stored for manual review.
   let correct = 0;
-  const total = assessment.questions.length;
+  let mcqTotal = 0;
+  let essayCount = 0;
   for (const a of answers) {
     const q = assessment.questions[a.questionIndex];
-    if (q && q.correctIndex === a.selectedOption) correct++;
+    if (!q) continue;
+    if (q.type === "essay") {
+      essayCount++;
+      continue;
+    }
+    mcqTotal++;
+    if (q.correctIndex === a.selectedOption) correct++;
   }
-  const score = Math.round((correct / total) * 100);
-  const threshold = assessment.passScore || 50;
-  const status = score >= threshold ? "selected" : "rejected";
+  const hasEssays = essayCount > 0 || assessment.questions.some((q: any) => q.type === "essay");
+  const score = mcqTotal > 0 ? Math.round((correct / mcqTotal) * 100) : null;
 
   // Check if auto-submitted (timer expired)
   const startedAt = new Date((candidate as any).assessmentStartedAt);
@@ -49,21 +55,39 @@ export async function POST(request: Request) {
   const now = new Date();
   const autoSubmitted = durationMin ? now.getTime() > startedAt.getTime() + durationMin * 60 * 1000 : false;
 
+  let status: string;
+  let reason: string;
+  if (hasEssays) {
+    status = "pending";
+    reason =
+      score != null
+        ? `Score: ${score}/100 (multiple-choice). Essay answers require manual review.`
+        : "Essay-only assessment — answers require manual review.";
+  } else {
+    const threshold = assessment.passScore || 50;
+    status = score! >= threshold ? "selected" : "rejected";
+    reason = autoSubmitted
+      ? `Score: ${score}/100 (${status === "selected" ? "Passed" : "Failed"}). Auto-submitted due to time limit.`
+      : `Score: ${score}/100 (${status === "selected" ? "Passed" : "Failed"}).`;
+  }
+
   await ATSCandidate.findByIdAndUpdate(candidate._id, {
     assessmentScore: score,
     assessmentStatus: status,
-    assessmentReason: autoSubmitted
-      ? `Score: ${score}/100 (${status === "selected" ? "Passed" : "Failed"}). Auto-submitted due to time limit.`
-      : `Score: ${score}/100 (${status === "selected" ? "Passed" : "Failed"}).`,
+    assessmentReason: reason,
     assessmentSubmittedAt: now,
-    assessmentAnswers: answers,
+    assessmentAnswers: answers.map((a) => ({
+      questionIndex: a.questionIndex,
+      selectedOption: a.selectedOption ?? 0,
+      textAnswer: String(a.textAnswer || "").trim().slice(0, 5000),
+    })),
   });
 
   await ATSTimeline.create({
     candidate: candidate._id,
     job: job._id,
     action: "assessment-submitted",
-    metadata: { score, total, correct, autoSubmitted },
+    metadata: { score, total: assessment.questions.length, correct, mcqTotal, essayCount, autoSubmitted, hasEssays },
     company: candidate.company,
   });
 
@@ -71,12 +95,18 @@ export async function POST(request: Request) {
     candidate: candidate._id,
     job: job._id,
     action: "assessment-graded",
-    metadata: {
-      content: `Assessment result: ${score}/100. ${status === "selected" ? "Passed." : "Failed."}`,
-      score,
-      status,
-      passed: status === "selected",
-    },
+    metadata: hasEssays
+      ? {
+          content: `Assessment submitted. ${score != null ? `Multiple-choice score: ${score}/100. ` : ""}Essay answers are pending manual review.`,
+          status: "pending",
+          passed: false,
+        }
+      : {
+          content: `Assessment result: ${score}/100. ${status === "selected" ? "Passed." : "Failed."}`,
+          score,
+          status,
+          passed: status === "selected",
+        },
     company: candidate.company,
   });
 
@@ -84,7 +114,12 @@ export async function POST(request: Request) {
     ok: true,
     score,
     status,
+    hasEssays,
     submittedAt: now.toISOString(),
-    message: status === "selected" ? "You have passed the assessment." : "Assessment submitted. You will be notified of the result.",
+    message: hasEssays
+      ? "Assessment submitted. Your multiple-choice answers are graded; your essay answers will be reviewed."
+      : status === "selected"
+        ? "You have passed the assessment."
+        : "Assessment submitted. You will be notified of the result.",
   });
 }

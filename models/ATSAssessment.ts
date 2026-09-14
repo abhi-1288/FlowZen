@@ -5,6 +5,8 @@ const ATSAssessmentQuestionSchema = new Schema(
     text: { type: String, required: true, trim: true, maxlength: 1000 },
     options: [{ type: String, trim: true, maxlength: 500 }],
     correctIndex: { type: Number, default: 0, min: 0 },
+    type: { type: String, enum: ["mcq", "essay"], default: "mcq" },
+    answer: { type: String, default: "", trim: true, maxlength: 2000 },
   },
   { _id: false }
 );

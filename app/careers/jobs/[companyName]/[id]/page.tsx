@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { Suspense, useEffect, useState, type CSSProperties } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -60,7 +60,15 @@ function formatEmploymentType(type: string): string {
     .join(" ");
 }
 
-export default function JobDetailPage() {
+export default function JobDetailPageWrapper() {
+  return (
+    <Suspense fallback={<main className="grid min-h-screen place-items-center bg-[#fafafa] dark:bg-[#1a1a1a]"><div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--c-border-light)] border-t-slate-900" /></main>}>
+      <JobDetailPage />
+    </Suspense>
+  );
+}
+
+function JobDetailPage() {
   const params = useParams()!;
   const id = params.id as string;
   const searchParams = useSearchParams();

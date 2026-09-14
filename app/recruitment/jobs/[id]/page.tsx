@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { ArrowLeft, Pencil, Trash2, Globe, Archive, Share2, Check, Cog, Briefcase, Building2, MapPin, Clock, Users, Banknote, ShieldCheck, CalendarClock, UserPlus, CalendarPlus, Columns3, ChevronDown } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Globe, Archive, Share2, Check, Cog, Briefcase, Building2, MapPin, Clock, Users, Banknote, ShieldCheck, CalendarClock, UserPlus, CalendarPlus, Columns3, ChevronDown, Download } from "lucide-react";
 import { DEFAULT_ACCENT, salarySuffix, hexToRgba } from "@/lib/accent";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
@@ -14,6 +14,7 @@ import { JobDescription } from "@/components/recruitment/job-description";
 import { InterviewLocationFields } from "@/components/recruitment/interview-location-fields";
 import { AssessmentManagerModal } from "@/components/recruitment/assessment-manager";
 import { AssessmentResultsModal } from "@/components/recruitment/assessment-results-modal";
+import { AssessmentCandidatesModal } from "@/components/recruitment/assessment-candidates-modal";
 import { assessmentResultsUnlocked } from "@/lib/assessment";
 
 function fmtDateTime(value: string): string {
@@ -25,6 +26,16 @@ function formatEmploymentType(type: string): string {
     .split("-")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
+}
+
+function isDayBeforeAssessment(dateStr: string | null | undefined): boolean {
+  if (!dateStr) return false;
+  const assess = new Date(dateStr);
+  if (isNaN(assess.getTime())) return false;
+  const target = new Date(assess.getFullYear(), assess.getMonth(), assess.getDate() - 1);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return today.getTime() === target.getTime();
 }
 
 function initials(first?: string, last?: string): string {
@@ -63,7 +74,15 @@ export default function JobDetailPage() {
   const [bulkIvOpen, setBulkIvOpen] = useState(false);
   const [assessmentManagerOpen, setAssessmentManagerOpen] = useState(false);
   const [assessmentResultsOpen, setAssessmentResultsOpen] = useState(false);
-  const [assessmentStats, setAssessmentStats] = useState<{ total: number; passed: number; failed: number } | null>(null);
+  const [assessmentCandidatesOpen, setAssessmentCandidatesOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
+  const [assessmentStats, setAssessmentStats] = useState<{
+    total: number;
+    passed: number;
+    failed: number;
+    essayReviews?: { _id: string; firstName: string; lastName: string; email: string; score: number | null; answers: { questionIndex: number; questionText: string; textAnswer: string }[] }[];
+  } | null>(null);
   const [assessmentApplied, setAssessmentApplied] = useState<{ moved: number; advanced: number } | null>(null);
   const [assessmentStatsData, setAssessmentStatsData] = useState<{ inAssessment: number; started: number; submitted: number; passed: number; failed: number; pending: number } | null>(null);
   const [selectedCandidates, setSelectedCandidates] = useState<Record<string, boolean>>({});
@@ -106,9 +125,38 @@ export default function JobDetailPage() {
       const data = await res.json();
       setAssessmentStatsData(data.stats || null);
       if (data.stats) {
-        setAssessmentStats({ total: data.stats.submitted + data.stats.failed + data.stats.passed, passed: data.stats.passed, failed: data.stats.failed });
+        setAssessmentStats({ total: data.stats.submitted + data.stats.failed + data.stats.passed, passed: data.stats.passed, failed: data.stats.failed, essayReviews: data.essayReviews || [] });
       }
     } catch { /* ignore */ }
+  }
+
+  async function handleExport() {
+    if (exporting) return;
+    setExporting(true);
+    setExportError("");
+    try {
+      const res = await fetch(`/api/recruitment/jobs/${id}/export-candidates`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error((data as { error?: string })?.error || `Server error (${res.status}).`);
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") || "";
+      const match = disposition.match(/filename="?([^";]+)"?/);
+      const filename = match ? match[1] : `candidates-${id}.csv`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setExportError(e.message || "Failed to export candidates.");
+    } finally {
+      setExporting(false);
+    }
   }
 
   useEffect(() => { void fetchJob(id); void fetchCandidates({ jobId: id }); void loadAssessmentStats(); }, [id, fetchJob, fetchCandidates]);
@@ -187,7 +235,7 @@ export default function JobDetailPage() {
 
   const companyName = typeof activeJob.company === "object" ? (activeJob.company as any)?.name || "" : String(activeJob.company || "");
   const durationText = formatJobDuration(activeJob.durationMonths, activeJob.durationDays, activeJob.durationHours, activeJob.durationYears);
-  const experienceText = activeJob.requiredExperienceMaxYears && activeJob.requiredExperienceMaxYears > activeJob.requiredExperienceYears
+  const experienceText = activeJob.requiredExperienceMaxYears != null && activeJob.requiredExperienceYears != null && activeJob.requiredExperienceMaxYears > activeJob.requiredExperienceYears
     ? `${activeJob.requiredExperienceYears}-${activeJob.requiredExperienceMaxYears} years`
     : activeJob.requiredExperienceYears
       ? `${activeJob.requiredExperienceYears}+ years`
@@ -572,6 +620,13 @@ export default function JobDetailPage() {
               {isHrOrAdmin && activeJob.assessment && assessmentStats && assessmentStats.total > 0 && (
                 <ActionButton accent={accent} icon={Check} label="Review Assessment Results" onClick={() => { void loadAssessmentStats(); setAssessmentResultsOpen(true); }} />
               )}
+              {isHrOrAdmin && activeJob.status === "closed" && (
+                <ActionButton accent={accent} icon={Download} label={exporting ? "Exporting…" : "Export Candidates"} disabled={exporting} onClick={() => { void handleExport(); }} />
+              )}
+              {isHrOrAdmin && activeJob.assessment && isDayBeforeAssessment(activeJob.assessmentDate) && (
+                <ActionButton accent={accent} icon={Users} label="Assessment Candidates" onClick={() => { void fetchCandidates({ jobId: id }); setAssessmentCandidatesOpen(true); }} />
+              )}
+              {exportError && <p className="text-xs text-rose-600">{exportError}</p>}
             </div>
 
             <div className="mt-4 space-y-2.5 border-t border-[var(--c-border-light)] dark:border-zinc-800 pt-4">
@@ -688,9 +743,16 @@ export default function JobDetailPage() {
         />
       )}
       {assessmentManagerOpen && <AssessmentManagerModal jobId={id} onClose={() => { setAssessmentManagerOpen(false); void loadAssessmentStats(); }} />}
+      {assessmentCandidatesOpen && (
+        <AssessmentCandidatesModal
+          candidates={jobCandidates.filter((c) => c.stage === "screening" || c.stage === "assessment")}
+          onClose={() => setAssessmentCandidatesOpen(false)}
+        />
+      )}
       {assessmentResultsOpen && (
         <AssessmentResultsModal
           data={assessmentStats}
+          jobId={id}
           onClose={() => setAssessmentResultsOpen(false)}
           onSubmit={async (mode, note) => {
             const res = await fetch(`/api/recruitment/jobs/${id}/assessment-apply-rejections`, {

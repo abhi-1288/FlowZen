@@ -11,6 +11,8 @@ const AttendanceSchema = new Schema(
   { timestamps: true }
 );
 
+AttendanceSchema.index({ user: 1, date: 1 }, { unique: true });
+
 if (process.env.NODE_ENV === "development") {
   delete (models as any).Attendance;
 }

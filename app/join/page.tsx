@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
@@ -21,7 +21,15 @@ function kindFromCode(code: string) {
   return "unknown";
 }
 
-export default function JoinPage() {
+export default function JoinPageWrapper() {
+  return (
+    <Suspense fallback={<main className="grid min-h-screen place-items-center bg-[var(--c-bg)]"><Loader2 className="animate-spin" size={24} /></main>}>
+      <JoinPage />
+    </Suspense>
+  );
+}
+
+function JoinPage() {
   const { status } = useSession();
   const searchParams = useSearchParams();
   const code = useMemo(() => normalizeCode(searchParams?.get("code") ?? null), [searchParams]);

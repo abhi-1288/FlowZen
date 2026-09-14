@@ -61,7 +61,7 @@ const ATSCandidateSchema = new Schema(
     assessmentRejectionNote: { type: String, default: "" },
     assessmentStartedAt: { type: Date, default: null },
     assessmentSubmittedAt: { type: Date, default: null },
-    assessmentAnswers: { type: [{ questionIndex: Number, selectedOption: Number }], default: [] },
+    assessmentAnswers: { type: [{ questionIndex: Number, selectedOption: Number, textAnswer: { type: String, default: "" } }], default: [] },
     magicTokenHash: { type: String, default: "", select: false },
     magicTokenExpiresAt: { type: Date, default: null },
     portalTokenHash: { type: String, default: "", select: false },

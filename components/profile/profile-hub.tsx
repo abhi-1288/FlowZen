@@ -51,6 +51,7 @@ import { ItTicketsView } from "@/components/it/it-tickets-view";
 import { AnyRecord, AvatarBadge, formatRoleWithCustom } from "./profile-hub/shared";
 
 type ProfileHubCache = {
+  userId: string;
   profile: AnyRecord | null;
   insights: AnyRecord | null;
   approvals: AnyRecord[];
@@ -210,6 +211,7 @@ export function ProfileHub() {
   useEffect(() => {
     if (!profileHubCache) return;
     if (Date.now() - profileHubCache.fetchedAt > PROFILE_CACHE_TTL_MS) return;
+    if (session?.user?.id && profileHubCache.userId !== session.user.id) return;
 
     setProfile(profileHubCache.profile);
     setInsights(profileHubCache.insights);
@@ -226,7 +228,7 @@ export function ProfileHub() {
     setLostCardReportedCount(profileHubCache.lostCardReportedCount);
     setMessagesCount(profileHubCache.messagesCount ?? 0);
     setLoading(false);
-  }, []);
+  }, [session?.user?.id]);
 
   const role = session?.user?.role ?? String(profile?.role ?? "employee");
   const displayRole = formatRoleWithCustom(String(role), profile?.customRole, Boolean((profile as any)?.isSeniorSecurity));
@@ -300,7 +302,8 @@ export function ProfileHub() {
       const canUseCache =
         !silent &&
         cached &&
-        Date.now() - cached.fetchedAt < PROFILE_CACHE_TTL_MS;
+        Date.now() - cached.fetchedAt < PROFILE_CACHE_TTL_MS &&
+        (!session?.user?.id || cached.userId === session.user.id);
 
       if (canUseCache && cached) {
         setProfile(cached.profile);
@@ -433,6 +436,7 @@ export function ProfileHub() {
       }
 
       profileHubCache = {
+        userId: String(session?.user?.id ?? ""),
         profile: nextProfile,
         insights: nextInsights,
         approvals: nextApprovals,

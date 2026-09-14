@@ -92,6 +92,8 @@ export async function PATCH(request: Request, { params }: Params) {
     }
   }
 
+  const previousStatus = ticket.status;
+
   if (newStatus && newStatus !== ticket.status) {
     if (newStatus === "CANCELLED") {
       return jsonError("Use the cancel endpoint to cancel a ticket.", 400);
@@ -117,7 +119,7 @@ export async function PATCH(request: Request, { params }: Params) {
   await ticket.save();
 
   // Notify the requester of meaningful status changes.
-  if (newStatus && newStatus !== ticket.status) {
+  if (newStatus && newStatus !== previousStatus) {
     const requesterId = String(ticket.requester ?? "");
     if (requesterId && requesterId !== userId) {
       await Notification.create({
