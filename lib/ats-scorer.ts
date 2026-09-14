@@ -35,6 +35,7 @@ export async function scoreResumeWithGemini(
   jobDescription: string,
   requiredSkills: string[],
   requiredExperienceYears: number | null,
+  requiredExperienceMaxYears: number | null = null,
 ): Promise<AtsScoreResult> {
   if (!GEMINI_API_KEY) {
     throw new Error("GEMINI_API_KEY is not configured.");
@@ -45,7 +46,9 @@ export async function scoreResumeWithGemini(
     : "Not specified";
 
   const expRequirement = requiredExperienceYears != null && requiredExperienceYears > 0
-    ? `${requiredExperienceYears} years`
+    ? requiredExperienceMaxYears != null && requiredExperienceMaxYears > requiredExperienceYears
+      ? `${requiredExperienceYears}-${requiredExperienceMaxYears} years`
+      : `${requiredExperienceYears} years`
     : "Not specified";
 
   const contextMissing = !jobDescription?.trim() && (!requiredSkills || requiredSkills.length === 0);

@@ -87,7 +87,7 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({
-    candidate: serializeDoc(candidate),
+    candidate: serializeDoc(more ?? candidate),
     timeline: timeline.map((t: any) => serializeDoc(t)),
     interviews: interviews.map((i: any) => serializeDoc(i)),
     offer: offer ? serializeDoc(offer) : null,

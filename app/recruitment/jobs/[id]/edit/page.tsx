@@ -28,6 +28,7 @@ export default function EditJobPage() {
   const [durationUnit, setDurationUnit] = useState("months");
   const [durationValue, setDurationValue] = useState("");
   const [requiredExperienceYears, setRequiredExperienceYears] = useState("");
+  const [requiredExperienceMaxYears, setRequiredExperienceMaxYears] = useState("");
   const [atsScoreThreshold, setAtsScoreThreshold] = useState("");
   const [assessment, setAssessment] = useState(false);
   const [assessmentDate, setAssessmentDate] = useState("");
@@ -66,6 +67,7 @@ export default function EditJobPage() {
         setDurationValue("");
       }
       setRequiredExperienceYears(activeJob.requiredExperienceYears ? String(activeJob.requiredExperienceYears) : "");
+      setRequiredExperienceMaxYears(activeJob.requiredExperienceMaxYears ? String(activeJob.requiredExperienceMaxYears) : "");
       setAtsScoreThreshold(activeJob.atsScoreThreshold ? String(activeJob.atsScoreThreshold) : "");
       setAssessment(activeJob.assessment || false);
       setAssessmentDate(activeJob.assessmentDate ? activeJob.assessmentDate.split("T")[0] : "");
@@ -83,6 +85,7 @@ export default function EditJobPage() {
       durationHours: durationUnit === "hours" ? (durationValue ? Number(durationValue) : null) : null,
       durationYears: durationUnit === "years" ? (durationValue ? Number(durationValue) : null) : null,
       requiredExperienceYears: requiredExperienceYears ? Number(requiredExperienceYears) : null,
+      requiredExperienceMaxYears: requiredExperienceMaxYears ? Number(requiredExperienceMaxYears) : null,
       atsScoreThreshold: atsScoreThreshold ? Number(atsScoreThreshold) : null,
       assessment,
       assessmentDate: assessment && assessmentDate ? (assessmentTime ? `${assessmentDate}T${assessmentTime}:00` : `${assessmentDate}T00:00:00`) : null,
@@ -143,7 +146,11 @@ export default function EditJobPage() {
           )}
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Required Experience (years)</span>
-            <input value={requiredExperienceYears} onChange={(e) => setRequiredExperienceYears(e.target.value)} type="number" min="0" max="50" placeholder="e.g. 2" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
+            <div className="flex items-center gap-2">
+              <input value={requiredExperienceYears} onChange={(e) => setRequiredExperienceYears(e.target.value)} type="number" min="0" max="50" placeholder="Min, e.g. 1" className="neu-inset min-w-0 flex-1 rounded-lg px-3 py-2.5 text-sm" />
+              <span className="text-sm text-slate-400">to</span>
+              <input value={requiredExperienceMaxYears} onChange={(e) => setRequiredExperienceMaxYears(e.target.value)} type="number" min="0" max="50" placeholder="Max, e.g. 2" className="neu-inset min-w-0 flex-1 rounded-lg px-3 py-2.5 text-sm" />
+            </div>
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">ATS Min Score (0-100)</span>

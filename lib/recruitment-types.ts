@@ -98,6 +98,7 @@ export type ATSJob = {
   durationHours: number | null;
   durationYears: number | null;
   requiredExperienceYears: number | null;
+  requiredExperienceMaxYears: number | null;
   atsScoreThreshold: number | null;
   salaryRangeMin: number;
   salaryRangeMax: number;

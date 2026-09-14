@@ -119,6 +119,7 @@ export async function POST(request: Request) {
     durationHours: body.durationHours != null ? Number(body.durationHours) : null,
     durationYears: body.durationYears != null ? Number(body.durationYears) : null,
     requiredExperienceYears: body.requiredExperienceYears != null ? Number(body.requiredExperienceYears) : null,
+    requiredExperienceMaxYears: body.requiredExperienceMaxYears != null ? Number(body.requiredExperienceMaxYears) : null,
     atsScoreThreshold: body.atsScoreThreshold != null ? Number(body.atsScoreThreshold) : null,
     salaryRangeMin: Number(body.salaryRangeMin) || 0,
     salaryRangeMax: Number(body.salaryRangeMax) || 0,

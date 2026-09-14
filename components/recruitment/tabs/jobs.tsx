@@ -142,7 +142,7 @@ export function JobsTab() {
                   {job.requiredExperienceYears != null && job.requiredExperienceYears > 0 && (
                     <>
                       <span>&middot;</span>
-                      <span>{job.requiredExperienceYears}+ years exp</span>
+                      <span>{job.requiredExperienceMaxYears && job.requiredExperienceMaxYears > job.requiredExperienceYears ? `${job.requiredExperienceYears}-${job.requiredExperienceMaxYears}` : `${job.requiredExperienceYears}+`} years exp</span>
                     </>
                   )}
                   {(job.salaryRangeMin > 0 || job.salaryRangeMax > 0) && (
@@ -255,9 +255,11 @@ function JobModals() {
   const [useOther, setUseOther] = useState(false);
   const [durationUnit, setDurationUnit] = useState("months");
   const [durationValue, setDurationValue] = useState("");
+  const [description, setDescription] = useState("");
 
   useEffect(() => {
     setLocation(editingJob?.location || "");
+    setDescription(editingJob?.description || "");
     setUseOther(false);
     if (editingJob?.durationYears) {
       setDurationUnit("years");
@@ -341,6 +343,7 @@ function JobModals() {
       durationHours: unit === "hours" ? value : null,
       durationYears: unit === "years" ? value : null,
       requiredExperienceYears: form.get("requiredExperienceYears") ? Number(form.get("requiredExperienceYears")) : null,
+      requiredExperienceMaxYears: form.get("requiredExperienceMaxYears") ? Number(form.get("requiredExperienceMaxYears")) : null,
       atsScoreThreshold: form.get("atsScoreThreshold") ? Number(form.get("atsScoreThreshold")) : null,
       currency: String(form.get("currency") || "INR"),
       salaryRangeMin: Number(form.get("salaryRangeMin") || 0),
@@ -352,7 +355,7 @@ function JobModals() {
         const t = String(form.get("autoCloseTime") || "");
         return d ? (t ? `${d}T${t}:00` : `${d}T23:59:59`) : "";
       })(),
-      description: String(form.get("description") || ""),
+      description,
       requiredSkills: String(form.get("requiredSkills") || "").split(",").map((s) => s.trim()).filter(Boolean),
       assessment: Boolean(form.get("assessment")),
       assessmentDate: (() => {
@@ -458,7 +461,12 @@ function JobModals() {
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Required Experience (years)</span>
-              <input name="requiredExperienceYears" type="number" min="0" max="50" defaultValue={editingJob?.requiredExperienceYears || ""} placeholder="e.g. 2" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
+              <div className="flex items-center gap-2">
+                <input name="requiredExperienceYears" type="number" min="0" max="50" defaultValue={editingJob?.requiredExperienceYears || ""} placeholder="Min, e.g. 1" className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
+                <span className="text-sm text-slate-400">to</span>
+                <input name="requiredExperienceMaxYears" type="number" min="0" max="50" defaultValue={editingJob?.requiredExperienceMaxYears || ""} placeholder="Max, e.g. 2" className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
+              </div>
+              <span className="mt-1 block text-xs text-slate-400 dark:text-zinc-500">Leave Max empty for &ldquo;{">"}= Min years&rdquo;.</span>
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">ATS Min Score (0-100)</span>
@@ -533,7 +541,7 @@ function JobModals() {
           </label>
           <div>
             <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Description</span>
-            <MarkdownTextarea name="description" defaultValue={editingJob?.description || ""} rows={5} />
+            <MarkdownTextarea name="description" value={description} onChange={setDescription} rows={5} />
           </div>
           <button suppressHydrationWarning type="submit" disabled={saving} className="w-full rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50">
             {saving ? "Saving..." : isEdit ? "Save Changes" : "Create Job"}

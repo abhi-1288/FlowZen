@@ -70,6 +70,7 @@ export async function POST(request: Request, { params }: Params) {
         (job as any).description || "",
         (job as any).requiredSkills || [],
         (job as any).requiredExperienceYears ?? null,
+        (job as any).requiredExperienceMaxYears ?? null,
       );
 
       const status = result.score >= threshold ? "selected" : "rejected";

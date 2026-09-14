@@ -24,6 +24,7 @@ type JobInfo = {
   durationHours: number | null;
   durationYears: number | null;
   requiredExperienceYears: number | null;
+  requiredExperienceMaxYears: number | null;
   salaryRangeMin: number;
   salaryRangeMax: number;
   description: string;
@@ -154,7 +155,7 @@ export default function CareersPage() {
                         {job.requiredExperienceYears != null && job.requiredExperienceYears > 0 && (
                           <span className="inline-flex items-center gap-1.5">
                             <Briefcase size={14} className="text-slate-400 dark:text-zinc-500" />
-                            {job.requiredExperienceYears}+ years exp
+                            {job.requiredExperienceMaxYears && job.requiredExperienceMaxYears > job.requiredExperienceYears ? `${job.requiredExperienceYears}-${job.requiredExperienceMaxYears}` : `${job.requiredExperienceYears}+`} years exp
                           </span>
                         )}
                       </div>

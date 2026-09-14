@@ -99,7 +99,8 @@ export async function PATCH(request: Request, { params }: Params) {
   if (body.durationHours !== undefined) updates.durationHours = body.durationHours != null ? Number(body.durationHours) : null;
   if (body.durationYears !== undefined) updates.durationYears = body.durationYears != null ? Number(body.durationYears) : null;
     if (body.durationDays !== undefined) updates.durationDays = body.durationDays != null ? Number(body.durationDays) : null;
-    if (body.requiredExperienceYears !== undefined) updates.requiredExperienceYears = body.requiredExperienceYears != null ? Number(body.requiredExperienceYears) : null;
+if (body.requiredExperienceYears !== undefined) updates.requiredExperienceYears = body.requiredExperienceYears != null ? Number(body.requiredExperienceYears) : null;
+    if (body.requiredExperienceMaxYears !== undefined) updates.requiredExperienceMaxYears = body.requiredExperienceMaxYears != null ? Number(body.requiredExperienceMaxYears) : null;
     if (body.atsScoreThreshold !== undefined) updates.atsScoreThreshold = body.atsScoreThreshold != null ? Number(body.atsScoreThreshold) : null;
     if (body.currency !== undefined) updates.currency = String(body.currency).trim();
     if (body.openings !== undefined) updates.openings = Number(body.openings);
@@ -276,6 +277,7 @@ export async function PATCH(request: Request, { params }: Params) {
   if (body.durationHours !== undefined) updates.durationHours = body.durationHours != null ? Number(body.durationHours) : null;
   if (body.durationYears !== undefined) updates.durationYears = body.durationYears != null ? Number(body.durationYears) : null;
   if (body.requiredExperienceYears !== undefined) updates.requiredExperienceYears = body.requiredExperienceYears != null ? Number(body.requiredExperienceYears) : null;
+  if (body.requiredExperienceMaxYears !== undefined) updates.requiredExperienceMaxYears = body.requiredExperienceMaxYears != null ? Number(body.requiredExperienceMaxYears) : null;
   if (body.atsScoreThreshold !== undefined) updates.atsScoreThreshold = body.atsScoreThreshold != null ? Number(body.atsScoreThreshold) : null;
   if (body.salaryRangeMin !== undefined) updates.salaryRangeMin = Number(body.salaryRangeMin);
   if (body.salaryRangeMax !== undefined) updates.salaryRangeMax = Number(body.salaryRangeMax);

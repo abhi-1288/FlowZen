@@ -183,7 +183,8 @@ export async function POST(
   const portalLink = `${origin}/candidate-portal?token=${encodeURIComponent(token)}`;
 
   try {
-    const emailContent = applicationReceivedContent(firstName, job.title, portalLink);
+    const companyDoc = await Company.findOne({ _id: job.company }).select("name icon").lean();
+    const emailContent = applicationReceivedContent(firstName, job.title, portalLink, { name: (companyDoc as any)?.name, icon: (companyDoc as any)?.icon });
     await sendMail({
       to: email,
       subject: emailContent.subject,

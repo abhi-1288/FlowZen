@@ -1,6 +1,6 @@
 // ── Shared helpers ──────────────────────────────────────────
 
-function baseEmailLayout(content: string, options: { title?: string; companyName?: string } = {}): string {
+function baseEmailLayout(content: string, options: { title?: string; companyName?: string; companyLogo?: string } = {}): string {
   const brand = options.companyName || "FlowZen";
   const year = new Date().getFullYear();
 
@@ -18,6 +18,9 @@ function baseEmailLayout(content: string, options: { title?: string; companyName
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
           <tr>
             <td style="background:#1e293b;padding:24px 32px;text-align:center;">
+              ${options.companyLogo
+                ? `<img src="${options.companyLogo}" alt="${brand}" width="40" height="40" style="display:inline-block;width:40px;height:40px;border-radius:50%;object-fit:cover;margin:0 auto 10px;" />`
+                : ""}
               <h1 style="margin:0;font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.3px;">${brand}</h1>
             </td>
           </tr>
@@ -28,7 +31,7 @@ function baseEmailLayout(content: string, options: { title?: string; companyName
           </tr>
           <tr>
             <td style="background:#f8fafc;padding:16px 32px;border-top:1px solid #e2e8f0;text-align:center;">
-              <p style="margin:0;font-size:12px;color:#94a3b8;">&copy; ${year} ${brand}. All rights reserved.</p>
+              <p style="margin:0;font-size:12px;color:#94a3b8;">&copy; ${year} FlowZen. All rights reserved.</p>
               <p style="margin:4px 0 0;font-size:11px;color:#94a3b8;">This is an automated message. Please do not reply directly.</p>
             </td>
           </tr>
@@ -147,7 +150,7 @@ export function passwordResetEmailContent(magicLink: string): { subject: string;
 
 // ── Application Received ─────────────────────────────────────
 
-export function applicationReceivedContent(firstName: string, jobTitle: string, portalLink: string): { subject: string; text: string; html: string } {
+export function applicationReceivedContent(firstName: string, jobTitle: string, portalLink: string, company?: { name?: string; icon?: string }): { subject: string; text: string; html: string } {
   const html = baseEmailLayout(`
     <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#1e293b;">Application Received</h2>
     <p style="margin:0 0 20px;font-size:14px;color:#64748b;">Thank you for applying.</p>
@@ -169,7 +172,7 @@ export function applicationReceivedContent(firstName: string, jobTitle: string, 
     ${emailButton(portalLink, "Track Your Application")}
 
     <p style="margin:0;font-size:12px;color:#94a3b8;">Or open this link: <a href="${portalLink}" style="color:#10b981;text-decoration:underline;">${portalLink}</a></p>
-  `, { title: "Application Received" });
+  `, { title: "Application Received", companyName: company?.name, companyLogo: company?.icon });
 
   return {
     subject: `Application received for ${jobTitle}`,

@@ -482,10 +482,16 @@ function CandidatePortalInner() {
       <header className="sticky top-0 z-20 border-b border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)]/85 dark:bg-[#000000]/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 sm:px-8">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold text-white" style={{ backgroundColor: accent }}>
-              F
-            </div>
-            <span className="text-base font-semibold text-slate-900 dark:text-zinc-100">FlowZen</span>
+            {candidate.company?.icon ? (
+              <img src={candidate.company.icon} alt="" className="h-9 w-9 rounded-xl object-cover" />
+            ) : (
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold text-white" style={{ backgroundColor: accent }}>
+                {candidate.company?.name ? companyInitials : "F"}
+              </div>
+            )}
+            <span className="text-base font-semibold text-slate-900 dark:text-zinc-100">
+              {candidate.company?.name || "FlowZen"}
+            </span>
             <span className="hidden text-sm text-slate-400 dark:text-zinc-500 sm:inline">·</span>
             <span className="hidden text-sm text-slate-500 dark:text-zinc-400 sm:inline">Candidate Portal</span>
           </div>
@@ -926,6 +932,10 @@ function CandidatePortalInner() {
           </div>
         </div>
       )}
+
+      <footer className="border-t border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] dark:bg-[#000000] pb-8 pt-6 text-center">
+        <p className="text-xs text-slate-400 dark:text-zinc-500">&copy; {new Date().getFullYear()} FlowZen. All rights reserved.</p>
+      </footer>
     </main>
   );
 }

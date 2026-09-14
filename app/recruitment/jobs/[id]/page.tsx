@@ -1,19 +1,44 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { ArrowLeft, Plus, Pencil, Eye, Trash2, Globe, Archive, Share2, Check, Cog } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Globe, Archive, Share2, Check, Cog, Briefcase, Building2, MapPin, Clock, Users, Banknote, ShieldCheck, CalendarClock, UserPlus, CalendarPlus, Columns3, ChevronDown } from "lucide-react";
+import { DEFAULT_ACCENT, salarySuffix, hexToRgba } from "@/lib/accent";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
 import { apiFetch } from "@/lib/client-utils";
-import { CURRENCY_SYMBOLS, STAGES, STAGE_LABELS, type Stage, type Source, type JobStatus } from "@/lib/recruitment-types";
+import { CURRENCY_SYMBOLS, STAGES, STAGE_LABELS, type Stage, type Source, type JobStatus, type ATSCandidate } from "@/lib/recruitment-types";
 import { formatJobDuration } from "@/lib/format-duration";
 import { JobDescription } from "@/components/recruitment/job-description";
 import { InterviewLocationFields } from "@/components/recruitment/interview-location-fields";
 import { AssessmentManagerModal } from "@/components/recruitment/assessment-manager";
 import { AssessmentResultsModal } from "@/components/recruitment/assessment-results-modal";
 import { assessmentResultsUnlocked } from "@/lib/assessment";
+
+function fmtDateTime(value: string): string {
+  return `${new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} ${new Date(value).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}`;
+}
+
+function formatEmploymentType(type: string): string {
+  return type
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+function initials(first?: string, last?: string): string {
+  const f = (first || "").trim().charAt(0);
+  const l = (last || "").trim().charAt(0);
+  return (f + l).toUpperCase() || "?";
+}
+
+function stagePillClass(stage: string): string {
+  if (stage === "joined") return "bg-emerald-50 text-emerald-700";
+  if (stage === "rejected" || stage === "ats-rejected") return "bg-rose-50 text-rose-700";
+  if (stage === "offer") return "bg-indigo-50 text-indigo-700";
+  return "bg-[var(--c-bg-muted)] text-slate-600";
+}
 
 export default function JobDetailPage() {
   const params = useParams()!;
@@ -23,8 +48,8 @@ export default function JobDetailPage() {
   const role = session?.user?.role ?? "";
   const isAdmin = role === "admin";
   const isHrOrAdmin = role === "admin" || role === "human-resource";
-  const { activeJob, candidates, loading, fetchJob, fetchCandidates, setModal, updateJob } = useRecruitmentStore(
-    useShallow((s) => ({ activeJob: s.activeJob, candidates: s.candidates, loading: s.loading, fetchJob: s.fetchJob, fetchCandidates: s.fetchCandidates, setModal: s.setModal, updateJob: s.updateJob }))
+  const { activeJob, candidates, loading, fetchJob, fetchCandidates, setModal, updateJob, moveCandidateStage } = useRecruitmentStore(
+    useShallow((s) => ({ activeJob: s.activeJob, candidates: s.candidates, loading: s.loading, fetchJob: s.fetchJob, fetchCandidates: s.fetchCandidates, setModal: s.setModal, updateJob: s.updateJob, moveCandidateStage: s.moveCandidateStage }))
   );
   const [candidateFilter, setCandidateFilter] = useState("");
   const [copied, setCopied] = useState(false);
@@ -41,6 +66,9 @@ export default function JobDetailPage() {
   const [assessmentStats, setAssessmentStats] = useState<{ total: number; passed: number; failed: number } | null>(null);
   const [assessmentApplied, setAssessmentApplied] = useState<{ moved: number; advanced: number } | null>(null);
   const [assessmentStatsData, setAssessmentStatsData] = useState<{ inAssessment: number; started: number; submitted: number; passed: number; failed: number; pending: number } | null>(null);
+  const [selectedCandidates, setSelectedCandidates] = useState<Record<string, boolean>>({});
+  const [bulkTargetStage, setBulkTargetStage] = useState<Stage>("screening");
+  const [stageModal, setStageModal] = useState<{ targets: ATSCandidate[]; target: Stage } | null>(null);
 
   async function handleRunAts(force: boolean) {
     if (!activeJob) return;
@@ -106,6 +134,33 @@ export default function JobDetailPage() {
     return list;
   }, [jobCandidates, candidateFilter]);
 
+  const selectedCount = Object.values(selectedCandidates).filter(Boolean).length;
+  const allFilteredSelected = filtered.length > 0 && filtered.every((c) => selectedCandidates[c.id]);
+
+  function toggleSelectAll() {
+    const next: Record<string, boolean> = {};
+    if (!allFilteredSelected) for (const c of filtered) next[c.id] = true;
+    setSelectedCandidates(next);
+  }
+
+  function openStageModal(candidate: ATSCandidate, target: Stage) {
+    setStageModal({ targets: [candidate], target });
+  }
+
+  function openBulkStageModal() {
+    const targets = filtered.filter((c) => selectedCandidates[c.id]);
+    if (targets.length === 0) return;
+    setStageModal({ targets, target: bulkTargetStage });
+  }
+
+  async function confirmStageChange(toStage: Stage) {
+    if (!stageModal) return;
+    await Promise.all(stageModal.targets.map((c) => moveCandidateStage(c.id, toStage)));
+    setSelectedCandidates({});
+    setStageModal(null);
+    void fetchCandidates({ jobId: id });
+  }
+
   if (loading && !activeJob) {
     return (
       <div className="grid min-h-screen place-items-center">
@@ -125,277 +180,471 @@ export default function JobDetailPage() {
 
   const stages = STAGES;
 
+  const accent = DEFAULT_ACCENT;
+  const accentStyle = { "--accent": accent } as CSSProperties;
+  const accentSoft = hexToRgba(accent, 0.12);
+  const accentSofter = hexToRgba(accent, 0.06);
+
+  const companyName = typeof activeJob.company === "object" ? (activeJob.company as any)?.name || "" : String(activeJob.company || "");
+  const durationText = formatJobDuration(activeJob.durationMonths, activeJob.durationDays, activeJob.durationHours, activeJob.durationYears);
+  const experienceText = activeJob.requiredExperienceMaxYears && activeJob.requiredExperienceMaxYears > activeJob.requiredExperienceYears
+    ? `${activeJob.requiredExperienceYears}-${activeJob.requiredExperienceMaxYears} years`
+    : activeJob.requiredExperienceYears
+      ? `${activeJob.requiredExperienceYears}+ years`
+      : "Not specified";
+
+  const jobFactCards = [
+    { icon: MapPin, label: "Location", value: activeJob.location || "Remote / On-site" },
+    { icon: Briefcase, label: "Type", value: formatEmploymentType(activeJob.employmentType) },
+    { icon: Clock, label: "Duration", value: durationText || "Not specified" },
+    { icon: ShieldCheck, label: "Experience", value: experienceText },
+    { icon: Users, label: "Openings", value: String(activeJob.openings) },
+    { icon: CalendarClock, label: "Closes", value: activeJob.autoCloseDate ? fmtDateTime(activeJob.autoCloseDate) : "Rolling" },
+    { icon: Clock, label: "Assessment", value: activeJob.assessment ? (activeJob.assessmentDate ? fmtDateTime(activeJob.assessmentDate) : "Scheduled") : "Not required" },
+    { icon: Users, label: "Candidates", value: `${jobCandidates.length} applied` },
+  ].filter((f) => f.value !== "Not specified" && f.value !== "Not required");
+
   return (
-    <div className="p-6">
+    <>
+      <div className="mx-auto max-w-6xl px-6 py-8 sm:px-8" style={accentStyle}>
       <button
         onClick={() => router.push("/recruitment/jobs")}
-        className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900"
+        className="mb-6 inline-flex items-center gap-1.5 rounded-full border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] dark:bg-[#000000] px-4 py-2 text-sm font-medium text-slate-600 dark:text-zinc-300 transition-all hover:shadow-sm"
       >
-        <ArrowLeft size={16} /> Back to jobs
+        <ArrowLeft size={15} /> Back to jobs
       </button>
 
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold text-slate-900">{activeJob.title}</h1>
-            <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${ activeJob.status === "open" ? "bg-emerald-50 text-emerald-700" : activeJob.status === "draft" ? "bg-amber-50 text-amber-700" : "bg-[var(--c-bg-muted)] text-slate-600" }`}>{activeJob.status}</span>
-          </div>
-          <p className="mt-1 text-sm text-slate-500">{activeJob.department} &middot; {activeJob.location || "Remote"} &middot; {activeJob.employmentType}{formatJobDuration(activeJob.durationMonths, activeJob.durationDays, activeJob.durationHours, activeJob.durationYears) ? ` · ${formatJobDuration(activeJob.durationMonths, activeJob.durationDays, activeJob.durationHours, activeJob.durationYears)}` : ""}{activeJob.requiredExperienceYears ? ` · ${activeJob.requiredExperienceYears}+ years exp` : ""}</p>
-          {activeJob.salaryRangeMin > 0 || activeJob.salaryRangeMax > 0 ? (
-            <p className="text-sm text-slate-500">Salary: {CURRENCY_SYMBOLS[activeJob.currency] || "₹"}{activeJob.salaryRangeMin.toLocaleString()} - {CURRENCY_SYMBOLS[activeJob.currency] || "₹"}{activeJob.salaryRangeMax.toLocaleString()}{activeJob.salaryType === "per-month" ? " per month" : activeJob.salaryType === "per-day" ? " per day" : activeJob.salaryType === "per-hour" ? " per hour" : " per annum"}</p>
-          ) : null}
-          <p className="text-sm text-slate-500">{activeJob.openings} opening{activeJob.openings > 1 ? "s" : ""} &middot; {jobCandidates.length} candidate{jobCandidates.length !== 1 ? "s" : ""}</p>
-          {activeJob.autoCloseDate && (
-            <p className="text-sm text-slate-500">Auto-closes: {new Date(activeJob.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} {new Date(activeJob.autoCloseDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}</p>
-          )}
-          {activeJob.assessment && activeJob.assessmentDate && (
-            <p className="text-sm text-teal-700">
-              Assessment on: {new Date(activeJob.assessmentDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} {new Date(activeJob.assessmentDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
-              {activeJob.assessmentDurationMinutes ? ` · ${activeJob.assessmentDurationMinutes}min` : ""}
-            </p>
-          )}
-        </div>
-<div className="flex flex-wrap items-center gap-2">
-          {activeJob.status === "draft" && isAdmin && (
-            <button
-              onClick={() => { void updateJob(id, { status: "open" as JobStatus }); }}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white hover:bg-emerald-700"
-            >
-              <Globe size={15} /> Publish
-            </button>
-          )}
-          {activeJob.status === "open" && (
-            <button
-              onClick={() => {
-                const c = typeof activeJob.company === "object" ? (activeJob.company as any)?.name || "" : "";
-                const slug = c.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-                const url = slug ? `${window.location.origin}/careers/jobs/${slug}/${id}` : "";
-                if (url) navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
-              }}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 text-sm font-medium text-indigo-600 hover:bg-indigo-50"
-            >
-              {copied ? <Check size={15} /> : <Share2 size={15} />} {copied ? "Copied" : "Share"}
-            </button>
-          )}
-          {activeJob.status === "open" && isAdmin && (
-            <button
-              onClick={() => { void updateJob(id, { status: "closed" as JobStatus }); }}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 text-sm font-medium text-rose-600 hover:bg-rose-50"
-            >
-              <Archive size={15} /> Close
-            </button>
-          )}
-          <button
-            onClick={() => router.push(`/recruitment/jobs/${id}/edit`)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 text-sm font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
-          >
-            <Pencil size={15} /> Edit
-          </button>
-          <button
-            onClick={() => router.push(`/recruitment/jobs/${id}/board`)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 text-sm font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
-          >
-            <Eye size={15} /> Kanban
-          </button>
-          <button
-            onClick={() => setModal({ type: "create-candidate", jobId: id })}
-            className="neu-btn neu-btn-primary inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium"
-          >
-            <Plus size={15} /> Add Candidate
-          </button>
-          {isHrOrAdmin && (
-            <button
-              onClick={() => setBulkIvOpen(true)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-emerald-200 px-3 text-sm font-medium text-emerald-600 hover:bg-emerald-50"
-            >
-              <Plus size={15} /> Schedule Interview
-            </button>
-          )}
-          {isHrOrAdmin && (
-            <button
-              onClick={() => void handleRunAts(false)}
-              disabled={atsLoading}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-indigo-200 px-3 text-sm font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
-            >
-              <Cog size={15} className={atsLoading ? "animate-spin" : ""} />
-              {atsLoading ? "Scoring..." : "Run ATS Score"}
-            </button>
-          )}
-          {isHrOrAdmin && (
-            <button
-              onClick={() => void handleRunAts(true)}
-              disabled={atsLoading}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-amber-200 px-3 text-sm font-medium text-amber-600 hover:bg-amber-50 disabled:opacity-50"
-            >
-              {atsLoading ? "Scoring..." : "Re-score All"}
-            </button>
-          )}
-          {atsDecisionPending && atsLastResult && (
-            <button
-              onClick={() => setAtsResultData(atsLastResult)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-rose-200 px-3 text-sm font-medium text-rose-600 hover:bg-rose-50"
-            >
-              Review ATS timelines
-            </button>
-          )}
-          {isHrOrAdmin && activeJob.assessment && (
-            <button
-              onClick={() => { setAssessmentManagerOpen(true); }}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-teal-200 px-3 text-sm font-medium text-teal-600 hover:bg-teal-50"
-            >
-              <Cog size={15} /> Manage Assessment
-            </button>
-          )}
-          {isHrOrAdmin && activeJob.assessment && assessmentStats && assessmentStats.total > 0 && (
-            <button
-              onClick={() => { void loadAssessmentStats(); setAssessmentResultsOpen(true); }}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-violet-200 px-3 text-sm font-medium text-violet-600 hover:bg-violet-50"
-            >
-              Review Assessment Results
-            </button>
-          )}
-          {activeJob.status !== "open" && (
-            <button
-              onClick={() => setModal({ type: "delete-job", jobId: id })}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-red-200 px-3 text-sm font-medium text-red-600 hover:bg-red-50"
-            >
-              <Trash2 size={15} /> Delete
-            </button>
-          )}
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {activeJob.assessment && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-3 py-1 text-xs font-medium text-teal-700">
-              {activeJob.assessmentDate
-                ? `Assessment: ${new Date(activeJob.assessmentDate).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })} ${new Date(activeJob.assessmentDate).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })}`
-                : "Assessment"}
-              {activeJob.assessmentDurationMinutes ? ` · ${activeJob.assessmentDurationMinutes}min` : ""}
-            </span>
-          )}
-          {activeJob.atsScoreThreshold != null && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
-              ATS Threshold: {activeJob.atsScoreThreshold}+
-            </span>
-          )}
-          {assessmentApplied && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-              {assessmentApplied.advanced} advanced to Technical Interview · {assessmentApplied.moved} moved to ATS Rejected
-            </span>
-          )}
-{atsApplied && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-              {atsApplied.advanced} advanced to Screening · {atsApplied.moved} moved to ATS Rejected
-            </span>
-          )}
-        </div>
-      </div>
-
-<div className="mt-4 rounded-lg neu-card p-4">
-        <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Description</h3>
-        {activeJob.description ? (
-          <JobDescription content={activeJob.description} />
-        ) : (
-          <p className="text-sm text-slate-400">No description provided.</p>
-        )}
-      </div>
-
-      {activeJob.requiredSkills?.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {activeJob.requiredSkills.map((skill) => (
-            <span key={skill} className="rounded-full bg-[var(--c-bg-muted)] px-3 py-1 text-xs font-medium text-slate-700">{skill}</span>
-          ))}
-        </div>
-      )}
-
-      <div className="mt-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">Candidates ({jobCandidates.length})</h2>
-          <select
-            className="neu-inset rounded-lg px-3 py-1.5 text-sm"
-            value={candidateFilter}
-            onChange={(e) => setCandidateFilter(e.target.value)}
-          >
-            <option value="">All Stages</option>
-            <optgroup label="By Stage">
-              {stages.map((s) => (
-                <option key={s} value={s}>{STAGE_LABELS[s as Stage]}</option>
-              ))}
-            </optgroup>
-            <optgroup label="By ATS Status">
-              <option value="__ats-selected">ATS Selected</option>
-              <option value="__ats-rejected">ATS Rejected</option>
-              <option value="__ats-pending">Not Scored</option>
-            </optgroup>
-            {activeJob.assessment && (
-              <optgroup label="By Assessment Status">
-                <option value="__assessment-passed">Assessment Passed</option>
-                <option value="__assessment-failed">Assessment Failed</option>
-                <option value="__assessment-pending">Not Assessed</option>
-              </optgroup>
-            )}
-          </select>
-        </div>
-        {atsResultData && (
-          <div className="mt-2 rounded-lg bg-indigo-50 p-3 text-sm text-indigo-700">
-            Scored {atsResultData.scored} candidate{atsResultData.scored !== 1 ? "s" : ""} — {atsResultData.selected} selected, {atsResultData.rejected} rejected{atsResultData.errors > 0 ? `, ${atsResultData.errors} error${atsResultData.errors !== 1 ? "s" : ""}` : ""}
-          </div>
-        )}
-
-        <div className="mt-4 space-y-3">
-          {filtered.map((candidate) => (
-            <div
-              key={candidate.id}
-              className="flex items-center justify-between rounded-lg neu-card p-4 transition"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-slate-900">{candidate.firstName} {candidate.lastName}</span>
-                  {candidate.atsScore != null && (
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${ candidate.atsStatus === "selected" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700" }`}>
-                      ATS {candidate.atsScore}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
+        {/* ---------- Main column ---------- */}
+        <div className="min-w-0 space-y-6">
+          {/* Hero */}
+          <div className="overflow-hidden rounded-2xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] dark:bg-[#000000] shadow-sm">
+            <div className="h-2.5 w-full" style={{ background: `linear-gradient(90deg, ${accent}, ${hexToRgba(accent, 0.6)})` }} />
+            <div className="p-6 sm:p-8">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+                        activeJob.status === "open" ? "bg-emerald-50 text-emerald-700"
+                        : activeJob.status === "draft" ? "bg-amber-50 text-amber-700"
+                        : "bg-[var(--c-bg-muted)] text-slate-600"
+                      }`}
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${activeJob.status === "open" ? "bg-emerald-500" : activeJob.status === "draft" ? "bg-amber-500" : "bg-slate-400"}`}
+                      />
+                      {activeJob.status}
                     </span>
-                  )}
-                  {(candidate as any).assessmentStatus && (candidate as any).assessmentStatus !== "pending" && activeJob.assessment && (
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${(candidate as any).assessmentStatus === "selected" ? "bg-teal-50 text-teal-700" : "bg-rose-50 text-rose-700"}`}>
-                      Assessment {(candidate as any).assessmentScore ?? ""}
+                    {companyName && (
+                      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 dark:text-zinc-400">
+                        <Building2 size={15} /> {companyName}
+                      </span>
+                    )}
+                    {activeJob.department && <span className="text-sm text-slate-400 dark:text-zinc-500">{activeJob.department}</span>}
+                  </div>
+                  <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 dark:text-zinc-100 sm:text-3xl">{activeJob.title}</h1>
+                </div>
+                {activeJob.salaryRangeMin > 0 && (
+                  <div className="inline-flex shrink-0 items-center gap-2.5 rounded-xl px-4 py-3" style={{ backgroundColor: accentSoft }}>
+                    <Banknote size={18} style={{ color: accent }} />
+                    <span className="text-base font-semibold text-slate-900 dark:text-zinc-100">
+                      {CURRENCY_SYMBOLS[activeJob.currency] || "₹"}{activeJob.salaryRangeMin.toLocaleString()} - {CURRENCY_SYMBOLS[activeJob.currency] || "₹"}{activeJob.salaryRangeMax.toLocaleString()}
+                      <span className="ml-1 text-sm font-medium" style={{ color: accent }}>{salarySuffix(activeJob.salaryType)}</span>
                     </span>
-                  )}
-                  {candidate.atsStatus === "rejected" && candidate.stage !== "ats-rejected" && candidate.stage !== "rejected" && (
-                    <span className="text-[10px] font-medium text-amber-600">ATS-flagged, HR reviewing</span>
-                  )}
-                  {candidate.rating > 0 && (
-                    <span className="text-xs text-amber-500">{'★'.repeat(candidate.rating)}{'☆'.repeat(5 - candidate.rating)}</span>
-                  )}
-                </div>
-                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                  <span>{candidate.email}</span>
-                  {candidate.currentCompany && <><span>&middot;</span><span>{candidate.currentCompany}</span></>}
-                  {candidate.experienceYears > 0 && <><span>&middot;</span><span>{candidate.experienceYears}y exp</span></>}
-                </div>
-                {candidate.atsRejectionNote && (
-                  <p className="mt-1 line-clamp-2 text-xs text-rose-600">
-                    <span className="font-medium">Rejected:</span> {candidate.atsRejectionNote}
-                  </p>
+                  </div>
                 )}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${ candidate.stage === "joined" ? "bg-emerald-50 text-emerald-700" : candidate.stage === "rejected" || candidate.stage === "ats-rejected" ? "bg-rose-50 text-rose-700" : candidate.stage === "offer" ? "bg-indigo-50 text-indigo-700" : "bg-[var(--c-bg-muted)] text-slate-600" }`}>
-                  {STAGE_LABELS[candidate.stage]}
+
+              <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-500 dark:text-zinc-400">
+                {activeJob.location && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <MapPin size={15} /> {activeJob.location}
+                  </span>
+                )}
+                <span className="inline-flex items-center gap-1.5">
+                  <Briefcase size={15} /> {formatEmploymentType(activeJob.employmentType)}
                 </span>
-                <button
-                  onClick={() => router.push(`/recruitment/candidates/${candidate.id}`)}
-                  className="rounded-lg border border-[var(--c-border-light)] px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
-                >
-                  Profile
-                </button>
+                {durationText && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Clock size={15} /> {durationText}
+                  </span>
+                )}
+                {activeJob.requiredExperienceYears ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <ShieldCheck size={15} /> {experienceText}
+                  </span>
+                ) : null}
+                <span className="inline-flex items-center gap-1.5">
+                  <Users size={15} /> {activeJob.openings} opening{activeJob.openings > 1 ? "s" : ""} &middot; {jobCandidates.length} candidate{jobCandidates.length !== 1 ? "s" : ""}
+                </span>
+                {activeJob.autoCloseDate && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <CalendarClock size={15} /> Closes {fmtDateTime(activeJob.autoCloseDate)}
+                  </span>
+                )}
+                {activeJob.assessment && activeJob.assessmentDate && (
+                  <span className="inline-flex items-center gap-1.5" style={{ color: accent }}>
+                    <Clock size={15} /> Assessment: {fmtDateTime(activeJob.assessmentDate)}{activeJob.assessmentDurationMinutes ? ` · ${activeJob.assessmentDurationMinutes}min` : ""}
+                  </span>
+                )}
+              </div>
+
+              {(atsApplied || assessmentApplied || activeJob.atsScoreThreshold != null || activeJob.assessment) && (
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {activeJob.assessment && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-3 py-1 text-xs font-medium text-teal-700">
+                      Assessment enabled
+                    </span>
+                  )}
+                  {activeJob.atsScoreThreshold != null && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
+                      ATS Threshold: {activeJob.atsScoreThreshold}+
+                    </span>
+                  )}
+                  {assessmentApplied && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                      {assessmentApplied.advanced} advanced to Technical Interview &middot; {assessmentApplied.moved} moved to ATS Rejected
+                    </span>
+                  )}
+                  {atsApplied && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                      {atsApplied.advanced} advanced to Screening &middot; {atsApplied.moved} moved to ATS Rejected
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Highlights */}
+          <div className="rounded-2xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] dark:bg-[#000000] p-6 shadow-sm">
+            <h2 className="text-base font-bold text-slate-900 dark:text-zinc-100">Job highlights</h2>
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {jobFactCards.map((f) => (
+                <div key={f.label} className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 p-3.5" style={{ backgroundColor: accentSofter }}>
+                  <div className="flex items-center gap-2">
+                    <f.icon size={15} style={{ color: accent }} />
+                    <span className="text-xs text-slate-400 dark:text-zinc-500">{f.label}</span>
+                  </div>
+                  <p className="mt-1.5 text-sm font-semibold text-slate-800 dark:text-zinc-200">{f.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+{/* About the role */}
+          <div className="rounded-2xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] dark:bg-[#000000] p-6 shadow-sm sm:p-8">
+            <h2 className="text-base font-bold text-slate-900 dark:text-zinc-100">About the role</h2>
+            <div className="mt-3">
+              {activeJob.description ? (
+                <JobDescription content={activeJob.description} />
+              ) : (
+                <p className="text-sm text-slate-400">No description provided.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Skills */}
+          {activeJob.requiredSkills.length > 0 && (
+            <div className="rounded-2xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] dark:bg-[#000000] p-6 shadow-sm sm:p-8">
+              <h2 className="text-base font-bold text-slate-900 dark:text-zinc-100">Skills &amp; requirements</h2>
+              <div className="mt-3.5 flex flex-wrap gap-2">
+                {activeJob.requiredSkills.map((skill) => (
+                  <span
+                    key={skill}
+                    className="rounded-full border px-3.5 py-1.5 text-sm font-medium"
+                    style={{ backgroundColor: accentSofter, borderColor: hexToRgba(accent, 0.25), color: accent }}
+                  >
+                    {skill}
+                  </span>
+                ))}
               </div>
             </div>
-          ))}
-          {filtered.length === 0 && (
-            <p className="py-8 text-center text-sm text-slate-500">No candidates found.</p>
           )}
+
+      {/* Candidates */}
+          <div className="rounded-2xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] dark:bg-[#000000] p-6 shadow-sm sm:p-8">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-slate-900 dark:text-zinc-100">Candidates ({jobCandidates.length})</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">
+                  {filtered.length} shown{candidateFilter ? ` · ${candidateFilter.startsWith("__ats") ? "ATS status" : candidateFilter.startsWith("__assessment") ? "assessment status" : (STAGE_LABELS[candidateFilter as Stage] ?? candidateFilter)}` : ""}
+                </p>
+                {isHrOrAdmin && filtered.length > 0 && (
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={allFilteredSelected}
+                      onChange={() => toggleSelectAll()}
+                      className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600"
+                    />
+                    <button type="button" onClick={() => toggleSelectAll()} className="text-xs font-medium text-indigo-600 hover:underline">
+                      {allFilteredSelected ? "Clear all" : "Select all"}
+                    </button>
+                  </div>
+                )}
+              </div>
+              <select
+                className="neu-inset rounded-xl px-3 py-2 text-sm"
+                value={candidateFilter}
+                onChange={(e) => setCandidateFilter(e.target.value)}
+              >
+                <option value="">All Stages</option>
+                <optgroup label="By Stage">
+                  {stages.map((s) => (
+                    <option key={s} value={s}>{STAGE_LABELS[s as Stage]}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="By ATS Status">
+                  <option value="__ats-selected">ATS Selected</option>
+                  <option value="__ats-rejected">ATS Rejected</option>
+                  <option value="__ats-pending">Not Scored</option>
+                </optgroup>
+                {activeJob.assessment && (
+                  <optgroup label="By Assessment Status">
+                    <option value="__assessment-passed">Assessment Passed</option>
+                    <option value="__assessment-failed">Assessment Failed</option>
+                    <option value="__assessment-pending">Not Assessed</option>
+                  </optgroup>
+                )}
+              </select>
+            </div>
+
+            {isHrOrAdmin && selectedCount > 0 && (
+              <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-900/50 dark:bg-indigo-950/40">
+                <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">{selectedCount} selected</span>
+                <select
+                  value={bulkTargetStage}
+                  onChange={(e) => setBulkTargetStage(e.target.value as Stage)}
+                  className="neu-inset rounded-lg px-3 py-1.5 text-sm"
+                >
+                  {STAGES.map((s) => (
+                    <option key={s} value={s}>{STAGE_LABELS[s]}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={openBulkStageModal}
+                  className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-700"
+                >
+                  Change Stage
+                </button>
+                <button type="button" onClick={() => setSelectedCandidates({})} className="ml-auto text-xs font-medium text-indigo-600 hover:underline">
+                  Clear
+                </button>
+              </div>
+            )}
+
+            {atsResultData && (
+              <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-700">
+                Scored {atsResultData.scored} candidate{atsResultData.scored !== 1 ? "s" : ""} — {atsResultData.selected} selected, {atsResultData.rejected} rejected{atsResultData.errors > 0 ? `, ${atsResultData.errors} error${atsResultData.errors !== 1 ? "s" : ""}` : ""}
+              </div>
+            )}
+
+            <div className="mt-5 space-y-3">
+              {filtered.map((candidate) => (
+                <div
+                  key={candidate.id}
+                  className="flex flex-col gap-3 rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] dark:bg-[#000000] p-4 transition-all hover:shadow-md sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="flex min-w-0 items-start gap-3">
+                    {isHrOrAdmin && (
+                      <input
+                        type="checkbox"
+                        checked={!!selectedCandidates[candidate.id]}
+                        onChange={(e) => setSelectedCandidates((prev) => ({ ...prev, [candidate.id]: e.target.checked }))}
+                        className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600"
+                      />
+                    )}
+                    <div
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+                      style={{ backgroundColor: accent }}
+                    >
+                      {initials(candidate.firstName, candidate.lastName)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-semibold text-slate-900 dark:text-zinc-100">{candidate.firstName} {candidate.lastName}</span>
+                        {candidate.atsScore != null && (
+                          <span className="group relative inline-flex">
+                            <span className={`cursor-help rounded-full px-2 py-0.5 text-xs font-bold ${candidate.atsStatus === "selected" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
+                              ATS {candidate.atsScore}
+                            </span>
+                            <span className="pointer-events-none absolute bottom-full left-0 z-50 mb-1.5 hidden w-60 whitespace-normal rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] leading-relaxed text-slate-600 shadow-xl group-hover:block dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+                              <span className="block font-semibold text-slate-800 dark:text-zinc-100">
+                                ATS Score: {candidate.atsScore}/100 ({candidate.atsStatus === "rejected" ? "flagged" : candidate.atsStatus})
+                              </span>
+                              {candidate.atsReason && (
+                                <span className="mt-1 block">{candidate.atsReason}</span>
+                              )}
+                            </span>
+                          </span>
+                        )}
+                        {(candidate as any).assessmentStatus && (candidate as any).assessmentStatus !== "pending" && activeJob.assessment && (
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${(candidate as any).assessmentStatus === "selected" ? "bg-teal-50 text-teal-700" : "bg-rose-50 text-rose-700"}`}>
+                            Assessment {(candidate as any).assessmentScore ?? ""}
+                          </span>
+                        )}
+                        {candidate.atsStatus === "rejected" && candidate.stage !== "ats-rejected" && candidate.stage !== "rejected" && (
+                          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-600">ATS-flagged, HR reviewing</span>
+                        )}
+                        {candidate.rating > 0 && (
+                          <span className="text-sm text-amber-500">{'★'.repeat(candidate.rating)}{'☆'.repeat(5 - candidate.rating)}</span>
+                        )}
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500 dark:text-zinc-400">
+                        <span>{candidate.email}</span>
+                        {candidate.currentCompany && <><span>&middot;</span><span>{candidate.currentCompany}</span></>}
+                        {candidate.experienceYears > 0 && <><span>&middot;</span><span>{candidate.experienceYears}y exp</span></>}
+                      </div>
+                      {candidate.atsRejectionNote && (
+                        <p className="mt-1.5 line-clamp-2 text-xs text-rose-600">
+                          <span className="font-medium">Rejected:</span> {candidate.atsRejectionNote}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {isHrOrAdmin ? (
+                      <span className="relative inline-flex items-center">
+                        <select
+                          value={candidate.stage}
+                          onChange={(e) => openStageModal(candidate, e.target.value as Stage)}
+                          className={`cursor-pointer appearance-none rounded-full py-0.5 pl-2.5 pr-6 text-xs font-medium ${stagePillClass(candidate.stage)}`}
+                          title={`Move ${candidate.firstName} ${candidate.lastName} to another stage`}
+                        >
+                          {STAGES.map((s) => (
+                            <option key={s} value={s}>{STAGE_LABELS[s]}</option>
+                          ))}
+                        </select>
+                        <ChevronDown size={12} className="pointer-events-none absolute right-1.5 text-current opacity-60" />
+                      </span>
+                    ) : (
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${stagePillClass(candidate.stage)}`}>
+                        {STAGE_LABELS[candidate.stage]}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => router.push(`/recruitment/candidates/${candidate.id}`)}
+                      className="rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
+                    >
+                      Profile
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {filtered.length === 0 && (
+                <p className="py-10 text-center text-sm text-slate-500">No candidates found.</p>
+              )}
+            </div>
+          </div>
         </div>
+
+        {/* ---------- Sticky sidebar ---------- */}
+        <aside className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+          {/* Quick actions */}
+          <div className="rounded-2xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] dark:bg-[#000000] p-6 shadow-sm">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Quick actions</h3>
+            <div className="mt-4 space-y-2.5">
+              <button
+                onClick={() => setModal({ type: "create-candidate", jobId: id })}
+                className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-white transition-all duration-200 hover:opacity-90"
+                style={{ backgroundColor: accent }}
+              >
+                <UserPlus size={16} /> Add Candidate
+              </button>
+              {isHrOrAdmin && (
+                <ActionButton accent={accent} icon={CalendarPlus} label="Schedule Interview" onClick={() => setBulkIvOpen(true)} />
+              )}
+              {isHrOrAdmin && (
+                <ActionButton accent={accent} icon={Cog} label={atsLoading ? "Scoring…" : "Run ATS Score"} disabled={atsLoading} onClick={() => { if (!atsLoading) void handleRunAts(false); }} />
+              )}
+              {isHrOrAdmin && (
+                <ActionButton accent={accent} icon={Cog} label="Re-score All" disabled={atsLoading} onClick={() => { if (!atsLoading) void handleRunAts(true); }} />
+              )}
+              {atsDecisionPending && atsLastResult && (
+                <ActionButton accent={accent} icon={Check} label="Review ATS timelines" onClick={() => setAtsResultData(atsLastResult)} />
+              )}
+              {isHrOrAdmin && activeJob.assessment && (
+                <ActionButton accent={accent} icon={Cog} label="Manage Assessment" onClick={() => setAssessmentManagerOpen(true)} />
+              )}
+              {isHrOrAdmin && activeJob.assessment && assessmentStats && assessmentStats.total > 0 && (
+                <ActionButton accent={accent} icon={Check} label="Review Assessment Results" onClick={() => { void loadAssessmentStats(); setAssessmentResultsOpen(true); }} />
+              )}
+            </div>
+
+            <div className="mt-4 space-y-2.5 border-t border-[var(--c-border-light)] dark:border-zinc-800 pt-4">
+              {activeJob.status === "draft" && isAdmin && (
+                <ActionButton accent={accent} icon={Globe} label="Publish Job" onClick={() => { void updateJob(id, { status: "open" as JobStatus }); }} />
+              )}
+              {activeJob.status === "open" && isAdmin && (
+                <ActionButton accent={accent} icon={Archive} label="Close Job" onClick={() => { void updateJob(id, { status: "closed" as JobStatus }); }} />
+              )}
+              {activeJob.status === "open" && (
+                <ActionButton
+                  accent={accent}
+                  icon={copied ? Check : Share2}
+                  label={copied ? "Link copied!" : "Share job"}
+                  onClick={() => {
+                    const slug = companyName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                    const url = slug ? `${window.location.origin}/careers/jobs/${slug}/${id}` : "";
+                    if (url) navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+                  }}
+                />
+              )}
+              <ActionButton accent={accent} icon={Pencil} label="Edit job" onClick={() => router.push(`/recruitment/jobs/${id}/edit`)} />
+              <ActionButton accent={accent} icon={Columns3} label="Kanban board" onClick={() => router.push(`/recruitment/jobs/${id}/board`)} />
+              {activeJob.status !== "open" && (
+                <ActionButton accent={accent} icon={Trash2} label="Delete job" danger onClick={() => setModal({ type: "delete-job", jobId: id })} />
+              )}
+            </div>
+          </div>
+
+          {/* Job details */}
+          <div className="rounded-2xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] dark:bg-[#000000] p-6 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl text-white" style={{ backgroundColor: accent }}>
+                <Building2 size={20} />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-900 dark:text-zinc-100">{companyName || "Your company"}</p>
+                <p className="text-xs text-slate-500 dark:text-zinc-400">Recruitment on FlowZen</p>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-3 border-t border-[var(--c-border-light)] dark:border-zinc-800 pt-5">
+              <SideRow accent={accent} icon={Briefcase} label="Position" value={activeJob.title} />
+              {activeJob.department && <SideRow accent={accent} icon={Building2} label="Department" value={activeJob.department} />}
+              <SideRow accent={accent} icon={MapPin} label="Location" value={activeJob.location || "Remote / On-site"} />
+              <SideRow accent={accent} icon={Users} label="Openings" value={String(activeJob.openings)} />
+              <SideRow accent={accent} icon={Clock} label="Type" value={formatEmploymentType(activeJob.employmentType)} />
+              <SideRow accent={accent} icon={ShieldCheck} label="Experience" value={experienceText} />
+              {durationText && <SideRow accent={accent} icon={Clock} label="Duration" value={durationText} />}
+              {activeJob.atsScoreThreshold != null && <SideRow accent={accent} icon={Cog} label="ATS threshold" value={`${activeJob.atsScoreThreshold}+`} />}
+              {activeJob.assessment && (
+                <SideRow
+                  accent={accent}
+                  icon={Clock}
+                  label="Assessment"
+                  value={activeJob.assessmentDate ? `${fmtDateTime(activeJob.assessmentDate)}${activeJob.assessmentDurationMinutes ? ` · ${activeJob.assessmentDurationMinutes}min` : ""}` : "Scheduled"}
+                />
+              )}
+              <SideRow accent={accent} icon={CalendarClock} label="Closes" value={activeJob.autoCloseDate ? fmtDateTime(activeJob.autoCloseDate) : "Rolling"} />
+              {activeJob.salaryRangeMin > 0 && (
+                <SideRow
+                  accent={accent}
+                  icon={Banknote}
+                  label="Salary range"
+                  highlight
+                  value={`${CURRENCY_SYMBOLS[activeJob.currency] || "₹"}${activeJob.salaryRangeMin.toLocaleString()} - ${CURRENCY_SYMBOLS[activeJob.currency] || "₹"}${activeJob.salaryRangeMax.toLocaleString()} ${salarySuffix(activeJob.salaryType)}`}
+                />
+              )}
+            </div>
+          </div>
+        </aside>
       </div>
+    </div>
 
       <DeleteJobModal id={id} />
       <CandidateModal jobId={id} />
@@ -431,6 +680,13 @@ export default function JobDetailPage() {
         candidates={jobCandidates}
         onDone={() => { void fetchCandidates({ jobId: id }); }}
       />
+      {stageModal && (
+        <StageChangeModal
+          data={stageModal}
+          onClose={() => setStageModal(null)}
+          onConfirm={confirmStageChange}
+        />
+      )}
       {assessmentManagerOpen && <AssessmentManagerModal jobId={id} onClose={() => { setAssessmentManagerOpen(false); void loadAssessmentStats(); }} />}
       {assessmentResultsOpen && (
         <AssessmentResultsModal
@@ -450,6 +706,66 @@ export default function JobDetailPage() {
           }}
         />
       )}
+    </>
+  );
+}
+
+function ActionButton({
+  accent,
+  icon: Icon,
+  label,
+  onClick,
+  disabled = false,
+  danger = false,
+}: {
+  accent: string;
+  icon: React.ElementType;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="flex w-full items-center gap-3 rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 px-3.5 py-2.5 text-sm font-medium text-slate-700 dark:text-zinc-300 transition-all hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <span
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+        style={{ backgroundColor: danger ? hexToRgba("#ef4444", 0.1) : hexToRgba(accent, 0.1) }}
+      >
+        <Icon size={15} style={{ color: danger ? "#dc2626" : accent }} />
+      </span>
+      {label}
+    </button>
+  );
+}
+
+function SideRow({
+  accent,
+  icon: Icon,
+  label,
+  value,
+  highlight = false,
+}: {
+  accent: string;
+  icon: React.ElementType;
+  label: string;
+  value: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: hexToRgba(accent, 0.1) }}>
+        <Icon size={15} style={{ color: accent }} />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs text-slate-400 dark:text-zinc-500">{label}</p>
+        <p className={`break-words text-sm ${highlight ? "font-semibold text-slate-900 dark:text-zinc-100" : "text-slate-700 dark:text-zinc-300"}`}>
+          {value}
+        </p>
+      </div>
     </div>
   );
 }
@@ -614,6 +930,93 @@ function DeleteJobModal({ id }: { id: string }) {
               className="neu-btn neu-btn-danger rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving ? "Deleting…" : "Delete"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StageChangeModal({
+  data,
+  onClose,
+  onConfirm,
+}: {
+  data: { targets: ATSCandidate[]; target: Stage };
+  onClose: () => void;
+  onConfirm: (stage: Stage) => Promise<void>;
+}) {
+  const [stage, setStage] = useState<Stage>(data.target);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const single = data.targets.length === 1;
+  const subject = single ? `${data.targets[0].firstName} ${data.targets[0].lastName}` : `${data.targets.length} candidates`;
+
+  async function handleConfirm() {
+    if (saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      await onConfirm(stage);
+      onClose();
+    } catch {
+      setError("Failed to update stage. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center neu-overlay px-4">
+      <div className="w-full max-w-sm rounded-lg neu-card">
+        <div className="p-5">
+          <h2 className="text-base font-semibold text-slate-900">{single ? "Move Candidate" : `Move ${data.targets.length} Candidates`}</h2>
+          {single ? (
+            <p className="mt-2 text-sm text-slate-600">
+              Move <span className="font-medium text-slate-800">{subject}</span> from{" "}
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${stagePillClass(data.targets[0].stage)}`}>
+                {STAGE_LABELS[data.targets[0].stage]}
+              </span>
+            </p>
+          ) : (
+            <div className="mt-2">
+              <p className="text-sm text-slate-600">Change the stage of {subject}:</p>
+              <ul className="mt-2 max-h-28 space-y-1 overflow-y-auto rounded-lg bg-[var(--c-bg-muted)] p-2">
+                {data.targets.map((c) => (
+                  <li key={c.id} className="flex items-center justify-between gap-2 text-xs text-slate-600">
+                    <span className="min-w-0 truncate">{c.firstName} {c.lastName}</span>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 font-medium ${stagePillClass(c.stage)}`}>
+                      {STAGE_LABELS[c.stage]}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <label className="mt-4 block">
+            <span className="mb-1 block text-sm font-medium text-slate-700">Move to</span>
+            <select value={stage} onChange={(e) => setStage(e.target.value as Stage)} className="neu-inset w-full rounded-lg px-3 py-2 text-sm">
+              {STAGES.map((s) => (
+                <option key={s} value={s}>{STAGE_LABELS[s]}</option>
+              ))}
+            </select>
+          </label>
+          {error && <p className="mt-3 text-sm text-rose-600">{error}</p>}
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              onClick={onClose}
+              className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => void handleConfirm()}
+              disabled={saving}
+              className="neu-btn neu-btn-primary rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saving ? "Moving…" : single ? "Move" : `Move ${data.targets.length}`}
             </button>
           </div>
         </div>

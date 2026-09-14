@@ -43,6 +43,7 @@ const ATSJobSchema = new Schema(
     durationHours: { type: Number, default: null, min: 0, max: 9999 },
     durationYears: { type: Number, default: null, min: 0, max: 50 },
     requiredExperienceYears: { type: Number, default: null, min: 0, max: 50 },
+    requiredExperienceMaxYears: { type: Number, default: null, min: 0, max: 50 },
     atsScoreThreshold: { type: Number, default: null, min: 0, max: 100 },
     autoCloseDate: { type: Date, default: null },
     description: { type: String, default: "", maxlength: 5000 },
