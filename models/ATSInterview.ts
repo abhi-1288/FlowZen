@@ -23,7 +23,7 @@ const ATSInterviewSchema = new Schema(
     interviewer: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     roundType: {
       type: String,
-      enum: ["screening", "technical", "manager", "hr"],
+      enum: ["screening", "technical", "manager", "hr", "admin"],
       required: true,
     },
     scheduledAt: { type: Date, required: true },
@@ -34,7 +34,7 @@ const ATSInterviewSchema = new Schema(
     passValidUntil: { type: Date, default: null },
     status: {
       type: String,
-      enum: ["scheduled", "completed", "cancelled", "rescheduled"],
+      enum: ["scheduled", "in-progress", "completed", "cancelled", "rescheduled"],
       default: "scheduled",
     },
     feedback: { type: InterviewFeedbackSchema, default: () => ({}) },

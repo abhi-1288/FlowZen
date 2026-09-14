@@ -21,6 +21,7 @@ type ModalState =
   | { type: "edit-candidate"; candidateId: string }
   | { type: "schedule-interview"; candidateId: string }
   | { type: "edit-interview"; interviewId: string }
+  | { type: "view-interview"; interviewId: string }
   | { type: "add-feedback"; interviewId: string }
   | { type: "generate-offer"; candidateId: string }
   | { type: "edit-offer"; offerId: string }

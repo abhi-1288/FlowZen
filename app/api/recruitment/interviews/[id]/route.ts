@@ -5,6 +5,7 @@ import { ATSTimeline } from "@/models/ATSTimeline";
 import { ATSAuditLog } from "@/models/ATSAuditLog";
 import { User } from "@/models/User";
 import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
+import { canStartInterview } from "@/lib/interview-utils";
 import { emitToUser } from "@/lib/socket-emit";
 import { sendMail } from "@/lib/mailer";
 import { interviewRescheduledEmail, interviewCancelledEmail } from "@/lib/email-templates";
@@ -12,6 +13,7 @@ import { buildOrigin, buildPortalLink, resolveCandidatePortalToken } from "@/lib
 
 type Params = { params: Promise<{ id: string }> };
 const HR_ROLES = ["admin", "human-resource"];
+const INTERVIEWER_STATUSES = ["in-progress", "scheduled"];
 
 export async function PATCH(request: Request, { params }: Params) {
   const { id } = await params;
@@ -30,11 +32,33 @@ export async function PATCH(request: Request, { params }: Params) {
 
   await connectDb();
   const user = await User.findById(userId);
-  if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  if (!user) return jsonError("Forbidden", 403);
   if (!user.company) return jsonError("No company found.", 400);
+
+  const existing = await ATSInterview.findOne({ _id: id, company: user.company });
+  if (!existing) return jsonError("Interview not found.", 404);
+
+  const isHr = HR_ROLES.includes(user.role);
+  const isAssignedInterviewer = String((existing as any).interviewer) === String(userId);
+
+  if (!isHr && !isAssignedInterviewer) return jsonError("Forbidden", 403);
+
+  if (!isHr) {
+    if (Object.keys(body).some((key) => key !== "status")) {
+      return jsonError("You can only update the status of your interview.", 400);
+    }
+    if (!INTERVIEWER_STATUSES.includes(body.status)) {
+      return jsonError("Invalid status update.", 400);
+    }
+  }
 
   const wasRescheduled = body.scheduledAt !== undefined;
   const wasCancelled = body.status === "cancelled";
+
+  if (body.status === "in-progress") {
+    const canStart = await canStartInterview(id);
+    if (!canStart.ok) return jsonError(canStart.reason, 400);
+  }
 
   const interview = await ATSInterview.findOneAndUpdate(
     { _id: id, company: user.company },
@@ -60,7 +84,13 @@ export async function PATCH(request: Request, { params }: Params) {
 
   await ATSAuditLog.create({
     actor: userId,
-    action: wasCancelled ? "cancel-interview" : wasRescheduled ? "reschedule-interview" : "update-interview",
+    action: wasCancelled
+      ? "cancel-interview"
+      : wasRescheduled
+        ? "reschedule-interview"
+        : body.status === "in-progress"
+          ? "start-interview"
+          : "update-interview",
     entityType: "ATSInterview",
     entityId: interview._id,
     metadata: { status: interview.status, roundType: interview.roundType },

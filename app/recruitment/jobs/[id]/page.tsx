@@ -38,6 +38,16 @@ function isDayBeforeAssessment(dateStr: string | null | undefined): boolean {
   return today.getTime() === target.getTime();
 }
 
+const INTERVIEWER_ROLES: Record<string, string> = {
+  "project-manager": "Project Manager",
+  "qa-tester": "QA Tester",
+  finance: "Finance",
+  "human-resource": "HR",
+  admin: "Admin",
+  "it-admin": "IT Admin",
+  "it-administration": "IT Administrative",
+};
+
 function initials(first?: string, last?: string): string {
   const f = (first || "").trim().charAt(0);
   const l = (last || "").trim().charAt(0);
@@ -1195,12 +1205,28 @@ function BulkInterviewModal({
   const [pickerRole, setPickerRole] = useState("human-resource");
   const [pickerUsers, setPickerUsers] = useState<any[]>([]);
   const [pickerLoading, setPickerLoading] = useState(false);
+  const [availableRoles, setAvailableRoles] = useState<string[]>(Object.keys(INTERVIEWER_ROLES));
   const [meetingType, setMeetingType] = useState("online");
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const isRemoteJob = !!jobLocation && /^remote$/i.test(jobLocation.trim());
+
+  useEffect(() => {
+    let active = true;
+    apiFetch<{ availableRoles: string[] }>("/api/recruitment/interviewer-roles")
+      .then((res) => {
+        if (!active) return;
+        const roles = res.availableRoles ?? [];
+        setAvailableRoles(roles.length ? roles : Object.keys(INTERVIEWER_ROLES));
+        setPickerRole((prev) => (roles.includes(prev) ? prev : roles[0] || prev));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -1281,6 +1307,7 @@ function BulkInterviewModal({
                 <option value="technical">Technical</option>
                 <option value="manager">Manager</option>
                 <option value="hr">HR</option>
+                <option value="admin">Admin</option>
               </select>
             </label>
             <label className="block">
@@ -1295,11 +1322,11 @@ function BulkInterviewModal({
               <label className="block">
                 <span className="mb-1 block text-xs text-slate-500">Role</span>
                 <select value={pickerRole} onChange={(e) => setPickerRole(e.target.value)} className="neu-inset rounded-lg px-3 py-2.5 text-sm">
-                  <option value="project-manager">Project Manager</option>
-                  <option value="qa-tester">QA Tester</option>
-                  <option value="finance">Finance</option>
-                  <option value="human-resource">HR</option>
-                  <option value="admin">Admin</option>
+                  {Object.entries(INTERVIEWER_ROLES)
+                    .filter(([value]) => availableRoles.includes(value))
+                    .map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
                 </select>
               </label>
               <label className="block min-w-[200px] flex-1">

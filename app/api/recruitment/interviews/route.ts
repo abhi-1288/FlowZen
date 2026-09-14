@@ -4,7 +4,7 @@ import { ATSInterview } from "@/models/ATSInterview";
 import { User } from "@/models/User";
 import { isObjectId, jsonError, requireUserId, serializeDocs } from "@/lib/api";
 
-const ALL_ROLES = ["admin", "human-resource", "project-manager", "qa-tester", "finance"];
+const ALL_ROLES = ["admin", "human-resource", "project-manager", "qa-tester", "finance", "it-admin", "it-administration"];
 
 export async function GET(request: Request) {
   const userId = await requireUserId();
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   const toDate = searchParams.get("to");
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
   const rawLimit = parseInt(searchParams.get("limit") ?? "10", 10);
-  const limit = rawLimit === 0 ? 0 : Math.min(100, Math.max(1, rawLimit));
+  const limit = rawLimit === 0 ? 0 : Math.min(1000, Math.max(1, rawLimit));
   const skip = limit === 0 ? 0 : (page - 1) * limit;
 
   const filter: Record<string, unknown> = { company: user.company };
@@ -42,7 +42,7 @@ export async function GET(request: Request) {
       .skip(skip)
       .limit(limit || undefined)
       .populate("interviewer", "name email")
-      .populate("candidate", "firstName lastName")
+      .populate("candidate", "firstName lastName email phone stage")
       .populate("job", "title"),
   ]);
 

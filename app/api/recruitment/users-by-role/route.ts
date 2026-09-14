@@ -4,7 +4,7 @@ import { User } from "@/models/User";
 import { requireUserId } from "@/lib/api";
 import { jsonError, serializeDocs } from "@/lib/api";
 
-const ALLOWED_ROLES = ["project-manager", "qa-tester", "finance", "human-resource", "admin"];
+const ALLOWED_ROLES = ["project-manager", "qa-tester", "finance", "human-resource", "admin", "it-admin", "it-administration"];
 
 export async function GET(request: Request) {
   try {

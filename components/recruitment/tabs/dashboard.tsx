@@ -44,6 +44,7 @@ const ROUND_LABELS: Record<string, string> = {
   technical: "Technical",
   manager: "Manager",
   hr: "HR",
+  admin: "Admin",
 };
 
 const ACTION_LABELS: Record<string, string> = {
