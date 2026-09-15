@@ -5,10 +5,36 @@ import { ATSJob } from "@/models/ATSJob";
 import { ATSAssessment } from "@/models/ATSAssessment";
 import { ATSCandidate } from "@/models/ATSCandidate";
 import { User } from "@/models/User";
+import { pickDomain } from "@/lib/assessment";
 
 const HR_ROLES = ["admin", "human-resource"];
 
 type Params = { params: Promise<{ id: string }> };
+
+function cleanQuestion(q: any) {
+  const type = q.type === "essay" ? "essay" : "mcq";
+  if (type === "essay") {
+    return {
+      text: String(q.text || "").trim(),
+      options: [],
+      correctIndex: 0,
+      type,
+      answer: String(q.answer || "").trim().slice(0, 2000),
+      marks: Math.max(0, Math.min(100, Number(q.marks) || 1)),
+      required: Boolean(q.required),
+    };
+  }
+  const options = Array.isArray(q.options) ? q.options.map(String) : ["A", "B", "C", "D"];
+  return {
+    text: String(q.text || "").trim(),
+    options,
+    correctIndex: Math.max(0, Number(q.correctIndex) || 0),
+    type,
+    answer: "",
+    marks: Math.max(0, Math.min(100, Number(q.marks) || 1)),
+    required: Boolean(q.required),
+  };
+}
 
 export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
@@ -38,28 +64,32 @@ export async function GET(_request: Request, { params }: Params) {
     assessmentStatus: "pending",
     assessmentSubmittedAt: { $ne: null },
   })
-    .select("firstName lastName email assessmentScore assessmentAnswers")
+    .select("firstName lastName email assessmentScore assessmentDomain assessmentAnswers")
     .lean();
 
-  const qIndexToText = new Map<number, string>();
-  if (assessment) {
-    assessment.questions.forEach((q: any, i: number) => qIndexToText.set(i, q.text));
-  }
-
-  const essayReviews = essayPendingCandidates.map((c: any) => ({
-    _id: String(c._id),
-    firstName: c.firstName,
-    lastName: c.lastName || "",
-    email: c.email,
-    score: c.assessmentScore ?? null,
-    answers: (c.assessmentAnswers || [])
-      .filter((a: any) => a && a.textAnswer && String(a.textAnswer).trim())
-      .map((a: any) => ({
-        questionIndex: a.questionIndex,
-        questionText: qIndexToText.get(a.questionIndex) ?? `Question ${a.questionIndex + 1}`,
-        textAnswer: String(a.textAnswer).trim(),
-      })),
-  }));
+  const essayReviews = essayPendingCandidates.map((c: any) => {
+    const domain = pickDomain((assessment?.domains as any[]) || [], c.assessmentDomain);
+    const flat = [
+      ...(assessment?.questions || []),
+      ...(domain?.questions || []),
+    ];
+    const qIndexToText = new Map<number, string>();
+    flat.forEach((q: any, i: number) => qIndexToText.set(i, q.text));
+    return {
+      _id: String(c._id),
+      firstName: c.firstName,
+      lastName: c.lastName || "",
+      email: c.email,
+      score: c.assessmentScore ?? null,
+      answers: (c.assessmentAnswers || [])
+        .filter((a: any) => a && a.textAnswer && String(a.textAnswer).trim())
+        .map((a: any) => ({
+          questionIndex: a.questionIndex,
+          questionText: qIndexToText.get(a.questionIndex) ?? `Question ${a.questionIndex + 1}`,
+          textAnswer: String(a.textAnswer).trim(),
+        })),
+    };
+  });
 
   return NextResponse.json({
     assessment: assessment ? serializeDoc(assessment) : null,
@@ -76,8 +106,12 @@ export async function POST(request: Request, { params }: Params) {
     if (!userId) return jsonError("Unauthorized", 401);
 
   const body = await request.json();
-  if (!body.questions || !Array.isArray(body.questions) || body.questions.length === 0) {
-    return jsonError("At least one question is required.", 400);
+  const general = Array.isArray(body.questions) ? body.questions : [];
+  const domains = Array.isArray(body.domains) ? body.domains : [];
+
+  const totalQuestions = general.length + domains.reduce((s: number, d: any) => s + (Array.isArray(d.questions) ? d.questions.length : 0), 0);
+  if (totalQuestions === 0) {
+    return jsonError("Add at least one question across the general section or the domain sections.", 400);
   }
 
   await connectDb();
@@ -89,27 +123,22 @@ export async function POST(request: Request, { params }: Params) {
   if (!job) return jsonError("Job not found.", 404);
   if (!job.assessment) return jsonError("Online assessment is not enabled for this job.", 400);
 
-  const questions = body.questions.map((q: any) => {
-  const type = q.type === "essay" ? "essay" : "mcq";
-  if (type === "essay") {
-    return {
-      text: String(q.text || "").trim(),
-      options: [],
-      correctIndex: 0,
-      type,
-      answer: String(q.answer || "").trim().slice(0, 2000),
-    };
-  }
-  return {
-    text: String(q.text || "").trim(),
-    options: Array.isArray(q.options) ? q.options.map(String) : ["A", "B", "C", "D"],
-    correctIndex: Math.max(0, Number(q.correctIndex) || 0),
-    type,
-    answer: "",
-  };
-});
+  const questions = general.map(cleanQuestion);
+
+  const cleanDomains = domains
+    .map((d: any) => {
+      const name = String(d.name || "").trim();
+      if (!name) return null;
+      return {
+        name: name.slice(0, 100),
+        limit: Math.max(0, Math.min(500, Number(d.limit) || 0)),
+        questions: (Array.isArray(d.questions) ? d.questions : []).map(cleanQuestion),
+      };
+    })
+    .filter((d: any) => !!d);
 
   const passScore = Math.max(0, Math.min(100, Number(body.passScore) || 50));
+  const negativeMarking = Math.max(0, Math.min(100, Number(body.negativeMarking) || 0));
 
   const durationMinutes =
     body.durationMinutes != null
@@ -118,7 +147,7 @@ export async function POST(request: Request, { params }: Params) {
 
   await ATSJob.findByIdAndUpdate(job._id, { assessmentDurationMinutes: durationMinutes });
 
-  const set = { passScore, questions, createdBy: userId };
+  const set = { passScore, negativeMarking, questions, domains: cleanDomains, createdBy: userId };
   let assessment;
   try {
     assessment = await ATSAssessment.findOneAndUpdate(

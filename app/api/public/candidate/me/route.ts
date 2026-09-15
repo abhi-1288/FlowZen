@@ -4,6 +4,7 @@ import { ATSCandidate } from "@/models/ATSCandidate";
 import { ATSOffer } from "@/models/ATSOffer";
 import { ATSInterview } from "@/models/ATSInterview";
 import { ATSTimeline } from "@/models/ATSTimeline";
+import { ATSAssessment } from "@/models/ATSAssessment";
 import { jsonError, serializeDoc } from "@/lib/api";
 import { createUniqueGuestPassCode, findCandidateByToken } from "@/lib/candidate-portal";
 
@@ -69,14 +70,29 @@ export async function GET(request: Request) {
     const startedAt = (candidate as any).assessmentStartedAt ? new Date((candidate as any).assessmentStartedAt) : null;
     const durationMin = jobDoc.assessmentDurationMinutes || null;
     const endsAt = startedAt && durationMin ? new Date(startedAt.getTime() + durationMin * 60 * 1000).toISOString() : null;
+
+    const assessmentDoc = await ATSAssessment.findOne({ job: candidate.job, company: candidate.company }).lean();
+    const domains = ((assessmentDoc as any)?.domains || []).map((d: any) => ({
+      name: d.name,
+      limit: d.limit ?? 0,
+      questionCount: Array.isArray(d.questions) ? d.questions.length : 0,
+    }));
+
     assessmentPayload = {
       enabled: true,
       date: jobDoc.assessmentDate ? jobDoc.assessmentDate.toISOString() : null,
       durationMinutes: durationMin,
+      passScore: (assessmentDoc as any)?.passScore ?? 50,
+      negativeMarking: (assessmentDoc as any)?.negativeMarking ?? 0,
+      domains,
+      domain: (candidate as any).assessmentDomain || "",
+      answerKeyPublished: (assessmentDoc as any)?.answerKeyPublished ?? false,
       stage: candidate.stage,
       startedAt: (candidate as any).assessmentStartedAt || null,
       submittedAt: (candidate as any).assessmentSubmittedAt || null,
       score: (candidate as any).assessmentScore ?? null,
+      rawMarks: (candidate as any).assessmentRawMarks ?? null,
+      maxMarks: (candidate as any).assessmentMaxMarks ?? null,
       status: (candidate as any).assessmentStatus || "pending",
       reason: (candidate as any).assessmentReason || "",
       rejectionNote: (candidate as any).assessmentRejectionNote || "",

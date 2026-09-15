@@ -6,10 +6,17 @@ export type ParsedAssessmentQuestion = {
   correctIndex: number;
   type: "mcq" | "essay";
   answer: string;
+  section?: string;
+};
+
+export type ParsedSection = {
+  name: string;
+  questionCount: number;
 };
 
 export type ParseAssessmentPdfResult = {
   questions: ParsedAssessmentQuestion[];
+  sections: ParsedSection[];
   warnings: string[];
   text: string;
 };
@@ -45,6 +52,12 @@ const KEY_LETTER = /^\(?([A-D])\)?\.?\s*$/i;
 const KEY_NUMBERED_INLINE = /(\d{1,3})\s*[.):\-]?\s*\(?([A-Da-d])\)?/g;
 const QUESTION_LIKE = /\?\s*$/;
 
+// Section / domain header detection.
+// Matches lines like "Section A: General Knowledge", "Part 1 - Mechanical", "Domain: React", "Category B".
+// The optional (letter|number + separator) group strips a prefix index so the captured
+// group is clean, e.g. "Section A: GK" -> "GK", "Part 1 - Mech" -> "Mech", "Section: JS" -> "JS".
+const SECTION_HEADER = /^\s*(?:section|part|domain|category|module)[\s.\-:\u2013\u2014]*\s*(?:(?:[A-Za-z]{1,3}|\d{1,3})[\s.\-:\u2013\u2014]+\s*)?(.+)$/i;
+
 const LETTER_TO_INDEX: Record<string, number> = { A: 0, B: 1, C: 2, D: 3, a: 0, b: 1, c: 2, d: 3 };
 
 function normalizeText(text: string): string {
@@ -59,6 +72,7 @@ type QuestionBuffer = {
 
 export function parseAssessmentText(rawText: string): {
   questions: ParsedAssessmentQuestion[];
+  sections: ParsedSection[];
   warnings: string[];
 } {
   const warnings: string[] = [];
@@ -72,11 +86,16 @@ export function parseAssessmentText(rawText: string): {
   const resolvedByInline = new Set<number>();
   let current: QuestionBuffer | null = null;
   let pending: string[] = [];
+  let currentSection = "";
+  let sectionStartIndex = 0;
 
-  // Answer key resolution: keys can be numbered by the original PDF question
-  // number (answerByPdf) or appear as a bare ordered list (answerBySeq).
-  const answerByPdf = new Map<number, number>();
-  const answerBySeq = new Map<number, number>();
+  // Answer key resolution: keys are scoped to the section they appear in,
+  // because multi-section PDFs commonly restart question numbering per section.
+  // Numbered keys reference the original PDF question number within the section
+  // (answerByPdf); bare ordered lists map positionally (answerBySeq).
+  const answerByPdf = new Map<string, Map<number, number>>();
+  const answerBySeq = new Map<string, Map<number, number>>();
+  let keySection = "";
   let inKeyBlock = false;
   let keyBlockSequence = 0;
   let currentAnswer = -1;
@@ -85,7 +104,7 @@ export function parseAssessmentText(rawText: string): {
     if (!pending.length) return;
     const text = pending.join(" ").replace(/\s+/g, " ").trim();
     if (text && QUESTION_LIKE.test(text)) {
-      questions.push({ text, options: [], correctIndex: 0, type: "essay", answer: "" });
+      questions.push({ text, options: [], correctIndex: 0, type: "essay", answer: "", section: currentSection || undefined });
       pdfNumbers.push(null);
     }
     pending = [];
@@ -105,7 +124,7 @@ export function parseAssessmentText(rawText: string): {
           resolvedByInline.add(qIndex);
         }
       }
-      questions.push({ text, options: isEssay ? [] : options, correctIndex, type: isEssay ? "essay" : "mcq", answer: "" });
+      questions.push({ text, options: isEssay ? [] : options, correctIndex, type: isEssay ? "essay" : "mcq", answer: "", section: currentSection || undefined });
       pdfNumbers.push(null);
     }
     current = null;
@@ -121,7 +140,9 @@ export function parseAssessmentText(rawText: string): {
       if (!rest) {
         // Bare "Answers:" header -> subsequent lines form the key block.
         inKeyBlock = true;
+        keySection = currentSection;
         keyBlockSequence = 0;
+        if (!answerBySeq.has(keySection)) answerBySeq.set(keySection, new Map());
         close();
         continue;
       }
@@ -129,9 +150,11 @@ export function parseAssessmentText(rawText: string): {
       let inlineMatched = false;
       const inline = Array.from(rest.matchAll(KEY_NUMBERED_INLINE));
       if (inline.length) {
+        const secMap = answerByPdf.get(currentSection) ?? new Map<number, number>();
         for (const m of inline) {
-          answerByPdf.set(Number(m[1]), LETTER_TO_INDEX[m[2].toUpperCase()]);
+          secMap.set(Number(m[1]), LETTER_TO_INDEX[m[2].toUpperCase()]);
         }
+        answerByPdf.set(currentSection, secMap);
         inlineMatched = true;
       }
       if (!inlineMatched) {
@@ -147,17 +170,44 @@ export function parseAssessmentText(rawText: string): {
     if (inKeyBlock) {
       const numbered = line.match(KEY_NUMBERED);
       if (numbered) {
-        answerByPdf.set(Number(numbered[1]), LETTER_TO_INDEX[numbered[2].toUpperCase()]);
+        const secMap = answerByPdf.get(keySection) ?? new Map<number, number>();
+        secMap.set(Number(numbered[1]), LETTER_TO_INDEX[numbered[2].toUpperCase()]);
+        answerByPdf.set(keySection, secMap);
         keyBlockSequence = Math.max(keyBlockSequence, Number(numbered[1]));
         continue;
       }
       const letter = line.match(KEY_LETTER);
       if (letter) {
-        answerBySeq.set(keyBlockSequence, LETTER_TO_INDEX[letter[1].toUpperCase()]);
+        const secMap = answerBySeq.get(keySection) ?? new Map<number, number>();
+        secMap.set(sectionStartIndex + keyBlockSequence, LETTER_TO_INDEX[letter[1].toUpperCase()]);
+        answerBySeq.set(keySection, secMap);
         keyBlockSequence++;
         continue;
       }
+      const numberedInline = Array.from(line.matchAll(KEY_NUMBERED_INLINE));
+      if (numberedInline.length) {
+        const secMap = answerByPdf.get(keySection) ?? new Map<number, number>();
+        for (const m of numberedInline) {
+          secMap.set(Number(m[1]), LETTER_TO_INDEX[m[2].toUpperCase()]);
+          keyBlockSequence = Math.max(keyBlockSequence, Number(m[1]));
+        }
+        answerByPdf.set(keySection, secMap);
+        continue;
+      }
       inKeyBlock = false;
+    }
+
+    const sec = line.match(SECTION_HEADER);
+    if (sec && line.length <= 70 && !/[.?!]\s*$/.test(line)) {
+      const name = sec[1].replace(/\s+/g, " ").trim();
+      if (name) {
+        flushPendingAsQuestion();
+        close();
+        currentSection = name;
+        sectionStartIndex = questions.length;
+        currentAnswer = -1;
+      }
+      continue;
     }
 
     const qStart = line.match(QUESTION_START);
@@ -204,14 +254,16 @@ export function parseAssessmentText(rawText: string): {
   close();
   flushPendingAsQuestion();
 
-  // Apply explicit answer keys. Numbered entries reference the original PDF
-  // question numbers; a question flagged mcq without any key gets a warning.
+  // Apply explicit answer keys. Keys are scoped per section; numbered entries
+  // reference the original PDF question number within that section. A question
+  // flagged mcq without any key gets a warning.
   for (let i = 0; i < questions.length; i++) {
     const q = questions[i];
     if (q.type !== "mcq") continue;
-    const key = pdfNumbers[i] != null ? answerByPdf.get(pdfNumbers[i]!) : undefined;
-    const seqKey = answerBySeq.get(i);
-    const mapped = key !== undefined ? key : seqKey !== undefined ? seqKey : undefined;
+    const secKey = q.section || "";
+    const pdfKey = q && pdfNumbers[i] != null ? answerByPdf.get(secKey)?.get(pdfNumbers[i]!) : undefined;
+    const seqKey = answerBySeq.get(secKey)?.get(i);
+    const mapped = pdfKey !== undefined ? pdfKey : seqKey !== undefined ? seqKey : undefined;
     if (mapped !== undefined) {
       if (mapped < q.options.length) {
         q.correctIndex = mapped;
@@ -223,11 +275,21 @@ export function parseAssessmentText(rawText: string): {
     }
   }
 
-  return { questions, warnings };
+  // Build detected section summary from question tags.
+  const sections: ParsedSection[] = [];
+  for (const q of questions) {
+    const name = q.section?.trim();
+    if (!name) continue;
+    const existing = sections.find((s) => s.name === name);
+    if (existing) existing.questionCount++;
+    else sections.push({ name, questionCount: 1 });
+  }
+
+  return { questions, sections, warnings };
 }
 
 export async function parseAssessmentPdf(buffer: Buffer): Promise<ParseAssessmentPdfResult> {
   const data = await pdf(buffer);
-  const { questions, warnings } = parseAssessmentText(data.text);
-  return { questions, warnings, text: data.text };
+  const { questions, sections, warnings } = parseAssessmentText(data.text);
+  return { questions, sections, warnings, text: data.text };
 }

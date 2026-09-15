@@ -602,6 +602,7 @@ function CandidatePortalInner() {
                   token={token!}
                   assessment={assessmentData}
                   accent={accent}
+                  companyName={candidate.company?.name}
                   onRefresh={() => {
                     if (!token) return;
                     fetch(`/api/public/candidate/me?token=${encodeURIComponent(token)}`)

@@ -6,6 +6,7 @@ import { ATSAssessment } from "@/models/ATSAssessment";
 import { ATSTimeline } from "@/models/ATSTimeline";
 import { jsonError } from "@/lib/api";
 import { findCandidateByToken } from "@/lib/candidate-portal";
+import { buildAssessmentQuestions, computeAssessmentScore, pickDomain } from "@/lib/assessment";
 
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -30,24 +31,39 @@ export async function POST(request: Request) {
   if (!job) return jsonError("Job not found.", 404);
 
   const assessment = await ATSAssessment.findOne({ job: job._id, company: candidate.company });
-  if (!assessment || !assessment.questions.length) return jsonError("Assessment not available.", 400);
+  if (!assessment) return jsonError("Assessment not available.", 400);
+
+  // Rebuild the exact question order the candidate received at /start.
+  const chosenDomain = pickDomain((assessment.domains as any[]) || [], (candidate as any).assessmentDomain);
+  const flatQuestions = buildAssessmentQuestions(
+    (assessment.questions as any[]) || [],
+    chosenDomain?.questions as any[] || []
+  );
+  if (!flatQuestions.length) return jsonError("Assessment not available.", 400);
+
+  // Required questions (MCQ or essay) must be answered.
+  const missingRequired: number[] = [];
+  for (let i = 0; i < flatQuestions.length; i++) {
+    const q = flatQuestions[i];
+    if (!q.required) continue;
+    const a = answers.find((x) => x.questionIndex === i);
+    const answered =
+      q.type === "essay"
+        ? Boolean(a && String(a.textAnswer || "").trim())
+        : a != null && typeof a.selectedOption === "number";
+    if (!answered) missingRequired.push(i + 1);
+  }
+  if (missingRequired.length) {
+    return jsonError(
+      `Please answer the required question${missingRequired.length > 1 ? "s" : ""}: ${missingRequired.join(", ")}.`,
+      400
+    );
+  }
 
   // Auto-grade only multiple-choice questions; essays are stored for manual review.
-  let correct = 0;
-  let mcqTotal = 0;
-  let essayCount = 0;
-  for (const a of answers) {
-    const q = assessment.questions[a.questionIndex];
-    if (!q) continue;
-    if (q.type === "essay") {
-      essayCount++;
-      continue;
-    }
-    mcqTotal++;
-    if (q.correctIndex === a.selectedOption) correct++;
-  }
-  const hasEssays = essayCount > 0 || assessment.questions.some((q: any) => q.type === "essay");
-  const score = mcqTotal > 0 ? Math.round((correct / mcqTotal) * 100) : null;
+  const negativeMarking = Math.max(0, Number((assessment as any).negativeMarking) || 0);
+  const graded = computeAssessmentScore(answers, flatQuestions, negativeMarking);
+  const { score, rawMarks, maxMarks, correct, mcqTotal, essayCount, hasEssays } = graded;
 
   // Check if auto-submitted (timer expired)
   const startedAt = new Date((candidate as any).assessmentStartedAt);
@@ -60,19 +76,22 @@ export async function POST(request: Request) {
   if (hasEssays) {
     status = "pending";
     reason =
-      score != null
-        ? `Score: ${score}/100 (multiple-choice). Essay answers require manual review.`
+      maxMarks > 0
+        ? `Score: ${score}/100 (${rawMarks}/${maxMarks} marks, multiple-choice). Essay answers require manual review.`
         : "Essay-only assessment — answers require manual review.";
   } else {
     const threshold = assessment.passScore || 50;
     status = score! >= threshold ? "selected" : "rejected";
     reason = autoSubmitted
-      ? `Score: ${score}/100 (${status === "selected" ? "Passed" : "Failed"}). Auto-submitted due to time limit.`
-      : `Score: ${score}/100 (${status === "selected" ? "Passed" : "Failed"}).`;
+      ? `Score: ${score}/100 (${rawMarks}/${maxMarks} marks; ${status === "selected" ? "Passed" : "Failed"}). Auto-submitted due to time limit.`
+      : `Score: ${score}/100 (${rawMarks}/${maxMarks} marks; ${status === "selected" ? "Passed" : "Failed"}).`;
   }
 
   await ATSCandidate.findByIdAndUpdate(candidate._id, {
     assessmentScore: score,
+    assessmentRawMarks: rawMarks,
+    assessmentMaxMarks: maxMarks,
+    assessmentDomain: chosenDomain?.name || "",
     assessmentStatus: status,
     assessmentReason: reason,
     assessmentSubmittedAt: now,
@@ -87,7 +106,7 @@ export async function POST(request: Request) {
     candidate: candidate._id,
     job: job._id,
     action: "assessment-submitted",
-    metadata: { score, total: assessment.questions.length, correct, mcqTotal, essayCount, autoSubmitted, hasEssays },
+    metadata: { score, rawMarks, maxMarks, total: flatQuestions.length, correct, mcqTotal, essayCount, autoSubmitted, hasEssays, domain: chosenDomain?.name || null },
     company: candidate.company,
   });
 
@@ -97,12 +116,12 @@ export async function POST(request: Request) {
     action: "assessment-graded",
     metadata: hasEssays
       ? {
-          content: `Assessment submitted. ${score != null ? `Multiple-choice score: ${score}/100. ` : ""}Essay answers are pending manual review.`,
+          content: `Assessment submitted. ${maxMarks > 0 ? `Multiple-choice score: ${score}/100 (${rawMarks}/${maxMarks}). ` : ""}Essay answers are pending manual review.`,
           status: "pending",
           passed: false,
         }
       : {
-          content: `Assessment result: ${score}/100. ${status === "selected" ? "Passed." : "Failed."}`,
+          content: `Assessment result: ${score}/100 (${rawMarks}/${maxMarks}). ${status === "selected" ? "Passed." : "Failed."}`,
           score,
           status,
           passed: status === "selected",
@@ -113,6 +132,8 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     score,
+    rawMarks,
+    maxMarks,
     status,
     hasEssays,
     submittedAt: now.toISOString(),

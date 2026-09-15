@@ -95,6 +95,9 @@ export default function JobDetailPage() {
   } | null>(null);
   const [assessmentApplied, setAssessmentApplied] = useState<{ moved: number; advanced: number } | null>(null);
   const [assessmentStatsData, setAssessmentStatsData] = useState<{ inAssessment: number; started: number; submitted: number; passed: number; failed: number; pending: number } | null>(null);
+  const [answerKeyPublished, setAnswerKeyPublished] = useState(false);
+  const [answerKeyBusy, setAnswerKeyBusy] = useState(false);
+  const [answerKeyError, setAnswerKeyError] = useState("");
   const [selectedCandidates, setSelectedCandidates] = useState<Record<string, boolean>>({});
   const [bulkTargetStage, setBulkTargetStage] = useState<Stage>("screening");
   const [stageModal, setStageModal] = useState<{ targets: ATSCandidate[]; target: Stage } | null>(null);
@@ -137,7 +140,28 @@ export default function JobDetailPage() {
       if (data.stats) {
         setAssessmentStats({ total: data.stats.submitted + data.stats.failed + data.stats.passed, passed: data.stats.passed, failed: data.stats.failed, essayReviews: data.essayReviews || [] });
       }
+      setAnswerKeyPublished(Boolean(data.assessment?.answerKeyPublished));
     } catch { /* ignore */ }
+  }
+
+  async function toggleAnswerKey() {
+    if (answerKeyBusy) return;
+    setAnswerKeyBusy(true);
+    setAnswerKeyError("");
+    try {
+      const res = await fetch(`/api/recruitment/jobs/${id}/assessment/answer-key`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ published: !answerKeyPublished }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error((data as { error?: string })?.error || `Server error (${res.status}).`);
+      setAnswerKeyPublished(Boolean(data.published));
+    } catch (e: any) {
+      setAnswerKeyError(e.message);
+    } finally {
+      setAnswerKeyBusy(false);
+    }
   }
 
   async function handleExport() {
@@ -636,6 +660,16 @@ export default function JobDetailPage() {
               {isHrOrAdmin && activeJob.assessment && isDayBeforeAssessment(activeJob.assessmentDate) && (
                 <ActionButton accent={accent} icon={Users} label="Assessment Candidates" onClick={() => { void fetchCandidates({ jobId: id }); setAssessmentCandidatesOpen(true); }} />
               )}
+              {isHrOrAdmin && activeJob.assessment && assessmentResultsUnlocked({ assessment: activeJob.assessment, assessmentDate: activeJob.assessmentDate }) && (
+                <ActionButton
+                  accent={accent}
+                  icon={Check}
+                  label={answerKeyBusy ? "Saving…" : answerKeyPublished ? "Unpublish Answer Key" : "Publish Answer Key"}
+                  disabled={answerKeyBusy}
+                  onClick={() => void toggleAnswerKey()}
+                />
+              )}
+              {answerKeyError && <p className="text-xs text-rose-600">{answerKeyError}</p>}
               {exportError && <p className="text-xs text-rose-600">{exportError}</p>}
             </div>
 

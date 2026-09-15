@@ -144,6 +144,9 @@ export type ATSCandidate = {
   assessmentRejectionNote: string;
   assessmentStartedAt: string | null;
   assessmentSubmittedAt: string | null;
+  assessmentDomain: string;
+  assessmentRawMarks: number | null;
+  assessmentMaxMarks: number | null;
   assessmentAnswers: Array<{ questionIndex: number; selectedOption: number }>;
   notes: string;
   resumeUrl: string;
@@ -246,13 +249,27 @@ export type ATSAssessmentQuestion = {
   text: string;
   options: string[];
   correctIndex: number;
+  type?: "mcq" | "essay";
+  answer?: string;
+  marks?: number;
+  required?: boolean;
+};
+
+export type ATSAssessmentDomain = {
+  name: string;
+  limit: number;
+  questions: ATSAssessmentQuestion[];
 };
 
 export type ATSAssessment = {
   id: string;
   job: string;
   passScore: number;
+  negativeMarking: number;
   questions: ATSAssessmentQuestion[];
+  domains: ATSAssessmentDomain[];
+  answerKeyPublished?: boolean;
+  answerKeyPublishedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };

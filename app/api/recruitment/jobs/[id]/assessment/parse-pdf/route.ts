@@ -50,7 +50,7 @@ export async function POST(request: Request, { params }: Params) {
         400
       );
     }
-    return NextResponse.json({ questions: result.questions, warnings: result.warnings, count: result.questions.length });
+    return NextResponse.json({ questions: result.questions, sections: result.sections, warnings: result.warnings, count: result.questions.length });
   } catch (e: any) {
     return jsonError(e?.message || "Failed to parse the PDF.", 500);
   }

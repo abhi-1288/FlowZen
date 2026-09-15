@@ -6,6 +6,7 @@ import { ATSAssessment } from "@/models/ATSAssessment";
 import { ATSTimeline } from "@/models/ATSTimeline";
 import { jsonError } from "@/lib/api";
 import { findCandidateByToken } from "@/lib/candidate-portal";
+import { buildAssessmentQuestions, pickDomain } from "@/lib/assessment";
 
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -33,11 +34,28 @@ export async function POST(request: Request) {
   if (now < start || now > end) return jsonError("The assessment window is not open today.", 400);
 
   const assessment = await ATSAssessment.findOne({ job: job._id, company: candidate.company });
-  if (!assessment || !assessment.questions.length) return jsonError("Assessment questions are not yet available.", 400);
+  if (!assessment) return jsonError("Assessment questions are not yet available.", 400);
+
+  const body = await request.json().catch(() => ({}));
+  const domainName = typeof body.domain === "string" ? body.domain : "";
+
+  // Candidate selects their domain (one) when the assessment has domain sections;
+  // the general (non-domain) questions are always included.
+  const chosenDomain = pickDomain((assessment.domains as any[]) || [], domainName);
+  if ((assessment.domains as any[])?.length && !chosenDomain) {
+    return jsonError("Please select your domain to start the assessment.", 400);
+  }
+
+  const flatQuestions = buildAssessmentQuestions(
+    (assessment.questions as any[]) || [],
+    chosenDomain?.questions as any[] || []
+  );
+  if (!flatQuestions.length) return jsonError("Assessment questions are not yet available.", 400);
 
   // Mark as started
   const fromStage = candidate.stage;
   const updates: any = { assessmentStartedAt: new Date() };
+  if (chosenDomain) updates.assessmentDomain = chosenDomain.name;
   if (fromStage === "screening") updates.stage = "assessment";
   await ATSCandidate.findByIdAndUpdate(candidate._id, updates);
 
@@ -45,7 +63,7 @@ export async function POST(request: Request) {
     candidate: candidate._id,
     job: job._id,
     action: "assessment-started",
-    metadata: { jobTitle: job.title },
+    metadata: { jobTitle: job.title, ...(chosenDomain ? { domain: chosenDomain.name } : {}) },
     company: candidate.company,
   });
 
@@ -54,20 +72,30 @@ export async function POST(request: Request) {
       candidate: candidate._id,
       job: job._id,
       action: "stage-changed",
-      metadata: { from: "screening", to: "assessment", reason: "Started online assessment" },
+      metadata: { from: "screening", to: "assessment", reason: "Started online assessment", ...(chosenDomain ? { domain: chosenDomain.name } : {}) },
       company: candidate.company,
     });
   }
 
-  const questions = assessment.questions.map((q: any, idx: number) => ({
-    index: idx,
-    text: q.text,
-    options: q.options,
-    type: q.type === "essay" ? "essay" : "mcq",
-  }));
+  const sourceQuestions = [
+    ...(assessment.questions as any[]) || [],
+    ...(chosenDomain?.questions as any[]) || [],
+  ];
+  const questions = flatQuestions.map((q, idx) => {
+    const src = sourceQuestions[idx] || {};
+    return {
+      index: idx,
+      text: src.text ?? "",
+      options: Array.isArray(src.options) ? src.options : [],
+      type: q.type,
+      marks: q.marks,
+      required: q.required,
+    };
+  });
 
   return NextResponse.json({
     ok: true,
+    domain: chosenDomain?.name || null,
     questions,
     durationMinutes: job.assessmentDurationMinutes || null,
     endsAt: job.assessmentDurationMinutes
