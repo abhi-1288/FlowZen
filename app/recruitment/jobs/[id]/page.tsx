@@ -28,14 +28,17 @@ function formatEmploymentType(type: string): string {
     .join(" ");
 }
 
-function isDayBeforeAssessment(dateStr: string | null | undefined): boolean {
+// The assessment candidates list is relevant from the day before the assessment
+// onward (remains visible after the test day so HR can review who started/
+// submitted).
+function assessmentCandidatesVisible(dateStr: string | null | undefined): boolean {
   if (!dateStr) return false;
   const assess = new Date(dateStr);
   if (isNaN(assess.getTime())) return false;
-  const target = new Date(assess.getFullYear(), assess.getMonth(), assess.getDate() - 1);
+  const dayBefore = new Date(assess.getFullYear(), assess.getMonth(), assess.getDate() - 1);
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return today.getTime() === target.getTime();
+  return today.getTime() >= dayBefore.getTime();
 }
 
 const INTERVIEWER_ROLES: Record<string, string> = {
@@ -657,7 +660,7 @@ export default function JobDetailPage() {
               {isHrOrAdmin && activeJob.status === "closed" && (
                 <ActionButton accent={accent} icon={Download} label={exporting ? "Exporting…" : "Export Candidates"} disabled={exporting} onClick={() => { void handleExport(); }} />
               )}
-              {isHrOrAdmin && activeJob.assessment && isDayBeforeAssessment(activeJob.assessmentDate) && (
+              {isHrOrAdmin && activeJob.assessment && assessmentCandidatesVisible(activeJob.assessmentDate) && (
                 <ActionButton accent={accent} icon={Users} label="Assessment Candidates" onClick={() => { void fetchCandidates({ jobId: id }); setAssessmentCandidatesOpen(true); }} />
               )}
               {isHrOrAdmin && activeJob.assessment && assessmentResultsUnlocked({ assessment: activeJob.assessment, assessmentDate: activeJob.assessmentDate }) && (

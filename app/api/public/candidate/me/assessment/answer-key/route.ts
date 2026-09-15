@@ -17,6 +17,7 @@ export async function GET(request: Request) {
   if (!candidate) return jsonError("Invalid or expired link.", 401);
 
   if (!(candidate as any).assessmentSubmittedAt) return jsonError("You have not submitted the assessment.", 400);
+  if (!(candidate as any).assessmentResultPublishedAt) return jsonError("Your results have not been published yet.", 403);
 
   const job = await ATSJob.findById(candidate.job).select("title");
   if (!job) return jsonError("Job not found.", 404);

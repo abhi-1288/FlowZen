@@ -66,7 +66,9 @@ export async function GET(request: Request) {
       return now >= start && now <= end;
     })();
     const isSubmitted = Boolean((candidate as any).assessmentSubmittedAt);
-    const isStarted = Boolean((candidate as any).assessmentStartedAt) && !isSubmitted;
+    // A candidate moved back to "screening" by HR should be able to restart,
+    // even if a stale assessmentStartedAt flag remains.
+    const isStarted = Boolean((candidate as any).assessmentStartedAt) && !isSubmitted && candidate.stage === "assessment";
     const startedAt = (candidate as any).assessmentStartedAt ? new Date((candidate as any).assessmentStartedAt) : null;
     const durationMin = jobDoc.assessmentDurationMinutes || null;
     const endsAt = startedAt && durationMin ? new Date(startedAt.getTime() + durationMin * 60 * 1000).toISOString() : null;
@@ -78,6 +80,9 @@ export async function GET(request: Request) {
       questionCount: Array.isArray(d.questions) ? d.questions.length : 0,
     }));
 
+    // Results stay hidden until HR reviews the assessment outcomes.
+    const resultPublished = Boolean((candidate as any).assessmentResultPublishedAt);
+
     assessmentPayload = {
       enabled: true,
       date: jobDoc.assessmentDate ? jobDoc.assessmentDate.toISOString() : null,
@@ -87,15 +92,16 @@ export async function GET(request: Request) {
       domains,
       domain: (candidate as any).assessmentDomain || "",
       answerKeyPublished: (assessmentDoc as any)?.answerKeyPublished ?? false,
+      resultPublished,
       stage: candidate.stage,
       startedAt: (candidate as any).assessmentStartedAt || null,
       submittedAt: (candidate as any).assessmentSubmittedAt || null,
-      score: (candidate as any).assessmentScore ?? null,
-      rawMarks: (candidate as any).assessmentRawMarks ?? null,
-      maxMarks: (candidate as any).assessmentMaxMarks ?? null,
-      status: (candidate as any).assessmentStatus || "pending",
-      reason: (candidate as any).assessmentReason || "",
-      rejectionNote: (candidate as any).assessmentRejectionNote || "",
+      score: resultPublished ? (candidate as any).assessmentScore ?? null : null,
+      rawMarks: resultPublished ? (candidate as any).assessmentRawMarks ?? null : null,
+      maxMarks: resultPublished ? (candidate as any).assessmentMaxMarks ?? null : null,
+      status: resultPublished ? (candidate as any).assessmentStatus || "pending" : "pending",
+      reason: resultPublished ? (candidate as any).assessmentReason || "" : "",
+      rejectionNote: resultPublished ? (candidate as any).assessmentRejectionNote || "" : "",
       eligibleToStart: isOpen && ["screening", "assessment"].includes(candidate.stage) && !isStarted && !isSubmitted,
       submittable: isStarted,
       endsAt,

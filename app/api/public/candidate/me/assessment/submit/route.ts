@@ -114,33 +114,19 @@ export async function POST(request: Request) {
     candidate: candidate._id,
     job: job._id,
     action: "assessment-graded",
-    metadata: hasEssays
-      ? {
-          content: `Assessment submitted. ${maxMarks > 0 ? `Multiple-choice score: ${score}/100 (${rawMarks}/${maxMarks}). ` : ""}Essay answers are pending manual review.`,
-          status: "pending",
-          passed: false,
-        }
-      : {
-          content: `Assessment result: ${score}/100 (${rawMarks}/${maxMarks}). ${status === "selected" ? "Passed." : "Failed."}`,
-          score,
-          status,
-          passed: status === "selected",
-        },
+    metadata: {
+      content: "Your assessment has been submitted. Results will be shared once the assessment has been reviewed.",
+      status: "pending",
+      passed: false,
+      score, // retained for HR; not rendered on the candidate timeline
+      outcome: status,
+    },
     company: candidate.company,
   });
 
   return NextResponse.json({
     ok: true,
-    score,
-    rawMarks,
-    maxMarks,
-    status,
-    hasEssays,
     submittedAt: now.toISOString(),
-    message: hasEssays
-      ? "Assessment submitted. Your multiple-choice answers are graded; your essay answers will be reviewed."
-      : status === "selected"
-        ? "You have passed the assessment."
-        : "Assessment submitted. You will be notified of the result.",
+    message: "Assessment submitted. Results will be shared once the assessment has been reviewed.",
   });
 }

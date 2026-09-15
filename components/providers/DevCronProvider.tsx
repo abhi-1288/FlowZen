@@ -9,6 +9,8 @@ export function DevCronProvider() {
     const interval = setInterval(async () => {
       try {
         await fetch("/api/dev/contract-end-disconnect", { credentials: "include" });
+        await fetch("/api/dev/assessment-day", { credentials: "include" });
+        await fetch("/api/dev/assessment-answer-key", { credentials: "include" });
       } catch (e) {
         console.error("Dev cron failed:", e);
       }

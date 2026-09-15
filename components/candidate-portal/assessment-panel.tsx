@@ -17,6 +17,7 @@ type Props = {
     domains: { name: string; limit: number; questionCount: number }[];
     domain: string;
     answerKeyPublished?: boolean;
+    resultPublished?: boolean;
     stage: string;
     startedAt: string | null;
     submittedAt: string | null;
@@ -32,6 +33,8 @@ type Props = {
   accent: string;
   companyName?: string;
   onRefresh: () => void;
+  /** When true, auto-starts the assessment on mount (used in test tab). */
+  autoStart?: boolean;
 };
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
@@ -260,7 +263,7 @@ function generateAnswerKeyPdf(data: AnswerKeyPayload, accent: string, companyNam
   doc.save(`answer-key-${safeJob}-${safeName}.pdf`);
 }
 
-export function AssessmentPanel({ token, assessment, accent, companyName, onRefresh }: Props) {
+export function AssessmentPanel({ token, assessment, accent, companyName, onRefresh, autoStart }: Props) {
   const [started, setStarted] = useState(assessment.submittable);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<number, { selectedOption?: number; textAnswer?: string }>>({});
@@ -274,6 +277,7 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoSubmittedRef = useRef(false);
   const autoSubmitRef = useRef<() => void>(() => {});
+  const autoStartRef = useRef(false);
 
   // Compute initial remaining
   useEffect(() => {
@@ -343,23 +347,77 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
     }
   }, [remaining, submitted]);
 
+  // Auto-start when test tab opens (only fires once)
+  useEffect(() => {
+    if (!autoStart || autoStartRef.current) return;
+    autoStartRef.current = true;
+
+    // If already started (re-open), restore from localStorage
+    // If started but no cached questions, fetch them from the start API
+    if (started) {
+      try {
+        const stored = localStorage.getItem(`ap-${token}`);
+        if (stored) {
+          const { q, e } = JSON.parse(stored);
+          if (Array.isArray(q) && q.length > 0) {
+            setQuestions(q);
+            if (e) setRemaining(Math.max(0, Math.floor((new Date(e).getTime() - Date.now()) / 1000)));
+            return;
+          }
+        }
+      } catch {}
+      void handleStart();
+      return;
+    }
+
+    if (submitted || !assessment.eligibleToStart) return;
+
+    // When a domain must be selected manually, let the user pick it first
+    if (assessment.domains?.length && !assessment.domain) return;
+
+    // Check localStorage for previously stored questions
+    try {
+      const stored = localStorage.getItem(`ap-${token}`);
+      if (stored) {
+        const { q, e } = JSON.parse(stored);
+        if (Array.isArray(q) && q.length > 0) {
+          setQuestions(q);
+          setStarted(true);
+          if (e) setRemaining(Math.max(0, Math.floor((new Date(e).getTime() - Date.now()) / 1000)));
+          return;
+        }
+      }
+    } catch {}
+
+    void handleStart();
+  }, [autoStart]);
+
   async function handleStart() {
     setError("");
-    if (assessment.domains?.length && !selectedDomain) {
+    if (assessment.domains?.length && !selectedDomain && !assessment.domain) {
       setError("Please select your domain to start the assessment.");
       return;
     }
+
+    // Normal mode: open the test in a new tab
+    if (!autoStart) {
+      window.open(`/candidate-portal?token=${encodeURIComponent(token)}&test=true`, "_blank");
+      return;
+    }
+
+    // Auto-start mode (new tab): call the start API directly
     try {
       const res = await fetch(`/api/public/candidate/me/assessment/start?token=${encodeURIComponent(token)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ domain: selectedDomain }),
+        body: JSON.stringify({ domain: assessment.domain || selectedDomain }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to start.");
       setQuestions(data.questions);
       setStarted(true);
       onRefresh();
+      try { localStorage.setItem(`ap-${token}`, JSON.stringify({ q: data.questions, e: data.endsAt, d: data.domain })); } catch {}
     } catch (e: any) {
       setError(e.message);
     }
@@ -408,15 +466,21 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
 
   // ─── Render ────────────────────────────────────────────────
   const accentSoft = accent + "1a"; // simple alpha
-  const fmtDate = assessment.date ? new Date(assessment.date).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "";
+  const fmtDate = assessment.date ? new Date(assessment.date).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" }) : "";
+  const fmtTime = assessment.date ? new Date(assessment.date).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }) : "";
   const hasDomains = Array.isArray(assessment.domains) && assessment.domains.length > 0;
 
   // 1. Submitted view
   if (submitted && assessment.submittedAt) {
+    const published = Boolean(assessment.resultPublished);
     return (
       <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-5">
         <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">Online Assessment</h3>
-        {assessment.status && assessment.status === "pending" ? (
+        {!published ? (
+          <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">
+            Your assessment has been submitted and is under review. Results will be shared once evaluated.
+          </p>
+        ) : assessment.status && assessment.status === "pending" ? (
           <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">
             {assessment.score != null ? (
               <>Assessment submitted. Multiple-choice score: {assessment.score}/100{assessment.rawMarks != null ? ` (${assessment.rawMarks}/${assessment.maxMarks} marks)` : ""}. Your essay answer(s) will be reviewed manually.</>
@@ -439,10 +503,10 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
         ) : (
           <p className="mt-2 text-sm text-slate-500">Your assessment has been submitted. Results are pending.</p>
         )}
-        {assessment.status === "rejected" && assessment.rejectionNote && (
+        {published && assessment.status === "rejected" && assessment.rejectionNote && (
           <p className="mt-2 text-sm text-slate-500">{assessment.rejectionNote}</p>
         )}
-        {assessment.answerKeyPublished && (
+        {published && assessment.answerKeyPublished && (
           <button
             onClick={() => void handleDownloadAnswerKey()}
             disabled={downloading}
@@ -532,7 +596,7 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
       <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">Online Assessment</h3>
       {assessment.enabled && (
         <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
-          {fmtDate}{assessment.durationMinutes ? ` · ${assessment.durationMinutes} min time limit` : ""} · Passing threshold {assessment.passScore}%
+          {fmtDate}{fmtTime ? ` · ${fmtTime}` : ""}{assessment.durationMinutes ? ` · ${assessment.durationMinutes} min time limit` : ""} · Passing threshold {assessment.passScore}%
         </p>
       )}
 
@@ -578,7 +642,7 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
       )}
       {!assessment.eligibleToStart && !submitted && assessment.enabled && assessment.date && (
         <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">
-          Assessment available on {fmtDate}.
+          Assessment available on {fmtDate}{fmtTime ? ` at ${fmtTime}` : ""}.
         </p>
       )}
       {error && <p className="mt-2 flex items-center gap-1.5 text-sm text-rose-600"><AlertTriangle size={14} /> {error}</p>}

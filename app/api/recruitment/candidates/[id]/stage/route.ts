@@ -34,6 +34,25 @@ export async function PATCH(request: Request, { params }: Params) {
 
   const fromStage = candidate.stage;
 
+  // When moving backward to a pre-assessment stage, reset assessment state
+  // so the candidate can restart the assessment.
+  const ASSESSMENT_STAGES = ["assessment", "technical-interview", "manager-round", "hr-round", "offer", "joined"];
+  const PRE_ASSESSMENT_STAGES = ["applied", "screening"];
+  if (ASSESSMENT_STAGES.includes(fromStage) && PRE_ASSESSMENT_STAGES.includes(toStage)) {
+    candidate.assessmentStartedAt = null;
+    candidate.assessmentSubmittedAt = null;
+    candidate.assessmentInviteSentAt = null;
+    candidate.assessmentResultPublishedAt = null;
+    candidate.assessmentScore = null;
+    candidate.assessmentStatus = "pending";
+    candidate.assessmentReason = "";
+    candidate.assessmentRejectionNote = "";
+    candidate.assessmentDomain = "";
+    candidate.assessmentRawMarks = null;
+    candidate.assessmentMaxMarks = null;
+    candidate.assessmentAnswers = [];
+  }
+
   candidate.stage = toStage as typeof candidate.stage;
   await candidate.save();
 

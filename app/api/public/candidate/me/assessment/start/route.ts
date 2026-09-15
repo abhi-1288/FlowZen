@@ -21,9 +21,12 @@ export async function POST(request: Request) {
   const job = await ATSJob.findById(candidate.job);
   if (!job || !job.assessment) return jsonError("Assessment is not available for this job.", 400);
 
-  if (!["screening", "assessment"].includes(candidate.stage)) return jsonError("You are not currently eligible for the assessment.", 400);
+  if (!["screening", "assessment"].includes(candidate.stage)) return jsonError("You are not eligible for the assessment.", 400);
   if ((candidate as any).assessmentSubmittedAt) return jsonError("You have already submitted the assessment.", 400);
-  if ((candidate as any).assessmentStartedAt) return jsonError("Assessment already started. Please submit your answers.", 400);
+
+  // A candidate in "screening" stage (moved back by HR) is treated as not
+  // started, even if a stale assessmentStartedAt flag remains.
+  const alreadyStarted = Boolean((candidate as any).assessmentStartedAt) && candidate.stage === "assessment";
 
   // Check if assessment date is today (window open)
   const now = new Date();
@@ -41,7 +44,7 @@ export async function POST(request: Request) {
 
   // Candidate selects their domain (one) when the assessment has domain sections;
   // the general (non-domain) questions are always included.
-  const chosenDomain = pickDomain((assessment.domains as any[]) || [], domainName);
+  const chosenDomain = pickDomain((assessment.domains as any[]) || [], domainName || (candidate as any).assessmentDomain || "");
   if ((assessment.domains as any[])?.length && !chosenDomain) {
     return jsonError("Please select your domain to start the assessment.", 400);
   }
@@ -52,29 +55,31 @@ export async function POST(request: Request) {
   );
   if (!flatQuestions.length) return jsonError("Assessment questions are not yet available.", 400);
 
-  // Mark as started
-  const fromStage = candidate.stage;
-  const updates: any = { assessmentStartedAt: new Date() };
-  if (chosenDomain) updates.assessmentDomain = chosenDomain.name;
-  if (fromStage === "screening") updates.stage = "assessment";
-  await ATSCandidate.findByIdAndUpdate(candidate._id, updates);
+  // If not yet started, mark as started
+  if (!alreadyStarted) {
+    const fromStage = candidate.stage;
+    const updates: any = { assessmentStartedAt: new Date() };
+    if (chosenDomain) updates.assessmentDomain = chosenDomain.name;
+    if (fromStage === "screening") updates.stage = "assessment";
+    await ATSCandidate.findByIdAndUpdate(candidate._id, updates);
 
-  await ATSTimeline.create({
-    candidate: candidate._id,
-    job: job._id,
-    action: "assessment-started",
-    metadata: { jobTitle: job.title, ...(chosenDomain ? { domain: chosenDomain.name } : {}) },
-    company: candidate.company,
-  });
-
-  if (fromStage === "screening") {
     await ATSTimeline.create({
       candidate: candidate._id,
       job: job._id,
-      action: "stage-changed",
-      metadata: { from: "screening", to: "assessment", reason: "Started online assessment", ...(chosenDomain ? { domain: chosenDomain.name } : {}) },
+      action: "assessment-started",
+      metadata: { jobTitle: job.title, ...(chosenDomain ? { domain: chosenDomain.name } : {}) },
       company: candidate.company,
     });
+
+    if (fromStage === "screening") {
+      await ATSTimeline.create({
+        candidate: candidate._id,
+        job: job._id,
+        action: "stage-changed",
+        metadata: { from: "screening", to: "assessment", reason: "Started online assessment", ...(chosenDomain ? { domain: chosenDomain.name } : {}) },
+        company: candidate.company,
+      });
+    }
   }
 
   const sourceQuestions = [
@@ -93,13 +98,14 @@ export async function POST(request: Request) {
     };
   });
 
+  const startedAt = alreadyStarted ? new Date((candidate as any).assessmentStartedAt) : now;
   return NextResponse.json({
     ok: true,
-    domain: chosenDomain?.name || null,
+    domain: chosenDomain?.name || (candidate as any).assessmentDomain || null,
     questions,
     durationMinutes: job.assessmentDurationMinutes || null,
     endsAt: job.assessmentDurationMinutes
-      ? new Date(now.getTime() + job.assessmentDurationMinutes * 60 * 1000).toISOString()
+      ? new Date(startedAt.getTime() + job.assessmentDurationMinutes * 60 * 1000).toISOString()
       : null,
   });
 }

@@ -61,6 +61,8 @@ const ATSCandidateSchema = new Schema(
     assessmentRejectionNote: { type: String, default: "" },
     assessmentStartedAt: { type: Date, default: null },
     assessmentSubmittedAt: { type: Date, default: null },
+    assessmentInviteSentAt: { type: Date, default: null },
+    assessmentResultPublishedAt: { type: Date, default: null },
     assessmentDomain: { type: String, default: "", trim: true, maxlength: 100 },
     assessmentRawMarks: { type: Number, default: null },
     assessmentMaxMarks: { type: Number, default: null },

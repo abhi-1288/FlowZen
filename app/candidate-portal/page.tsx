@@ -454,6 +454,56 @@ function CandidatePortalInner() {
   const accentSoft = hexToRgba(accent, 0.12);
   const accentSofter = hexToRgba(accent, 0.06);
 
+  const companyInitials = candidate.company?.name
+    ? candidate.company.name
+        .split(" ")
+        .map((w) => w[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()
+    : "CO";
+
+  // ─── Test mode: show only the assessment in a minimal shell ───
+  if (isTestLink && assessmentData && assessmentData.enabled) {
+    return (
+      <main className="min-h-screen bg-[#fafafa] dark:bg-[#1a1a1a]">
+        <header className="sticky top-0 z-20 border-b border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)]/85 backdrop-blur-md">
+          <div className="mx-auto flex max-w-3xl items-center gap-3 px-6 py-3 sm:px-8">
+            {candidate.company?.icon ? (
+              <img src={candidate.company.icon} alt="" className="h-7 w-7 rounded-lg object-cover" />
+            ) : (
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold text-white" style={{ backgroundColor: accent }}>
+                {companyInitials}
+              </div>
+            )}
+            <span className="text-sm font-semibold text-slate-900 dark:text-zinc-100">{candidate.company?.name || "FlowZen"}</span>
+            <span className="ml-auto text-xs text-slate-400 dark:text-zinc-500">Online Assessment</span>
+          </div>
+        </header>
+        <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+          <AssessmentPanel
+            token={token!}
+            assessment={assessmentData}
+            accent={accent}
+            companyName={candidate.company?.name}
+            autoStart
+            onRefresh={() => {
+              if (!token) return;
+              fetch(`/api/public/candidate/me?token=${encodeURIComponent(token)}`)
+                .then((r) => r.json())
+                .then((d) => {
+                  setCandidate(d.candidate);
+                  setTimeline(d.timeline ?? []);
+                  setAssessmentData(d.assessment ?? null);
+                })
+                .catch(() => {});
+            }}
+          />
+        </div>
+      </main>
+    );
+  }
+
   const stageIdx = STAGE_ORDER.indexOf(candidate.stage);
   const isRejected = candidate.stage === "rejected";
   const isJoined = candidate.stage === "joined";
@@ -464,15 +514,6 @@ function CandidatePortalInner() {
       : isJoined
         ? { label: "Joined", cls: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400" }
         : { label: STAGE_LABELS[candidate.stage] || formatStage(candidate.stage), cls: "accent-pill" };
-
-  const companyInitials = candidate.company?.name
-    ? candidate.company.name
-        .split(" ")
-        .map((w) => w[0])
-        .slice(0, 2)
-        .join("")
-        .toUpperCase()
-    : "CO";
 
   const showSalary = candidate.job && (candidate.job.salaryRangeMin > 0 || candidate.job.salaryRangeMax > 0);
 

@@ -27,7 +27,7 @@ export async function POST(request: Request, { params }: Params) {
   if (!job) return jsonError("Job not found.", 404);
 
   // Gate: only available after assessment date + 1 day
-  const assessment = await ATSAssessment.findOne({ job: job._id, company: user.company }).select("passScore");
+  const assessment = await ATSAssessment.findOne({ job: job._id, company: user.company }).select("passScore resultsAppliedAt");
   if (!assessment) return jsonError("No assessment configured for this job.", 400);
 
   const body = await request.json().catch(() => ({}));
@@ -104,6 +104,46 @@ export async function POST(request: Request, { params }: Params) {
       }
     }
   }
+
+  // Reveal results to candidates whose assessment outcome is final.
+  // Marks/status are hidden from the candidate portal until HR triggers
+  // this review action.
+  const published = await ATSCandidate.find({
+    job: job._id,
+    company: user.company,
+    assessmentStatus: { $in: ["selected", "rejected"] },
+    assessmentResultPublishedAt: null,
+  }).select("assessmentScore assessmentStatus assessmentRawMarks assessmentMaxMarks");
+
+  if (published.length > 0) {
+    await ATSCandidate.updateMany(
+      { _id: { $in: published.map((c: any) => c._id) } },
+      { $set: { assessmentResultPublishedAt: new Date() } }
+    );
+
+    for (const c of published as any[]) {
+      const score = (c as any).assessmentScore;
+      const passed = c.assessmentStatus === "selected";
+      await ATSTimeline.updateOne(
+        { candidate: c._id, job: job._id, action: "assessment-graded" },
+        {
+          $set: {
+            "metadata.content": `Assessment result: ${score != null ? `${score}/100` : "—"}${passed ? ". Passed." : ". Failed."}`,
+            "metadata.status": passed ? "selected" : "rejected",
+            "metadata.passed": passed,
+          },
+        }
+      );
+    }
+  }
+
+  // Schedule the answer key auto-publish: exactly one day after this review the
+  // question paper/answer key is released to candidates by the cron job
+  // (/api/cron/assessment-answer-key).
+  await ATSAssessment.updateOne(
+    { _id: (assessment as any)._id },
+    { $set: { resultsAppliedAt: new Date() } }
+  );
 
   if (moved > 0 || advanced > 0) {
     const hrAndAdmin = await User.find({ company: user.company, role: { $in: ["admin", "human-resource"] }, _id: { $ne: userId } });

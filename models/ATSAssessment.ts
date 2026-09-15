@@ -32,6 +32,7 @@ const ATSAssessmentSchema = new Schema(
     domains: { type: [ATSAssessmentDomainSchema], default: [] },
     answerKeyPublished: { type: Boolean, default: false },
     answerKeyPublishedAt: { type: Date, default: null },
+    resultsAppliedAt: { type: Date, default: null },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
   },
   { timestamps: true }

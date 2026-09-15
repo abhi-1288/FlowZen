@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sendAssessmentReminderEmails } from "@/lib/assessment-day-emails";
+import { autoPublishAnswerKeys } from "@/lib/assessment-answer-key";
 
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
@@ -7,6 +7,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await sendAssessmentReminderEmails();
+  const result = await autoPublishAnswerKeys();
   return NextResponse.json({ ok: true, ...result });
 }
