@@ -6,6 +6,7 @@ import { ATSTimeline } from "@/models/ATSTimeline";
 import { ATSAuditLog } from "@/models/ATSAuditLog";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
+import { Company } from "@/models/Company";
 import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
 import { sendMail } from "@/lib/mailer";
@@ -111,6 +112,7 @@ export async function PATCH(request: Request, { params }: Params) {
     const candidateName = `${cand.firstName} ${cand.lastName}`;
 
     try {
+      const companyDoc = await Company.findById(user.company).select("name icon");
       const candidateToken = await resolveCandidatePortalToken(String(cand._id));
       const portalLink = buildPortalLink(buildOrigin(request), candidateToken);
       const emailContent = offerLetterContent({
@@ -120,6 +122,7 @@ export async function PATCH(request: Request, { params }: Params) {
         department: offer.department,
         joiningDate: offer.joiningDate,
         portalLink,
+        company: { name: (companyDoc as any)?.name, icon: (companyDoc as any)?.icon },
       });
       await sendMail({
         to: cand.email,

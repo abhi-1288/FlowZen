@@ -71,6 +71,8 @@ type AnswerKeyPayload = {
   maxMarks: number | null;
   passScore: number;
   negativeMarking: number;
+  startedAt: string | null;
+  submittedAt: string | null;
   publishedAt: string | null;
   questions: AnswerKeyQuestion[];
 };
@@ -123,6 +125,14 @@ function generateAnswerKeyPdf(data: AnswerKeyPayload, accent: string, companyNam
     y
   );
   y += 15;
+  if (data.startedAt && data.submittedAt) {
+    doc.text(
+      `Assessment date: ${new Date(data.startedAt).toLocaleString("en-IN", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })} – ${new Date(data.submittedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`,
+      margin,
+      y
+    );
+    y += 15;
+  }
   if (data.negativeMarking > 0) {
     doc.text(`Negative marking: -${data.negativeMarking} per wrong answer`, margin, y);
     y += 15;
@@ -468,6 +478,7 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
   const accentSoft = accent + "1a"; // simple alpha
   const fmtDate = assessment.date ? new Date(assessment.date).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" }) : "";
   const fmtTime = assessment.date ? new Date(assessment.date).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }) : "";
+  const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
   const hasDomains = Array.isArray(assessment.domains) && assessment.domains.length > 0;
 
   // 1. Submitted view
@@ -497,6 +508,11 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
             {assessment.rawMarks != null && (
               <p className="mt-2 text-xs text-slate-500 dark:text-zinc-400">
                 {assessment.rawMarks}/{assessment.maxMarks} marks · Passing threshold: {assessment.passScore}%
+              </p>
+            )}
+            {assessment.startedAt && (
+              <p className="mt-2 text-xs text-slate-500 dark:text-zinc-400">
+                {fmtDay(assessment.startedAt)}
               </p>
             )}
           </>

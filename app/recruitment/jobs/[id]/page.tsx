@@ -3,12 +3,12 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { ArrowLeft, Pencil, Trash2, Globe, Archive, Share2, Check, Cog, Briefcase, Building2, MapPin, Clock, Users, Banknote, ShieldCheck, CalendarClock, UserPlus, CalendarPlus, Columns3, ChevronDown, Download } from "lucide-react";
+import { ArrowLeft, Pencil, PencilOff, Trash2, Globe, Archive, Share2, Check, Cog, Briefcase, Building2, MapPin, Clock, Users, Banknote, ShieldCheck, CalendarClock, UserPlus, CalendarPlus, Columns3, ChevronDown, Download, ExternalLink, Upload, Loader2, CheckCircle } from "lucide-react";
 import { DEFAULT_ACCENT, salarySuffix, hexToRgba } from "@/lib/accent";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
 import { apiFetch } from "@/lib/client-utils";
-import { CURRENCY_SYMBOLS, STAGES, STAGE_LABELS, type Stage, type Source, type JobStatus, type ATSCandidate } from "@/lib/recruitment-types";
+import { CURRENCY_SYMBOLS, STAGES, STAGE_LABELS, TERMINAL_STAGES, type Stage, type JobStatus, type ATSCandidate } from "@/lib/recruitment-types";
 import { formatJobDuration } from "@/lib/format-duration";
 import { JobDescription } from "@/components/recruitment/job-description";
 import { InterviewLocationFields } from "@/components/recruitment/interview-location-fields";
@@ -72,8 +72,8 @@ export default function JobDetailPage() {
   const role = session?.user?.role ?? "";
   const isAdmin = role === "admin";
   const isHrOrAdmin = role === "admin" || role === "human-resource";
-  const { activeJob, candidates, loading, fetchJob, fetchCandidates, setModal, updateJob, moveCandidateStage } = useRecruitmentStore(
-    useShallow((s) => ({ activeJob: s.activeJob, candidates: s.candidates, loading: s.loading, fetchJob: s.fetchJob, fetchCandidates: s.fetchCandidates, setModal: s.setModal, updateJob: s.updateJob, moveCandidateStage: s.moveCandidateStage }))
+  const { activeJob, candidates, loading, fetchJob, fetchCandidates, setModal, updateJob, moveCandidateStage, setAtsDecision } = useRecruitmentStore(
+    useShallow((s) => ({ activeJob: s.activeJob, candidates: s.candidates, loading: s.loading, fetchJob: s.fetchJob, fetchCandidates: s.fetchCandidates, setModal: s.setModal, updateJob: s.updateJob, moveCandidateStage: s.moveCandidateStage, setAtsDecision: s.setAtsDecision }))
   );
   const [candidateFilter, setCandidateFilter] = useState("");
   const [copied, setCopied] = useState(false);
@@ -104,6 +104,8 @@ export default function JobDetailPage() {
   const [selectedCandidates, setSelectedCandidates] = useState<Record<string, boolean>>({});
   const [bulkTargetStage, setBulkTargetStage] = useState<Stage>("screening");
   const [stageModal, setStageModal] = useState<{ targets: ATSCandidate[]; target: Stage } | null>(null);
+  const [atsDecisionTarget, setAtsDecisionTarget] = useState<ATSCandidate | null>(null);
+  const [editAppsConfirm, setEditAppsConfirm] = useState<"enable" | "disable" | null>(null);
 
   async function handleRunAts(force: boolean) {
     if (!activeJob) return;
@@ -219,6 +221,11 @@ export default function JobDetailPage() {
     return list;
   }, [jobCandidates, candidateFilter]);
 
+  const schedulableCandidates = useMemo(
+    () => jobCandidates.filter((c) => !TERMINAL_STAGES.includes(c.stage) && c.atsStatus !== "rejected"),
+    [jobCandidates],
+  );
+
   const selectedCount = Object.values(selectedCandidates).filter(Boolean).length;
   const allFilteredSelected = filtered.length > 0 && filtered.every((c) => selectedCandidates[c.id]);
 
@@ -243,6 +250,11 @@ export default function JobDetailPage() {
     await Promise.all(stageModal.targets.map((c) => moveCandidateStage(c.id, toStage)));
     setSelectedCandidates({});
     setStageModal(null);
+    void fetchCandidates({ jobId: id });
+  }
+
+  async function atsMarkOk(candidate: ATSCandidate) {
+    await setAtsDecision(candidate.id, "selected");
     void fetchCandidates({ jobId: id });
   }
 
@@ -591,6 +603,24 @@ export default function JobDetailPage() {
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
+                    {isHrOrAdmin && candidate.atsStatus === "rejected" && candidate.stage !== "ats-rejected" && candidate.stage !== "rejected" && (
+                      <>
+                        <button
+                          onClick={() => void atsMarkOk(candidate)}
+                          className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                          title="Keep the candidate in the pipeline (override the ATS flag)"
+                        >
+                          Mark OK
+                        </button>
+                        <button
+                          onClick={() => setAtsDecisionTarget(candidate)}
+                          className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                          title="Move the candidate to ATS Rejected (with an optional note)"
+                        >
+                          ATS Reject
+                        </button>
+                      </>
+                    )}
                     {isHrOrAdmin ? (
                       <span className="relative inline-flex items-center">
                         <select
@@ -647,6 +677,14 @@ export default function JobDetailPage() {
               )}
               {isHrOrAdmin && (
                 <ActionButton accent={accent} icon={Cog} label="Re-score All" disabled={atsLoading} onClick={() => { if (!atsLoading) void handleRunAts(true); }} />
+              )}
+              {isHrOrAdmin && (
+                <ActionButton
+                  accent={accent}
+                  icon={activeJob?.editApplicationsEnabled ? PencilOff : Pencil}
+                  label={activeJob?.editApplicationsEnabled ? "Disable edit application" : "Enable edit application"}
+                  onClick={() => setEditAppsConfirm(activeJob?.editApplicationsEnabled ? "disable" : "enable")}
+                />
               )}
               {atsDecisionPending && atsLastResult && (
                 <ActionButton accent={accent} icon={Check} label="Review ATS timelines" onClick={() => setAtsResultData(atsLastResult)} />
@@ -749,7 +787,7 @@ export default function JobDetailPage() {
     </div>
 
       <DeleteJobModal id={id} />
-      <CandidateModal jobId={id} />
+      <CandidateModal jobId={id} employmentType={activeJob?.employmentType} />
       <AtsWarnModal
         warn={atsWarn}
         onCancel={() => setAtsWarn((w) => ({ ...w, open: false }))}
@@ -779,7 +817,7 @@ export default function JobDetailPage() {
         onClose={() => setBulkIvOpen(false)}
         jobId={id}
         jobLocation={activeJob?.location ?? ""}
-        candidates={jobCandidates}
+        candidates={schedulableCandidates}
         onDone={() => { void fetchCandidates({ jobId: id }); }}
       />
       {stageModal && (
@@ -787,6 +825,26 @@ export default function JobDetailPage() {
           data={stageModal}
           onClose={() => setStageModal(null)}
           onConfirm={confirmStageChange}
+        />
+      )}
+      <AtsDecisionModal
+        candidate={atsDecisionTarget}
+        onClose={() => setAtsDecisionTarget(null)}
+        onSubmit={async (candidate, note) => {
+          setAtsDecisionTarget(null);
+          await setAtsDecision(candidate.id, "rejected", note);
+          void fetchCandidates({ jobId: id });
+        }}
+      />
+      {editAppsConfirm && (
+        <EditApplicationsModal
+          mode={editAppsConfirm}
+          onClose={() => setEditAppsConfirm(null)}
+          onConfirm={async () => {
+            await updateJob(id, {
+              action: editAppsConfirm === "enable" ? "enable-edit-applications" : "disable-edit-applications",
+            });
+          }}
         />
       )}
       {assessmentManagerOpen && <AssessmentManagerModal jobId={id} onClose={() => { setAssessmentManagerOpen(false); void loadAssessmentStats(); }} />}
@@ -1013,6 +1071,123 @@ function AtsResultModal({
   );
 }
 
+function AtsDecisionModal({
+  candidate,
+  onClose,
+  onSubmit,
+}: {
+  candidate: ATSCandidate | null;
+  onClose: () => void;
+  onSubmit: (candidate: ATSCandidate, note: string) => void;
+}) {
+  const [note, setNote] = useState("");
+  if (!candidate) return null;
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center neu-overlay px-4">
+      <div className="w-full max-w-md rounded-lg neu-card">
+        <div className="p-5">
+          <h2 className="text-base font-semibold text-slate-900">Reject {candidate.firstName} {candidate.lastName} via ATS</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            This will move the candidate to the <span className="font-medium">ATS Rejected</span> stage and record a rejection note on their timeline.
+          </p>
+          <div className="mt-3">
+            <label className="block text-sm font-medium text-slate-700">Rejection note (optional)</label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={3}
+              placeholder="Type a reason for rejection. If left empty, an automatic ATS-based reason (score vs. threshold) will be recorded."
+              className="neu-inset mt-1 w-full resize-none rounded-lg px-3 py-2.5 text-sm"
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              {note.trim() ? "A manual note will be saved." : "An auto note (score vs. threshold + ATS reason) will be saved."}
+            </p>
+          </div>
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              onClick={onClose}
+              className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => onSubmit(candidate, note.trim())}
+              className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700"
+            >
+              ATS Reject
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditApplicationsModal({
+  mode,
+  onClose,
+  onConfirm,
+}: {
+  mode: "enable" | "disable";
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const enabled = mode === "enable";
+
+  async function handleConfirm() {
+    if (saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      await onConfirm();
+      onClose();
+    } catch {
+      setError("Something went wrong. Please try again.");
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center neu-overlay px-4">
+      <div className="w-full max-w-sm rounded-lg neu-card">
+        <div className="p-5">
+          <h2 className="text-base font-semibold text-slate-900">
+            {enabled ? "Enable edit application?" : "Disable edit application?"}
+          </h2>
+          <p className="mt-2 text-sm text-slate-600">
+            {enabled
+              ? "All candidates who applied to this job will receive an email inviting them to update their application (name, phone, resume, portfolio, LinkedIn)."
+              : "Candidates will no longer be able to edit their application. No notification will be sent to candidates."}
+          </p>
+          {error && <p className="mt-3 text-xs text-rose-600">{error}</p>}
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              onClick={onClose}
+              disabled={saving}
+              className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-600 hover:bg-[var(--c-bg-muted)] disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => void handleConfirm()}
+              disabled={saving}
+              className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-60 ${
+                enabled ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"
+              }`}
+            >
+              {saving && <Loader2 size={13} className="animate-spin" />}
+              {saving ? (enabled ? "Enabling…" : "Disabling…") : enabled ? "Yes, Enable" : "Yes, Disable"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DeleteJobModal({ id }: { id: string }) {
   const router = useRouter();
   const { modal, setModal, deleteJob, activeJob, saving } = useRecruitmentStore();
@@ -1134,32 +1309,161 @@ function StageChangeModal({
   );
 }
 
-function CandidateModal({ jobId }: { jobId: string }) {
-  const { modal, setModal, createCandidate, saving } = useRecruitmentStore();
+function FieldInput({
+  label,
+  value,
+  onChange,
+  type = "text",
+  required = false,
+  placeholder,
+  icon,
+  min,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+  required?: boolean;
+  placeholder?: string;
+  icon?: React.ReactNode;
+  min?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-zinc-300">{label}</span>
+      <div className="relative">
+        {icon && (
+          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500">{icon}</span>
+        )}
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          required={required}
+          placeholder={placeholder}
+          min={min}
+          className={`neu-inset w-full rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 dark:bg-[#000000] px-4 py-3 text-sm text-slate-900 dark:text-zinc-100 transition-all placeholder:text-slate-400 dark:placeholder:text-zinc-500 ${icon ? "pl-10" : ""}`}
+        />
+      </div>
+    </label>
+  );
+}
+
+function CandidateModal({ jobId, employmentType }: { jobId: string; employmentType?: string }) {
+  const { modal, setModal, createCandidate, uploadResume, saving } = useRecruitmentStore();
+
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [currentCompany, setCurrentCompany] = useState("");
+  const [experienceYears, setExperienceYears] = useState("");
+  const [internshipExperienceMonths, setInternshipExperienceMonths] = useState("");
+  const [noticePeriod, setNoticePeriod] = useState("");
+  const [notes, setNotes] = useState("");
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [portfolioUrl, setPortfolioUrl] = useState("");
+  const [linkedInUrl, setLinkedInUrl] = useState("");
+  const [knowEmployee, setKnowEmployee] = useState(false);
+  const [referralId, setReferralId] = useState("");
+  const [referralStatus, setReferralStatus] = useState<"idle" | "verifying" | "verified" | "error">("idle");
+  const [referralName, setReferralName] = useState("");
+  const [referralCompanyName, setReferralCompanyName] = useState("");
+  const [emailChecking, setEmailChecking] = useState(false);
+  const [emailDuplicate, setEmailDuplicate] = useState<{ firstName: string; lastName: string; stage: string } | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (modal?.type !== "create-candidate") return;
+    setFirstName(""); setLastName(""); setEmail(""); setPhone(""); setCurrentCompany("");
+    setExperienceYears(""); setInternshipExperienceMonths(""); setNoticePeriod(""); setNotes("");
+    setResumeFile(null); setPortfolioUrl(""); setLinkedInUrl("");
+    setKnowEmployee(false); setReferralId(""); setReferralStatus("idle"); setReferralName(""); setReferralCompanyName("");
+    setEmailChecking(false); setEmailDuplicate(null); setError("");
+  }, [modal?.type]);
+
+  useEffect(() => {
+    const emailValue = email.trim().toLowerCase();
+    if (!emailValue || !jobId) {
+      setEmailDuplicate(null);
+      setEmailChecking(false);
+      return;
+    }
+    setEmailChecking(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/public/jobs/${jobId}/check-email?email=${encodeURIComponent(emailValue)}`);
+        setEmailDuplicate(res.ok ? (await res.json()).candidate ?? null : null);
+      } catch {
+        setEmailDuplicate(null);
+      } finally {
+        setEmailChecking(false);
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [email, jobId]);
+
+  useEffect(() => {
+    if (!knowEmployee || !referralId.trim() || !jobId) {
+      setReferralStatus("idle");
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setReferralStatus("verifying");
+      try {
+        const res = await fetch(`/api/public/jobs/${jobId}/verify-referral?referralId=${encodeURIComponent(referralId)}`);
+        if (!res.ok) {
+          setReferralStatus("error");
+          return;
+        }
+        const data = await res.json();
+        setReferralName(data.name);
+        setReferralCompanyName(data.company);
+        setReferralStatus("verified");
+      } catch {
+        setReferralStatus("error");
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [referralId, knowEmployee, jobId]);
+
   if (modal?.type !== "create-candidate") return null;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (saving) return;
-    const form = new FormData(e.currentTarget);
+    if (!resumeFile) {
+      setError("Resume / CV is required.");
+      return;
+    }
+    setError("");
+    const isReferral = knowEmployee && referralStatus === "verified" && referralId.trim().length > 0;
     const data: Record<string, unknown> = {
-      firstName: String(form.get("firstName") || ""),
-      lastName: String(form.get("lastName") || ""),
-      email: String(form.get("email") || ""),
-      phone: String(form.get("phone") || ""),
-      currentCompany: String(form.get("currentCompany") || ""),
-      experienceYears: Number(form.get("experienceYears") || 0),
-      currentCTC: Number(form.get("currentCTC") || 0),
-      expectedCTC: Number(form.get("expectedCTC") || 0),
-      noticePeriod: Number(form.get("noticePeriod") || 0),
-      source: String(form.get("source") || "Other") as Source,
+      firstName,
+      lastName,
+      email,
+      phone,
+      currentCompany,
+      experienceYears: Number(experienceYears) || 0,
+      internshipExperienceMonths: Number(internshipExperienceMonths) || 0,
+      noticePeriod: Number(noticePeriod) || 0,
+      notes,
+      portfolioUrl,
+      linkedInUrl,
+      source: isReferral ? "Referral" : "Other",
+      referralId: isReferral ? referralId : "",
       job: jobId,
     };
-    await createCandidate(data);
-    setModal(null);
+    try {
+      const created = await createCandidate(data);
+      if (created?.id && resumeFile) {
+        await uploadResume(created.id, resumeFile);
+      }
+      setModal(null);
+    } catch {
+      setError("Failed to add candidate. Please try again.");
+    }
   }
-
-  const sources = ["Referral", "LinkedIn", "Company Website", "Naukri", "Indeed", "Walk-In", "Other"];
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center neu-overlay px-4">
@@ -1170,51 +1474,117 @@ function CandidateModal({ jobId }: { jobId: string }) {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
         </div>
-        <form className="space-y-4 p-5 max-h-[80vh] overflow-y-auto" onSubmit={handleSubmit}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">First Name *</span>
-              <input name="firstName" required className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Last Name</span>
-              <input name="lastName" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Email *</span>
-              <input name="email" type="email" required className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Phone</span>
-              <input name="phone" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Current Company</span>
-              <input name="currentCompany" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Experience (years)</span>
-              <input name="experienceYears" type="number" min="0" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Current CTC</span>
-              <input name="currentCTC" type="number" min="0" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Expected CTC</span>
-              <input name="expectedCTC" type="number" min="0" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Notice Period (days)</span>
-              <input name="noticePeriod" type="number" min="0" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Source</span>
-              <select name="source" className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm">
-                {sources.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </label>
+        <form className="space-y-5 p-5 max-h-[80vh] overflow-y-auto" onSubmit={handleSubmit}>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FieldInput label="First Name" value={firstName} onChange={setFirstName} required placeholder="John" />
+            <FieldInput label="Last Name" value={lastName} onChange={setLastName} placeholder="Doe" />
+            <div className="sm:col-span-2">
+              <FieldInput label="Email" value={email} onChange={setEmail} type="email" required placeholder="you@email.com" />
+              {emailChecking && <p className="mt-1.5 text-xs text-slate-400 dark:text-zinc-500">Checking if you have already applied...</p>}
+              {!emailChecking && emailDuplicate && (
+                <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">
+                  A candidate with this email already exists for this job{emailDuplicate.firstName ? ` (${emailDuplicate.firstName} ${emailDuplicate.lastName || ""})` : ""}. You can still add them if you want to.
+                </p>
+              )}
+            </div>
           </div>
+          <FieldInput label="Phone" value={phone} onChange={setPhone} placeholder="+1 (555) 000-0000" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FieldInput label="Current Company" value={currentCompany} onChange={setCurrentCompany} placeholder="Acme Inc." />
+            <FieldInput label="Years of Experience" value={experienceYears} onChange={setExperienceYears} type="number" min="0" placeholder="5" />
+          </div>
+          {employmentType === "internship" && (
+            <FieldInput label="Experience in Internship (months)" value={internshipExperienceMonths} onChange={setInternshipExperienceMonths} type="number" min="0" placeholder="6" />
+          )}
+          <FieldInput label="Notice Period (days)" value={noticePeriod} onChange={setNoticePeriod} type="number" min="0" placeholder="30" />
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-zinc-300">Cover Letter / Notes</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={4}
+              className="neu-inset w-full resize-y rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 dark:bg-[#000000] px-4 py-3 text-sm text-slate-900 dark:text-zinc-100 transition-all placeholder:text-slate-400 dark:placeholder:text-zinc-500"
+              placeholder="Tell us about yourself..."
+            />
+          </div>
+
+          <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 p-5">
+            <p className="mb-3 text-sm font-medium text-slate-700 dark:text-zinc-300">Do you know anyone working at this company?</p>
+            <div className="flex items-center gap-5">
+              <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-zinc-400">
+                <input type="radio" name="knowEmployee" checked={knowEmployee === true} onChange={() => setKnowEmployee(true)} className="text-slate-900" />
+                Yes
+              </label>
+              <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-zinc-400">
+                <input type="radio" name="knowEmployee" checked={knowEmployee === false} onChange={() => setKnowEmployee(false)} className="text-slate-900" />
+                No
+              </label>
+            </div>
+            {knowEmployee && (
+              <div className="mt-4">
+                <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-zinc-300">Employee Referral ID</label>
+                <div className="relative">
+                  <input
+                    value={referralId}
+                    onChange={(e) => setReferralId(e.target.value)}
+                    placeholder="HELLO-COMPANY-41279814"
+                    className="neu-inset w-full rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 dark:bg-[#000000] px-4 py-3 pr-12 text-sm text-slate-900 dark:text-zinc-100 transition-all placeholder:text-slate-400 dark:placeholder:text-zinc-500"
+                  />
+                  {referralStatus === "verifying" && (
+                    <Loader2 size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 animate-spin text-slate-400" />
+                  )}
+                  {referralStatus === "verified" && (
+                    <CheckCircle size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-emerald-500" />
+                  )}
+                </div>
+                {referralStatus === "verified" && (
+                  <p className="mt-2 text-xs text-emerald-600">Verified: {referralName} ({referralCompanyName})</p>
+                )}
+                {referralStatus === "error" && (
+                  <p className="mt-2 text-xs text-rose-500">Referral employee not found. Please check the referral ID.</p>
+                )}
+                {referralStatus === "idle" && (
+                  <p className="mt-2 text-xs text-slate-400 dark:text-zinc-500">Enter the referral ID provided by the employee.</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between">
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-zinc-300">Resume / CV *</label>
+              {resumeFile && <span className="mb-1.5 text-xs text-slate-500">{resumeFile.name}</span>}
+            </div>
+            <div className="flex items-center gap-3 rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 px-4 py-3">
+              <Upload size={16} className="shrink-0 text-slate-400 dark:text-zinc-500" />
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                required
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  if (file && file.size > 2 * 1024 * 1024) {
+                    setError("File exceeds 2 MB limit.");
+                    e.target.value = "";
+                    return;
+                  }
+                  setError("");
+                  setResumeFile(file);
+                }}
+                className="w-full cursor-pointer text-sm text-slate-500 dark:text-zinc-400 outline-none file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:px-4 file:py-1.5 file:text-xs file:font-semibold file:text-white file:shadow-sm file:transition-all hover:file:opacity-90"
+              />
+              <style>{`input[type="file"]::file-selector-button { background-color: ${DEFAULT_ACCENT}; }`}</style>
+            </div>
+            <p className="mt-1 text-xs text-slate-400 dark:text-zinc-500">PDF, DOC, DOCX, PNG, or JPG — max 2 MB</p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FieldInput label="Portfolio URL" value={portfolioUrl} onChange={setPortfolioUrl} placeholder="https://" icon={<ExternalLink size={14} />} />
+            <FieldInput label="LinkedIn URL" value={linkedInUrl} onChange={setLinkedInUrl} placeholder="https://linkedin.com/in/" icon={<ExternalLink size={14} />} />
+          </div>
+
+          {error && <p className="text-sm text-rose-600">{error}</p>}
+
           <button type="submit" disabled={saving} className="neu-btn neu-btn-primary w-full rounded-full px-4 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60">
             {saving ? "Adding…" : "Add Candidate"}
           </button>
@@ -1417,6 +1787,16 @@ function BulkInterviewModal({
                     <span className="flex-1 text-sm text-slate-700">
                       {(c as any).firstName} {(c as any).lastName}
                     </span>
+                    {(c as any).atsScore != null && (
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${(c as any).atsStatus === "selected" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
+                        ATS {(c as any).atsScore}
+                      </span>
+                    )}
+                    {(c as any).assessmentScore != null && (
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${(c as any).assessmentStatus === "selected" ? "bg-teal-50 text-teal-700" : "bg-rose-50 text-rose-700"}`}>
+                        Assessment {(c as any).assessmentScore}%
+                      </span>
+                    )}
                     {selected[cid] && (c as any).email && (
                       <span className="text-xs text-slate-400">{c.email}</span>
                     )}

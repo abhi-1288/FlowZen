@@ -19,8 +19,8 @@ export async function GET(request: Request) {
   if (!candidate) return jsonError("Invalid or expired link.", 401);
 
   const more = await ATSCandidate.findById(candidate._id)
-    .populate("job", "title department location employmentType salaryRangeMin salaryRangeMax salaryType currency description requiredSkills assessment assessmentDate assessmentDurationMinutes")
-    .populate("company", "name icon primaryColor");
+    .populate("job", "title department location employmentType salaryRangeMin salaryRangeMax salaryType currency description requiredSkills assessment assessmentDate assessmentDurationMinutes editApplicationsEnabled")
+    .populate("company", "name icon primaryColor stageOrder");
 
   if (!candidate) return jsonError("Invalid or expired link.", 401);
 
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
 
   const interviews = await ATSInterview.find({ candidate: candidate._id, status: "scheduled" })
     .sort({ scheduledAt: 1 })
-    .populate("interviewer", "name");
+    .populate("interviewer", "name companyIdentityCode");
 
   // Lazy backfill: ensure in-person scheduled interviews carry a scannable guest
   // pass code so existing candidates' ID cards and QR verifications work.
@@ -108,11 +108,17 @@ export async function GET(request: Request) {
     };
   }
 
+  const defaultStageOrder = ["applied", "screening", "assessment", "technical-interview", "manager-round", "hr-round", "offer", "joined"];
+  const companyStageOrder = Array.isArray((more as any)?.company?.stageOrder) && (more as any).company.stageOrder.length
+    ? (more as any).company.stageOrder
+    : [];
+
   return NextResponse.json({
     candidate: serializeDoc(more ?? candidate),
     timeline: timeline.map((t: any) => serializeDoc(t)),
     interviews: interviews.map((i: any) => serializeDoc(i)),
     offer: offer ? serializeDoc(offer) : null,
     assessment: assessmentPayload,
+    stageOrder: companyStageOrder.length ? companyStageOrder : defaultStageOrder,
   });
 }

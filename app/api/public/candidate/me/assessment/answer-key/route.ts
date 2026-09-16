@@ -63,6 +63,8 @@ export async function GET(request: Request) {
     maxMarks: (candidate as any).assessmentMaxMarks ?? null,
     passScore: (assessment as any).passScore ?? 50,
     negativeMarking: (assessment as any).negativeMarking ?? 0,
+    startedAt: (candidate as any).assessmentStartedAt?.toISOString() ?? null,
+    submittedAt: (candidate as any).assessmentSubmittedAt?.toISOString() ?? null,
     publishedAt: (assessment as any).answerKeyPublishedAt?.toISOString() ?? null,
     questions,
   });

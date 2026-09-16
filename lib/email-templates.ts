@@ -191,6 +191,7 @@ export function interviewScheduledEmail({
   meetingLink,
   location,
   portalLink,
+  company,
 }: {
   candidateName: string;
   jobTitle: string;
@@ -199,6 +200,7 @@ export function interviewScheduledEmail({
   meetingLink?: string;
   location?: string;
   portalLink?: string;
+  company?: { name?: string; icon?: string };
 }) {
   const dateStr = scheduledAt.toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
@@ -258,7 +260,7 @@ export function interviewScheduledEmail({
     ` : ""}
 
     <p style="margin:0;font-size:14px;color:#64748b;">Please be prepared and join on time. Good luck!</p>
-  `, { title: "Interview Scheduled" });
+  `, { title: "Interview Scheduled", companyName: company?.name, companyLogo: company?.icon });
 
   return {
     subject: `Interview Scheduled for ${jobTitle} (${roundType})`,
@@ -275,12 +277,14 @@ export function assessmentInvitationEmail({
   dateStr,
   durationMinutes,
   portalLink,
+  company,
 }: {
   candidateName: string;
   jobTitle: string;
   dateStr: string;
   durationMinutes?: number | null;
   portalLink?: string;
+  company?: { name?: string; icon?: string };
 }) {
   const html = baseEmailLayout(`
     <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#1e293b;">Online Assessment Available</h2>
@@ -316,7 +320,7 @@ export function assessmentInvitationEmail({
     ${portalLink ? emailButton(portalLink, "Start Assessment") : ""}
 
     <p style="margin:0;font-size:14px;color:#64748b;">Complete the test before the time limit. It will auto-submit when the time is up. Good luck!</p>
-  `, { title: "Online Assessment Available" });
+  `, { title: "Online Assessment Available", companyName: company?.name, companyLogo: company?.icon });
 
   return {
     subject: `Online Assessment Available for ${jobTitle}`,
@@ -335,6 +339,7 @@ export function interviewRescheduledEmail({
   meetingLink,
   location,
   portalLink,
+  company,
 }: {
   candidateName: string;
   jobTitle: string;
@@ -343,6 +348,7 @@ export function interviewRescheduledEmail({
   meetingLink?: string;
   location?: string;
   portalLink?: string;
+  company?: { name?: string; icon?: string };
 }) {
   const dateStr = scheduledAt.toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
@@ -402,7 +408,7 @@ export function interviewRescheduledEmail({
     ` : ""}
 
     <p style="margin:0;font-size:14px;color:#64748b;">Please update your calendar accordingly. Apologies for any inconvenience.</p>
-  `, { title: "Interview Rescheduled" });
+  `, { title: "Interview Rescheduled", companyName: company?.name, companyLogo: company?.icon });
 
   return {
     subject: `Interview Rescheduled – ${jobTitle} (${roundType})`,
@@ -418,11 +424,13 @@ export function interviewCancelledEmail({
   jobTitle,
   roundType,
   portalLink,
+  company,
 }: {
   candidateName: string;
   jobTitle: string;
   roundType: string;
   portalLink?: string;
+  company?: { name?: string; icon?: string };
 }) {
   const html = baseEmailLayout(`
     <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#dc2626;">Interview Cancelled</h2>
@@ -447,7 +455,7 @@ export function interviewCancelledEmail({
     ` : ""}
 
     <p style="margin:0;font-size:14px;color:#64748b;">We apologise for any inconvenience caused.</p>
-  `, { title: "Interview Cancelled" });
+  `, { title: "Interview Cancelled", companyName: company?.name, companyLogo: company?.icon });
 
   return {
     subject: `Interview Cancelled – ${jobTitle} (${roundType})`,
@@ -465,6 +473,7 @@ export function offerLetterContent({
   department,
   joiningDate,
   portalLink,
+  company,
 }: {
   candidateName: string;
   designation: string;
@@ -472,6 +481,7 @@ export function offerLetterContent({
   department?: string;
   joiningDate?: Date | null;
   portalLink?: string;
+  company?: { name?: string; icon?: string };
 }): { subject: string; text: string; html: string } {
   const html = baseEmailLayout(`
     <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#1e293b;">Offer Letter</h2>
@@ -535,11 +545,51 @@ export function offerLetterContent({
 
     <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 16px;">
     <p style="margin:0;font-size:12px;color:#94a3b8;">This is a system-generated offer letter. For any queries, please contact the HR team.</p>
-  `, { title: "Offer Letter" });
+  `, { title: "Offer Letter", companyName: company?.name, companyLogo: company?.icon });
 
   return {
     subject: `Offer Letter - ${designation} position`,
     text: `Dear ${candidateName},\n\nWe are pleased to offer you the position of ${designation}.\n\nOffered CTC: ₹${offeredCTC.toLocaleString()}/year\n\n${portalLink ? `Log in to the candidate portal to view and accept your offer letter: ${portalLink}` : "Please log in to the candidate portal to view and accept your offer letter."}`,
+    html,
+  };
+}
+
+// ── Edit Application Enabled ────────────────────────────────
+
+export function editApplicationsEnabledEmail({
+  candidateName,
+  jobTitle,
+  portalLink,
+  company,
+}: {
+  candidateName: string;
+  jobTitle: string;
+  portalLink?: string;
+  company?: { name?: string; icon?: string };
+}): { subject: string; text: string; html: string } {
+  const html = baseEmailLayout(`
+    <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#1e293b;">Update your application</h2>
+    <p style="margin:0 0 20px;font-size:14px;color:#64748b;">${jobTitle}</p>
+
+    <p style="margin:0 0 8px;font-size:15px;color:#334155;">Dear ${candidateName},</p>
+    <p style="margin:0 0 24px;font-size:15px;color:#334155;">
+      We have opened <strong>editing</strong> for your application to <strong>${jobTitle}</strong>.
+      You can now update your name, phone number, resume, and portfolio or LinkedIn links.
+    </p>
+
+    ${portalLink
+      ? `<div style="margin:0 0 24px;padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
+          <p style="margin:0 0 8px;font-size:14px;color:#64748b;">Use the button below to review and update your application:</p>
+          ${emailButton(portalLink, "Update Application")}
+        </div>`
+      : `<p style="margin:0 0 8px;font-size:14px;color:#64748b;">Log in to the candidate portal to update your application.</p>`}
+
+    <p style="margin:0;font-size:14px;color:#64748b;">If you did not apply for this role, you can ignore this email.</p>
+  `, { title: "Update your application", companyName: company?.name, companyLogo: company?.icon });
+
+  return {
+    subject: `Update your application for ${jobTitle}`,
+    text: `Dear ${candidateName},\n\nWe have opened editing for your application to ${jobTitle}. You can now update your name, phone number, resume, and portfolio or LinkedIn links.${portalLink ? `\n\nUpdate your application: ${portalLink}` : "\n\nLog in to the candidate portal to update your application."}`,
     html,
   };
 }

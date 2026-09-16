@@ -13,6 +13,7 @@ import type {
   Stage,
   WorkflowStatus,
 } from "@/lib/recruitment-types";
+import { STAGES } from "@/lib/recruitment-types";
 
 type ModalState =
   | { type: "create-job" }
@@ -59,11 +60,17 @@ type RecruitmentStore = {
   setModal: (modal: ModalState) => void;
   setError: (error: string | null) => void;
 
+  stages: Stage[];
+  canManage: boolean;
+  stagesLoaded: boolean;
+  fetchStages: (silent?: boolean) => Promise<void>;
+  reorderStages: (next: Stage[]) => Promise<void>;
+
   fetchDashboard: () => Promise<void>;
   fetchJobs: (params?: Record<string, string>) => Promise<void>;
   fetchJob: (id: string) => Promise<void>;
   createJob: (data: Partial<ATSJob>) => Promise<ATSJob>;
-  updateJob: (id: string, data: Partial<ATSJob>) => Promise<void>;
+  updateJob: (id: string, data: Partial<ATSJob> & { action?: string }) => Promise<void>;
   deleteJob: (id: string) => Promise<void>;
   requestJob: (data: { title: string; assignedHR: string; openings?: number }) => Promise<void>;
   fetchMyTasks: () => Promise<void>;
@@ -76,6 +83,7 @@ type RecruitmentStore = {
   createCandidate: (data: Partial<ATSCandidate>) => Promise<ATSCandidate>;
   updateCandidate: (id: string, data: Partial<ATSCandidate>) => Promise<void>;
   moveCandidateStage: (candidateId: string, toStage: Stage) => Promise<void>;
+  setAtsDecision: (candidateId: string, decision: "selected" | "rejected", note?: string) => Promise<void>;
   convertToEmployee: (candidateId: string, password: string, role?: string) => Promise<void>;
   deleteCandidate: (candidateId: string) => Promise<void>;
   silentRefreshCandidates: () => Promise<void>;
@@ -126,6 +134,33 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
 
   setModal: (modal) => set({ modal }),
   setError: (error) => set({ error }),
+
+  stages: STAGES,
+  canManage: false,
+  stagesLoaded: false,
+
+  fetchStages: async (silent = false) => {
+    if (!silent && get().stagesLoaded) return;
+    try {
+      const data = await apiFetch<{ stages: { id: Stage; label: string }[]; canManage?: boolean }>("/api/recruitment/stages");
+      set({ stages: data.stages.map((s) => s.id), canManage: Boolean(data.canManage), stagesLoaded: true });
+    } catch {
+      set({ stages: STAGES, canManage: false, stagesLoaded: true });
+    }
+  },
+
+  reorderStages: async (next) => {
+    set({ stages: next });
+    try {
+      const data = await apiFetch<{ stages: { id: Stage; label: string }[] }>("/api/recruitment/stages", {
+        method: "PATCH",
+        body: JSON.stringify({ stages: next }),
+      });
+      set({ stages: data.stages.map((s) => s.id) });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : "Failed to update stage order." });
+    }
+  },
 
   fetchDashboard: async () => {
     try {
@@ -186,6 +221,9 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
         jobs: state.jobs.map((j) => (j.id === id ? job : j)),
         activeJob: state.activeJob?.id === id ? job : state.activeJob,
       }));
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : "Update failed." });
+      throw error;
     } finally {
       set({ saving: false });
     }
@@ -311,6 +349,22 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
       const { candidate } = await apiFetch<{ candidate: ATSCandidate }>(
         `/api/recruitment/candidates/${candidateId}/stage`,
         { method: "PATCH", body: JSON.stringify({ stage: toStage }) }
+      );
+      set((state) => ({
+        candidates: state.candidates.map((c) => (c.id === candidateId ? candidate : c)),
+        activeCandidate: state.activeCandidate?.id === candidateId ? candidate : state.activeCandidate,
+      }));
+    } finally {
+      set({ saving: false });
+    }
+  },
+
+  setAtsDecision: async (candidateId, decision, note) => {
+    set({ saving: true, error: null });
+    try {
+      const { candidate } = await apiFetch<{ candidate: ATSCandidate }>(
+        `/api/recruitment/candidates/${candidateId}/ats-decision`,
+        { method: "POST", body: JSON.stringify({ decision, note }) }
       );
       set((state) => ({
         candidates: state.candidates.map((c) => (c.id === candidateId ? candidate : c)),

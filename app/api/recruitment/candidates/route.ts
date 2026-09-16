@@ -4,7 +4,11 @@ import { ATSCandidate } from "@/models/ATSCandidate";
 import { ATSJob } from "@/models/ATSJob";
 import { ATSTimeline } from "@/models/ATSTimeline";
 import { ATSAuditLog } from "@/models/ATSAuditLog";
+import { ATSReferral } from "@/models/ATSReferral";
+import { Company } from "@/models/Company";
+import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
+import { companyCodePrefix } from "@/lib/company-identity";
 import { isObjectId, jsonError, requireUserId, serializeDoc, serializeDocs } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
 
@@ -96,6 +100,25 @@ export async function POST(request: Request) {
   const job = await ATSJob.findOne({ _id: body.job, company: user.company });
   if (!job) return jsonError("Job not found.", 404);
 
+  const referralId = String(body.referralId ?? "").trim();
+  let referralEmployee: any = null;
+  if (referralId) {
+    const companyDoc = await Company.findOne({ _id: user.company });
+    if (!companyDoc) return jsonError("Company not found.", 404);
+    const expectedPrefix = companyCodePrefix(companyDoc.name);
+    const actualPrefix = referralId.includes("-") ? referralId.slice(0, referralId.lastIndexOf("-")) : "";
+    if (!actualPrefix || expectedPrefix !== actualPrefix) {
+      return jsonError("Referral company does not match this job's company.");
+    }
+    referralEmployee = await User.findOne({
+      companyIdentityCode: referralId,
+      company: user.company,
+    });
+    if (!referralEmployee) {
+      return jsonError("Referral employee not found. Please check the referral ID.");
+    }
+  }
+
   const candidate = await ATSCandidate.create({
     firstName: String(body.firstName).trim(),
     lastName: String(body.lastName ?? "").trim(),
@@ -103,10 +126,11 @@ export async function POST(request: Request) {
     phone: String(body.phone ?? "").trim(),
     currentCompany: String(body.currentCompany ?? "").trim(),
     experienceYears: Number(body.experienceYears) || 0,
+    internshipExperienceMonths: Number(body.internshipExperienceMonths) || 0,
     currentCTC: Number(body.currentCTC) || 0,
     expectedCTC: Number(body.expectedCTC) || 0,
     noticePeriod: Number(body.noticePeriod) || 0,
-    source: body.source || "Other",
+    source: referralEmployee ? "Referral" : (body.source || "Other"),
     stage: "applied",
     rating: Number(body.rating) || 0,
     notes: String(body.notes ?? "").trim(),
@@ -117,11 +141,35 @@ export async function POST(request: Request) {
     company: user.company,
   });
 
+  if (referralEmployee) {
+    await ATSReferral.create({
+      employee: referralEmployee._id,
+      candidate: candidate._id,
+      job: job._id,
+      referralId,
+      status: "pending",
+      referralBonusEligible: false,
+      company: user.company,
+    });
+    const candidateName = `${candidate.firstName} ${candidate.lastName}`.trim();
+    await Notification.create({
+      user: referralEmployee._id,
+      company: user.company,
+      type: "info",
+      title: "New Referral Application",
+      message: `${candidateName} was added using your referral for ${job.title}.`,
+      link: `/recruitment/candidates/${candidate._id}`,
+    });
+    emitToUser(String(referralEmployee._id), "notification:new", {
+      message: `${candidateName} added using your referral for ${job.title}.`,
+    });
+  }
+
   await ATSTimeline.create({
     candidate: candidate._id,
     job: job._id,
     action: "applied",
-    metadata: { source: body.source || "Other" },
+    metadata: { source: referralEmployee ? "Referral" : (body.source || "Other") },
     actor: userId,
     company: user.company,
   });

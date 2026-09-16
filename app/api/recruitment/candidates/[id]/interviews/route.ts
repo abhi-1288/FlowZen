@@ -6,6 +6,7 @@ import { ATSTimeline } from "@/models/ATSTimeline";
 import { ATSAuditLog } from "@/models/ATSAuditLog";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
+import { Company } from "@/models/Company";
 import { isObjectId, jsonError, requireUserId, serializeDocs } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
 import { sendMail } from "@/lib/mailer";
@@ -173,6 +174,7 @@ export async function POST(request: Request, { params }: Params) {
 
   // Send email notifications
   try {
+    const companyDoc = await Company.findById(user.company).select("name icon");
     const candidateName = `${candidate.firstName} ${candidate.lastName}`.trim();
     const jobTitle = (candidate.job as any)?.title ?? "Position";
 
@@ -185,6 +187,7 @@ export async function POST(request: Request, { params }: Params) {
         scheduledAt: new Date(body.scheduledAt),
         meetingLink: body.meetingLink,
         location: String(body.location ?? "").trim(),
+        company: { name: (companyDoc as any)?.name, icon: (companyDoc as any)?.icon },
       });
       await sendMail({ to: interviewerUser.email, subject: interviewerEmail.subject, text: "", html: interviewerEmail.html });
     }
@@ -200,6 +203,7 @@ export async function POST(request: Request, { params }: Params) {
         meetingLink: body.meetingLink,
         location: String(body.location ?? "").trim(),
         portalLink,
+        company: { name: (companyDoc as any)?.name, icon: (companyDoc as any)?.icon },
       });
       await sendMail({ to: candidate.email, subject: candidateEmail.subject, text: "", html: candidateEmail.html });
     }

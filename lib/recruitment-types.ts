@@ -31,6 +31,19 @@ export const STAGES: Stage[] = [
   "rejected",
 ];
 
+export const CORE_STAGES: Stage[] = [
+  "applied",
+  "screening",
+  "assessment",
+  "technical-interview",
+  "manager-round",
+  "hr-round",
+  "offer",
+  "joined",
+];
+
+export const TERMINAL_STAGES: Stage[] = ["ats-rejected", "rejected"];
+
 export const STAGE_LABELS: Record<Stage, string> = {
   applied: "Applied",
   screening: "Screening",
@@ -85,7 +98,8 @@ export type TimelineAction =
   | "note-added"
   | "assessment-started"
   | "assessment-submitted"
-  | "assessment-graded";
+  | "assessment-graded"
+  | "application-updated";
 
 export type ATSJob = {
   id: string;
@@ -100,6 +114,7 @@ export type ATSJob = {
   requiredExperienceYears: number | null;
   requiredExperienceMaxYears: number | null;
   atsScoreThreshold: number | null;
+  editApplicationsEnabled: boolean;
   salaryRangeMin: number;
   salaryRangeMax: number;
   salaryType: SalaryType;
@@ -174,9 +189,9 @@ export type ATSCandidate = {
 
 export type ATSInterview = {
   id: string;
-  candidate: { id: string; firstName: string; lastName: string } | string;
-  job: { id: string; title: string } | string;
-  interviewer: { id: string; name: string; email: string } | string;
+  candidate: { id: string; firstName: string; lastName: string; email: string; phone: string; stage: string; resumeUrl: string; atsScore: number | null; atsStatus: "pending" | "selected" | "rejected"; assessmentScore: number | null; assessmentStatus: "pending" | "selected" | "rejected"; assessmentRawMarks: number | null; assessmentMaxMarks: number | null } | string;
+  job: { id: string; title: string; requiredSkills: string[]; description: string } | string;
+  interviewer: { id: string; name: string; email: string; companyIdentityCode?: string } | string;
   roundType: RoundType;
   scheduledAt: string;
   meetingLink: string;
@@ -190,7 +205,7 @@ export type ATSInterview = {
     overallRecommendation: Recommendation;
     notes: string;
   };
-  createdBy: string;
+  createdBy: { id: string; name: string; companyIdentityCode?: string } | string;
   company: string;
   createdAt: string;
   updatedAt: string;

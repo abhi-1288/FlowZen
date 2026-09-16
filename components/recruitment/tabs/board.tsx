@@ -15,9 +15,9 @@ export function BoardTab() {
   const draggingRef = useRef(false);
 
   useEffect(() => {
+    void fetchJobs({ limit: "0" });
     if (candidates.length === 0) void fetchCandidates({ limit: "0" });
-    if (jobs.length === 0) void fetchJobs({ limit: "0" });
-  }, [candidates.length, jobs.length, fetchCandidates, fetchJobs]);
+  }, [candidates.length, fetchCandidates, fetchJobs]);
 
   const startResize = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -162,7 +162,7 @@ export function BoardTab() {
                   </span>
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-white">
-                  <RecruitmentKanbanBoard candidates={jobCandidates} />
+                  <RecruitmentKanbanBoard candidates={jobCandidates} excludeStages={job.assessment ? undefined : ["assessment"]} />
                 </div>
               </section>
             ))

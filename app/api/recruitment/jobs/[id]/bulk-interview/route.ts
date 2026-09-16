@@ -7,6 +7,7 @@ import { ATSTimeline } from "@/models/ATSTimeline";
 import { ATSAuditLog } from "@/models/ATSAuditLog";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
+import { Company } from "@/models/Company";
 import { isObjectId, jsonError, requireUserId } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
 import { sendMail } from "@/lib/mailer";
@@ -61,6 +62,7 @@ export async function POST(request: Request, { params }: Params) {
   const interviewerUser = await User.findById(body.interviewer).select("name email role");
 
   const origin = buildOrigin(request);
+  const companyDoc = await Company.findById(user.company).select("name icon");
 
   let created = 0;
   let advanced = 0;
@@ -163,13 +165,13 @@ export async function POST(request: Request, { params }: Params) {
       try {
         const jobTitle = (candidate.job as any)?.title ?? "Position";
         if (interviewerUser?.email) {
-          const interviewerEmail = interviewScheduledEmail({ candidateName, jobTitle, roundType, scheduledAt, meetingLink, location });
+          const interviewerEmail = interviewScheduledEmail({ candidateName, jobTitle, roundType, scheduledAt, meetingLink, location, company: { name: (companyDoc as any)?.name, icon: (companyDoc as any)?.icon } });
           await sendMail({ to: interviewerUser.email, subject: interviewerEmail.subject, text: "", html: interviewerEmail.html });
         }
         if (candidate.email) {
           const candidateToken = await resolveCandidatePortalToken(String(candidate._id));
           const portalLink = buildPortalLink(origin, candidateToken);
-          const candidateEmail = interviewScheduledEmail({ candidateName, jobTitle, roundType, scheduledAt, meetingLink, location, portalLink });
+          const candidateEmail = interviewScheduledEmail({ candidateName, jobTitle, roundType, scheduledAt, meetingLink, location, portalLink, company: { name: (companyDoc as any)?.name, icon: (companyDoc as any)?.icon } });
           await sendMail({ to: candidate.email, subject: candidateEmail.subject, text: "", html: candidateEmail.html });
         }
       } catch (emailErr) {

@@ -7,6 +7,7 @@ export function RecruitmentSSEListener() {
   const silentRefreshCandidates = useRecruitmentStore((s) => s.silentRefreshCandidates);
   const fetchJobs = useRecruitmentStore((s) => s.fetchJobs);
   const fetchOffers = useRecruitmentStore((s) => s.fetchOffers);
+  const fetchStages = useRecruitmentStore((s) => s.fetchStages);
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
 
   useEffect(() => {
@@ -30,6 +31,10 @@ export function RecruitmentSSEListener() {
         if (type.includes("offer") || type.includes("sign")) {
           refreshAfterDebounce("offers", () => fetchOffers({ page: "1", limit: "10" }), 2000);
         }
+        if (type === "stages-reordered") {
+          refreshAfterDebounce("stages", () => fetchStages(true), 500);
+        }
+        refreshAfterDebounce("jobs", () => fetchJobs({ limit: "0" }), 2000);
         refreshAfterDebounce("candidates", () => silentRefreshCandidates(), 2000);
       });
 
@@ -52,7 +57,7 @@ export function RecruitmentSSEListener() {
         clearTimeout(debounceRef.current[key]!);
       }
     };
-  }, [silentRefreshCandidates, fetchJobs, fetchOffers]);
+  }, [silentRefreshCandidates, fetchJobs, fetchOffers, fetchStages]);
 
   return null;
 }

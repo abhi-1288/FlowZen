@@ -4,6 +4,7 @@ import { ATSInterview } from "@/models/ATSInterview";
 import { ATSTimeline } from "@/models/ATSTimeline";
 import { ATSAuditLog } from "@/models/ATSAuditLog";
 import { User } from "@/models/User";
+import { Company } from "@/models/Company";
 import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
 import { canStartInterview } from "@/lib/interview-utils";
 import { emitToUser } from "@/lib/socket-emit";
@@ -99,6 +100,7 @@ export async function PATCH(request: Request, { params }: Params) {
 
   // Send email notifications
   try {
+    const companyDoc = await Company.findById(user.company).select("name icon");
     const candidateName = `${(interview.candidate as any)?.firstName ?? ""} ${(interview.candidate as any)?.lastName ?? ""}`.trim();
     const jobTitle = (interview.job as any)?.title ?? "Position";
     const scheduledAt = interview.scheduledAt;
@@ -108,7 +110,7 @@ export async function PATCH(request: Request, { params }: Params) {
     if (wasCancelled) {
       const candidateToken = await resolveCandidatePortalToken(String((interview.candidate as any)._id));
       const portalLink = buildPortalLink(buildOrigin(request), candidateToken);
-      const candidateEmail = interviewCancelledEmail({ candidateName, jobTitle, roundType: interview.roundType, portalLink });
+      const candidateEmail = interviewCancelledEmail({ candidateName, jobTitle, roundType: interview.roundType, portalLink, company: { name: (companyDoc as any)?.name, icon: (companyDoc as any)?.icon } });
       if ((interview.candidate as any)?.email) {
         await sendMail({ to: (interview.candidate as any).email, subject: candidateEmail.subject, text: "", html: candidateEmail.html });
       }
@@ -118,7 +120,7 @@ export async function PATCH(request: Request, { params }: Params) {
     } else if (wasRescheduled) {
       const candidateToken = await resolveCandidatePortalToken(String((interview.candidate as any)._id));
       const portalLink = buildPortalLink(buildOrigin(request), candidateToken);
-      const email = interviewRescheduledEmail({ candidateName, jobTitle, roundType: interview.roundType, scheduledAt, meetingLink, location, portalLink });
+      const email = interviewRescheduledEmail({ candidateName, jobTitle, roundType: interview.roundType, scheduledAt, meetingLink, location, portalLink, company: { name: (companyDoc as any)?.name, icon: (companyDoc as any)?.icon } });
       if ((interview.candidate as any)?.email) {
         await sendMail({ to: (interview.candidate as any).email, subject: email.subject, text: "", html: email.html });
       }

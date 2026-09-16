@@ -9,13 +9,24 @@ import { ATSReferral } from "@/models/ATSReferral";
 import { ATSAuditLog } from "@/models/ATSAuditLog";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
+import { Company } from "@/models/Company";
 import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
 import { autoCloseOverdueJobs } from "@/lib/recruitment-utils";
 import { deleteFileByUrl } from "@/lib/storage";
+import { buildOrigin, buildPortalLink, resolveCandidatePortalToken } from "@/lib/candidate-portal";
+import { sendMail } from "@/lib/mailer";
+import { editApplicationsEnabledEmail } from "@/lib/email-templates";
 
 type Params = { params: Promise<{ id: string }> };
 const HR_ROLES = ["admin", "human-resource"];
+
+async function notifyJobUpdated(companyId: string) {
+  const users = await User.find({ company: companyId });
+  for (const u of users) {
+    emitToUser(String(u._id), "recruitment:update", { type: "job-updated" });
+  }
+}
 
 export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
@@ -147,6 +158,7 @@ if (body.requiredExperienceYears !== undefined) updates.requiredExperienceYears 
         message: `Draft saved for ${(job as any).title}.`,
       });
     }
+    await notifyJobUpdated(companyId);
     return NextResponse.json({ job: serializeDoc(job!) });
   }
 
@@ -266,6 +278,61 @@ if (body.requiredExperienceYears !== undefined) updates.requiredExperienceYears 
     return NextResponse.json({ job: serializeDoc(job!) });
   }
 
+  if (action === "enable-edit-applications" || action === "disable-edit-applications") {
+    const enabled = action === "enable-edit-applications";
+    const job = await ATSJob.findOneAndUpdate(
+      { _id: id, company: companyId },
+      { $set: { editApplicationsEnabled: enabled } },
+      { new: true }
+    ).populate("company", "name icon");
+    if (!job) return jsonError("Job not found.", 404);
+
+    await ATSAuditLog.create({
+      actor: userId,
+      action: enabled ? "enable-edit-applications" : "disable-edit-applications",
+      entityType: "ATSJob",
+      entityId: job._id,
+      metadata: { title: job.title },
+      company: companyId,
+    });
+
+    await notifyJobUpdated(companyId);
+
+    if (enabled) {
+      const candidates = await ATSCandidate.find(
+        { job: id, company: companyId, email: { $ne: "" } },
+        "firstName lastName email"
+      );
+      const companyDoc = job.company as any;
+      const brand = {
+        name: (companyDoc as any)?.name,
+        icon: (companyDoc as any)?.icon,
+      };
+      const origin = buildOrigin(request);
+      let emailed = 0;
+      for (const candidate of candidates) {
+        try {
+          const token = await resolveCandidatePortalToken(String(candidate._id));
+          if (!token || !candidate.email) continue;
+          const portalLink = buildPortalLink(origin, token);
+          const emailContent = editApplicationsEnabledEmail({
+            candidateName: `${candidate.firstName} ${candidate.lastName}`.trim(),
+            jobTitle: job.title,
+            portalLink,
+            company: brand,
+          });
+          await sendMail({ to: candidate.email, subject: emailContent.subject, text: "", html: emailContent.html });
+          emailed++;
+        } catch (emailErr) {
+          console.error("Failed to send edit-application email:", emailErr);
+        }
+      }
+      return NextResponse.json({ job: serializeDoc(job), emailed });
+    }
+
+    return NextResponse.json({ job: serializeDoc(job) });
+  }
+
   // Fallback: regular field updates (for published/open/closed jobs)
   const updates: Record<string, unknown> = {};
   if (body.title !== undefined) updates.title = String(body.title).trim();
@@ -312,6 +379,8 @@ if (body.requiredExperienceYears !== undefined) updates.requiredExperienceYears 
     metadata: { title: job.title, updates: Object.keys(updates) },
     company: companyId,
   });
+
+  await notifyJobUpdated(companyId);
 
   if (wasPublished) {
     const hrUsers = await User.find({ company: companyId, role: "human-resource" });

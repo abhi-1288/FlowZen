@@ -68,7 +68,11 @@ const CompanySchema = new Schema(
     identityCodeDigits: { type: Number, default: null },
     identityCodeStartRange: { type: Number, default: null },
     identityCodeEndRange: { type: Number, default: null },
-    identityCodeNextNumber: { type: Number, default: null }
+    identityCodeNextNumber: { type: Number, default: null },
+    stageOrder: {
+      type: [String],
+      default: ["applied", "screening", "assessment", "technical-interview", "manager-round", "hr-round", "offer", "joined", "ats-rejected", "rejected"],
+    }
   },
   { timestamps: true }
 );

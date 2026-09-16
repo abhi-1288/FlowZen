@@ -41,9 +41,10 @@ export async function GET(request: Request) {
       .sort({ scheduledAt: -1 })
       .skip(skip)
       .limit(limit || undefined)
-      .populate("interviewer", "name email")
-      .populate("candidate", "firstName lastName email phone stage")
-      .populate("job", "title"),
+      .populate("interviewer", "name email companyIdentityCode")
+      .populate("candidate", "firstName lastName email phone stage resumeUrl atsScore atsStatus assessmentScore assessmentStatus assessmentRawMarks assessmentMaxMarks")
+      .populate("job", "title requiredSkills description")
+      .populate("createdBy", "name companyIdentityCode"),
   ]);
 
   return NextResponse.json({ interviews: serializeDocs(interviews), totalCount, page, limit });

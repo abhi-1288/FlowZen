@@ -30,6 +30,7 @@ import {
   IdCard,
   Printer,
   Download,
+  Pencil,
 } from "lucide-react";
 import QRCode from "qrcode";
 import html2canvas from "html2canvas";
@@ -38,13 +39,18 @@ import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
 import { JobDescription } from "@/components/recruitment/job-description";
 import { DEFAULT_ACCENT, hexToRgba, salarySuffix } from "@/lib/accent";
 import { AssessmentPanel } from "@/components/candidate-portal/assessment-panel";
+import EditApplicationModal from "@/components/candidate-portal/edit-application-modal";
 
 type CandidateData = {
   id: string;
   firstName: string;
   lastName: string;
   email: string;
+  phone?: string;
+  portfolioUrl?: string;
+  linkedInUrl?: string;
   stage: string;
+  stageOrder?: string[];
   resumeUrl: string;
   job: {
     title: string;
@@ -60,6 +66,7 @@ type CandidateData = {
     assessment?: boolean;
     assessmentDate?: string | null;
     assessmentDurationMinutes?: number | null;
+    editApplicationsEnabled?: boolean;
   };
   company: { name: string; icon?: string; primaryColor?: string };
   createdAt: string;
@@ -79,7 +86,7 @@ type InterviewData = {
   meetingLink: string;
   location?: string;
   status: string;
-  interviewer: { id: string; name: string } | string;
+  interviewer: { id: string; name: string; companyIdentityCode?: string } | string;
 };
 
 type OfferData = {
@@ -123,6 +130,7 @@ const ACTION_LABELS: Record<string, string> = {
   "assessment-started": "Assessment Started",
   "assessment-submitted": "Assessment Submitted",
   "assessment-graded": "Assessment Result",
+  "application-updated": "Application Updated",
 };
 
 const STAGE_ORDER = ["applied", "screening", "assessment", "technical-interview", "manager-round", "hr-round", "offer", "joined"];
@@ -328,6 +336,16 @@ function getTimelineDetails(entry: TimelineEntry): {
       return { title: "Assessment Submitted", description: "Your assessment has been submitted successfully.", icon: <Send {...iconProps} />, iconBg: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400", meta: [] };
     case "assessment-graded":
       return { title: "Assessment Result", description: m.content ? String(m.content) : "Your assessment result is available.", icon: <CheckCircle {...iconProps} />, iconBg: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400", meta: [] };
+    case "application-updated":
+      return {
+        title: "Application Updated",
+        description: "You updated your application details.",
+        icon: <Pencil {...iconProps} />,
+        iconBg: "bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-400",
+        meta: Array.isArray(m.fields)
+          ? (m.fields as string[]).map((f) => ({ icon: <CheckCircle size={11} />, label: f }))
+          : [],
+      };
     default:
       return {
         title: ACTION_LABELS[entry.action] || entry.action,
@@ -378,6 +396,7 @@ function CandidatePortalInner() {
   const [confirmAction, setConfirmAction] = useState<"accept" | "reject" | null>(null);
   const [activePass, setActivePass] = useState<InterviewData | null>(null);
   const [assessmentData, setAssessmentData] = useState<any>(null);
+  const [editAppOpen, setEditAppOpen] = useState(false);
   const assessmentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -387,7 +406,7 @@ function CandidatePortalInner() {
         if (!r.ok) { const d = await r.json(); throw new Error(d.error || "Invalid link."); }
         return r.json();
       })
-      .then((data) => { setCandidate(data.candidate); setTimeline(data.timeline ?? []); setInterviews(data.interviews ?? []); setOffer(data.offer ?? null); setAssessmentData(data.assessment ?? null); })
+      .then((data) => { setCandidate({ ...data.candidate, stageOrder: data.stageOrder }); setTimeline(data.timeline ?? []); setInterviews(data.interviews ?? []); setOffer(data.offer ?? null); setAssessmentData(data.assessment ?? null); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [token]);
@@ -418,7 +437,7 @@ function CandidatePortalInner() {
       const refreshRes = await fetch(`/api/public/candidate/me?token=${encodeURIComponent(token)}`);
       if (refreshRes.ok) {
         const refreshData = await refreshRes.json();
-        setCandidate(refreshData.candidate);
+        setCandidate({ ...refreshData.candidate, stageOrder: refreshData.stageOrder });
         setTimeline(refreshData.timeline ?? []);
         setInterviews(refreshData.interviews ?? []);
         setAssessmentData(refreshData.assessment ?? null);
@@ -492,7 +511,7 @@ function CandidatePortalInner() {
               fetch(`/api/public/candidate/me?token=${encodeURIComponent(token)}`)
                 .then((r) => r.json())
                 .then((d) => {
-                  setCandidate(d.candidate);
+                  setCandidate({ ...d.candidate, stageOrder: d.stageOrder });
                   setTimeline(d.timeline ?? []);
                   setAssessmentData(d.assessment ?? null);
                 })
@@ -504,7 +523,10 @@ function CandidatePortalInner() {
     );
   }
 
-  const stageIdx = STAGE_ORDER.indexOf(candidate.stage);
+  const stageOrder = (candidate.stageOrder?.length ? candidate.stageOrder : STAGE_ORDER).filter(
+    (s) => s !== "ats-rejected" && s !== "rejected"
+  );
+  const stageIdx = stageOrder.indexOf(candidate.stage);
   const isRejected = candidate.stage === "rejected";
   const isJoined = candidate.stage === "joined";
 
@@ -578,11 +600,22 @@ function CandidatePortalInner() {
 
             {/* Application progress */}
             <div className="rounded-2xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] dark:bg-[#000000] p-6 shadow-sm sm:p-8">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-base font-bold text-slate-900 dark:text-zinc-100">Application progress</h2>
-                <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${stagePill.cls}`}>
-                  {STAGE_LABELS[candidate.stage] || formatStage(candidate.stage)}
-                </span>
+                <div className="flex items-center gap-2">
+                  {candidate.job?.editApplicationsEnabled && (
+                    <button
+                      onClick={() => setEditAppOpen(true)}
+                      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all hover:opacity-90"
+                      style={{ backgroundColor: accent, color: "#fff" }}
+                    >
+                      <Pencil size={12} /> Edit application
+                    </button>
+                  )}
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${stagePill.cls}`}>
+                    {STAGE_LABELS[candidate.stage] || formatStage(candidate.stage)}
+                  </span>
+                </div>
               </div>
 
               {isRejected ? (
@@ -599,7 +632,7 @@ function CandidatePortalInner() {
                 <div className="mt-5 overflow-x-auto">
                   <div className="min-w-[560px]">
                     <div className="flex items-center gap-1">
-                      {STAGE_ORDER.map((s, i) => (
+                      {stageOrder.map((s, i) => (
                         <div key={s} className="flex flex-1 items-center gap-1">
                           <div
                             className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold transition-all ${
@@ -611,7 +644,7 @@ function CandidatePortalInner() {
                           >
                             {i < stageIdx ? <CheckCircle size={13} /> : i + 1}
                           </div>
-                          {i < STAGE_ORDER.length - 1 && (
+                          {i < stageOrder.length - 1 && (
                             <div
                               className="h-0.5 flex-1"
                               style={{ backgroundColor: i < stageIdx ? accent : "var(--c-bg-hover)" }}
@@ -621,11 +654,11 @@ function CandidatePortalInner() {
                       ))}
                     </div>
                     <div className="mt-2 flex px-0.5 text-[9px] font-medium text-slate-500 dark:text-zinc-400">
-                      {STAGE_ORDER.map((s, i) => (
+                      {stageOrder.map((s, i) => (
                         <span
                           key={s}
                           className={`text-center ${i <= stageIdx ? "opacity-100" : "opacity-60"}`}
-                          style={{ width: `${100 / STAGE_ORDER.length}%` }}
+                          style={{ width: `${100 / stageOrder.length}%` }}
                         >
                           {STAGE_LABELS[s]}
                         </span>
@@ -941,6 +974,28 @@ function CandidatePortalInner() {
         />
       )}
 
+      {editAppOpen && candidate && (
+        <EditApplicationModal
+          candidate={candidate}
+          token={token!}
+          accent={accent}
+          onClose={() => setEditAppOpen(false)}
+          onSaved={() => {
+            if (!token) return;
+            fetch(`/api/public/candidate/me?token=${encodeURIComponent(token)}`)
+              .then((r) => r.json())
+              .then((d) => {
+                setCandidate({ ...d.candidate, stageOrder: d.stageOrder });
+                setTimeline(d.timeline ?? []);
+                setInterviews(d.interviews ?? []);
+                setOffer(d.offer ?? null);
+                setAssessmentData(d.assessment ?? null);
+              })
+              .catch(() => {});
+          }}
+        />
+      )}
+
       {/* --- Confirmation Modal --- */}
       {confirmAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
@@ -1091,6 +1146,7 @@ function IdCardModal({
   const dateStr = new Date(interview.scheduledAt).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
   const timeStr = new Date(interview.scheduledAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
   const interviewerName = typeof interview.interviewer === "object" ? interview.interviewer.name : "";
+  const interviewerIdentity = typeof interview.interviewer === "object" ? interview.interviewer.companyIdentityCode || "" : "";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm" onClick={onClose}>
@@ -1145,7 +1201,7 @@ function IdCardModal({
               {interviewerName && (
                 <div className="flex items-center gap-2">
                   <User size={14} style={{ color: accent }} />
-                  <span className="text-slate-500">Contact: <span className="font-medium text-slate-700">{interviewerName}</span></span>
+                  <span className="text-slate-500">Contact: <span className="font-medium text-slate-700">{interviewerName}{interviewerIdentity ? ` · ${interviewerIdentity}` : ""}</span></span>
                 </div>
               )}
             </div>
