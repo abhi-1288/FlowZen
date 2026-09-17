@@ -15,6 +15,19 @@ import type {
 } from "@/lib/recruitment-types";
 import { STAGES } from "@/lib/recruitment-types";
 
+export type ConvertEmailInfo = {
+  exists: boolean;
+  isInYourCompany?: boolean;
+  user?: {
+    email: string;
+    name: string;
+    companyName: string | null;
+    companyIdentityCode: string | null;
+    companyStatus: string;
+    role: string;
+  };
+};
+
 type ModalState =
   | { type: "create-job" }
   | { type: "edit-job"; jobId: string }
@@ -84,7 +97,9 @@ type RecruitmentStore = {
   updateCandidate: (id: string, data: Partial<ATSCandidate>) => Promise<void>;
   moveCandidateStage: (candidateId: string, toStage: Stage) => Promise<void>;
   setAtsDecision: (candidateId: string, decision: "selected" | "rejected", note?: string) => Promise<void>;
-  convertToEmployee: (candidateId: string, password: string, role?: string) => Promise<void>;
+  convertToEmployee: (candidateId: string, password: string, role?: string, email?: string, otp?: string) => Promise<void>;
+  fetchConvertEmailInfo: (candidateId: string, email?: string) => Promise<ConvertEmailInfo>;
+  sendConvertOtp: (candidateId: string, email: string) => Promise<void>;
   deleteCandidate: (candidateId: string) => Promise<void>;
   silentRefreshCandidates: () => Promise<void>;
 
@@ -375,16 +390,30 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
     }
   },
 
-  convertToEmployee: async (candidateId, password, role) => {
+  convertToEmployee: async (candidateId, password, role, email, otp) => {
     set({ saving: true, error: null });
     try {
       await apiFetch(`/api/recruitment/candidates/${candidateId}/convert`, {
         method: "POST",
-        body: JSON.stringify({ password, role }),
+        body: JSON.stringify({ password, role, email, otp }),
       });
     } finally {
       set({ saving: false });
     }
+  },
+
+  fetchConvertEmailInfo: async (candidateId, email) => {
+    const query = email ? `?email=${encodeURIComponent(email)}` : "";
+    return apiFetch<ConvertEmailInfo>(
+      `/api/recruitment/candidates/${candidateId}/convert/email-info${query}`,
+    );
+  },
+
+  sendConvertOtp: async (candidateId, email) => {
+    await apiFetch(`/api/recruitment/candidates/${candidateId}/convert/send-otp`, {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
   },
 
   deleteCandidate: async (candidateId) => {

@@ -56,6 +56,8 @@ export default function CandidateProfilePage() {
     updateCandidate,
     moveCandidateStage,
     convertToEmployee,
+    fetchConvertEmailInfo,
+    sendConvertOtp,
     uploadResume,
     setModal,
   } = useRecruitmentStore(
@@ -69,6 +71,8 @@ export default function CandidateProfilePage() {
       updateCandidate: s.updateCandidate,
       moveCandidateStage: s.moveCandidateStage,
       convertToEmployee: s.convertToEmployee,
+      fetchConvertEmailInfo: s.fetchConvertEmailInfo,
+      sendConvertOtp: s.sendConvertOtp,
       uploadResume: s.uploadResume,
       setModal: s.setModal,
     }))
@@ -87,6 +91,16 @@ export default function CandidateProfilePage() {
     activeCandidate && typeof activeCandidate.job === "object"
       ? (activeCandidate.job as any).id
       : null;
+
+  const handleLookupConvertEmail = useCallback(
+    (email?: string) => fetchConvertEmailInfo(id, email),
+    [id, fetchConvertEmailInfo],
+  );
+
+  const handleSendConvertOtp = useCallback(
+    (email: string) => sendConvertOtp(id, email),
+    [id, sendConvertOtp],
+  );
 
   useEffect(() => {
     void fetchCandidate(id);
@@ -1057,7 +1071,9 @@ export default function CandidateProfilePage() {
       <ConvertEmployeeModal
         isOpen={showConvertModal}
         onClose={() => setShowConvertModal(false)}
-        onSubmit={async (password, role) => { await convertToEmployee(id, password, role); }}
+        onSubmit={async (password, role, email, otp) => { await convertToEmployee(id, password, role, email, otp); }}
+        onLookupEmail={handleLookupConvertEmail}
+        onSendOtp={handleSendConvertOtp}
         candidateName={`${(activeCandidate as any).firstName} ${(activeCandidate as any).lastName}`}
         candidateEmail={(activeCandidate as any).email}
         isSeniorSecurity={isSeniorSecurity}

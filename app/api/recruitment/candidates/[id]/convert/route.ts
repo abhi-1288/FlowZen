@@ -43,12 +43,9 @@ export async function POST(request: Request, { params }: Params) {
   if (!hrUser || (!HR_ROLES.includes(hrUser.role) && !isSeniorSecurity)) return jsonError("Forbidden", 403);
   if (!hrUser.company) return jsonError("No company found.", 400);
 
-  const candidate = await ATSCandidate.findOne({ _id: id, company: hrUser.company }).populate("job", "title department employmentType durationMonths durationDays durationHours durationYears");
+  const candidate = await ATSCandidate.findOne({ _id: id, company: hrUser.company }).select("+conversionOtpHash").populate("job", "title department employmentType durationMonths durationDays durationHours durationYears");
   if (!candidate) return jsonError("Candidate not found.", 404);
   if (candidate.stage !== "joined") return jsonError("Candidate must be in 'Joined' stage to convert.", 400);
-
-  const existingUser = await User.findOne({ email: candidate.email });
-  if (existingUser) return jsonError("A user with this email already exists.", 409);
 
   const body = await request.json();
   const password = body.password;
@@ -57,6 +54,35 @@ export async function POST(request: Request, { params }: Params) {
   let role = String(body.role ?? "others").trim();
   if (!ALLOWED_CONVERT_ROLES.includes(role)) role = "others";
   if (isSeniorSecurity && role !== "security") return jsonError("Senior security can only convert to Junior Security role.", 403);
+
+  const originalEmail = String(candidate.email ?? "").trim().toLowerCase();
+  const finalEmail = String(body.email ?? candidate.email ?? "").trim().toLowerCase();
+  if (!finalEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(finalEmail)) {
+    return jsonError("Enter a valid email address.", 400);
+  }
+  const emailChanged = finalEmail !== originalEmail;
+
+  const existingUser = await User.findOne({ email: finalEmail });
+
+  if (emailChanged) {
+    if (String(candidate.convertedEmail ?? "").trim().toLowerCase() !== finalEmail) {
+      return jsonError("Please request a verification code for this email first.", 400);
+    }
+    if (!candidate.conversionOtpHash || !candidate.conversionOtpExpiresAt || candidate.conversionOtpExpiresAt.getTime() < Date.now()) {
+      return jsonError("Verification code expired. Please request a new one.", 410);
+    }
+    const otp = String(body.otp ?? "").trim();
+    if (!/^\d{6}$/.test(otp)) return jsonError("A valid 6-digit verification code is required.", 400);
+    const otpValid = await bcrypt.compare(otp, String(candidate.conversionOtpHash));
+    if (!otpValid) return jsonError("Invalid verification code.", 401);
+    if (existingUser) return jsonError("This email is already registered.", 409);
+  } else if (
+    existingUser &&
+    String(existingUser.company ?? "") === String(hrUser.company) &&
+    ["pending", "approved"].includes(String(existingUser.companyStatus ?? ""))
+  ) {
+    return jsonError("A user with this email is already present in this company.", 409);
+  }
 
   const company = await Company.findById(hrUser.company);
   const companyName = company?.name || "Company";
@@ -92,9 +118,9 @@ export async function POST(request: Request, { params }: Params) {
     if (jobDurationHours) employmentEndDate.setHours(employmentEndDate.getHours() + jobDurationHours);
   }
 
-  const employee = await User.create({
-    name: `${candidate.firstName} ${candidate.lastName}`.trim(),
-    email: candidate.email,
+  const candidateFullName = `${candidate.firstName} ${candidate.lastName}`.trim();
+
+  const baseAccountFields = {
     passwordHash,
     role: role === "security" ? "security" : role,
     isSeniorSecurity: role === "security" ? false : undefined,
@@ -102,9 +128,6 @@ export async function POST(request: Request, { params }: Params) {
     companyStatus: "pending",
     emailVerified: true,
     authProvider: "credentials",
-    phone: candidate.phone || "",
-    dob: candidate.dob || null,
-    address: candidate.address || "",
     companyJoined: joiningDate,
     employmentEndDate,
     employmentType: jobEmploymentType,
@@ -115,22 +138,43 @@ export async function POST(request: Request, { params }: Params) {
     salaryType: payBasis,
     hourlyRate: payBasis === "per-hour" ? offerCTC : 0,
     dailyRate: payBasis === "per-day" ? offerCTC : 0,
-  });
+  };
+
+  let employee: any;
+  if (!emailChanged && existingUser) {
+    // Reuse the existing account: preserve its name and any existing personal data.
+    const reuseFields: Record<string, unknown> = { ...baseAccountFields };
+    if (candidate.phone) reuseFields.phone = candidate.phone;
+    if (candidate.dob) reuseFields.dob = candidate.dob;
+    if (candidate.address) reuseFields.address = candidate.address;
+    employee = await User.findByIdAndUpdate(existingUser._id, reuseFields, { new: true });
+  } else {
+    // Email unchanged with no existing account, or a brand-new email account.
+    employee = await User.create({
+      email: finalEmail,
+      name: candidateFullName,
+      ...baseAccountFields,
+      phone: candidate.phone || "",
+      dob: candidate.dob || null,
+      address: candidate.address || "",
+    });
+  }
 
   // Best-effort: auto-fill empty personal details from the candidate's resume.
   if (candidate.resumeUrl) {
     try {
       const parsedResume = await parseResumeFromUrl(String(candidate.resumeUrl));
-      const hasDob = Boolean(candidate.dob);
-      if (!employee.phone && parsedResume.phone) employee.phone = parsedResume.phone;
+      const hasDob = Boolean(candidate.dob || employee.dob);
+      let resumeChanged = false;
+      if (!employee.phone && parsedResume.phone) { employee.phone = parsedResume.phone; resumeChanged = true; }
       if (!hasDob && parsedResume.dob) {
         const dob = parseDobString(parsedResume.dob);
-        if (dob && !Number.isNaN(dob.getTime())) employee.dob = dob;
+        if (dob && !Number.isNaN(dob.getTime())) { employee.dob = dob; resumeChanged = true; }
       }
-      if (!employee.address && parsedResume.address) employee.address = parsedResume.address;
-      if (!employee.bloodGroup && parsedResume.bloodGroup) employee.bloodGroup = parsedResume.bloodGroup;
-      if (!employee.emergencyContact && parsedResume.emergencyContact) employee.emergencyContact = parsedResume.emergencyContact;
-      if (employee.isModified("phone") || employee.isModified("dob") || employee.isModified("address") || employee.isModified("bloodGroup") || employee.isModified("emergencyContact")) {
+      if (!employee.address && parsedResume.address) { employee.address = parsedResume.address; resumeChanged = true; }
+      if (!employee.bloodGroup && parsedResume.bloodGroup) { employee.bloodGroup = parsedResume.bloodGroup; resumeChanged = true; }
+      if (!employee.emergencyContact && parsedResume.emergencyContact) { employee.emergencyContact = parsedResume.emergencyContact; resumeChanged = true; }
+      if (resumeChanged) {
         await employee.save();
       }
     } catch (resumeError) {
@@ -139,23 +183,28 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   const loginUrl = `${buildOrigin(request)}/login`;
+  const credentialRecipients = emailChanged
+    ? Array.from(new Set([originalEmail, finalEmail].filter(Boolean)))
+    : [finalEmail];
 
-  try {
-    const emailContent = employeeAccountContent({
-      firstName: candidate.firstName,
-      companyName,
-      email: candidate.email,
-      password,
-      loginUrl,
-    });
-    await sendMail({
-      to: candidate.email,
-      subject: emailContent.subject,
-      text: emailContent.text,
-      html: emailContent.html,
-    });
-  } catch (emailError) {
-    console.error("Welcome email failed:", emailError);
+  for (const recipient of credentialRecipients) {
+    try {
+      const emailContent = employeeAccountContent({
+        firstName: candidate.firstName,
+        companyName,
+        email: finalEmail,
+        password,
+        loginUrl,
+      });
+      await sendMail({
+        to: recipient,
+        subject: emailContent.subject,
+        text: emailContent.text,
+        html: emailContent.html,
+      });
+    } catch (emailError) {
+      console.error("Welcome email failed:", emailError);
+    }
   }
 
   await Attendance.create({
@@ -165,6 +214,17 @@ export async function POST(request: Request, { params }: Params) {
     checkOut: null,
     status: "present",
   });
+
+  const existingPendingRequest = await JoinRequest.findOne({
+    requester: employee._id,
+    company: hrUser.company,
+    kind: "company",
+    status: "pending",
+  });
+  if (existingPendingRequest) {
+    existingPendingRequest.status = "rejected";
+    await existingPendingRequest.save();
+  }
 
   await JoinRequest.create({
     requester: employee._id,
@@ -183,13 +243,23 @@ export async function POST(request: Request, { params }: Params) {
   });
 
   candidate.stage = "joined";
+  if (emailChanged) {
+    candidate.convertedEmail = finalEmail;
+    candidate.conversionOtpHash = "";
+    candidate.conversionOtpExpiresAt = null;
+  }
   await candidate.save();
 
   await ATSTimeline.create({
     candidate: candidate._id,
     job: candidate.job,
     action: "joined",
-    metadata: { convertedBy: userId, employeeId: String(employee._id) },
+    metadata: {
+      convertedBy: userId,
+      employeeId: String(employee._id),
+      accountEmail: finalEmail,
+      ...(emailChanged ? { originalEmail } : {}),
+    },
     actor: userId,
     company: hrUser.company,
   });
@@ -200,9 +270,11 @@ export async function POST(request: Request, { params }: Params) {
     entityType: "ATSCandidate",
     entityId: candidate._id,
     metadata: {
-      name: `${candidate.firstName} ${candidate.lastName}`,
+      name: candidateFullName,
       employeeId: String(employee._id),
       jobTitle: job?.title,
+      accountEmail: finalEmail,
+      ...(emailChanged ? { originalEmail } : {}),
     },
     company: hrUser.company,
   });
