@@ -1460,8 +1460,8 @@ function CandidateModal({ jobId, employmentType }: { jobId: string; employmentTy
         await uploadResume(created.id, resumeFile);
       }
       setModal(null);
-    } catch {
-      setError("Failed to add candidate. Please try again.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add candidate. Please try again.");
     }
   }
 

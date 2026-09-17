@@ -1,16 +1,22 @@
+import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
-import { ATSCandidate } from "@/models/ATSCandidate";
 import { ATSJob } from "@/models/ATSJob";
+import { ATSCandidate } from "@/models/ATSCandidate";
+import { ATSReferral } from "@/models/ATSReferral";
 import { ATSTimeline } from "@/models/ATSTimeline";
 import { ATSAuditLog } from "@/models/ATSAuditLog";
-import { ATSReferral } from "@/models/ATSReferral";
 import { Company } from "@/models/Company";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { companyCodePrefix } from "@/lib/company-identity";
 import { isObjectId, jsonError, requireUserId, serializeDoc, serializeDocs } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
+import { createMagicLinkToken } from "@/lib/codes";
+import { buildOrigin } from "@/lib/candidate-portal";
+import { applicationReceivedContent } from "@/lib/email-templates";
+import { sendMail } from "@/lib/mailer";
+
 
 const HR_ROLES = ["admin", "human-resource"];
 const ALL_ROLES = [...HR_ROLES, "project-manager", "qa-tester", "finance"];
@@ -133,7 +139,10 @@ export async function POST(request: Request) {
     source: referralEmployee ? "Referral" : (body.source || "Other"),
     stage: "applied",
     rating: Number(body.rating) || 0,
-    notes: String(body.notes ?? "").trim(),
+    notes: (() => {
+      const text = String(body.notes ?? "").trim();
+      return text ? [{ author: userId, content: text }] : [];
+    })(),
     portfolioUrl: String(body.portfolioUrl ?? "").trim(),
     linkedInUrl: String(body.linkedInUrl ?? "").trim(),
     assignedRecruiter: isObjectId(body.assignedRecruiter) ? body.assignedRecruiter : null,
@@ -182,6 +191,35 @@ export async function POST(request: Request) {
     metadata: { name: `${candidate.firstName} ${candidate.lastName}`, job: job.title },
     company: user.company,
   });
+
+  try {
+    const token = createMagicLinkToken();
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    await ATSCandidate.findByIdAndUpdate(candidate._id, {
+      magicTokenHash: tokenHash,
+      magicTokenExpiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+      portalAccessToken: token,
+    });
+
+    const origin = buildOrigin(request);
+    const portalLink = `${origin}/candidate-portal?token=${encodeURIComponent(token)}`;
+
+    const companyDoc = await Company.findOne({ _id: user.company }).select("name icon").lean();
+    const emailContent = applicationReceivedContent(
+      candidate.firstName,
+      job.title,
+      portalLink,
+      { name: (companyDoc as any)?.name, icon: (companyDoc as any)?.icon }
+    );
+    await sendMail({
+      to: candidate.email,
+      subject: emailContent.subject,
+      text: emailContent.text,
+      html: emailContent.html,
+    });
+  } catch {
+    // best-effort
+  }
 
   if (candidate.assignedRecruiter) {
     emitToUser(String(candidate.assignedRecruiter), "notification:new", {
