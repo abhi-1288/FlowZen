@@ -6,27 +6,28 @@ import { buildPortalLink, resolveCandidatePortalToken } from "@/lib/candidate-po
 import { assessmentInvitationEmail } from "@/lib/email-templates";
 import { sendMail } from "@/lib/mailer";
 
-// The cron fires every 15 minutes on Vercel (free tier /api/cron/assessment-day)
-// and every 5 minutes in dev mode (/api/dev/assessment-day). Emails are sent when
-// the assessment is between 45 and 60 minutes away so that every candidate is
-// caught by at least one invocation no matter when the interval lands.
-const WINDOW_START_MINUTES = 45;
-const WINDOW_END_MINUTES = 60;
+// The cron fires once per day on Vercel (free tier /api/cron/assessment-day)
+// and on demand in dev mode (/api/dev/assessment-day). Emails are sent to every
+// candidate whose assessment is today or within the next 24 hours, so each one is
+// caught by at least one invocation. The one-hour grace period in the past covers
+// Vercel Hobby's scheduling precision (±59 min) so late runs still catch up.
+const GRACE_MS = 60 * 60 * 1000;
+const LOOKAHEAD_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Sends the "Online Assessment Available" email to candidates roughly one hour
- * before their scheduled assessment time.
+ * Sends the "Online Assessment Available" email to candidates whose assessment
+ * is today or within the next 24 hours.
  *
  * `assessmentDate` is stored as an absolute UTC timestamp, so no timezone
  * conversion is needed here — an assessment scheduled for 09:00 IST is stored as
- * 03:30 UTC, and the 45–60 minute window below automatically aligns to IST.
+ * 03:30 UTC, and the UTC window below automatically aligns to IST.
  */
 export async function sendAssessmentReminderEmails(): Promise<{ emailed: number; jobsChecked: number }> {
   await connectDb();
 
   const now = new Date();
-  const windowStart = new Date(now.getTime() + WINDOW_START_MINUTES * 60 * 1000);
-  const windowEnd = new Date(now.getTime() + (WINDOW_END_MINUTES + 1) * 60 * 1000);
+  const windowStart = new Date(now.getTime() - GRACE_MS);
+  const windowEnd = new Date(now.getTime() + LOOKAHEAD_MS);
 
   const jobs = await ATSJob.find({
     assessment: true,
