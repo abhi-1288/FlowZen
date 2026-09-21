@@ -476,8 +476,8 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
 
   // ─── Render ────────────────────────────────────────────────
   const accentSoft = accent + "1a"; // simple alpha
-  const fmtDate = assessment.date ? new Date(assessment.date).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" }) : "";
-  const fmtTime = assessment.date ? new Date(assessment.date).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }) : "";
+  const fmtDate = assessment.date ? new Date(assessment.date).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : "";
+  const fmtTime = assessment.date ? new Date(assessment.date).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "UTC" }) : "";
   const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
   const hasDomains = Array.isArray(assessment.domains) && assessment.domains.length > 0;
 

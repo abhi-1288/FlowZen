@@ -18,7 +18,10 @@ import { AssessmentCandidatesModal } from "@/components/recruitment/assessment-c
 import { assessmentResultsUnlocked } from "@/lib/assessment";
 
 function fmtDateTime(value: string): string {
-  return `${new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} ${new Date(value).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}`;
+  const d = new Date(value);
+  const date = d.toLocaleDateString("en-IN", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" });
+  const time = d.toLocaleTimeString("en-IN", { timeZone: "UTC", hour: "2-digit", minute: "2-digit", hour12: true });
+  return `${date} ${time}`;
 }
 
 function formatEmploymentType(type: string): string {

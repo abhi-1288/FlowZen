@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client-utils";
 import { Eye, Share2, Check } from "lucide-react";
 import { stripMarkdown } from "@/components/recruitment/job-description";
+import { fmtJobDateTime } from "@/lib/date-utils";
 
 type CareerJob = {
   id: string;
@@ -95,7 +96,7 @@ export function CareersTab({ identityCode }: { identityCode?: string }) {
               )}
               {job.autoCloseDate && (
                 <p className="mt-2 text-xs text-slate-400">
-                  Closes: {new Date(job.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} {new Date(job.autoCloseDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                  Closes: {fmtJobDateTime(job.autoCloseDate)}
                 </p>
               )}
               <div className="mt-3 flex items-center gap-2">

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { MarkdownTextarea } from "@/components/recruitment/markdown-textarea";
+import { dateInputValue, timeInputValue } from "@/lib/date-utils";
 
 export default function EditJobPage() {
   const params = useParams()!;
@@ -45,8 +46,8 @@ export default function EditJobPage() {
       setSalaryRangeMax(String(activeJob.salaryRangeMax));
       setCurrency(activeJob.currency || "INR");
       setOpenings(String(activeJob.openings));
-      setAutoCloseDate(activeJob.autoCloseDate ? activeJob.autoCloseDate.split("T")[0] : "");
-      setAutoCloseTime(activeJob.autoCloseDate ? new Date(activeJob.autoCloseDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : "");
+      setAutoCloseDate(activeJob.autoCloseDate ? dateInputValue(activeJob.autoCloseDate) : "");
+      setAutoCloseTime(activeJob.autoCloseDate ? timeInputValue(activeJob.autoCloseDate) : "");
       setDescription(activeJob.description);
       setRequiredSkills(activeJob.requiredSkills.join(", "));
       setStatus(activeJob.status);
@@ -70,8 +71,8 @@ export default function EditJobPage() {
       setRequiredExperienceMaxYears(activeJob.requiredExperienceMaxYears ? String(activeJob.requiredExperienceMaxYears) : "");
       setAtsScoreThreshold(activeJob.atsScoreThreshold ? String(activeJob.atsScoreThreshold) : "");
       setAssessment(activeJob.assessment || false);
-      setAssessmentDate(activeJob.assessmentDate ? activeJob.assessmentDate.split("T")[0] : "");
-      setAssessmentTime(activeJob.assessmentDate ? new Date(activeJob.assessmentDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : "");
+      setAssessmentDate(activeJob.assessmentDate ? dateInputValue(activeJob.assessmentDate) : "");
+      setAssessmentTime(activeJob.assessmentDate ? timeInputValue(activeJob.assessmentDate) : "");
     }
   }, [activeJob]);
 

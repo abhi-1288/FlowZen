@@ -10,6 +10,7 @@ import type { EmploymentType, JobStatus, SalaryType } from "@/lib/recruitment-ty
 import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
 import { formatJobDuration } from "@/lib/format-duration";
 import { apiFetch } from "@/lib/client-utils";
+import { dateInputValue, fmtJobDateTime, timeInputValue } from "@/lib/date-utils";
 import { MarkdownTextarea } from "@/components/recruitment/markdown-textarea";
 
 export function JobsTab() {
@@ -160,7 +161,7 @@ export function JobsTab() {
                   {job.autoCloseDate && (
                     <>
                       <span>&middot;</span>
-                      <span>Closes: {new Date(job.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} {new Date(job.autoCloseDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}</span>
+                      <span>Closes: {fmtJobDateTime(job.autoCloseDate)}</span>
                     </>
                   )}
                 </div>
@@ -506,8 +507,8 @@ function JobModals() {
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Auto-Close Date & Time</span>
               <div className="flex gap-2">
-                <input name="autoCloseDate" type="date" defaultValue={editingJob?.autoCloseDate ? editingJob.autoCloseDate.split("T")[0] : ""} className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
-                <input name="autoCloseTime" type="time" defaultValue={editingJob?.autoCloseDate ? new Date(editingJob.autoCloseDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : ""} className="w-28 shrink-0 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
+                <input name="autoCloseDate" type="date" defaultValue={editingJob?.autoCloseDate ? dateInputValue(editingJob.autoCloseDate) : ""} className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
+                <input name="autoCloseTime" type="time" defaultValue={editingJob?.autoCloseDate ? timeInputValue(editingJob.autoCloseDate) : ""} className="w-28 shrink-0 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
               </div>
             </label>
             <div className="sm:col-span-2">
@@ -528,8 +529,8 @@ function JobModals() {
                 <label className="block">
                   <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Assessment Date & Time</span>
                   <div className="flex gap-2">
-                    <input name="assessmentDate" type="date" defaultValue={editingJob?.assessmentDate ? editingJob.assessmentDate.split("T")[0] : ""} className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
-                    <input name="assessmentTime" type="time" defaultValue={editingJob?.assessmentDate ? new Date(editingJob.assessmentDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : ""} className="w-28 shrink-0 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
+                    <input name="assessmentDate" type="date" defaultValue={editingJob?.assessmentDate ? dateInputValue(editingJob.assessmentDate) : ""} className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
+                    <input name="assessmentTime" type="time" defaultValue={editingJob?.assessmentDate ? timeInputValue(editingJob.assessmentDate) : ""} className="w-28 shrink-0 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
                   </div>
                 </label>
               </div>

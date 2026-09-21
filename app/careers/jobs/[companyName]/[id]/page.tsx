@@ -22,6 +22,7 @@ import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
 import { formatJobDuration } from "@/lib/format-duration";
 import { JobDescription } from "@/components/recruitment/job-description";
 import { DEFAULT_ACCENT, salarySuffix, hexToRgba } from "@/lib/accent";
+import { fmtJobDateTime } from "@/lib/date-utils";
 
 type JobDetail = {
   id: string;
@@ -50,7 +51,7 @@ type JobDetail = {
 };
 
 function formatAssessmentDate(date: string): string {
-  return `${new Date(date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} ${new Date(date).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}`;
+  return fmtJobDateTime(date);
 }
 
 function formatEmploymentType(type: string): string {
@@ -266,7 +267,7 @@ function JobDetailPage() {
     { icon: Clock, label: "Duration", value: formatJobDuration(job.durationMonths, job.durationDays, job.durationHours, job.durationYears) || "Not specified" },
     { icon: ShieldCheck, label: "Experience", value: job.requiredExperienceYears && job.requiredExperienceYears > 0 ? (job.requiredExperienceMaxYears && job.requiredExperienceMaxYears > job.requiredExperienceYears ? `${job.requiredExperienceYears}-${job.requiredExperienceMaxYears} years` : `${job.requiredExperienceYears}+ years`) : "Not specified" },
     { icon: Users, label: "Openings", value: job.openings ? String(job.openings) : "1" },
-    { icon: CalendarClock, label: "Closes", value: job.autoCloseDate ? `${new Date(job.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} ${new Date(job.autoCloseDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}` : "Rolling" },
+    { icon: CalendarClock, label: "Closes", value: job.autoCloseDate ? fmtJobDateTime(job.autoCloseDate) : "Rolling" },
     { icon: Clock, label: "Assessment", value: job.assessment ? (job.assessmentDate ? `${formatAssessmentDate(job.assessmentDate)}${job.assessmentDurationMinutes ? ` · ${job.assessmentDurationMinutes}min` : ""}` : "Scheduled") : "Not required" },
   ].filter((f) => f.value !== null && f.value !== "" && f.value !== "Not required" && f.value !== "Not specified");
 
@@ -332,7 +333,7 @@ function JobDetailPage() {
                   {job.autoCloseDate && (
                     <span className="inline-flex items-center gap-1.5">
                       <CalendarClock size={15} /> Applications close{" "}
-                      {new Date(job.autoCloseDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} {new Date(job.autoCloseDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                      {fmtJobDateTime(job.autoCloseDate)}
                     </span>
                   )}
                   {job.assessment && job.assessmentDate && (
