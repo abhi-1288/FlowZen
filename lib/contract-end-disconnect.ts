@@ -8,6 +8,7 @@ import { Notification } from "@/models/Notification";
 import { Team } from "@/models/Team";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
+import { recordIdentityCodeRelease } from "@/lib/company-identity";
 import { generateFinalSettlement, getSettlementGapDays } from "@/app/api/finance/helpers";
 
 function startOfDay(date: Date) {
@@ -150,7 +151,9 @@ export async function runContractEndDisconnect(): Promise<{ generated: string[];
     member.baseSalary = 0;
     member.hourlyRate = 0;
     member.dailyRate = 0;
+    const releasedCode = String(member.companyIdentityCode ?? "");
     member.companyIdentityCode = undefined;
+    await recordIdentityCodeRelease(companyId, releasedCode, new Date());
     await member.save();
 
     await Company.updateOne({ _id: companyId }, { $pull: { members: member._id } });

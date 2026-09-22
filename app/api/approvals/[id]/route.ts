@@ -10,7 +10,7 @@ import { Board } from "@/models/Board";
 import { User } from "@/models/User";
 import { Task } from "@/models/Task";
 import { emitNotification } from "@/lib/realtime";
-import { ensureCompanyIdentityCode } from "@/lib/company-identity";
+import { ensureCompanyIdentityCode, recordIdentityCodeRelease } from "@/lib/company-identity";
 import { generateFinalSettlement } from "@/app/api/finance/helpers";
 import { CompanyPolicy } from "@/models/CompanyPolicy";
 
@@ -580,8 +580,10 @@ export async function PATCH(request: Request, { params }: Params) {
         requester.company = null;
         requester.companyJoined = null;
         requester.companyStatus = "none";
+        const releasedCode = String(requester.companyIdentityCode ?? "");
         requester.companyIdentityCode = undefined;
         requester.baseSalary = 0;
+        await recordIdentityCodeRelease(joinRequest.company, releasedCode, new Date());
         
         // Clear any old pending join requests so new requests can be processed cleanly
         await JoinRequest.deleteMany({

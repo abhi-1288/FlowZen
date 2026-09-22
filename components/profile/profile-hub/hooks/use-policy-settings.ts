@@ -31,6 +31,7 @@ export function usePolicySettings(
   const [savingCarryForwardLeave, setSavingCarryForwardLeave] = useState(false);
   const [savingDayHour, setSavingDayHour] = useState(false);
 
+  const [identityCodePrefix, setIdentityCodePrefix] = useState<string>("");
   const [identityCodeDigits, setIdentityCodeDigits] = useState<number | null>(null);
   const [identityCodeStartRange, setIdentityCodeStartRange] = useState<number | null>(null);
   const [identityCodeEndRange, setIdentityCodeEndRange] = useState<number | null>(null);
@@ -60,6 +61,7 @@ export function usePolicySettings(
   useEffect(() => {
     if (!company) return;
     apiFetch<{
+      prefix: string;
       digits: number | null;
       startRange: number | null;
       endRange: number | null;
@@ -67,6 +69,7 @@ export function usePolicySettings(
       remaining: number | null;
     }>("/api/hr/identity-code-settings", undefined, { toast: false })
       .then((data) => {
+        setIdentityCodePrefix(data.prefix ?? "");
         setIdentityCodeDigits(data.digits);
         setIdentityCodeStartRange(data.startRange);
         setIdentityCodeEndRange(data.endRange);
@@ -130,12 +133,14 @@ export function usePolicySettings(
     try {
       setSavingIdentityCode(true);
       const body: Record<string, unknown> = {};
+      body.prefix = identityCodePrefix;
       if (identityCodeDigits != null) body.digits = identityCodeDigits;
       if (identityCodeStartRange != null) body.startRange = identityCodeStartRange;
       if (identityCodeEndRange != null) body.endRange = identityCodeEndRange;
       if (identityCodeNextNumber != null) body.nextNumber = identityCodeNextNumber;
 
       const data = await apiFetch<{
+        prefix: string;
         digits: number | null;
         startRange: number | null;
         endRange: number | null;
@@ -145,6 +150,7 @@ export function usePolicySettings(
         method: "PATCH",
         body: JSON.stringify(body),
       });
+      setIdentityCodePrefix(data.prefix ?? "");
       setIdentityCodeDigits(data.digits);
       setIdentityCodeStartRange(data.startRange);
       setIdentityCodeEndRange(data.endRange);
@@ -261,6 +267,7 @@ export function usePolicySettings(
     savePaidLeaveOnly,
     saveCarryForwardLeaveOnly,
     saveDayHourOnly,
+    identityCodePrefix, setIdentityCodePrefix,
     identityCodeDigits, setIdentityCodeDigits,
     identityCodeStartRange, setIdentityCodeStartRange,
     identityCodeEndRange, setIdentityCodeEndRange,

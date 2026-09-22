@@ -4,6 +4,13 @@ import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 
+function normalizePrefix(raw: unknown): string {
+  return String(raw ?? "")
+    .trim()
+    .replace(/[^A-Za-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export async function GET() {
   const userId = await requireUserId();
   if (!userId) return jsonError("Unauthorized", 401);
@@ -34,7 +41,7 @@ export async function GET() {
   }
 
   const company = await Company.findById(user.company).select(
-    "name identityCodeDigits identityCodeStartRange identityCodeEndRange identityCodeNextNumber",
+    "name identityCodePrefix identityCodeDigits identityCodeStartRange identityCodeEndRange identityCodeNextNumber",
   );
   if (!company) return jsonError("Company not found.", 404);
 
@@ -44,6 +51,7 @@ export async function GET() {
       : null;
 
   return NextResponse.json({
+    prefix: String(company.identityCodePrefix ?? ""),
     digits: company.identityCodeDigits ?? null,
     startRange: company.identityCodeStartRange ?? null,
     endRange: company.identityCodeEndRange ?? null,
@@ -86,6 +94,7 @@ export async function PATCH(request: Request) {
   if (!company) return jsonError("Company not found.", 404);
 
   const body = await request.json().catch(() => ({}));
+  const hasPrefix = Object.prototype.hasOwnProperty.call(body, "prefix");
   const hasDigits = Object.prototype.hasOwnProperty.call(body, "digits");
   const hasStartRange = Object.prototype.hasOwnProperty.call(body, "startRange");
   const hasEndRange = Object.prototype.hasOwnProperty.call(body, "endRange");
@@ -97,8 +106,8 @@ export async function PATCH(request: Request) {
   const nextNumber = hasNextNumber ? Number(body.nextNumber) : company.identityCodeNextNumber;
 
   if (hasDigits && digits != null) {
-    if (!Number.isFinite(digits) || digits < 4 || digits > 12) {
-      return jsonError("Digits must be between 4 and 12.", 400);
+    if (!Number.isFinite(digits) || digits < 3 || digits > 12) {
+      return jsonError("Digits must be between 3 and 12.", 400);
     }
   }
 
@@ -137,11 +146,17 @@ export async function PATCH(request: Request) {
     }
   }
 
+  const prefix = hasPrefix ? normalizePrefix(body.prefix) : String(company.identityCodePrefix ?? "");
+  if (prefix.length > 24) {
+    return jsonError("Prefix must be 24 characters or fewer.", 400);
+  }
+
   const configChanged =
     (hasDigits && digits !== company.identityCodeDigits) ||
     (hasStartRange && startRange !== company.identityCodeStartRange) ||
     (hasEndRange && endRange !== company.identityCodeEndRange);
 
+  if (hasPrefix) company.identityCodePrefix = prefix;
   if (hasDigits) company.identityCodeDigits = digits;
   if (hasStartRange) company.identityCodeStartRange = startRange;
   if (hasEndRange) company.identityCodeEndRange = endRange;
@@ -161,6 +176,7 @@ export async function PATCH(request: Request) {
 
   return NextResponse.json({
     ok: true,
+    prefix: String(company.identityCodePrefix ?? ""),
     digits: company.identityCodeDigits ?? null,
     startRange: company.identityCodeStartRange ?? null,
     endRange: company.identityCodeEndRange ?? null,

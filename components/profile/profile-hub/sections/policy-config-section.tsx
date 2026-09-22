@@ -4,7 +4,22 @@ import { PolicyModal } from "../modals/policy-modal";
 
 type ModalKey = "notice" | "paid-leave" | "wfh" | "day-hour" | "identity";
 
+function previewPrefix(raw: string, companyName: string): string {
+  const custom = raw.trim();
+  if (custom) {
+    return custom.replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "COMPANY";
+  }
+  return (
+    String(companyName ?? "")
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "COMPANY"
+  );
+}
+
 export function PolicyConfigSection({
+  companyName,
   noticePeriodDays,
   onNoticePeriodChange,
   savingNoticePeriod,
@@ -29,6 +44,8 @@ export function PolicyConfigSection({
   onMinWorkHoursChange,
   savingDayHour,
   onSaveDayHour,
+  identityCodePrefix,
+  onIdentityCodePrefixChange,
   identityCodeDigits,
   onIdentityCodeDigitsChange,
   identityCodeStartRange,
@@ -51,6 +68,7 @@ export function PolicyConfigSection({
   onPreviewBulkImport,
   onApplyBulkImport,
 }: {
+  companyName: string;
   noticePeriodDays: number;
   onNoticePeriodChange: (value: number) => void;
   savingNoticePeriod: boolean;
@@ -75,6 +93,8 @@ export function PolicyConfigSection({
   onMinWorkHoursChange: (value: number) => void;
   savingDayHour: boolean;
   onSaveDayHour: () => Promise<boolean>;
+  identityCodePrefix: string;
+  onIdentityCodePrefixChange: (value: string) => void;
   identityCodeDigits: number | null;
   onIdentityCodeDigitsChange: (value: number | null) => void;
   identityCodeStartRange: number | null;
@@ -111,7 +131,7 @@ export function PolicyConfigSection({
 
   const previewDigits = identityCodeDigits ?? 8;
   const previewStart = identityCodeStartRange ?? 10000000;
-  const previewCode = `ACME-${String(previewStart).padStart(previewDigits, "0")}`;
+  const previewCode = `${previewPrefix(identityCodePrefix, companyName)}-${String(previewStart).padStart(previewDigits, "0")}`;
 
   const cardBase = "rounded-xl neu-card p-5 transition-all duration-200 hover:-slate-300";
 
@@ -220,8 +240,8 @@ export function PolicyConfigSection({
                 <p className="text-sm font-semibold text-slate-900">Identity Code Settings</p>
                 <p className="mt-0.5 text-xs text-slate-500">
                   {identityCodeDigits != null
-                    ? `${identityCodeDigits} digits · ${identityCodeStartRange ?? "?"} – ${identityCodeEndRange ?? "?"} · Next: ${identityCodeNextNumber ?? "?"}`
-                    : "Random codes (legacy)"}
+                    ? `${previewPrefix(identityCodePrefix, companyName)} prefix · ${identityCodeDigits} digits · ${identityCodeStartRange ?? "?"} – ${identityCodeEndRange ?? "?"} · Next: ${identityCodeNextNumber ?? "?"}`
+                    : `${previewPrefix(identityCodePrefix, companyName)} prefix · Random codes (legacy)`}
                   {identityCodeRemaining != null ? ` · ${identityCodeRemaining} remaining` : ""}
                 </p>
               </div>
@@ -386,18 +406,32 @@ export function PolicyConfigSection({
         saveLabel="Save identity code settings"
       >
         <div className="grid gap-3 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label className="text-xs font-medium text-slate-600" htmlFor="id-prefix">Prefix</label>
+            <input
+              id="id-prefix"
+              type="text"
+              maxLength={24}
+              className="mt-1 w-full rounded-lg neu-inset px-3 py-2 text-sm"
+              placeholder={String(companyName || "COMPANY").toUpperCase().replace(/[^A-Z0-9]+/g, "-")}
+              value={identityCodePrefix ?? ""}
+              onChange={(e) => onIdentityCodePrefixChange(e.target.value)}
+            />
+            <p className="mt-1 text-xs text-slate-500">Leave empty to auto-prefix from the company name.</p>
+          </div>
           <div>
             <label className="text-xs font-medium text-slate-600" htmlFor="id-digits">Number of digits</label>
             <input
               id="id-digits"
               type="number"
-              min={4}
+              min={3}
               max={12}
               className="mt-1 w-full rounded-lg neu-inset px-3 py-2 text-sm"
               placeholder="e.g. 6"
               value={identityCodeDigits ?? ""}
               onChange={(e) => onIdentityCodeDigitsChange(e.target.value === "" ? null : Number(e.target.value))}
             />
+            <p className="mt-1 text-xs text-slate-500">Between 3 and 12.</p>
           </div>
           <div>
             <label className="text-xs font-medium text-slate-600" htmlFor="id-start">Start range</label>

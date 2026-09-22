@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Download } from "lucide-react";
+import { Download, Hash } from "lucide-react";
 import * as XLSX from "xlsx";
 import { apiFetch } from "@/lib/client-utils";
 import { AnyRecord, formatRole, formatRoleWithCustom, SectionHeader, ActionButton } from "../shared";
 import { FinanceMembersView } from "../finance-members-tab";
 import { HR_MEMBER_ROLE_KEYS } from "./types";
+import { IdCodesModal, type IdCodesData } from "./id-codes-modal";
 import { FireModal } from "./modals/fire-modal";
 import { SalaryModal } from "./modals/salary-modal";
 import { RoleModal } from "./modals/role-modal";
@@ -76,6 +77,26 @@ export function MembersTab({
   const [employmentTypeValue, setEmploymentTypeValue] = useState("");
   const [employmentEndDateValue, setEmploymentEndDateValue] = useState("");
   const [savingEmployment, setSavingEmployment] = useState(false);
+
+  /* ── ID Numbers Modal ── */
+  const canViewIdCodes = actorRole === "human-resource" || actorRole === "admin";
+  const [showIdCodes, setShowIdCodes] = useState(false);
+  const [idCodesLoading, setIdCodesLoading] = useState(false);
+  const [idCodesData, setIdCodesData] = useState<IdCodesData | null>(null);
+
+  async function openIdCodes() {
+    setShowIdCodes(true);
+    setIdCodesLoading(true);
+    setIdCodesData(null);
+    try {
+      const data = await apiFetch<IdCodesData>("/api/hr/identity-codes");
+      setIdCodesData(data);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to load ID numbers.", "error");
+    } finally {
+      setIdCodesLoading(false);
+    }
+  }
 
   function openSalaryModal(member: AnyRecord) {
     const st = String(member.salaryType ?? "per-month");
@@ -434,6 +455,16 @@ export function MembersTab({
             Export Excel
           </button>
         ) : null}
+        {canViewIdCodes ? (
+          <button
+            type="button"
+            onClick={openIdCodes}
+            className="inline-flex items-center gap-1.5 rounded-xl neu-card px-4 py-3 text-sm font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] hover:text-slate-800 ring-1 ring-slate-100"
+          >
+            <Hash size={15} />
+            Show ID numbers
+          </button>
+        ) : null}
       </div>
 
       <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
@@ -655,6 +686,13 @@ export function MembersTab({
           </div>
         </div>
       ) : null}
+
+      <IdCodesModal
+        open={showIdCodes}
+        onClose={() => { setShowIdCodes(false); setIdCodesData(null); }}
+        loading={idCodesLoading}
+        data={idCodesData}
+      />
     </section>
   );
 }

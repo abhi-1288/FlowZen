@@ -10,6 +10,7 @@ import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
 import { generateFinalSettlement } from "@/app/api/finance/helpers";
 import { CompanyPolicy } from "@/models/CompanyPolicy";
+import { recordIdentityCodeRelease } from "@/lib/company-identity";
 
 async function cleanupBoardsForUser(userId: any) {
   const boards = await Board.find({ "members.user": userId });
@@ -135,7 +136,9 @@ export async function POST(request: Request) {
   member.companyJoined = null;
   member.companyStatus = "none";
   member.baseSalary = 0;
+  const releasedCode = String(member.companyIdentityCode ?? "");
   member.companyIdentityCode = undefined;
+  await recordIdentityCodeRelease(company._id, releasedCode, new Date());
   await member.save();
 
   await Company.updateOne({ _id: company._id }, { $pull: { members: member._id } });

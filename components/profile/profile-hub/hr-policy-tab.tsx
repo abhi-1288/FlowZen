@@ -84,6 +84,7 @@ export function HrPolicyTab({
     <div className="space-y-6">
       {canEdit ? (
         <PolicyConfigSection
+          companyName={String(company?.name ?? "")}
           noticePeriodDays={policy.noticePeriodDays}
           onNoticePeriodChange={policy.setNoticePeriodDays}
           savingNoticePeriod={policy.savingNoticePeriod}
@@ -108,6 +109,8 @@ export function HrPolicyTab({
           onMinWorkHoursChange={policy.setMinWorkHours}
           savingDayHour={policy.savingDayHour}
           onSaveDayHour={policy.saveDayHourOnly}
+          identityCodePrefix={policy.identityCodePrefix}
+          onIdentityCodePrefixChange={policy.setIdentityCodePrefix}
           identityCodeDigits={policy.identityCodeDigits}
           onIdentityCodeDigitsChange={policy.setIdentityCodeDigits}
           identityCodeStartRange={policy.identityCodeStartRange}

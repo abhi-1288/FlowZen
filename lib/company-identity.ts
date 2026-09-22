@@ -10,28 +10,83 @@ export function companyCodePrefix(name: string) {
   return cleaned || "COMPANY";
 }
 
+export function identityCodePrefixOf(company: {
+  name?: string;
+  identityCodePrefix?: string | null;
+} | null): string {
+  const custom = String(company?.identityCodePrefix ?? "").trim();
+  return custom || companyCodePrefix(String(company?.name ?? "COMPANY"));
+}
+
 export interface IdentityCodeResult {
   code: string;
   remaining: number | null;
 }
 
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date.getTime());
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+const REUSE_GAP_DAYS = 30;
+
+export async function recordIdentityCodeRelease(
+  companyId: unknown,
+  code: string | undefined | null,
+  exitDate: Date,
+): Promise<void> {
+  const trimmed = String(code ?? "").trim();
+  if (!trimmed || !companyId) return;
+  await Company.updateOne({ _id: companyId }, { $pull: { identityCodeReleased: { code: trimmed } } });
+  await Company.updateOne(
+    { _id: companyId },
+    {
+      $push: {
+        identityCodeReleased: {
+          code: trimmed,
+          exitDate,
+          releaseDate: addDays(exitDate, REUSE_GAP_DAYS),
+        },
+      },
+    },
+  );
+}
+
 export async function generateCompanyIdentityCode(companyId: unknown): Promise<IdentityCodeResult> {
   const company = await Company.findById(companyId).select(
-    "name identityCodeDigits identityCodeStartRange identityCodeEndRange identityCodeNextNumber",
+    "name identityCodePrefix identityCodeDigits identityCodeStartRange identityCodeEndRange identityCodeNextNumber identityCodeReleased",
   );
-  const prefix = companyCodePrefix(String(company?.name ?? "COMPANY"));
+  const prefix = identityCodePrefixOf(company);
 
   const digits = company?.identityCodeDigits;
   const startRange = company?.identityCodeStartRange;
   const endRange = company?.identityCodeEndRange;
   const nextNumber = company?.identityCodeNextNumber;
 
+  const now = new Date();
+  const released = Array.isArray(company?.identityCodeReleased)
+    ? (company.identityCodeReleased as { code?: string; exitDate?: Date; releaseDate?: Date }[])
+        .filter((r) => r?.code && r.releaseDate && new Date(r.releaseDate) <= now)
+        .sort((a, b) => new Date(a.exitDate ?? 0).getTime() - new Date(b.exitDate ?? 0).getTime())
+    : [];
+  if (released.length > 0) {
+    for (const entry of released) {
+      const code = String(entry.code);
+      if (code && !(await User.exists({ companyIdentityCode: code }))) {
+        await Company.updateOne({ _id: companyId }, { $pull: { identityCodeReleased: { code } } });
+        return { code, remaining: null };
+      }
+      await Company.updateOne({ _id: companyId }, { $pull: { identityCodeReleased: { code } } });
+    }
+  }
+
   if (
     digits != null &&
     startRange != null &&
     endRange != null &&
     nextNumber != null &&
-    digits >= 4 &&
+    digits >= 3 &&
     digits <= 12 &&
     endRange > startRange
   ) {
