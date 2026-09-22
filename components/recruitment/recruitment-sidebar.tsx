@@ -5,7 +5,7 @@ import { signOut, useSession } from "next-auth/react";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import {
-  LayoutDashboard, Briefcase, Users, Columns3, Calendar, FileText, UserPlus, LogOut
+  LayoutDashboard, Briefcase, Users, Columns3, Calendar, FileText, UserPlus, LogOut, Gauge
 } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import { useNotificationToast } from "@/lib/toast-context";
@@ -32,6 +32,7 @@ type SidebarCounts = {
 };
 
 const navItems = [
+  { href: "/profile/command-center", label: "Command Centre", icon: Gauge },
   { href: "/recruitment/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/recruitment/jobs", label: "Jobs", icon: Briefcase },
   { href: "/recruitment/candidates", label: "Candidates", icon: Users },
@@ -78,7 +79,7 @@ export function RecruitmentSidebar() {
     for (const item of navItems) {
       router.prefetch(item.href);
     }
-    router.prefetch("/profile");
+    router.prefetch("/profile/command-center");
   }, [router]);
 
   useEffect(() => {
@@ -130,13 +131,14 @@ export function RecruitmentSidebar() {
       <nav className="flex-1 space-y-1 p-3">
         {navItems.filter((item) =>
           isFullAccess ||
+          item.href === "/profile/command-center" ||
           item.href === "/recruitment/dashboard" ||
           item.href === "/recruitment/jobs" ||
           item.href === "/recruitment/candidates" ||
           item.href === "/recruitment/interviews"
         ).map((item) => {
           const isActive = !!(pathname && (pathname === item.href || pathname.startsWith(item.href + "/")));
-          const chip = item.href !== "/recruitment/dashboard" && item.href !== "/recruitment/board" && counts
+          const chip = item.href !== "/profile/command-center" && item.href !== "/recruitment/dashboard" && item.href !== "/recruitment/board" && counts
             ? {
                 open: counts[`${item.href.replace("/recruitment/", "")}Open` as keyof SidebarCounts] as number,
                 closed: counts[`${item.href.replace("/recruitment/", "")}Closed` as keyof SidebarCounts] as number,

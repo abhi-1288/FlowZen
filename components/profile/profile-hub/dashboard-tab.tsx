@@ -35,6 +35,7 @@ type DashboardTabProps = {
   role: string;
   company: AnyRecord | null;
   showToast: (text: string, type?: "success" | "error") => void;
+  hideGreeting?: boolean;
 };
 
 function formatDurationText(profile: AnyRecord | null): string {
@@ -90,6 +91,7 @@ export function DashboardTab({
   role,
   company,
   showToast,
+  hideGreeting = false,
 }: DashboardTabProps) {
   const displayName = String(profile?.name ?? "User");
   const companyName = String(company?.name ?? "");
@@ -401,14 +403,16 @@ export function DashboardTab({
   return (
     <div className="space-y-6">
       {/* Greeting */}
-      <div className="rounded-2xl border border-[var(--c-border-light)] bg-gradient-to-br from-indigo-500 to-indigo-700 p-6 text-white shadow-lg">
-        <h1 className="text-2xl font-bold">
-          {greeting}, {displayName}
-        </h1>
-        <p className="mt-1 text-indigo-100">
-          {companyName ? `${companyName}  ·  ` : ""}{today}
-        </p>
-      </div>
+      {!hideGreeting ? (
+        <div className="rounded-2xl border border-[var(--c-border-light)] bg-gradient-to-br from-indigo-500 to-indigo-700 p-6 text-white shadow-lg">
+          <h1 className="text-2xl font-bold">
+            {greeting}, {displayName}
+          </h1>
+          <p className="mt-1 text-indigo-100">
+            {companyName ? `${companyName}  ·  ` : ""}{today}
+          </p>
+        </div>
+      ) : null}
 
       {/* ══════ Analytics Dashboard ══════ */}
       <div className="rounded-xl neu-card p-5">

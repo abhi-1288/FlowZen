@@ -238,6 +238,9 @@ export function BoardShell({ boardId }: { boardId?: string }) {
               <Search size={16} />
             </button>
           </div>
+          <Link className="mt-3 block rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-center text-sm font-medium text-indigo-700 hover:bg-indigo-100" href="/profile/command-center">
+            Command Centre
+          </Link>
           <Link className="mt-3 block rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-950" href="/profile">
             Profile center{unreadNotifications ? ` (${unreadNotifications})` : ""}
           </Link>

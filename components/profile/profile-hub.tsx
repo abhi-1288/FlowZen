@@ -48,6 +48,7 @@ import { CompanyCalendarTab } from "./profile-hub/company-calendar-tab";
 import { FinancePolicyTab } from "./profile-hub/finance-policy-tab";
 import { HrPolicyTab } from "./profile-hub/hr-policy-tab";
 import { ItTicketsView } from "@/components/it/it-tickets-view";
+import { CommandCenterHub } from "@/components/command-center/command-center-hub";
 import { AnyRecord, AvatarBadge, formatRoleWithCustom } from "./profile-hub/shared";
 
 type ProfileHubCache = {
@@ -74,6 +75,7 @@ let profileHubCache: ProfileHubCache | null = null;
 
 export type Tab =
   | "dashboard"
+  | "command-center"
   | "profile"
   | "timeline"
   | "onboarding"
@@ -93,7 +95,18 @@ export type Tab =
   | "hr-policy"
   | "it";
 
-const VALID_TABS = new Set<string>(["dashboard", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers", "calendar", "visitors", "security", "games", "finance-policy", "hr-policy", "it"]);
+const VALID_TABS = new Set<string>(["dashboard", "command-center", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers", "calendar", "visitors", "security", "games", "finance-policy", "hr-policy", "it"]);
+
+const LEADER_DASH_ROLES = new Set<string>([
+  "admin",
+  "human-resource",
+  "finance",
+  "project-manager",
+  "qa-tester",
+  "it-admin",
+  "it-administration",
+  "security",
+]);
 
 function formatDuration(profile: AnyRecord | null): string {
   if (!profile) return "";
@@ -262,7 +275,7 @@ export function ProfileHub() {
   const canViewCompanyTabs = hasCompany;
   const canViewGamesTab = hasCompany;
   const mobileTabs: Tab[] = [
-    "dashboard",
+    "command-center",
     "profile",
     "timeline",
     "onboarding",
@@ -759,10 +772,10 @@ export function ProfileHub() {
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4 sidebar-scrollbar">
           <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Users</p>
           <NavButton
-            active={tab === "dashboard"}
+            active={tab === "dashboard" || tab === "command-center"}
             icon={<LayoutDashboard size={16} />}
-            label="Dashboard"
-            onClick={() => setTab("dashboard")}
+            label="Command Centre"
+            onClick={() => setTab("command-center")}
           />
           <NavButton
             active={tab === "profile"}
@@ -1036,8 +1049,10 @@ export function ProfileHub() {
                                   ? `Messages (${messagesCount})`
                                   : item === "finance-policy"
                                     ? "Finance Policy"
-                                    : item === "hr-policy"
-                                      ? "HR Policy"
+: item === "hr-policy"
+                                    ? "HR Policy"
+                                    : item === "command-center"
+                                      ? "Command Centre"
                                       : item.charAt(0).toUpperCase() + item.slice(1);
 
               return (
@@ -1102,21 +1117,42 @@ export function ProfileHub() {
                   </div>
                 </div>
               ) : <>
-                {tab === "dashboard" ? (
-                  <DashboardTab
-                    profile={profile}
-                    insights={insights}
-                    notifications={notifications}
-                    approvals={approvals}
-                    attendanceHistory={attendanceHistory}
-                    leaveRequests={leaveRequests}
-                    wfhRequests={wfhRequests}
-                    financeCount={financeCount}
-                    checkOutRequestCount={checkOutRequestCount}
-                    role={String(role)}
-                    company={company}
-                    showToast={showToast}
-                  />
+                {tab === "dashboard" || tab === "command-center" ? (
+                  LEADER_DASH_ROLES.has(String(role)) ? (
+                    <>
+                      <CommandCenterHub />
+                      <DashboardTab
+                        profile={profile}
+                        insights={insights}
+                        notifications={notifications}
+                        approvals={approvals}
+                        attendanceHistory={attendanceHistory}
+                        leaveRequests={leaveRequests}
+                        wfhRequests={wfhRequests}
+                        financeCount={financeCount}
+                        checkOutRequestCount={checkOutRequestCount}
+                        role={String(role)}
+                        company={company}
+                        showToast={showToast}
+                        hideGreeting
+                      />
+                    </>
+                  ) : (
+                    <DashboardTab
+                      profile={profile}
+                      insights={insights}
+                      notifications={notifications}
+                      approvals={approvals}
+                      attendanceHistory={attendanceHistory}
+                      leaveRequests={leaveRequests}
+                      wfhRequests={wfhRequests}
+                      financeCount={financeCount}
+                      checkOutRequestCount={checkOutRequestCount}
+                      role={String(role)}
+                      company={company}
+                      showToast={showToast}
+                    />
+                  )
                 ) : null}
 
                 {tab === "profile" ? (
