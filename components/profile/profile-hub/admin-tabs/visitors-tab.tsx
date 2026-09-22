@@ -95,8 +95,7 @@ export function VisitorsTab({
   const [genRegion, setGenRegion] = useState("");
   const [generating, setGenerating] = useState(false);
 
-  const multiOffice = Boolean(company?.multiOffice);
-  const regionOpts = multiOffice && Array.isArray(company?.addresses)
+  const regionOpts = Array.isArray(company?.addresses) && (company.addresses as AnyRecord[]).length > 0
     ? (company.addresses as AnyRecord[]).map((a: AnyRecord) => String(a.label ?? "")).filter(Boolean)
     : company?.address ? ["Main Office"] : [];
 

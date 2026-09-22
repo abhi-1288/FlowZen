@@ -203,7 +203,9 @@ export function ApprovalsTab({
                         ? "requested to quit"
                         : String(request.kind) === "identity-code"
                           ? "requested a unique identity code"
-                          : String(request.kind) === "salary"
+                          : String(request.kind) === "identity-code-range"
+                            ? "requested an identity code range increase"
+                            : String(request.kind) === "salary"
                             ? "requested salary assignment"
                             : String(request.kind) === "salary-increment"
                               ? `requested salary update for ${metadata.targetUserName || "a member"}`
@@ -218,7 +220,9 @@ export function ApprovalsTab({
                                     : "requested to join"}{" "}
                   {String(request.kind) === "identity-code"
                     ? displayNested(request.company, "name", "company")
-                    : String(request.kind) === "salary-increment"
+                    : String(request.kind) === "identity-code-range"
+                      ? displayNested(request.company, "name", "company")
+                      : String(request.kind) === "salary-increment"
                       ? ""
                       : request.kind === "team" || request.kind === "quit-team"
                         ? displayNested(request.team, "name", "team")
@@ -271,6 +275,13 @@ export function ApprovalsTab({
                     {String((request.metadata as AnyRecord)?.employmentEndDate ?? "") ? (
                       <p>End date: {new Date(String((request.metadata as AnyRecord)?.employmentEndDate)).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
                     ) : null}
+                  </div>
+                ) : request.kind === "identity-code-range" ? (
+                  <div className="mt-1 space-y-0.5 text-xs text-slate-500">
+                    <p>Region: {String((request.metadata as AnyRecord)?.region ?? "")}</p>
+                    <p>Range: {String((request.metadata as AnyRecord)?.currentEndRange ?? "")} &rarr; {String((request.metadata as AnyRecord)?.newEndRange ?? "")}</p>
+                    <p>Requested by: {String((request.metadata as AnyRecord)?.requesterName ?? "") || displayNested(request.requester, "name", "Member")}</p>
+                    <p className="font-medium text-amber-600">Only the main-office HR or admin can approve this.</p>
                   </div>
                 ) : null}
               </div>

@@ -3,7 +3,8 @@ import { connectDb } from "@/lib/db";
 import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { Company } from "@/models/Company";
 import { User } from "@/models/User";
-import { identityCodePrefixOf } from "@/lib/company-identity";
+import { identityCodePrefixOf, identityCodeRegionRemaining, identityCodeRegionsOf } from "@/lib/company-identity";
+import { mainOfficeLabelOf } from "@/lib/company-regions";
 
 export async function GET() {
   const userId = await requireUserId();
@@ -29,7 +30,7 @@ export async function GET() {
   }
 
   const company = await Company.findById(user.company).select(
-    "name identityCodePrefix identityCodeDigits identityCodeStartRange identityCodeEndRange identityCodeNextNumber identityCodeReleased",
+    "name identityCodePrefix identityCodeDigits identityCodeStartRange identityCodeEndRange identityCodeNextNumber identityCodeReleased identityCodeRegions addresses address multiOffice",
   );
   if (!company) return jsonError("Company not found.", 404);
 
@@ -75,6 +76,15 @@ export async function GET() {
   const remaining =
     nextNumber != null && endRange != null ? Math.max(0, endRange - nextNumber) : null;
 
+  const regions = identityCodeRegionsOf(company as any).map((region) => ({
+    ...region,
+    remaining: identityCodeRegionRemaining(region),
+  }));
+  const mainOfficeLabel = mainOfficeLabelOf({
+    addresses: (company as any).addresses,
+    address: (company as any).address,
+  });
+
   return NextResponse.json({
     prefix: identityCodePrefixOf(company),
     customPrefix: String(company.identityCodePrefix ?? ""),
@@ -85,6 +95,11 @@ export async function GET() {
     remaining,
     released,
     assigned,
+    regions,
+    mainOfficeLabel,
+    addressLabels: Array.isArray((company as any).addresses)
+      ? (company as any).addresses.map((a: any) => String(a?.label ?? "").trim()).filter(Boolean)
+      : [],
     companyName: String(company.name ?? ""),
   });
 }

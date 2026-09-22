@@ -11,6 +11,7 @@ import { User } from "@/models/User";
 import { Task } from "@/models/Task";
 import { emitNotification } from "@/lib/realtime";
 import { ensureCompanyIdentityCode, recordIdentityCodeRelease } from "@/lib/company-identity";
+import { mainOfficeLabelOf } from "@/lib/company-regions";
 import { generateFinalSettlement } from "@/app/api/finance/helpers";
 import { CompanyPolicy } from "@/models/CompanyPolicy";
 
@@ -193,6 +194,21 @@ export async function PATCH(request: Request, { params }: Params) {
         String(actor.role) === "admin" &&
         String(actor.company ?? "") === String(joinRequest.company);
     }
+    if (!canDecide && joinRequest.kind === "identity-code-range") {
+      const actor = await User.findById(userId).select("role regionLabel company companyStatus");
+      const sameApprovedCompany =
+        !!actor &&
+        String(actor.companyStatus) === "approved" &&
+        String(actor.company ?? "") === String(joinRequest.company);
+      if (sameApprovedCompany && String(actor.role) === "admin") {
+        canDecide = true;
+      } else if (sameApprovedCompany && String(actor.role) === "human-resource") {
+        const companyDoc = await Company.findById(joinRequest.company).select("addresses address multiOffice");
+        const mainLabel = mainOfficeLabelOf(companyDoc as any);
+        canDecide = !mainLabel || String(mainLabel).trim().toLowerCase() === String(actor.regionLabel ?? "").trim().toLowerCase();
+      }
+      if (!canDecide) return jsonError("Forbidden", 403);
+    }
     if (!canDecide) return jsonError("Forbidden", 403);
     if (!["pending", "hr-approved"].includes(joinRequest.status)) return jsonError("Approval request already processed.", 409);
 
@@ -281,7 +297,6 @@ export async function PATCH(request: Request, { params }: Params) {
             type: "increment",
           });
         }
-        await ensureCompanyIdentityCode(requester, joinRequest.company);
         const meta = (joinRequest.metadata ?? {}) as { enrollingHrId?: unknown };
         let historyInviterId = joinRequest.approver;
         if (meta.enrollingHrId) {
@@ -311,6 +326,7 @@ export async function PATCH(request: Request, { params }: Params) {
         if (inviterHr?.regionLabel) {
           requester.regionLabel = String(inviterHr.regionLabel);
         }
+        await ensureCompanyIdentityCode(requester, joinRequest.company);
         requester.membershipHistory.push({
           company: joinRequest.company,
           inviter: historyInviterId,
@@ -352,6 +368,65 @@ export async function PATCH(request: Request, { params }: Params) {
           return jsonError("Requester is not in this company.", 409);
         }
         await ensureCompanyIdentityCode(requester, joinRequest.company);
+      }
+    }
+
+    if (joinRequest.kind === "identity-code-range") {
+      const metadata = (joinRequest.metadata ?? {}) as { region?: unknown; newEndRange?: unknown };
+      if (status === "approved") {
+        const actor = await User.findById(userId).select("role regionLabel company companyStatus");
+        const company = await Company.findById(joinRequest.company).select(
+          "addresses address multiOffice identityCodeRegions identityCodeStartRange identityCodeEndRange identityCodeDigits",
+        );
+        if (!company) return jsonError("Company not found.", 404);
+        const mainLabel = mainOfficeLabelOf(company as any);
+        const isAdmin = String(actor?.role) === "admin";
+        const isMainHr =
+          String(actor?.role) === "human-resource" &&
+          String(actor?.companyStatus) === "approved" &&
+          Boolean(mainLabel) &&
+          String(actor?.regionLabel ?? "").trim().toLowerCase() === String(mainLabel).trim().toLowerCase();
+        if (!mainLabel) {
+          if (!isAdmin) return jsonError("Only the main-office HR or admin can approve range increases.", 403);
+        } else if (!isAdmin && !isMainHr) {
+          return jsonError("Only the main-office HR or admin can approve range increases.", 403);
+        }
+
+        const regionName = String(metadata.region ?? "").trim();
+        const regions = Array.isArray((company as any).identityCodeRegions) ? ([...(company as any).identityCodeRegions] as any[]) : [];
+        const targetIndex = regions.findIndex(
+          (r) => String(r?.region ?? "").trim().toLowerCase() === regionName.toLowerCase(),
+        );
+        if (targetIndex === -1) return jsonError("Region range not found.", 409);
+        const target = regions[targetIndex];
+        const newEnd = Number(metadata.newEndRange ?? 0);
+        const masterEnd = company.identityCodeEndRange;
+        const digits = company.identityCodeDigits;
+        const capacity = digits != null ? Math.pow(10, digits) - 1 : null;
+
+        if (!Number.isFinite(newEnd) || newEnd <= Number(target.endRange ?? 0)) {
+          return jsonError("New end range must be greater than the current region end range.", 409);
+        }
+        if (masterEnd != null && newEnd > masterEnd) {
+          return jsonError(`New end range exceeds the company master end range (${masterEnd}). Increase the master range first.`, 409);
+        }
+        if (capacity != null && newEnd > capacity) {
+          return jsonError(`New end range exceeds the ${digits}-digit capacity (${capacity}).`, 409);
+        }
+        const sorted = [...regions].sort((a, b) => Number(a.startRange ?? 0) - Number(b.startRange ?? 0));
+        const pos = sorted.findIndex((r) => r === target);
+        const nextRegion = pos !== -1 ? sorted[pos + 1] : undefined;
+        if (nextRegion && Number(nextRegion.startRange ?? 0) <= newEnd) {
+          return jsonError(
+            `New end range overlaps region "${String(nextRegion.region ?? "")}" (starts at ${nextRegion.startRange}).`,
+            409,
+          );
+        }
+
+        await Company.updateOne(
+          { _id: joinRequest.company, "identityCodeRegions.region": target.region },
+          { $set: { "identityCodeRegions.$.endRange": newEnd } },
+        );
       }
     }
 
@@ -923,6 +998,14 @@ export async function PATCH(request: Request, { params }: Params) {
         status === "approved"
           ? `Your employment type has been set to ${empType || "not specified"}.`
           : `Your employment type request was rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`;
+    } else if (joinRequest.kind === "identity-code-range") {
+      const regionName = String((joinRequest.metadata as any)?.region ?? "");
+      const newEnd = Number((joinRequest.metadata as any)?.newEndRange ?? 0);
+      title = status === "approved" ? "Identity code range increased" : "Identity code range request rejected";
+      message =
+        status === "approved"
+          ? `The identity code range for "${regionName}" was extended to ${newEnd}.`
+          : `The identity code range increase for "${regionName}" was rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`;
     }
 
     const notificationLink =

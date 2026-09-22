@@ -1,8 +1,16 @@
 import { useState } from "react";
-import { Calendar, Umbrella, Home, Clock, Hash } from "lucide-react";
+import { Calendar, Umbrella, Home, Clock, Hash, Plus, X } from "lucide-react";
 import { PolicyModal } from "../modals/policy-modal";
 
 type ModalKey = "notice" | "paid-leave" | "wfh" | "day-hour" | "identity";
+
+export type IdentityCodeRegionRow = {
+  region: string;
+  startRange: number | null;
+  endRange: number | null;
+  nextNumber: number | null;
+  remaining: number | null;
+};
 
 function previewPrefix(raw: string, companyName: string): string {
   const custom = raw.trim();
@@ -58,6 +66,13 @@ export function PolicyConfigSection({
   identityCodeLoaded,
   savingIdentityCode,
   onSaveIdentityCode,
+  identityCodeRegions,
+  onIdentityCodeRegionsChange,
+  mainOfficeLabel,
+  addressLabels,
+  canManageRegions,
+  savingRegionIncrease,
+  onRequestRegionIncrease,
   bulkImportFile,
   onBulkImportFileChange,
   bulkPreview,
@@ -107,6 +122,13 @@ export function PolicyConfigSection({
   identityCodeLoaded: boolean;
   savingIdentityCode: boolean;
   onSaveIdentityCode: () => Promise<boolean>;
+  identityCodeRegions: IdentityCodeRegionRow[];
+  onIdentityCodeRegionsChange: (regions: IdentityCodeRegionRow[]) => void;
+  mainOfficeLabel: string;
+  addressLabels: string[];
+  canManageRegions: boolean;
+  savingRegionIncrease: boolean;
+  onRequestRegionIncrease: (region: string, newEndRange: number) => Promise<boolean>;
   bulkImportFile: File | null;
   onBulkImportFileChange: (file: File | null) => void;
   bulkPreview: {
@@ -128,6 +150,7 @@ export function PolicyConfigSection({
   onApplyBulkImport: () => Promise<void>;
 }) {
   const [activeModal, setActiveModal] = useState<ModalKey | null>(null);
+  const [regionIncreaseDrafts, setRegionIncreaseDrafts] = useState<Record<string, string>>({});
 
   const previewDigits = identityCodeDigits ?? 8;
   const previewStart = identityCodeStartRange ?? 10000000;
@@ -484,6 +507,130 @@ export function PolicyConfigSection({
             ) : null}
           </p>
         ) : null}
+
+        {/* Region Ranges */}
+        <div className="mt-5 border-t border-[var(--c-border-light)] pt-5">
+          <p className="text-xs font-semibold uppercase text-slate-500">Region Ranges</p>
+          <p className="mt-1 mb-3 text-xs text-slate-500">
+            {mainOfficeLabel ? `Main office: ${mainOfficeLabel}. ` : ""}
+            Partition the master range into per-region sub-ranges. Members take a code from their region&apos;s range.
+            {canManageRegions
+              ? " Only the main-office HR or admin can edit these."
+              : " Only the main-office HR or admin can edit these directly; others can request an increase."}
+          </p>
+
+          {identityCodeRegions.length === 0 ? (
+            <p className="rounded-lg bg-[var(--c-bg-muted)] p-3 text-xs text-slate-500">
+              No region ranges are configured. Codes are assigned from the master range.
+              {addressLabels.length > 0 ? ` Offices: ${addressLabels.join(", ")}.` : ""}
+            </p>
+          ) : null}
+
+          {canManageRegions ? (
+            <div className="space-y-2">
+              {identityCodeRegions.map((row, index) => (
+                <div key={index} className="grid items-center gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]">
+                  <input
+                    type="text"
+                    className="rounded-lg neu-inset px-3 py-2 text-sm"
+                    placeholder="Region name"
+                    value={row.region}
+                    onChange={(e) => {
+                      const next = [...identityCodeRegions];
+                      next[index] = { ...row, region: e.target.value };
+                      onIdentityCodeRegionsChange(next);
+                    }}
+                  />
+                  <input
+                    type="number"
+                    className="rounded-lg neu-inset px-3 py-2 text-sm"
+                    placeholder="Start"
+                    value={row.startRange ?? ""}
+                    onChange={(e) => {
+                      const next = [...identityCodeRegions];
+                      next[index] = { ...row, startRange: e.target.value === "" ? null : Number(e.target.value) };
+                      onIdentityCodeRegionsChange(next);
+                    }}
+                  />
+                  <input
+                    type="number"
+                    className="rounded-lg neu-inset px-3 py-2 text-sm"
+                    placeholder="End"
+                    value={row.endRange ?? ""}
+                    onChange={(e) => {
+                      const next = [...identityCodeRegions];
+                      next[index] = { ...row, endRange: e.target.value === "" ? null : Number(e.target.value) };
+                      onIdentityCodeRegionsChange(next);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    aria-label={`Remove region ${row.region}`}
+                    className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                    onClick={() => onIdentityCodeRegionsChange(identityCodeRegions.filter((_, i) => i !== index))}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
+                onClick={() =>
+                  onIdentityCodeRegionsChange([...identityCodeRegions, { region: "", startRange: null, endRange: null, nextNumber: null, remaining: null }])
+                }
+              >
+                <Plus size={14} className="mr-1 inline" />
+                Add region
+              </button>
+              <p className="text-[11px] text-slate-500">
+                Existing &ldquo;next number&rdquo; per region is preserved when its range is unchanged. Ranges are saved with the main Save button.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {identityCodeRegions.map((row) => (
+                <div key={String(row.region)} className="rounded-lg neu-inset px-3 py-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span className="font-medium text-slate-800">{row.region}</span>
+                    <span className="font-mono text-slate-600">{row.startRange ?? "?"} – {row.endRange ?? "?"}</span>
+                    <span className="text-slate-500">next: <span className="font-mono">{row.nextNumber ?? "?"}</span></span>
+                    <span className={`font-medium ${String(row.remaining ?? 0) === "0" ? "text-red-600" : "text-slate-500"}`}>
+                      {String(row.remaining ?? 0)} left
+                    </span>
+                  </div>
+                  {(row.remaining ?? 0) <= 50 ? (
+                    <div className="mt-2 flex items-center gap-2">
+                      <input
+                        type="number"
+                        className="w-32 rounded-lg neu-inset px-3 py-1.5 text-sm"
+                        placeholder={`New end (max ${identityCodeEndRange ?? "?"})`}
+                        value={regionIncreaseDrafts[String(row.region)] ?? ""}
+                        onChange={(e) => setRegionIncreaseDrafts((d) => ({ ...d, [String(row.region)]: e.target.value }))}
+                      />
+                      <button
+                        type="button"
+                        className="neu-btn neu-btn-primary rounded-full px-3 py-1.5 text-xs font-medium"
+                        disabled={savingRegionIncrease}
+                        onClick={async () => {
+                          const value = Number(regionIncreaseDrafts[String(row.region)]);
+                          if (!Number.isFinite(value) || value <= Number(row.endRange ?? 0)) {
+                            setRegionIncreaseDrafts((d) => ({ ...d, [String(row.region)]: String(row.endRange ?? "") }));
+                            return;
+                          }
+                          const ok = await onRequestRegionIncrease(String(row.region), value);
+                          if (ok) setRegionIncreaseDrafts((d) => ({ ...d, [String(row.region)]: "" }));
+                        }}
+                      >
+                        {savingRegionIncrease ? "Sending..." : "Request increase"}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Bulk Import */}
         <div className="mt-5 border-t border-[var(--c-border-light)] pt-5">

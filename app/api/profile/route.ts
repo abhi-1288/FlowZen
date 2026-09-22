@@ -256,8 +256,7 @@ export async function GET() {
       total: members.length,
     };
 
-    const multiOffice = Boolean(companyDoc?.multiOffice);
-    const companyAddresses: any[] = multiOffice && Array.isArray(companyDoc?.addresses)
+    const companyAddresses: any[] = Array.isArray(companyDoc?.addresses)
       ? companyDoc.addresses
       : [];
 

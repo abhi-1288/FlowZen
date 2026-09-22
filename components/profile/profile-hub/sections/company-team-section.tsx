@@ -21,8 +21,7 @@ export function CompanyTeamSection({
   onRequestIdentity: () => Promise<void>;
 }) {
   const joinedBy = (insights?.joinedBy as AnyRecord | undefined) ?? null;
-  const multiOffice = Boolean(company?.multiOffice);
-  const companyAddresses = multiOffice && Array.isArray(company?.addresses)
+  const companyAddresses = Array.isArray(company?.addresses)
     ? (company.addresses as AnyRecord[])
     : [];
   const regionLabel = profile?.regionLabel

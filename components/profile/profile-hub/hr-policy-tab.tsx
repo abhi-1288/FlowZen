@@ -123,6 +123,13 @@ export function HrPolicyTab({
           identityCodeLoaded={policy.identityCodeLoaded}
           savingIdentityCode={policy.savingIdentityCode}
           onSaveIdentityCode={policy.saveIdentityCodeSettings}
+          identityCodeRegions={policy.identityCodeRegions}
+          onIdentityCodeRegionsChange={policy.setIdentityCodeRegions}
+          mainOfficeLabel={policy.mainOfficeLabel}
+          addressLabels={policy.addressLabels}
+          canManageRegions={policy.canManageRegions}
+          savingRegionIncrease={policy.savingRegionIncrease}
+          onRequestRegionIncrease={policy.requestRegionIncrease}
           bulkImportFile={policy.bulkImportFile}
           onBulkImportFileChange={policy.setBulkImportFile}
           bulkPreview={policy.bulkPreview}

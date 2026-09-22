@@ -116,7 +116,10 @@ function AddressModal({
   const isAdmin = role === "admin";
   const multiOffice = company?.multiOffice ? Boolean(company.multiOffice) : false;
   const approvedAddresses = multiOffice && Array.isArray(company?.addresses) ? (company.addresses as AnyRecord[]) : [];
-  const legacyAddress = !multiOffice && company?.address ? String(company.address).trim() : "";
+  const singleOfficeEntry = !multiOffice && Array.isArray(company?.addresses) && (company.addresses as AnyRecord[]).length > 0
+    ? (company.addresses as AnyRecord[])[0]
+    : null;
+  const legacyAddress = !multiOffice && !singleOfficeEntry && company?.address ? String(company.address).trim() : "";
 
   const isAuthHr = !isAdmin && role === "human-resource" && multiOffice
     && (company?.addressManagers as string[] ?? []).includes(userId);
@@ -342,6 +345,19 @@ function AddressModal({
                 </div>
               </div>
             )}
+
+            {/* Single office with a stored name/label */}
+            {!multiOffice && singleOfficeEntry ? (
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">Office Address</span>
+                <div className="mt-2 rounded-lg neu-inset/50 p-3">
+                  <p className="text-sm font-medium text-slate-800 dark:text-zinc-200">{String(singleOfficeEntry.label ?? "").trim() || "Main Office"}</p>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400">
+                    {[String(singleOfficeEntry.line1 ?? ""), String(singleOfficeEntry.city ?? ""), String(singleOfficeEntry.state ?? ""), String(singleOfficeEntry.country ?? "")].filter(Boolean).join(", ") || String(company?.address ?? "")}
+                  </p>
+                </div>
+              </div>
+            ) : null}
 
             {/* Show legacy single address when multi-office is off */}
             {!multiOffice && legacyAddress && (

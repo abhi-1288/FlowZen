@@ -12,6 +12,8 @@ export interface IdCodesData {
   endRange: number | null;
   nextNumber: number | null;
   remaining: number | null;
+  regions: { region: string; startRange: number | null; endRange: number | null; nextNumber: number | null; remaining: number | null }[];
+  mainOfficeLabel: string;
   released: { code: string; exitDate: string | null; releaseDate: string | null }[];
   assigned: Record<string, {
     name: string;
@@ -43,11 +45,19 @@ export function IdCodesModal({
   const [query, setQuery] = useState("");
   const [windowSize, setWindowSize] = useState(WINDOW);
   const [tooltip, setTooltip] = useState<Tooltip>(null);
+  const [selectedRegion, setSelectedRegion] = useState("");
+
+  const regions = data?.regions ?? [];
+  const activeRegion = selectedRegion
+    ? regions.find((r) => String(r.region) === selectedRegion) ?? null
+    : null;
 
   const prefix = data?.prefix ?? "";
   const padDigits = data?.digits ?? String(data?.endRange ?? 0).length;
   const hasRange = data?.startRange != null && data?.endRange != null;
-  const total = hasRange ? (data!.endRange! - data!.startRange! + 1) : 0;
+  const viewStart = activeRegion?.startRange ?? data?.startRange ?? null;
+  const viewEnd = activeRegion?.endRange ?? data?.endRange ?? null;
+  const total = viewStart != null && viewEnd != null ? (viewEnd - viewStart + 1) : 0;
 
   const releasedByCode = useMemo(() => {
     const map = new Map<string, string | null>();
@@ -58,9 +68,9 @@ export function IdCodesModal({
   }, [data]);
 
   const visibleNumbers = useMemo(() => {
-    if (!hasRange) return [];
-    const start = data!.startRange!;
-    const end = data!.endRange!;
+    if (viewStart == null || viewEnd == null) return [];
+    const start = viewStart;
+    const end = viewEnd;
     const q = query.trim();
     const visible: number[] = [];
     const limit = q ? Infinity : windowSize;
@@ -70,7 +80,7 @@ export function IdCodesModal({
       if (visible.length >= limit) break;
     }
     return visible;
-  }, [data, hasRange, query, windowSize]);
+  }, [viewStart, viewEnd, query, windowSize]);
 
   function codeOf(n: number): string {
     return `${prefix}-${String(n).padStart(padDigits, "0")}`;
@@ -106,7 +116,7 @@ export function IdCodesModal({
             <p className="mt-0.5 text-xs text-slate-500">
               {data ? `${data.companyName} · prefix ${prefix}` : ""}
               {data && hasRange
-                ? ` · ${data.startRange} – ${data.endRange}`
+                ? ` · ${viewStart} – ${viewEnd}`
                 : ""}
               {data && data.digits != null ? ` · ${data.digits} digits` : ""}
               {data?.remaining != null ? ` · ${data.remaining} fresh remaining` : ""}
@@ -150,6 +160,41 @@ export function IdCodesModal({
             </div>
           ) : (
             <>
+              {regions.length > 0 ? (
+                <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-medium uppercase text-slate-400">Region:</span>
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedRegion(""); setQuery(""); setWindowSize(WINDOW); }}
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                      !activeRegion
+                        ? "bg-indigo-100 text-indigo-700"
+                        : "neu-card text-slate-500 hover:bg-[var(--c-bg-muted)]"
+                    }`}
+                  >
+                    All
+                  </button>
+                  {regions.map((region) => (
+                    <button
+                      key={String(region.region)}
+                      type="button"
+                      onClick={() => { setSelectedRegion(String(region.region)); setQuery(""); setWindowSize(WINDOW); }}
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                        activeRegion && String(region.region) === activeRegion.region
+                          ? "bg-indigo-100 text-indigo-700"
+                          : "neu-card text-slate-500 hover:bg-[var(--c-bg-muted)]"
+                      }`}
+                      title={`${String(region.region)} · ${region.startRange ?? "?"} – ${region.endRange ?? "?"} · ${region.remaining ?? "?"} left`}
+                    >
+                      {String(region.region)}
+                      {activeRegion && String(region.region) === activeRegion.region
+                        ? ` (${region.remaining ?? "?"})`
+                        : ""}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <input
                   type="text"

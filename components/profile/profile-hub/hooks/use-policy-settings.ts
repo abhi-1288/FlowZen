@@ -37,8 +37,15 @@ export function usePolicySettings(
   const [identityCodeEndRange, setIdentityCodeEndRange] = useState<number | null>(null);
   const [identityCodeNextNumber, setIdentityCodeNextNumber] = useState<number | null>(null);
   const [identityCodeRemaining, setIdentityCodeRemaining] = useState<number | null>(null);
+  const [identityCodeRegions, setIdentityCodeRegions] = useState<
+    { region: string; startRange: number | null; endRange: number | null; nextNumber: number | null; remaining: number | null }[]
+  >([]);
+  const [mainOfficeLabel, setMainOfficeLabel] = useState<string>("");
+  const [addressLabels, setAddressLabels] = useState<string[]>([]);
+  const [canManageRegions, setCanManageRegions] = useState(false);
   const [identityCodeLoaded, setIdentityCodeLoaded] = useState(false);
   const [savingIdentityCode, setSavingIdentityCode] = useState(false);
+  const [savingRegionIncrease, setSavingRegionIncrease] = useState(false);
 
   const [bulkImportFile, setBulkImportFile] = useState<File | null>(null);
   const [bulkPreview, setBulkPreview] = useState<{
@@ -67,6 +74,10 @@ export function usePolicySettings(
       endRange: number | null;
       nextNumber: number | null;
       remaining: number | null;
+      regions: { region: string; startRange: number | null; endRange: number | null; nextNumber: number | null; remaining: number | null }[];
+      mainOfficeLabel: string;
+      addressLabels: string[];
+      canManageRegions: boolean;
     }>("/api/hr/identity-code-settings", undefined, { toast: false })
       .then((data) => {
         setIdentityCodePrefix(data.prefix ?? "");
@@ -75,6 +86,10 @@ export function usePolicySettings(
         setIdentityCodeEndRange(data.endRange);
         setIdentityCodeNextNumber(data.nextNumber);
         setIdentityCodeRemaining(data.remaining);
+        setIdentityCodeRegions(Array.isArray(data.regions) ? data.regions : []);
+        setMainOfficeLabel(data.mainOfficeLabel ?? "");
+        setAddressLabels(Array.isArray(data.addressLabels) ? data.addressLabels : []);
+        setCanManageRegions(data.canManageRegions === true);
         setIdentityCodeLoaded(true);
       })
       .catch(() => {
@@ -138,6 +153,11 @@ export function usePolicySettings(
       if (identityCodeStartRange != null) body.startRange = identityCodeStartRange;
       if (identityCodeEndRange != null) body.endRange = identityCodeEndRange;
       if (identityCodeNextNumber != null) body.nextNumber = identityCodeNextNumber;
+      body.regions = identityCodeRegions.map((region) => ({
+        region: region.region,
+        startRange: region.startRange ?? 0,
+        endRange: region.endRange ?? 0,
+      }));
 
       const data = await apiFetch<{
         prefix: string;
@@ -146,6 +166,10 @@ export function usePolicySettings(
         endRange: number | null;
         nextNumber: number | null;
         remaining: number | null;
+        regions: { region: string; startRange: number | null; endRange: number | null; nextNumber: number | null; remaining: number | null }[];
+        mainOfficeLabel: string;
+        addressLabels: string[];
+        canManageRegions: boolean;
       }>("/api/hr/identity-code-settings", {
         method: "PATCH",
         body: JSON.stringify(body),
@@ -156,6 +180,10 @@ export function usePolicySettings(
       setIdentityCodeEndRange(data.endRange);
       setIdentityCodeNextNumber(data.nextNumber);
       setIdentityCodeRemaining(data.remaining);
+      setIdentityCodeRegions(Array.isArray(data.regions) ? data.regions : []);
+      setMainOfficeLabel(data.mainOfficeLabel ?? "");
+      setAddressLabels(Array.isArray(data.addressLabels) ? data.addressLabels : []);
+      setCanManageRegions(data.canManageRegions === true);
       showToast("Identity code settings updated.", "success");
       setSavingIdentityCode(false);
       return true;
@@ -163,6 +191,38 @@ export function usePolicySettings(
       setSavingIdentityCode(false);
       showToast(
         err instanceof Error ? err.message : "Unable to update identity code settings.",
+        "error",
+      );
+      return false;
+    }
+  }
+
+  async function requestRegionIncrease(
+    region: string,
+    newEndRange: number,
+  ): Promise<boolean> {
+    try {
+      setSavingRegionIncrease(true);
+      const data = await apiFetch<{
+        requestId: string;
+        approverName: string;
+        status: string;
+      }>("/api/hr/identity-code-range", {
+        method: "POST",
+        body: JSON.stringify({ region, newEndRange }),
+      });
+      setSavingRegionIncrease(false);
+      showToast(
+        data.approverName
+          ? `Increase request sent to ${data.approverName} for approval.`
+          : "Increase request sent for approval.",
+        "success",
+      );
+      return true;
+    } catch (err) {
+      setSavingRegionIncrease(false);
+      showToast(
+        err instanceof Error ? err.message : "Unable to request range increase.",
         "error",
       );
       return false;
@@ -273,9 +333,15 @@ export function usePolicySettings(
     identityCodeEndRange, setIdentityCodeEndRange,
     identityCodeNextNumber, setIdentityCodeNextNumber,
     identityCodeRemaining,
+    identityCodeRegions, setIdentityCodeRegions,
+    mainOfficeLabel,
+    addressLabels,
+    canManageRegions,
     identityCodeLoaded,
     savingIdentityCode,
+    savingRegionIncrease,
     saveIdentityCodeSettings,
+    requestRegionIncrease,
     bulkImportFile, setBulkImportFile,
     bulkPreview, setBulkPreview,
     bulkImportLoading,

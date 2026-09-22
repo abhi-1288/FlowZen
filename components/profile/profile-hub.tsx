@@ -1193,7 +1193,7 @@ export function ProfileHub() {
                     showToast={showToast}
                     refresh={load}
                     regionOptions={
-                      company?.multiOffice && Array.isArray(company?.addresses)
+                      Array.isArray(company?.addresses) && (company.addresses as AnyRecord[]).length > 0
                         ? (company.addresses as AnyRecord[]).map((a: AnyRecord) => String(a.label ?? "")).filter(Boolean)
                         : company?.address
                           ? ["Main Office"]

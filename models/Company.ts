@@ -75,6 +75,12 @@ const CompanySchema = new Schema(
       exitDate: { type: Date, default: null },
       releaseDate: { type: Date, default: null },
     }],
+    identityCodeRegions: [{
+      region: { type: String, required: true },
+      startRange: { type: Number, required: true },
+      endRange: { type: Number, required: true },
+      nextNumber: { type: Number, required: true },
+    }],
     stageOrder: {
       type: [String],
       default: ["applied", "screening", "assessment", "technical-interview", "manager-round", "hr-round", "offer", "joined", "ats-rejected", "rejected"],
