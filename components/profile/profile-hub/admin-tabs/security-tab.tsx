@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { Html5Qrcode } from "html5-qrcode";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
+import { withMainOfficeSuffix } from "@/lib/company-regions";
 import { ActionButton, AnyRecord, SectionHeader } from "../shared";
 
 type ActiveSection = "verify" | "scan" | "visitors" | "lost-cards" | "entry-logs" | "emergency";
@@ -788,7 +789,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                             ) : null}
                             {scanResult.data.regionLabel ? (
                               <span className="rounded bg-[var(--c-bg-hover)] px-2 py-0.5 text-[10px] text-slate-600">
-                                {String(scanResult.data.regionLabel)}
+                                {withMainOfficeSuffix(company, String(scanResult.data.regionLabel))}
                               </span>
                             ) : null}
                           </div>
@@ -1639,7 +1640,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                       <td className="px-3 py-2.5 text-xs text-slate-500">{c.emergencyContact || "-"}</td>
                       {isSenior ? <td className="px-3 py-2.5 text-xs text-slate-500">{c.phone || "-"}</td> : null}
                       <td className="px-3 py-2.5 text-xs text-slate-500">{c.bloodGroup || "-"}</td>
-                      <td className="px-3 py-2.5 text-xs text-slate-500">{c.regionLabel || "-"}</td>
+                      <td className="px-3 py-2.5 text-xs text-slate-500">{withMainOfficeSuffix(company, c.regionLabel) || "-"}</td>
                     </tr>
                   ))}
                 </tbody>

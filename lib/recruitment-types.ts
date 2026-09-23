@@ -183,6 +183,7 @@ export type ATSCandidate = {
   };
   job: { id: string; title: string } | string;
   company: string;
+  regionLabel?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -196,6 +197,8 @@ export type ATSInterview = {
   scheduledAt: string;
   meetingLink: string;
   location: string;
+  region?: string;
+  regionHr?: { id: string; name: string; email: string } | string | null;
   status: InterviewStatus;
   feedback: {
     technicalSkills: number;

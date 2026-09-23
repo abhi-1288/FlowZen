@@ -334,7 +334,7 @@ export function ProfileTab({
       <AppearanceSection />
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <PersonalInfoSection profile={profile} session={session as { user?: { name?: string; email?: string } } | null} avatarUrl={avatarUrl} displayName={displayName}
+        <PersonalInfoSection profile={profile} company={company} session={session as { user?: { name?: string; email?: string } } | null} avatarUrl={avatarUrl} displayName={displayName}
           uploading={uploading} onAvatarDelete={() => setAvatarDeleteModal(true)}
           onAvatarFileSelect={(file) => setAvatarCropFile(file)}
           effectiveRole={effectiveRole} displayRole={displayRole}
@@ -392,7 +392,14 @@ export function ProfileTab({
 
       {(role === "admin" || role === "human-resource") && profile?.companyStatus === "approved" ? (
         <div className="mt-4">
-          <CompanyAddressSection company={company} role={role} userId={profileId} showToast={showToast} refresh={refresh} />
+          <CompanyAddressSection
+            company={company}
+            role={role}
+            userId={profileId}
+            userRegionLabel={profile?.regionLabel ? String(profile.regionLabel) : ""}
+            showToast={showToast}
+            refresh={refresh}
+          />
         </div>
       ) : null}
 

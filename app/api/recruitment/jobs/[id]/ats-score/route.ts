@@ -3,9 +3,11 @@ import { connectDb } from "@/lib/db";
 import { jsonError, requireUserId } from "@/lib/api";
 import { ATSJob } from "@/models/ATSJob";
 import { ATSCandidate } from "@/models/ATSCandidate";
+import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 import { ATSTimeline } from "@/models/ATSTimeline";
 import { extractResumeText, scoreResumeWithGemini } from "@/lib/ats-scorer";
+import { closestRegionOf } from "@/lib/candidate-region";
 
 const HR_ROLES = ["admin", "human-resource"];
 
@@ -38,6 +40,9 @@ export async function POST(request: Request, { params }: Params) {
   const candidates = await ATSCandidate.find(filter);
   if (candidates.length === 0) return jsonError(force ? "No candidates to re-score." : "All candidates already scored.", 400);
 
+  const company = (await Company.findById(user.company).select("addresses multiOffice").lean()) as any;
+  const regions = Array.isArray(company?.addresses) ? (company.addresses as any[]) : [];
+
   let scored = 0;
   let selected = 0;
   let rejected = 0;
@@ -64,6 +69,13 @@ export async function POST(request: Request, { params }: Params) {
         continue;
       }
 
+      const regionMatch = closestRegionOf({
+        address: (candidate as any).address,
+        resumeText,
+        jobLocation: (job as any).location,
+        regions,
+      });
+
       const result = await scoreResumeWithGemini(
         resumeText,
         (job as any).title || "",
@@ -80,6 +92,7 @@ export async function POST(request: Request, { params }: Params) {
         atsStatus: status,
         atsReason: result.reason,
         atsScoredAt: new Date(),
+        ...(regionMatch.label ? { regionLabel: regionMatch.label } : {}),
       });
 
       await ATSTimeline.create({

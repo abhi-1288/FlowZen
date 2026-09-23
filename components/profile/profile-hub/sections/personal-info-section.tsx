@@ -1,6 +1,7 @@
 ﻿import { Camera, ChevronDown, Info, Mail, Pencil, Trash2, X } from "lucide-react";
 import { FormEvent, useRef, useState } from "react";
 import { apiFetch } from "@/lib/client-utils";
+import { withMainOfficeSuffix } from "@/lib/company-regions";
 import type { AnyRecord } from "../shared";
 import { AvatarBadge, Row, SectionHeader } from "../shared";
 
@@ -80,6 +81,7 @@ function stripCountryCode(phone: string): string {
 
 export function PersonalInfoSection({
   profile,
+  company,
   session,
   avatarUrl,
   displayName,
@@ -92,6 +94,7 @@ export function PersonalInfoSection({
   showToast,
 }: {
   profile: AnyRecord | null;
+  company: AnyRecord | null;
   session: { user?: { name?: string; email?: string } } | null;
   avatarUrl: string;
   displayName: string;
@@ -343,7 +346,7 @@ export function PersonalInfoSection({
         <Row label="Address" value={profile?.address ? String(profile.address) : undefined} />
         <Row label="Emergency Contact" value={profile?.emergencyContact ? String(profile.emergencyContact) : undefined} />
         <Row label="Blood Group" value={profile?.bloodGroup ? String(profile.bloodGroup) : undefined} />
-        {oldRegionLabel ? <Row label="Region" value={oldRegionLabel} /> : null}
+        {oldRegionLabel ? <Row label="Region" value={withMainOfficeSuffix(company, oldRegionLabel)} /> : null}
         <Row label="Role" value={effectiveRole ? displayRole : undefined} />
         <Row label="Employment Type" value={profile?.employmentType ? String(profile.employmentType).replace(/-/g, " ") : undefined} />
         {!profile?.employmentType ? (

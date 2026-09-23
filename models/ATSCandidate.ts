@@ -50,6 +50,7 @@ const ATSCandidateSchema = new Schema(
     },
     job: { type: Schema.Types.ObjectId, ref: "ATSJob", required: true, index: true },
     company: { type: Schema.Types.ObjectId, ref: "Company", required: true, index: true },
+    regionLabel: { type: String, default: "", trim: true, maxlength: 200, index: true },
     atsScore: { type: Number, default: null, min: 0, max: 100 },
     atsStatus: { type: String, enum: ["pending", "selected", "rejected"], default: "pending", index: true },
     atsReason: { type: String, default: "" },

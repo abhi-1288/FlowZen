@@ -1190,6 +1190,7 @@ export function ProfileHub() {
                   <MembersTab
                     insights={insights}
                     actorRole={String(role)}
+                    company={company}
                     showToast={showToast}
                     refresh={load}
                     regionOptions={

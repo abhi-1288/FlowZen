@@ -49,6 +49,8 @@ const CompanySchema = new Schema(
     mission: { type: String, default: "", maxlength: 1000 },
     multiOffice: { type: Boolean, default: false },
     addressManagers: [{ type: Schema.Types.ObjectId, ref: "User" }],
+    regionMaxHrs: { type: Number, default: 5 },
+    regionMaxAdmins: { type: Number, default: 2 },
     addresses: [{
       label: { type: String, default: "" },
       line1: { type: String, default: "" },
@@ -56,7 +58,14 @@ const CompanySchema = new Schema(
       state: { type: String, default: "" },
       zip: { type: String, default: "" },
       country: { type: String, default: "" },
-      isMain: { type: Boolean, default: false }
+      isMain: { type: Boolean, default: false },
+      hrs: [{ type: Schema.Types.ObjectId, ref: "User" }],
+      admins: [{ type: Schema.Types.ObjectId, ref: "User" }],
+      hrHead: { type: Schema.Types.ObjectId, ref: "User" },
+      adminHead: { type: Schema.Types.ObjectId, ref: "User" },
+      maxHrs: { type: Number, default: null },
+      maxAdmins: { type: Number, default: null },
+      createdBy: { type: Schema.Types.ObjectId, ref: "User" }
     }],
     startDate: { type: Date, default: null },
     requiredDocuments: [{

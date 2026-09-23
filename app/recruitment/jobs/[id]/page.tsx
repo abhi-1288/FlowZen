@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { ArrowLeft, Pencil, PencilOff, Trash2, Globe, Archive, Share2, Check, Cog, Briefcase, Building2, MapPin, Clock, Users, Banknote, ShieldCheck, CalendarClock, UserPlus, CalendarPlus, Columns3, ChevronDown, Download, ExternalLink, Upload, Loader2, CheckCircle } from "lucide-react";
@@ -202,6 +202,21 @@ export default function JobDetailPage() {
   }
 
   useEffect(() => { void fetchJob(id); void fetchCandidates({ jobId: id }); void loadAssessmentStats(); }, [id, fetchJob, fetchCandidates]);
+
+  const autoDetectRanRef = useRef(false);
+  useEffect(() => {
+    if (!id || !isHrOrAdmin || autoDetectRanRef.current) return;
+    autoDetectRanRef.current = true;
+    apiFetch<{ skipped?: boolean }>(`/api/recruitment/jobs/${id}/detect-regions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ onlyMissing: true }),
+    })
+      .then((res) => {
+        if (!res.skipped) void fetchCandidates({ jobId: id });
+      })
+      .catch(() => {});
+  }, [id, isHrOrAdmin, fetchCandidates]);
 
   const jobCandidates = useMemo(
     () => candidates.filter((c) => {
@@ -566,6 +581,11 @@ export default function JobDetailPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm font-semibold text-slate-900 dark:text-zinc-100">{candidate.firstName} {candidate.lastName}</span>
+                        {(candidate as any).regionLabel && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                            <MapPin size={10} /> {(candidate as any).regionLabel}
+                          </span>
+                        )}
                         {candidate.atsScore != null && (
                           <span className="group relative inline-flex">
                             <span className={`cursor-help rounded-full px-2 py-0.5 text-xs font-bold ${candidate.atsStatus === "selected" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
@@ -1621,7 +1641,48 @@ function BulkInterviewModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const isRemoteJob = !!jobLocation && /^remote$/i.test(jobLocation.trim());
+  const [regions, setRegions] = useState<string[]>([]);
+  const [regionFilter, setRegionFilter] = useState("");
+  const [stateFilter, setStateFilter] = useState("");
+  const [detecting, setDetecting] = useState(false);
+  const [detectStatus, setDetectStatus] = useState("");
+  const [regionHrUsers, setRegionHrUsers] = useState<any[]>([]);
+  const [regionHr, setRegionHr] = useState("");
+  const [regionHrLoading, setRegionHrLoading] = useState(false);
+  const [updatingRegion, setUpdatingRegion] = useState<string>("");
+
+  const candidateStates = useMemo(
+    () => [...new Set(candidates.map((c) => String((c as any).regionLabel || "").trim()).filter(Boolean))],
+    [candidates],
+  );
+
+  const fixedRegion = useMemo(() => {
+    const loc = String(jobLocation ?? "").trim();
+    if (!loc || /^remote$/i.test(loc) || /^pan$/i.test(loc)) return "";
+    return regions.find((r) => r.toLowerCase() === loc.toLowerCase()) ? loc : "";
+  }, [jobLocation, regions]);
+
+  const detectionMode = !fixedRegion;
+
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    apiFetch<{ addresses?: { label?: string }[] }>("/api/company/address")
+      .then((res) => {
+        if (!active) return;
+        setRegions((res.addresses || []).map((a) => (a.label ?? "").trim()).filter(Boolean));
+      })
+      .catch(() => { if (active) setRegions([]); });
+    return () => { active = false; };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    setRegionFilter(fixedRegion);
+    setStateFilter("");
+    setDetectStatus("");
+    setSelected({});
+  }, [open, fixedRegion]);
 
   useEffect(() => {
     let active = true;
@@ -1642,22 +1703,105 @@ function BulkInterviewModal({
     if (!open) return;
     let active = true;
     setPickerLoading(true);
-    const region = jobLocation && !isRemoteJob ? `&region=${encodeURIComponent(jobLocation)}` : "";
+    const region = regionFilter ? `&region=${encodeURIComponent(regionFilter)}` : "";
     apiFetch<{ users: any[] }>(`/api/recruitment/users-by-role?role=${pickerRole}${region}`)
       .then((res) => { if (active) setPickerUsers(res.users ?? []); })
       .catch(() => { if (active) setPickerUsers([]); })
       .finally(() => { if (active) setPickerLoading(false); });
     return () => { active = false; };
-  }, [open, pickerRole, isRemoteJob, jobLocation]);
+  }, [open, pickerRole, regionFilter]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!regionFilter) {
+      setRegionHrUsers([]);
+      setRegionHr("");
+      return;
+    }
+    let active = true;
+    setRegionHrLoading(true);
+    apiFetch<{ hrHead: any | null; hrs: any[] }>(`/api/recruitment/region-hrs?region=${encodeURIComponent(regionFilter)}`)
+      .then((res) => {
+        if (!active) return;
+        const list = [...(res.hrHead ? [res.hrHead] : []), ...(res.hrs ?? [])];
+        setRegionHrUsers(list);
+        setRegionHr(res.hrHead?.id ?? list[0]?.id ?? "");
+      })
+      .catch(() => { if (active) { setRegionHrUsers([]); setRegionHr(""); } })
+      .finally(() => { if (active) setRegionHrLoading(false); });
+    return () => { active = false; };
+  }, [open, regionFilter]);
+
+  const filteredCandidates = useMemo(() => {
+    if (!stateFilter) return candidates;
+    return candidates.filter((c) => String((c as any).regionLabel || "") === stateFilter);
+  }, [candidates, stateFilter]);
+
+  function handleRegionChange(v: string) {
+    setRegionFilter(v);
+  }
+
+  function handleStateChange(v: string) {
+    setStateFilter(v);
+    setSelected((prev) => {
+      if (!v) return prev;
+      const next: Record<string, boolean> = {};
+      for (const c of candidates) {
+        const cid = String((c as any)._id || c.id);
+        if (prev[cid] && String((c as any).regionLabel || "") === v) next[cid] = true;
+      }
+      return next;
+    });
+  }
+
+  async function handleDetectRegions() {
+    if (detecting) return;
+    setDetecting(true);
+    setDetectStatus("");
+    try {
+      const res = await apiFetch<{ skipped?: boolean; total: number; detected: number; errors: number }>(
+        `/api/recruitment/jobs/${jobId}/detect-regions`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) },
+      );
+      setDetectStatus(
+        res.skipped
+          ? "This job has a fixed region — no detection needed."
+          : `States matched for ${res.detected} candidate${res.detected !== 1 ? "s" : ""}${res.errors ? ` (${res.errors} skipped)` : ""} from their addresses and resumes.`,
+      );
+      onDone();
+    } catch (e: any) {
+      setDetectStatus(e?.message || "Failed to detect states from candidate details.");
+    } finally {
+      setDetecting(false);
+    }
+  }
+
+  async function handleCandidateRegion(cid: string, label: string) {
+    if (updatingRegion === cid) return;
+    setUpdatingRegion(cid);
+    setError("");
+    try {
+      await apiFetch(`/api/recruitment/candidates/${cid}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ regionLabel: label }),
+      });
+      onDone();
+    } catch {
+      setError("Failed to update candidate region.");
+    } finally {
+      setUpdatingRegion("");
+    }
+  }
 
   if (!open) return null;
 
-  const allSelected = candidates.length > 0 && candidates.every((c) => selected[String((c as any)._id || c.id)]);
+  const allSelected = filteredCandidates.length > 0 && filteredCandidates.every((c) => selected[String((c as any)._id || c.id)]);
 
   function toggleAll() {
     const next: Record<string, boolean> = {};
     if (!allSelected) {
-      for (const c of candidates) next[String((c as any)._id || c.id)] = true;
+      for (const c of filteredCandidates) next[String((c as any)._id || c.id)] = true;
     }
     setSelected(next);
   }
@@ -1666,7 +1810,7 @@ function BulkInterviewModal({
     e.preventDefault();
     if (saving) return;
     const form = new FormData(e.currentTarget);
-    const candidateIds = candidates
+    const candidateIds = filteredCandidates
       .map((c) => String((c as any)._id || c.id))
       .filter((cid) => selected[cid]);
     if (candidateIds.length === 0) {
@@ -1686,6 +1830,8 @@ function BulkInterviewModal({
           scheduledAt: String(form.get("scheduledAt") || ""),
           meetingLink: isOnline ? String(form.get("meetingLink") || "") : "",
           location: isOnline ? "" : String(form.get("location") || ""),
+          region: regionFilter,
+          regionHr,
           candidateIds,
         }),
       });
@@ -1726,6 +1872,72 @@ function BulkInterviewModal({
             </label>
           </div>
 
+          <div className="rounded-lg border border-[var(--c-border-light)] p-3">
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700">
+                Region <span className="text-xs font-normal text-slate-400">(office/HR area for interviewers — does not filter candidates)</span>
+              </span>
+              <select value={regionFilter} onChange={(e) => handleRegionChange(e.target.value)} className="neu-inset min-w-[180px] w-full rounded-lg px-3 py-2.5 text-sm">
+                <option value="">All regions</option>
+                {regions.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="rounded-lg border border-[var(--c-border-light)] p-3">
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700">
+                State <span className="text-xs font-normal text-slate-400">(filters candidates)</span>
+              </span>
+              <div className="flex flex-wrap items-end gap-3">
+                <select value={stateFilter} onChange={(e) => handleStateChange(e.target.value)} className="neu-inset min-w-[180px] flex-1 rounded-lg px-3 py-2.5 text-sm" disabled={candidateStates.length === 0}>
+                  <option value="">All states</option>
+                  {candidateStates.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+                {detectionMode && (
+                  <button
+                    type="button"
+                    onClick={() => void handleDetectRegions()}
+                    disabled={detecting}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 px-3 py-2 text-xs font-medium text-indigo-600 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-indigo-900 dark:text-indigo-400 dark:hover:bg-indigo-950"
+                  >
+                    {detecting ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <MapPin size={13} />
+                    )}
+                    {detecting ? "Detecting…" : "Detect states"}
+                  </button>
+                )}
+              </div>
+              {detectionMode && (
+                <p className="mt-1.5 text-xs text-slate-400">
+                  Each candidate&apos;s address and resume are scanned to find their state for scheduling interviews.
+                </p>
+              )}
+              {detectStatus && <p className="mt-1.5 text-xs text-emerald-600">{detectStatus}</p>}
+            </label>
+          </div>
+
+          {regionFilter && (
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-slate-700">
+                Region HR <span className="text-xs font-normal text-slate-400">(coordinator for {regionFilter})</span>
+              </span>
+              <select value={regionHr} onChange={(e) => setRegionHr(e.target.value)} className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm">
+                <option value="">{regionHrLoading ? "Loading region HR…" : "Select a region HR…"}</option>
+                {regionHrUsers.length === 0 && !regionHrLoading && <option value="">No HR assigned to this region</option>}
+                {regionHrUsers.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}{u.role === "admin" ? " (Admin)" : ""}</option>
+                ))}
+              </select>
+            </label>
+          )}
+
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Interviewer</span>
             <div className="flex flex-wrap items-end gap-3">
@@ -1750,6 +1962,11 @@ function BulkInterviewModal({
                 </select>
               </label>
             </div>
+            {regionFilter ? (
+              <p className="mt-1 text-xs text-slate-400">Interviewers shown for region &quot;{regionFilter}&quot;.</p>
+            ) : (
+              <p className="mt-1 text-xs text-slate-400">Showing interviewers across all regions.</p>
+            )}
           </label>
 
           <label className="block">
@@ -1765,48 +1982,70 @@ function BulkInterviewModal({
               <input name="meetingLink" placeholder="https://meet.google.com/..." className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
             </label>
           ) : (
-            <InterviewLocationFields jobLocation={jobLocation} />
+            <InterviewLocationFields jobLocation={regionFilter || jobLocation} />
           )}
 
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-700">Candidates ({Object.values(selected).filter(Boolean).length} selected)</span>
+              <span className="text-sm font-medium text-slate-700">
+                Candidates ({Object.values(selected).filter(Boolean).length} selected{stateFilter ? ` · ${filteredCandidates.length} in ${stateFilter}` : ""})
+              </span>
               <button type="button" onClick={toggleAll} className="text-xs font-medium text-indigo-600 hover:underline">
                 {allSelected ? "Clear all" : "Select all"}
               </button>
             </div>
             <div className="max-h-56 overflow-y-auto rounded-lg border border-[var(--c-border-light)]">
-              {candidates.length === 0 && <p className="p-3 text-sm text-slate-400">No candidates in this job yet.</p>}
-              {candidates.map((c) => {
+              {filteredCandidates.length === 0 && (
+                <p className="p-3 text-sm text-slate-400">
+                  {candidates.length === 0 ? "No candidates in this job yet." : "No candidates in this state."}
+                </p>
+              )}
+              {filteredCandidates.map((c) => {
                 const cid = String((c as any)._id || c.id);
+                const cRegion = String((c as any).regionLabel || "");
                 return (
-                  <label key={cid} className="flex cursor-pointer items-center gap-3 border-b border-[var(--c-border-light)] px-3 py-2 last:border-b-0 hover:bg-[var(--c-bg-muted)]">
+                  <div key={cid} className="flex items-center gap-2 border-b border-[var(--c-border-light)] px-3 py-2 last:border-b-0 hover:bg-[var(--c-bg-muted)]">
                     <input
                       type="checkbox"
                       checked={!!selected[cid]}
                       onChange={(e) => setSelected((prev) => ({ ...prev, [cid]: e.target.checked }))}
-                      className="h-4 w-4 rounded border-slate-300 text-indigo-600"
+                      className="h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600"
                     />
-                    <span className="flex-1 text-sm text-slate-700">
+                    <span className="min-w-0 flex-1 truncate text-sm text-slate-700">
                       {(c as any).firstName} {(c as any).lastName}
                     </span>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${cRegion ? "bg-indigo-50 text-indigo-700" : "bg-slate-100 text-slate-500"}`}>
+                      {cRegion || "No region"}
+                    </span>
+                    {detectionMode && candidateStates.length > 0 && (
+                      <select
+                        value={cRegion}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => void handleCandidateRegion(cid, e.target.value)}
+                        disabled={updatingRegion === cid}
+                        title="Override state for this candidate"
+                        className="shrink-0 rounded-md border border-[var(--c-border-light)] bg-transparent px-1.5 py-0.5 text-[10px] text-slate-600 max-w-[140px]"
+                      >
+                        <option value="">No state</option>
+                        {candidateStates.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    )}
                     {(c as any).atsScore != null && (
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${(c as any).atsStatus === "selected" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${(c as any).atsStatus === "selected" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
                         ATS {(c as any).atsScore}
                       </span>
                     )}
                     {(c as any).assessmentScore != null && (
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${(c as any).assessmentStatus === "selected" ? "bg-teal-50 text-teal-700" : "bg-rose-50 text-rose-700"}`}>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${(c as any).assessmentStatus === "selected" ? "bg-teal-50 text-teal-700" : "bg-rose-50 text-rose-700"}`}>
                         Assessment {(c as any).assessmentScore}%
                       </span>
                     )}
-                    {selected[cid] && (c as any).email && (
-                      <span className="text-xs text-slate-400">{c.email}</span>
-                    )}
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                    <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
                       {STAGE_LABELS[(c as any).stage as Stage] || (c as any).stage}
                     </span>
-                  </label>
+                  </div>
                 );
               })}
             </div>

@@ -1,5 +1,6 @@
 ﻿import type { AnyRecord } from "../shared";
 import { Row, SectionHeader } from "../shared";
+import { isMainOfficeLabel } from "@/lib/company-regions";
 
 export function CompanyTeamSection({
   profile,
@@ -30,6 +31,30 @@ export function CompanyTeamSection({
   const regionAddress = regionLabel && companyAddresses.length > 0
     ? companyAddresses.find((a) => String(a.label ?? "") === regionLabel)
     : null;
+  const regionLabelText = regionLabel ? String(regionLabel) : "";
+  const regionAddrText = regionAddress
+    ? [String(regionAddress.line1 ?? ""), String(regionAddress.city ?? ""), String(regionAddress.state ?? "")].filter(Boolean).join(", ")
+    : "";
+  const isMainOffice = isMainOfficeLabel(company, regionLabelText);
+  const alreadyLabelledMainOffice = regionLabelText.trim().toLowerCase() === "main office";
+  const suffixMainOffice = isMainOffice && !alreadyLabelledMainOffice;
+  const regionDisplay = regionLabelText
+    ? regionAddrText
+      ? `${regionLabelText} — ${regionAddrText}${suffixMainOffice ? " (Main Office)" : ""}`
+      : `${regionLabelText}${suffixMainOffice ? " (Main Office)" : ""}`
+    : undefined;
+
+  const regionHrHead = regionAddress ? String(regionAddress.hrHead ?? "") : "";
+  const regionAdminHead = regionAddress ? String(regionAddress.adminHead ?? "") : "";
+  const memberNameById = new Map<string, string>();
+  const hrMembers = Array.isArray((insights?.hr as AnyRecord | undefined)?.members)
+    ? ((insights?.hr as AnyRecord).members as AnyRecord[])
+    : [];
+  for (const m of hrMembers) {
+    if (m) memberNameById.set(String(m?._id ?? m?.id ?? ""), String(m?.name ?? ""));
+  }
+  const headName = (id: string) => (id ? memberNameById.get(id) ?? id.slice(-6) : "");
+  const hasRegionHeads = Boolean(regionHrHead || regionAdminHead);
   return (
     <section className="rounded-xl neu-card p-5 dark:bg-[#000000] dark:border-zinc-800">
       <SectionHeader title="Company & Team" description="Organizational structure" accent="emerald" />
@@ -41,11 +66,13 @@ export function CompanyTeamSection({
         <Row label="Company Start Date" value={company?.startDate || company?.createdAt ? new Date((company.startDate || company.createdAt) as string | Date).toLocaleDateString() : undefined} />
         <Row label="Company Joined" value={profile?.company && profile?.companyJoined ? new Date(profile.companyJoined as string | Date).toLocaleDateString() : undefined} />
         <Row label="Team Joined" value={profile?.team && profile?.teamJoined ? new Date(profile.teamJoined as string | Date).toLocaleDateString() : undefined} />
-        <Row label="Region" value={regionLabel
-          ? regionAddress
-            ? `${regionLabel} — ${[String(regionAddress.line1 ?? ""), String(regionAddress.city ?? ""), String(regionAddress.state ?? "")].filter(Boolean).join(", ")}`
-            : regionLabel
-          : undefined} />
+        <Row label="Region" value={regionDisplay} />
+        {hasRegionHeads ? (
+          <>
+            <Row label="HR Head" value={regionHrHead ? headName(regionHrHead) : "Not assigned"} />
+            <Row label="Admin Head" value={regionAdminHead ? headName(regionAdminHead) : "Not assigned"} />
+          </>
+        ) : null}
         {inApprovedCompany && !["human-resource", "admin"].includes(role) ? (
           <Row label={joinedBy?.viaHr ? "Joined By HR" : "Company approved by"} value={joinedBy?.name ? String(joinedBy.name) : undefined} />
         ) : null}

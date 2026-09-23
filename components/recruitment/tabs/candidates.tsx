@@ -121,6 +121,9 @@ export function CandidatesTab() {
                     {isExpanded ? <ChevronDown size={16} className="shrink-0 text-slate-400" /> : <ChevronRight size={16} className="shrink-0 text-slate-400" />}
                     <Briefcase size={15} className="shrink-0 text-slate-400" />
                     <span className="text-sm font-semibold text-slate-900">{jobTitle}</span>
+                    {job?.location && (
+                      <span className="text-xs text-slate-400">{job.location}</span>
+                    )}
                     {job && (
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                         job.status === "open" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
@@ -162,6 +165,11 @@ export function CandidatesTab() {
                                   )}
                                 </div>
                                 <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                                  {candidate.regionLabel && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700">
+                                      <Briefcase size={10} className="opacity-60" /> {candidate.regionLabel}
+                                    </span>
+                                  )}
                                   <span>{candidate.email}</span>
                                   {candidateJobTitle && <><span>&middot;</span><span>{candidateJobTitle}</span></>}
                                   {candidate.currentCompany && <><span>&middot;</span><span>{candidate.currentCompany}</span></>}

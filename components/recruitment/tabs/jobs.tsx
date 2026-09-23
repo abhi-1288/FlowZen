@@ -428,13 +428,14 @@ function JobModals() {
                   }}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800"
                 >
-                  {location && !regions.includes(location) && location !== "Remote" && (
+                  {location && !regions.includes(location) && location !== "Remote" && location !== "PAN" && (
                     <option value={location}>{location}</option>
                   )}
                   {regions.map((r) => (
                     <option key={r} value={r}>{r}</option>
                   ))}
                   <option value="Remote">Remote</option>
+                  <option value="PAN">PAN</option>
                   <option value="__other__">Other…</option>
                 </select>
               )}

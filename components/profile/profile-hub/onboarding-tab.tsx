@@ -83,6 +83,8 @@ export function OnboardingTab({
   const [addrState, setAddrState] = useState("");
   const [addrZip, setAddrZip] = useState("");
   const [addrCountry, setAddrCountry] = useState("");
+  const [mainRegionHrId, setMainRegionHrId] = useState("");
+  const [mainRegionHrOptions, setMainRegionHrOptions] = useState<{ id: string; name: string; email?: string }[]>([]);
 
   const [itCodes, setItCodes] = useState<AnyRecord[]>([]);
   const [itCodesLoading, setItCodesLoading] = useState(false);
@@ -270,9 +272,13 @@ export function OnboardingTab({
           state: addrState,
           zip: addrZip,
           country: addrCountry,
+          hrIds: mainRegionHrId ? [mainRegionHrId] : [],
+          hrHeadId: mainRegionHrId || undefined,
         }),
       });
-      showToast("Company address updated.");
+      showToast(mainRegionHrId
+        ? "Company address updated and HR Head assigned."
+        : "Company address updated. Assign an HR Head when HR joins.");
       await refresh(true);
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Unable to save address.", "error");
@@ -280,6 +286,13 @@ export function OnboardingTab({
       setAddressSaving(false);
     }
   }
+
+  useEffect(() => {
+    if (role !== "admin" || String(profile?.companyStatus ?? "") !== "approved") return;
+    apiFetch<{ hrs: { id: string; name: string; email?: string }[] }>("/api/company/hrs")
+      .then((data) => setMainRegionHrOptions(data.hrs ?? []))
+      .catch(() => {});
+  }, [role, profile?.companyStatus, profile?.company]);
 
   async function requestManagerQuit() {
     await apiFetch("/api/company/quit", { method: "POST" });
@@ -438,6 +451,7 @@ export function OnboardingTab({
               addrLabel={addrLabel} addrLine1={addrLine1} addrCity={addrCity} addrState={addrState} addrZip={addrZip} addrCountry={addrCountry}
               onAddrLabelChange={setAddrLabel} onAddrLine1Change={setAddrLine1} onAddrCityChange={setAddrCity} onAddrStateChange={setAddrState} onAddrZipChange={setAddrZip} onAddrCountryChange={setAddrCountry}
               onAddressSave={saveCompanyAddress} addressSaving={addressSaving}
+              hrOptions={mainRegionHrOptions} selectedMainHrId={mainRegionHrId} onMainHrIdChange={setMainRegionHrId}
             />
           </>
         ) : (

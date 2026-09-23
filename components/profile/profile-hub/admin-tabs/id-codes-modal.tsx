@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { X } from "lucide-react";
+import { withMainOfficeSuffixByLabel } from "@/lib/company-regions";
 import { formatRoleWithCustom } from "../shared";
 
 const WINDOW = 2000;
@@ -245,7 +246,7 @@ export function IdCodesModal({
                               label: "Role",
                               value: formatRoleWithCustom(holder.role, holder.customRole, holder.isSeniorSecurity),
                             },
-                            { label: "Region/Office", value: holder.regionLabel || "—" },
+                            { label: "Region/Office", value: withMainOfficeSuffixByLabel(data?.mainOfficeLabel, holder.regionLabel) || "—" },
                           ]);
                         } else if (isReleased) {
                           handleHover(e, [
@@ -268,7 +269,7 @@ export function IdCodesModal({
                               label: "Role",
                               value: formatRoleWithCustom(holder.role, holder.customRole, holder.isSeniorSecurity),
                             },
-                            { label: "Region/Office", value: holder.regionLabel || "—" },
+                            { label: "Region/Office", value: withMainOfficeSuffixByLabel(data?.mainOfficeLabel, holder.regionLabel) || "—" },
                           ]);
                         }
                       }}

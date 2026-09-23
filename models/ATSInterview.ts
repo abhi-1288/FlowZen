@@ -29,6 +29,8 @@ const ATSInterviewSchema = new Schema(
     scheduledAt: { type: Date, required: true },
     meetingLink: { type: String, default: "" },
     location: { type: String, default: "" },
+    region: { type: String, default: "" },
+    regionHr: { type: Schema.Types.ObjectId, ref: "User", default: null },
     passCode: { type: String, default: "", index: true },
     passValidFrom: { type: Date, default: null },
     passValidUntil: { type: Date, default: null },

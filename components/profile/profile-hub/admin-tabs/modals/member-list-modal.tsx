@@ -4,10 +4,12 @@ import * as XLSX from "xlsx";
 import { ActionButton, AnyRecord, formatRole, formatRoleWithCustom } from "../../shared";
 import { currencySymbol } from "../helpers";
 import { apiFetch } from "@/lib/client-utils";
+import { withMainOfficeSuffix } from "@/lib/company-regions";
 
 export function MemberListModal({
   modalRole,
   members,
+  company,
   firingFor,
   canEditOthersRole,
   selfId,
@@ -33,6 +35,7 @@ export function MemberListModal({
 }: {
   modalRole: string | null;
   members: AnyRecord[];
+  company: AnyRecord | null;
   firingFor: string | null;
   canEditOthersRole: boolean;
   selfId: string;
@@ -111,7 +114,7 @@ export function MemberListModal({
         String(m.email ?? ""),
         formatRoleWithCustom(String(m.role ?? "employee"), m.customRole, Boolean(m.isSeniorSecurity)),
         String(m.companyIdentityCode ?? ""),
-        String(m.regionLabel ?? ""),
+        withMainOfficeSuffix(company, String(m.regionLabel ?? "")),
         teams,
         salaryDisplay,
         fmtDate(m.companyJoined),
@@ -255,6 +258,9 @@ export function MemberListModal({
                           </span>
                           <span className="rounded-lg neu-inset px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-200" title={teams.length ? teams.join(", ") : "No team joined"}>
                             team: {teams.length ? teams.join(", ") : "-"}
+                          </span>
+                          <span className="rounded-lg neu-inset px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-200">
+                            region: {withMainOfficeSuffix(company, String(member.regionLabel ?? "")) || "-"}
                           </span>
                         </div>
 

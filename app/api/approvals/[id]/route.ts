@@ -751,7 +751,7 @@ export async function PATCH(request: Request, { params }: Params) {
     if (joinRequest.kind === "region-address") {
       if (status === "approved") {
         const meta = (joinRequest.metadata ?? {}) as Record<string, unknown>;
-        const newAddress = {
+        const newAddress: any = {
           label: String(meta.label ?? "").trim(),
           line1: String(meta.line1 ?? "").trim(),
           city: String(meta.city ?? "").trim(),
@@ -764,6 +764,23 @@ export async function PATCH(request: Request, { params }: Params) {
 
         const company = await Company.findById(joinRequest.company);
         if (!company) return jsonError("Company not found.", 404);
+
+        const submittingHrId = String(meta.hrId ?? joinRequest.requester ?? "");
+        let approvingAdminId = String(meta.adminId ?? "");
+        if (!approvingAdminId) {
+          const admin = await User.findById(joinRequest.approver)
+            .where("role").equals("admin")
+            .select("_id");
+          approvingAdminId = admin ? String(admin._id) : "";
+        }
+
+        newAddress.hrs = submittingHrId ? [submittingHrId] : [];
+        newAddress.hrHead = submittingHrId || null;
+        newAddress.admins = approvingAdminId ? [approvingAdminId] : [];
+        newAddress.adminHead = approvingAdminId || null;
+        newAddress.maxHrs = null;
+        newAddress.maxAdmins = null;
+        newAddress.createdBy = submittingHrId || null;
 
         if (!Array.isArray(company.addresses)) company.addresses = [];
         company.addresses.push(newAddress);

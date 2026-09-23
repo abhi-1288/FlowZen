@@ -355,6 +355,9 @@ export function CompanyIconSection({
   onAddrCountryChange,
   onAddressSave,
   addressSaving,
+  hrOptions,
+  selectedMainHrId,
+  onMainHrIdChange,
 }: {
   company: AnyRecord | null;
   uploading: boolean;
@@ -377,6 +380,9 @@ export function CompanyIconSection({
   onAddrCountryChange: (v: string) => void;
   onAddressSave: () => Promise<void>;
   addressSaving: boolean;
+  hrOptions: { id: string; name: string; email?: string }[];
+  selectedMainHrId: string;
+  onMainHrIdChange: (v: string) => void;
 }) {
   return (
     <>
@@ -466,6 +472,30 @@ export function CompanyIconSection({
                   onChange={(e) => onAddrCountryChange(e.target.value)}
                 />
               </div>
+            </div>
+            <div>
+              <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                <Users size={13} /> HR Head for this region
+              </label>
+              {hrOptions.length > 0 ? (
+                <select
+                  className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
+                  value={selectedMainHrId}
+                  onChange={(e) => onMainHrIdChange(e.target.value)}
+                >
+                  <option value="">Assign later (warning until assigned)</option>
+                  {hrOptions.map((hr) => (
+                    <option key={hr.id} value={hr.id}>{hr.name}{hr.email ? ` (${hr.email})` : ""}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  readOnly
+                  className="neu-inset w-full rounded-lg px-3 py-2 text-sm text-slate-400"
+                  value="No HR has joined yet — you can assign an HR Head later from Office Address Management."
+                />
+              )}
             </div>
             <button
               className="neu-btn neu-btn-primary mt-1 inline-flex items-center gap-1.5 rounded-lg px-5 py-2 text-sm font-medium"

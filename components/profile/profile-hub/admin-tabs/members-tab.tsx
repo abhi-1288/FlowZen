@@ -3,6 +3,7 @@ import { useSession } from "next-auth/react";
 import { Download, Hash } from "lucide-react";
 import * as XLSX from "xlsx";
 import { apiFetch } from "@/lib/client-utils";
+import { withMainOfficeSuffix } from "@/lib/company-regions";
 import { AnyRecord, formatRole, formatRoleWithCustom, SectionHeader, ActionButton } from "../shared";
 import { FinanceMembersView } from "../finance-members-tab";
 import { HR_MEMBER_ROLE_KEYS } from "./types";
@@ -19,12 +20,14 @@ import { currencySymbol } from "./helpers";
 export function MembersTab({
   insights,
   actorRole,
+  company,
   showToast,
   refresh,
   regionOptions = [],
 }: {
   insights: AnyRecord | null;
   actorRole: string;
+  company: AnyRecord | null;
   showToast: (text: string, type?: "success" | "error") => void;
   refresh: (silent?: boolean) => Promise<void>;
   regionOptions?: string[];
@@ -388,7 +391,7 @@ export function MembersTab({
         String(m.email ?? ""),
         formatRoleWithCustom(String(m.role ?? "employee"), m.customRole, Boolean(m.isSeniorSecurity)),
         String(m.companyIdentityCode ?? ""),
-        String(m.regionLabel ?? ""),
+        withMainOfficeSuffix(company, String(m.regionLabel ?? "")),
         teams,
         salaryDisplay,
         fmtDate(m.companyJoined),
@@ -510,6 +513,7 @@ export function MembersTab({
       <MemberListModal
         modalRole={modalRole}
         members={members}
+        company={company}
         firingFor={firingFor}
         canEditOthersRole={canEditOthersRole}
         selfId={selfId}
@@ -610,7 +614,7 @@ export function MembersTab({
             >
               <option value="">— None —</option>
               {regionOptions.map((opt) => (
-                <option key={opt} value={opt}>{opt}</option>
+                <option key={opt} value={opt}>{withMainOfficeSuffix(company, opt)}</option>
               ))}
             </select>
             <div className="mt-4 flex justify-end gap-2">

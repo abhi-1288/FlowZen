@@ -18,7 +18,7 @@ export async function GET() {
   const user = await User.findById(userId).select("company role companyStatus");
   if (!user) return jsonError("User not found.", 404);
   if (!user.company) return jsonError("No company found.");
-  if (user.role !== "admin") return jsonError("Forbidden", 403);
+  if (user.role !== "human-resource" && user.role !== "admin") return jsonError("Forbidden", 403);
   if (user.companyStatus !== "approved") return jsonError("Company not approved.");
 
   const companyId = typeof user.company === "object" && user.company

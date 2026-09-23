@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client-utils";
-import { Send, Clock, CheckCircle, MapPin, ToggleLeft, ToggleRight, UserCheck, UserX } from "lucide-react";
+import { Send, Clock, CheckCircle, MapPin, ToggleLeft, ToggleRight, UserCheck, UserX, Users, Shield, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
 import type { AnyRecord } from "../shared";
+import { mainOfficeLabelOf, regionManagerCaps } from "@/lib/company-regions";
 
 interface AdminOption {
   id: string;
@@ -21,12 +22,14 @@ export function CompanyAddressSection({
   company,
   role,
   userId,
+  userRegionLabel,
   showToast,
   refresh,
 }: {
   company: AnyRecord | null;
   role: string;
   userId: string;
+  userRegionLabel?: string;
   showToast: (text: string, type?: "success" | "error") => void;
   refresh: () => Promise<void>;
 }) {
@@ -74,6 +77,7 @@ export function CompanyAddressSection({
           company={company}
           role={role}
           userId={userId}
+          userRegionLabel={userRegionLabel ?? ""}
           showToast={showToast}
           refresh={refresh}
           onClose={() => setOpen(false)}
@@ -87,6 +91,7 @@ function AddressModal({
   company,
   role,
   userId,
+  userRegionLabel,
   showToast,
   refresh,
   onClose,
@@ -94,6 +99,7 @@ function AddressModal({
   company: AnyRecord | null;
   role: string;
   userId: string;
+  userRegionLabel?: string;
   showToast: (text: string, type?: "success" | "error") => void;
   refresh: () => Promise<void>;
   onClose: () => void;
@@ -124,6 +130,13 @@ function AddressModal({
   const isAuthHr = !isAdmin && role === "human-resource" && multiOffice
     && (company?.addressManagers as string[] ?? []).includes(userId);
 
+  const mainLabel = mainOfficeLabelOf({ addresses: (company?.addresses as AnyRecord[] | null) ?? [], address: String(company?.address ?? "") });
+  const isMainOfficeHr =
+    role === "human-resource" &&
+    !!multiOffice &&
+    (!mainLabel || String(userRegionLabel ?? "").trim().toLowerCase() === mainLabel.toLowerCase());
+  const canEditCaps = isAdmin || isMainOfficeHr;
+
   useEffect(() => {
     if (!multiOffice) return;
     apiFetch<{ admins: AdminOption[] }>("/api/company/admins")
@@ -141,12 +154,13 @@ function AddressModal({
       })
       .catch(() => {});
 
+    apiFetch<{ hrs: HrOption[] }>("/api/company/hrs")
+      .then((data) => setHrs(data.hrs ?? []))
+      .catch(() => {});
+
     if (isAdmin) {
       const managers = (company?.addressManagers as string[] ?? []).map((id: any) => String(id));
       setAuthorizedHrs(managers);
-      apiFetch<{ hrs: HrOption[] }>("/api/company/hrs")
-        .then((data) => setHrs(data.hrs ?? []))
-        .catch(() => {});
     }
   }, [multiOffice, isAdmin]);
 
@@ -303,43 +317,66 @@ function AddressModal({
               <p className="text-sm text-slate-400 italic dark:text-zinc-500">You are not authorized to submit office addresses. Contact your admin for access.</p>
             )}
 
+            {/* Global staffing caps (main office only) */}
+            {canEditCaps && (
+              <GlobalCapsEditor
+                company={company}
+                showToast={showToast}
+                refresh={refresh}
+              />
+            )}
+
             {/* Approved offices */}
             {approvedAddresses.length > 0 && (
               <div>
                 <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">Approved Offices</span>
                 <div className="mt-2 space-y-2">
                   {approvedAddresses.map((addr, i) => (
-                    <div key={i} className="flex items-center justify-between rounded-lg border border-[var(--c-border-light)] p-3 dark:border-zinc-800 dark:bg-[#0b0b0b]">
-                      <div>
-                        <p className="text-sm font-medium text-slate-800 dark:text-zinc-200">{String(addr.label ?? "")}</p>
-                        <p className="text-xs text-slate-500 dark:text-zinc-400">
-                          {[String(addr.line1 ?? ""), String(addr.city ?? ""), String(addr.state ?? "")].filter(Boolean).join(", ")}
-                        </p>
+                    <div key={i} className="rounded-lg border border-[var(--c-border-light)] dark:border-zinc-800 dark:bg-[#0b0b0b]">
+                      <div className="flex items-center justify-between p-3">
+                        <div>
+                          <p className="text-sm font-medium text-slate-800 dark:text-zinc-200">{String(addr.label ?? "")}</p>
+                          <p className="text-xs text-slate-500 dark:text-zinc-400">
+                            {[String(addr.line1 ?? ""), String(addr.city ?? ""), String(addr.state ?? "")].filter(Boolean).join(", ")}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {approvedAddresses.length >= 2 && isAdmin ? (
+                            <button
+                              type="button"
+                              className="text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                              onClick={async () => {
+                                const next = approvedAddresses.filter((_, idx) => idx !== i);
+                                try {
+                                  await apiFetch("/api/company/address", {
+                                    method: "PATCH",
+                                    body: JSON.stringify({ addresses: next }),
+                                  });
+                                  await refresh();
+                                  showToast("Office address removed.");
+                                } catch {
+                                  showToast("Failed to remove address.", "error");
+                                }
+                              }}
+                            >
+                              Delete
+                            </button>
+                          ) : null}
+                          <CheckCircle size={16} className="shrink-0 text-emerald-500" />
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {approvedAddresses.length >= 2 && isAdmin ? (
-                          <button
-                            type="button"
-                            className="text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                            onClick={async () => {
-                              const next = approvedAddresses.filter((_, idx) => idx !== i);
-                              try {
-                                await apiFetch("/api/company/address", {
-                                  method: "PATCH",
-                                  body: JSON.stringify({ addresses: next }),
-                                });
-                                await refresh();
-                                showToast("Office address removed.");
-                              } catch {
-                                showToast("Failed to remove address.", "error");
-                              }
-                            }}
-                          >
-                            Delete
-                          </button>
-                        ) : null}
-                        <CheckCircle size={16} className="shrink-0 text-emerald-500" />
-                      </div>
+                      <RegionStaffingBlock
+                        addr={addr}
+                        company={company}
+                        role={role}
+                        userId={userId}
+                        mainLabel={mainLabel}
+                        canEditCaps={canEditCaps}
+                        hrOptions={hrs}
+                        adminOptions={admins}
+                        showToast={showToast}
+                        refresh={refresh}
+                      />
                     </div>
                   ))}
                 </div>
@@ -495,6 +532,409 @@ function AddressModal({
         )}
       </div>
       </div>
+    </div>
+  );
+}
+
+function nameOf(opts: { id: string; name: string }[], id: string): string {
+  if (!id) return "";
+  return opts.find((o) => o.id === id)?.name ?? id.slice(-6);
+}
+
+function GlobalCapsEditor({
+  company,
+  showToast,
+  refresh,
+}: {
+  company: AnyRecord | null;
+  showToast: (text: string, type?: "success" | "error") => void;
+  refresh: () => Promise<void>;
+}) {
+  const [maxHrsStr, setMaxHrsStr] = useState(String(Number(company?.regionMaxHrs ?? 5)));
+  const [maxAdminsStr, setMaxAdminsStr] = useState(String(Number(company?.regionMaxAdmins ?? 2)));
+  const [saving, setSaving] = useState(false);
+
+  const saveCaps = async () => {
+    const maxHrs = Number(maxHrsStr);
+    const maxAdmins = Number(maxAdminsStr);
+    if (!Number.isFinite(maxHrs) || maxHrs < 1 || !Number.isFinite(maxAdmins) || maxAdmins < 1) {
+      showToast("Max values must be at least 1.", "error");
+      return;
+    }
+    setSaving(true);
+    try {
+      await apiFetch("/api/company/address", {
+        method: "PATCH",
+        body: JSON.stringify({ mode: "set-region-caps", maxHrs, maxAdmins }),
+      });
+      await refresh();
+      showToast("Global region caps updated.", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to update caps.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-[var(--c-border-light)] p-3 dark:border-zinc-800 dark:bg-[#0b0b0b]">
+      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">Region Staffing Limits (all regions)</span>
+      <p className="text-xs text-slate-400 mt-0.5 dark:text-zinc-500">
+        Across every region, the maximum number of HRs and admins a region may hold. The main office can override per-region.
+      </p>
+      <div className="mt-2 flex flex-wrap items-end gap-3">
+        <label className="block">
+          <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">Max HRs</span>
+          <input
+            type="number"
+            min={1}
+            className="mt-1 w-24 rounded-lg neu-inset px-2 py-1.5 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
+            value={maxHrsStr}
+            onChange={(e) => setMaxHrsStr(e.target.value)}
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">Max Admins</span>
+          <input
+            type="number"
+            min={1}
+            className="mt-1 w-24 rounded-lg neu-inset px-2 py-1.5 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
+            value={maxAdminsStr}
+            onChange={(e) => setMaxAdminsStr(e.target.value)}
+          />
+        </label>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={saveCaps}
+          className="rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
+        >
+          {saving ? "Saving..." : "Save Global Caps"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function staffIdsOf(value: unknown): string[] {
+  return Array.isArray(value) ? value.map((v) => String(v ?? "")).filter(Boolean) : [];
+}
+
+function RegionStaffingBlock({
+  addr,
+  company,
+  role,
+  userId,
+  mainLabel,
+  canEditCaps,
+  hrOptions,
+  adminOptions,
+  showToast,
+  refresh,
+}: {
+  addr: AnyRecord;
+  company: AnyRecord | null;
+  role: string;
+  userId: string;
+  mainLabel: string;
+  canEditCaps: boolean;
+  hrOptions: HrOption[];
+  adminOptions: AdminOption[];
+  showToast: (text: string, type?: "success" | "error") => void;
+  refresh: () => Promise<void>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [draft, setDraft] = useState<{ hrs: string[]; admins: string[]; hrHead: string; adminHead: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const [capHrsStr, setCapHrsStr] = useState(addr.maxHrs != null ? String(addr.maxHrs) : "");
+  const [capAdminsStr, setCapAdminsStr] = useState(addr.maxAdmins != null ? String(addr.maxAdmins) : "");
+  const [usingDefaults, setUsingDefaults] = useState(addr.maxHrs == null && addr.maxAdmins == null);
+  const [savingCaps, setSavingCaps] = useState(false);
+
+  const caps = regionManagerCaps(
+    {
+      regionMaxHrs: Number(company?.regionMaxHrs ?? 5),
+      regionMaxAdmins: Number(company?.regionMaxAdmins ?? 2),
+    },
+    addr,
+  );
+
+  const currentHrs = staffIdsOf(addr.hrs);
+  const currentAdmins = staffIdsOf(addr.admins);
+  const currentHrHead = String(addr.hrHead ?? "");
+  const currentAdminHead = String(addr.adminHead ?? "");
+  const label = String(addr.label ?? "").trim() || "Main Office";
+
+  const isMainOfficeHr =
+    role === "human-resource" &&
+    (!mainLabel || String(addr.label ?? "").trim().toLowerCase() === mainLabel.toLowerCase());
+  const canManage =
+    role === "admin" || isMainOfficeHr || currentHrs.includes(userId) || currentHrHead === userId;
+
+  const staffed = Boolean(currentHrHead && currentAdminHead);
+
+  const expand = () => {
+    setDraft({
+      hrs: currentHrs,
+      admins: currentAdmins,
+      hrHead: currentHrHead,
+      adminHead: currentAdminHead,
+    });
+    setExpanded(true);
+  };
+
+  const toggleHr = (id: string) => {
+    setDraft((d) => {
+      if (!d) return d;
+      const inList = d.hrs.includes(id);
+      const nextHrs = inList
+        ? d.hrs.filter((x) => x !== id)
+        : d.hrs.length >= caps.maxHrs
+          ? d.hrs
+          : [...d.hrs, id];
+      let hrHead = inList && d.hrHead === id ? "" : d.hrHead;
+      if (hrHead && !nextHrs.includes(hrHead)) hrHead = "";
+      if (!hrHead && nextHrs.length === 1) hrHead = nextHrs[0];
+      return { ...d, hrs: nextHrs, hrHead };
+    });
+  };
+
+  const toggleAdmin = (id: string) => {
+    setDraft((d) => {
+      if (!d) return d;
+      const inList = d.admins.includes(id);
+      const nextAdmins = inList
+        ? d.admins.filter((x) => x !== id)
+        : d.admins.length >= caps.maxAdmins
+          ? d.admins
+          : [...d.admins, id];
+      let adminHead = inList && d.adminHead === id ? "" : d.adminHead;
+      if (adminHead && !nextAdmins.includes(adminHead)) adminHead = "";
+      if (!adminHead && nextAdmins.length === 1) adminHead = nextAdmins[0];
+      return { ...d, admins: nextAdmins, adminHead };
+    });
+  };
+
+  const saveStaffing = async () => {
+    if (!draft) return;
+    if (draft.hrs.length === 0 && currentHrs.length > 0) {
+      showToast("A region must keep at least 1 assigned HR.", "error");
+      return;
+    }
+    if (draft.admins.length === 0 && currentAdmins.length > 0) {
+      showToast("A region must keep at least 1 assigned admin.", "error");
+      return;
+    }
+    setSaving(true);
+    try {
+      await apiFetch("/api/company/address", {
+        method: "PATCH",
+        body: JSON.stringify({
+          mode: "assign-region-managers",
+          label,
+          hrIds: draft.hrs,
+          adminIds: draft.admins,
+          hrHeadId: draft.hrHead || undefined,
+          adminHeadId: draft.adminHead || undefined,
+        }),
+      });
+      await refresh();
+      showToast("Region staff updated.", "success");
+      setExpanded(false);
+      setDraft(null);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to update region staff.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveCaps = async () => {
+    setSavingCaps(true);
+    try {
+      await apiFetch("/api/company/address", {
+        method: "PATCH",
+        body: JSON.stringify({
+          mode: "set-region-caps",
+          label,
+          useDefaults: usingDefaults,
+          maxHrs: usingDefaults ? undefined : Number(capHrsStr) || null,
+          maxAdmins: usingDefaults ? undefined : Number(capAdminsStr) || null,
+        }),
+      });
+      await refresh();
+      showToast("Region caps updated.", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to update caps.", "error");
+    } finally {
+      setSavingCaps(false);
+    }
+  };
+
+  return (
+    <div className="border-t border-[var(--c-border-light)] px-3 py-3 dark:border-zinc-800">
+      {!staffed && (
+        <div className="mb-2 flex items-start gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+          <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+          <span>This region has no HR Head / Admin Head yet. Assign staff so it is fully operational.</span>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-600 dark:text-zinc-300">
+        <span className="inline-flex items-center gap-1.5">
+          <Users size={13} className="text-indigo-500" />
+          HR Head: <span className="font-medium text-slate-800 dark:text-zinc-100">{nameOf(hrOptions, currentHrHead) || "—"}</span>
+          <span className="text-slate-400">({currentHrs.length}/{caps.maxHrs})</span>
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <Shield size={13} className="text-emerald-500" />
+          Admin Head: <span className="font-medium text-slate-800 dark:text-zinc-100">{nameOf(adminOptions, currentAdminHead) || "—"}</span>
+          <span className="text-slate-400">({currentAdmins.length}/{caps.maxAdmins})</span>
+        </span>
+        {canManage && (
+          <button
+            type="button"
+            onClick={() => (expanded ? setExpanded(false) : expand())}
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--c-border-light)] px-2 py-1 font-medium text-indigo-600 transition-colors hover:bg-indigo-50 dark:border-zinc-700 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+          >
+            {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            {expanded ? "Close" : "Manage Staff"}
+          </button>
+        )}
+      </div>
+
+      {expanded && draft && (
+        <div className="mt-3 space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-[var(--c-border-light)] p-3 dark:border-zinc-800 dark:bg-[#0b0b0b]">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">HR Staff (max {caps.maxHrs})</span>
+              <div className="mt-2 space-y-1.5">
+                {hrOptions.length === 0 && <p className="text-xs text-slate-400 italic">No HRs found.</p>}
+                {hrOptions.map((hr) => {
+                  const checked = draft.hrs.includes(hr.id);
+                  const disabled = !checked && draft.hrs.length >= caps.maxHrs;
+                  return (
+                    <label key={hr.id} className={`flex items-center gap-2 text-sm cursor-pointer ${disabled ? "opacity-40" : ""}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={disabled}
+                        onChange={() => toggleHr(hr.id)}
+                        className="accent-indigo-600"
+                      />
+                      <span className="text-slate-700 dark:text-zinc-200">{hr.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <label className="mt-2 block">
+                <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">HR Head</span>
+                <select
+                  className="mt-1 w-full rounded-lg neu-inset px-2 py-1.5 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
+                  value={draft.hrHead}
+                  onChange={(e) => setDraft((d) => (d ? { ...d, hrHead: e.target.value } : d))}
+                >
+                  <option value="">Select...</option>
+                  {draft.hrs.map((id) => (
+                    <option key={id} value={id}>{nameOf(hrOptions, id)}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="rounded-lg border border-[var(--c-border-light)] p-3 dark:border-zinc-800 dark:bg-[#0b0b0b]">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">Admin Staff (max {caps.maxAdmins})</span>
+              <div className="mt-2 space-y-1.5">
+                {adminOptions.length === 0 && <p className="text-xs text-slate-400 italic">No admins found.</p>}
+                {adminOptions.map((adm) => {
+                  const checked = draft.admins.includes(adm.id);
+                  const disabled = !checked && draft.admins.length >= caps.maxAdmins;
+                  return (
+                    <label key={adm.id} className={`flex items-center gap-2 text-sm cursor-pointer ${disabled ? "opacity-40" : ""}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={disabled}
+                        onChange={() => toggleAdmin(adm.id)}
+                        className="accent-emerald-600"
+                      />
+                      <span className="text-slate-700 dark:text-zinc-200">{adm.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <label className="mt-2 block">
+                <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">Admin Head</span>
+                <select
+                  className="mt-1 w-full rounded-lg neu-inset px-2 py-1.5 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
+                  value={draft.adminHead}
+                  onChange={(e) => setDraft((d) => (d ? { ...d, adminHead: e.target.value } : d))}
+                >
+                  <option value="">Select...</option>
+                  {draft.admins.map((id) => (
+                    <option key={id} value={id}>{nameOf(adminOptions, id)}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            disabled={saving}
+            onClick={saveStaffing}
+            className="neu-btn neu-btn-primary rounded-lg px-4 py-2 text-xs font-medium disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save Staff"}
+          </button>
+
+          {canEditCaps && (
+            <div className="rounded-lg border border-dashed border-slate-300 p-3 dark:border-zinc-800 dark:bg-[#0b0b0b]">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">Staffing Caps (main office)</span>
+              <p className="text-xs text-slate-400 mt-0.5 dark:text-zinc-500">
+                Company defaults: {Number(company?.regionMaxHrs ?? 5)} HRs / {Number(company?.regionMaxAdmins ?? 2)} admins per region. Override for this region only.
+              </p>
+              <div className="mt-2 flex flex-wrap items-end gap-3">
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">Max HRs</span>
+                  <input
+                    type="number"
+                    min={1}
+                    disabled={usingDefaults}
+                    className="mt-1 w-24 rounded-lg neu-inset px-2 py-1.5 text-sm disabled:opacity-40 dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
+                    value={capHrsStr}
+                    onChange={(e) => setCapHrsStr(e.target.value)}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">Max Admins</span>
+                  <input
+                    type="number"
+                    min={1}
+                    disabled={usingDefaults}
+                    className="mt-1 w-24 rounded-lg neu-inset px-2 py-1.5 text-sm disabled:opacity-40 dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
+                    value={capAdminsStr}
+                    onChange={(e) => setCapAdminsStr(e.target.value)}
+                  />
+                </label>
+                <label className="flex items-center gap-1.5 pb-2 text-xs text-slate-600 dark:text-zinc-300">
+                  <input type="checkbox" checked={usingDefaults} onChange={(e) => setUsingDefaults(e.target.checked)} className="accent-indigo-600" />
+                  Use company defaults
+                </label>
+                <button
+                  type="button"
+                  disabled={savingCaps}
+                  onClick={saveCaps}
+                  className="rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
+                >
+                  {savingCaps ? "Saving..." : "Save Caps"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

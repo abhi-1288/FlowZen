@@ -49,6 +49,8 @@ export async function POST(request: Request, { params }: Params) {
   const roundType: string = body.roundType || "screening";
   const meetingLink = String(body.meetingLink ?? "").trim();
   const location = String(body.location ?? "").trim();
+  const region = String(body.region ?? "").trim();
+  const regionHr = body.regionHr ? String(body.regionHr).trim() : "";
   const scheduledAt = new Date(body.scheduledAt);
 
   const candidates: any[] = await ATSCandidate.find({
@@ -71,6 +73,7 @@ export async function POST(request: Request, { params }: Params) {
     if (!candidate) continue;
 
     try {
+      const effectiveRegion = region;
       const passCode =
         !meetingLink && location ? await createUniqueGuestPassCode(String(user.company)) : "";
       const isInPerson = !meetingLink && location;
@@ -82,6 +85,8 @@ export async function POST(request: Request, { params }: Params) {
         scheduledAt,
         meetingLink,
         location,
+        region: effectiveRegion,
+        regionHr: regionHr && isObjectId(regionHr) ? regionHr : null,
         passCode,
         passValidFrom: isInPerson ? new Date(scheduledAt.getTime() - 15 * 60 * 1000) : null,
         passValidUntil: isInPerson ? new Date(scheduledAt.getTime() + 15 * 60 * 1000) : null,
@@ -114,7 +119,7 @@ export async function POST(request: Request, { params }: Params) {
         candidate: candidate._id,
         job: job._id,
         action: "interview-scheduled",
-        metadata: { roundType, scheduledAt: String(scheduledAt), interviewerId: body.interviewer, location },
+        metadata: { roundType, scheduledAt: String(scheduledAt), interviewerId: body.interviewer, location, region: effectiveRegion, regionHr: regionHr || "" },
         actor: userId,
         company: user.company,
       });
@@ -161,6 +166,18 @@ export async function POST(request: Request, { params }: Params) {
         title: "Interview Scheduled",
         body: `${roundType} round with ${candidateName} on ${ivDate}.${meetingInfo}`,
       });
+
+      if (regionHr && regionHr !== String(body.interviewer) && isObjectId(regionHr)) {
+        emitToUser(regionHr, "notification:new", {
+          message: `Interview scheduled for ${candidateName} (${roundType}) in ${region || "your region"} on ${ivDate}.${meetingInfo}`,
+        });
+        await Notification.create({
+          user: regionHr,
+          type: "info",
+          title: "Interview Scheduled in Your Region",
+          body: `${roundType} round with ${candidateName} (${region || "region"}) on ${ivDate}.${meetingInfo}`,
+        });
+      }
 
       try {
         const jobTitle = (candidate.job as any)?.title ?? "Position";

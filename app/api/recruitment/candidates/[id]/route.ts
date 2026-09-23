@@ -42,6 +42,7 @@ export async function PATCH(request: Request, { params }: Params) {
     "firstName", "lastName", "email", "phone", "currentCompany", "experienceYears",
     "currentCTC", "expectedCTC", "noticePeriod", "source", "rating",
     "portfolioUrl", "linkedInUrl", "assignedRecruiter", "dob", "address",
+    "regionLabel",
   ];
   const updates: Record<string, unknown> = {};
   for (const field of allowedFields) {
