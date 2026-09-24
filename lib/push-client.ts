@@ -32,7 +32,9 @@ export async function getVapidPublicKey(): Promise<string | null> {
 export async function ensureServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (!("serviceWorker" in navigator)) return null;
   try {
-    const registration = await navigator.serviceWorker.register("/sw.js");
+    const registration = await navigator.serviceWorker.register("/sw.js", {
+      updateViaCache: "none",
+    });
     await navigator.serviceWorker.ready;
     return registration;
   } catch (err) {
@@ -83,17 +85,23 @@ export async function subscribeToPush(): Promise<boolean> {
   }
   if (Notification.permission !== "granted") return false;
 
-  const publicKey = await getVapidPublicKey();
-  if (!publicKey) return false;
-
   try {
-    let subscription = await registration.pushManager.getSubscription();
-    if (!subscription) {
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey),
-      });
+    // The browser's subscription is the source of truth. If one already
+    // exists, keep it — destroying it risks losing it forever (its endpoint
+    // becomes invalid, leaving a stale record on the server). Just persist it.
+    const existing = await registration.pushManager.getSubscription();
+    if (existing) {
+      await submitSubscription(existing);
+      return true;
     }
+
+    const publicKey = await getVapidPublicKey();
+    if (!publicKey) return false;
+
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    });
     await submitSubscription(subscription);
     return true;
   } catch (err) {

@@ -5,9 +5,51 @@ import { User } from "@/models/User";
 import { Message } from "@/models/Message";
 import { Team } from "@/models/Team";
 import { emitToUser, isUserOnline } from "@/lib/socket-emit";
+import { sendNotificationPush } from "@/lib/push";
 import { computeExpiresAt, deriveKind } from "@/lib/message-attachments";
 
 const MAX_MESSAGE_LENGTH = 1000;
+
+interface MessageNotificationInput {
+  recipientIds: string[];
+  senderName: string;
+  groupId?: string;
+  groupName?: string;
+  text: string;
+  attachmentName?: string;
+}
+
+/**
+ * Native browser push for a new message. Error-safe: a push failure must
+ * never break message delivery. Messages intentionally do NOT create
+ * Notification docs — the in-app `message:new` toast covers the open app.
+ */
+async function deliverMessageNotification({
+  recipientIds,
+  senderName,
+  groupId,
+  groupName,
+  text,
+  attachmentName,
+}: MessageNotificationInput) {
+  const isGroup = Boolean(groupId);
+  const attachmentText = text || (attachmentName ? `Sent an attachment: ${attachmentName}` : "Sent a message");
+  const title = isGroup ? (groupName ?? "Group Chat") : senderName;
+  const body = isGroup ? `${senderName}: ${attachmentText}` : attachmentText;
+
+  for (const recipientId of recipientIds) {
+    try {
+      await sendNotificationPush(recipientId, {
+        title,
+        body,
+        link: "/profile?tab=messages",
+        type: "message",
+      });
+    } catch (err) {
+      console.error("deliverMessageNotification error:", err);
+    }
+  }
+}
 
 export async function GET() {
   const userId = await requireUserId();
@@ -173,6 +215,15 @@ export async function POST(request: Request) {
       }
     }
 
+    await deliverMessageNotification({
+      recipientIds: memberIds,
+      senderName: sender.name,
+      groupId: String(team._id),
+      groupName: team.name,
+      text: message,
+      attachmentName: attachmentData?.name,
+    });
+
     return NextResponse.json({ ok: true });
   }
 
@@ -203,6 +254,13 @@ export async function POST(request: Request) {
     createdAt: newMessage.createdAt,
     receivedAt: newMessage.receivedAt,
     ...(replyToId ? { replyTo: replyToId } : {}),
+  });
+
+  await deliverMessageNotification({
+    recipientIds: [String(recipient._id)],
+    senderName: sender.name,
+    text: message,
+    attachmentName: attachmentData?.name,
   });
 
   return NextResponse.json({ ok: true });

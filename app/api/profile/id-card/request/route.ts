@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     throw error;
   }
 
-  const user = await User.findById(userId).select("name email role company companyStatus phone avatarUrl bloodGroup emergencyContact regionLabel companyIdentityCode");
+  const user = await User.findById(userId).select("name email role company companyStatus phone avatarUrl bloodGroup emergencyContact regionLabel companyIdentityCode companyJoined createdAt membershipHistory");
   if (!user) return jsonError("User not found.", 404);
   if (!user.company || user.companyStatus !== "approved") return jsonError("You must belong to an approved company.", 403);
 
@@ -91,6 +91,14 @@ export async function POST(request: Request) {
       userEmergencyContact: user.emergencyContact,
       userRegionLabel: user.regionLabel,
       userIdentityCode: user.companyIdentityCode,
+      userJoiningDate:
+        user.companyJoined ||
+        (Array.isArray(user.membershipHistory)
+          ? (user.membershipHistory as Array<Record<string, unknown>>).find(
+              (m) => String(m?.action ?? "") === "joined-company",
+            )?.at
+          : null) ||
+        user.createdAt,
     },
   });
 

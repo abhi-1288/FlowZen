@@ -399,7 +399,7 @@ export function ApprovalsTab({
                       {isDeciding ? "Working..." : "Approve"}
                     </ActionButton>
                   </div>
-                ) : String(request.kind ?? "") === "document-letter" ? null : (
+                ) : ["document-letter", "id-card"].includes(String(request.kind ?? "")) ? null : (
                   <ActionButton variant="approve" className="px-3"
                     disabled={(() => {
                       const info = quitNoticeInfo(request);
@@ -589,13 +589,32 @@ export function ApprovalsTab({
           onClose={() => setIdCardPreviewRequest(null)}
           profile={{
             ...((idCardPreviewRequest.metadata as AnyRecord) ?? {}),
-            phone: (idCardPreviewRequest.metadata as AnyRecord)?.userPhone,
-            email: (idCardPreviewRequest.metadata as AnyRecord)?.userEmail,
-            avatarUrl: (idCardPreviewRequest.metadata as AnyRecord)?.userAvatar,
-            bloodGroup: (idCardPreviewRequest.metadata as AnyRecord)?.userBloodGroup,
-            emergencyContact: (idCardPreviewRequest.metadata as AnyRecord)?.userEmergencyContact,
-            regionLabel: (idCardPreviewRequest.metadata as AnyRecord)?.userRegionLabel,
-            companyIdentityCode: (idCardPreviewRequest.metadata as AnyRecord)?.userIdentityCode,
+            phone:
+              String((idCardPreviewRequest.requester as AnyRecord)?.phone ?? "") ||
+              (idCardPreviewRequest.metadata as AnyRecord)?.userPhone,
+            email:
+              String((idCardPreviewRequest.requester as AnyRecord)?.email ?? "") ||
+              (idCardPreviewRequest.metadata as AnyRecord)?.userEmail,
+            avatarUrl:
+              String((idCardPreviewRequest.requester as AnyRecord)?.avatarUrl ?? "") ||
+              (idCardPreviewRequest.metadata as AnyRecord)?.userAvatar,
+            bloodGroup:
+              String((idCardPreviewRequest.requester as AnyRecord)?.bloodGroup ?? "") ||
+              (idCardPreviewRequest.metadata as AnyRecord)?.userBloodGroup,
+            emergencyContact:
+              String((idCardPreviewRequest.requester as AnyRecord)?.emergencyContact ?? "") ||
+              (idCardPreviewRequest.metadata as AnyRecord)?.userEmergencyContact,
+            regionLabel:
+              String((idCardPreviewRequest.requester as AnyRecord)?.regionLabel ?? "") ||
+              (idCardPreviewRequest.metadata as AnyRecord)?.userRegionLabel,
+            companyIdentityCode:
+              String((idCardPreviewRequest.requester as AnyRecord)?.companyIdentityCode ?? "") ||
+              (idCardPreviewRequest.metadata as AnyRecord)?.userIdentityCode,
+            companyJoined:
+              (idCardPreviewRequest.metadata as AnyRecord)?.userJoiningDate ||
+              (idCardPreviewRequest.requester as AnyRecord)?.companyJoined ||
+              (idCardPreviewRequest.requester as AnyRecord)?.createdAt,
+            createdAt: (idCardPreviewRequest.requester as AnyRecord)?.createdAt,
           }}
           company={idCardPreviewRequest.company as AnyRecord}
           avatarUrl={String((idCardPreviewRequest.metadata as AnyRecord)?.userAvatar ?? "")}

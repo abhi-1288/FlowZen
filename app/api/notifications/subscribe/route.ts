@@ -46,6 +46,18 @@ export async function POST(request: Request) {
     { upsert: true }
   );
 
+  // The browser's subscription is the source of truth. Remove any other
+  // subscriptions recorded for this same browser/device (same user-agent),
+  // so a stale endpoint from a re-subscribe that failed mid-way can never
+  // linger behind the browser's current, valid one.
+  if (subscription.userAgent) {
+    await PushSubscription.deleteMany({
+      user: userId,
+      userAgent: subscription.userAgent,
+      endpoint: { $ne: subscription.endpoint },
+    });
+  }
+
   return NextResponse.json({ ok: true });
 }
 

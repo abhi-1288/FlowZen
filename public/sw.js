@@ -18,11 +18,15 @@ async function saveSubscription(subscription) {
   if (!response.ok) throw new Error("Failed to save push subscription");
 }
 
+const SW_VERSION = "v2";
+
 self.addEventListener("install", () => {
+  console.log(`[FlowZen SW] installing v${SW_VERSION}`);
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
+  console.log(`[FlowZen SW] activated v${SW_VERSION}`);
   event.waitUntil(self.clients.claim());
 });
 

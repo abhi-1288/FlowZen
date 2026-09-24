@@ -208,8 +208,8 @@ export async function GET() {
     });
 
     const [users, companies, teams] = await Promise.all([
-      User.find({ _id: { $in: [...userIds] } }).select("name email role").lean(),
-      Company.find({ _id: { $in: [...companyIds] } }).select("name joinCode noticePeriodDays primaryColor icon status supportEmail website").lean(),
+      User.find({ _id: { $in: [...userIds] } }).select("name email role phone avatarUrl bloodGroup emergencyContact regionLabel companyIdentityCode companyJoined createdAt").lean(),
+      Company.find({ _id: { $in: [...companyIds] } }).select("name joinCode noticePeriodDays primaryColor icon status supportEmail website address addresses multiOffice").lean(),
       Team.find({ _id: { $in: [...teamIds] } }).select("name joinCode").lean(),
     ]);
 

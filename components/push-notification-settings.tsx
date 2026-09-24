@@ -8,6 +8,7 @@ import {
   isPushSupported,
   pushPermissionState,
   subscribeToPush,
+  syncPushSubscription,
   unsubscribeFromPush,
 } from "@/lib/push-client";
 
@@ -24,6 +25,8 @@ export function PushNotificationSettings() {
     const refresh = () => {
       pushPermissionState().then((next) => {
         if (active) setPermission(next);
+        // Keep the server in sync with the browser's actual subscription.
+        if (next === "granted") void syncPushSubscription();
       });
       getExistingSubscription()
         .then((subscription) => {

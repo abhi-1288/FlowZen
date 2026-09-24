@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { darken, lighten } from "@/lib/theme";
+import { withMainOfficeSuffix } from "@/lib/company-regions";
 import {
   X,
   Printer,
@@ -278,7 +279,17 @@ export function IdCardModal({
       : "#2563eb";
     return { hex, dark: darken(hex, 14), light: lighten(hex, 95) };
   }, [company?.primaryColor, isVisitor]);
-  const joiningDate = formatDate(profile?.companyJoined);
+  const joinedEvent = Array.isArray(profile?.membershipHistory)
+    ? (profile.membershipHistory as AnyRecord[]).find(
+        (m) =>
+          String((m as AnyRecord)?.action ?? "") === "joined-company",
+      )
+    : null;
+  const joiningDate = formatDate(
+    profile?.companyJoined ||
+      (joinedEvent as AnyRecord | null)?.at ||
+      profile?.createdAt,
+  );
   const issueDateStr = issueDate
     ? formatDate(issueDate)
     : formatDate(new Date().toISOString());
@@ -294,29 +305,31 @@ export function IdCardModal({
     ? String(profile.emergencyContact)
     : "—";
 
-  const multiOffice = company?.multiOffice
-    ? Boolean(company.multiOffice)
-    : false;
   const userRegionLabel = profile?.regionLabel
-    ? String(profile.regionLabel)
+    ? String(profile.regionLabel).trim()
     : "";
   const companyAddresses =
-    multiOffice && Array.isArray(company?.addresses)
-      ? (company.addresses as AnyRecord[])
-      : [];
+    Array.isArray(company?.addresses) ? (company.addresses as AnyRecord[]) : [];
   const userAddr = userRegionLabel
-    ? companyAddresses.find((a) => String(a.label ?? "") === userRegionLabel)
+    ? companyAddresses.find(
+        (a) =>
+          String(a.label ?? "").trim().toLowerCase() ===
+          userRegionLabel.toLowerCase(),
+      )
     : null;
   const mainAddr =
-    userAddr || (companyAddresses.length > 0 ? companyAddresses[0] : null);
+    userAddr ||
+    companyAddresses.find((a) => Boolean((a as AnyRecord).isMain)) ||
+    (companyAddresses.length > 0 ? companyAddresses[0] : null);
 
   let addrLine1 = "";
   let addrLine2 = "";
-  let regionLabel = "";
+  let regionLabel = userRegionLabel;
+  let regionAddrText = "";
 
   if (mainAddr) {
     const a = mainAddr as AnyRecord;
-    regionLabel = String(a.label ?? "");
+    if (!regionLabel) regionLabel = String(a.label ?? "").trim();
     const line1 = String(a.line1 ?? "");
     const city = String(a.city ?? "");
     const state = String(a.state ?? "");
@@ -326,6 +339,9 @@ export function IdCardModal({
     const parts = [city, state].filter(Boolean).join(", ");
     const parts2 = [country, zip].filter(Boolean).join(", ");
     addrLine2 = [parts, parts2].filter(Boolean).join("\n");
+    regionAddrText = [line1, city, state, zip, country]
+      .filter(Boolean)
+      .join(", ");
   } else {
     const addrParts = companyAddr
       .split(",")
@@ -333,6 +349,8 @@ export function IdCardModal({
       .filter(Boolean);
     addrLine1 = addrParts.slice(0, 2).join(", ");
     addrLine2 = addrParts.slice(2).join(", ");
+    if (!regionLabel) regionLabel = addrParts[0] ?? "";
+    if (addrParts.length > 0) regionAddrText = addrParts.join(", ");
   }
 
   if (!open) return null;
@@ -566,20 +584,11 @@ export function IdCardModal({
                   {isVisitor ? (
                     <span className="idc-region-tag" style={{ background: "#d97706", color: "#fff", border: "none" }}>VISITOR</span>
                   ) : null}
-                  {regionLabel && multiOffice ? (
-                    <span className="idc-region-tag">{regionLabel}</span>
+                  {regionLabel ? (
+                    <span className="idc-region-tag">
+                      {withMainOfficeSuffix(company, regionLabel)}
+                    </span>
                   ) : null}
-                  {addrLine1 && (
-                    <p className="idc-front-company-addr">
-                      {addrLine1}
-                      {addrLine2 ? (
-                        <>
-                          <br />
-                          {renderMultiline(addrLine2)}
-                        </>
-                      ) : null}
-                    </p>
-                  )}
                 </div>
 
                 {/* ID Card title */}
@@ -828,6 +837,16 @@ export function IdCardModal({
                       <div>
                         <p className="idc-back-info-label">Joining Date</p>
                         <p className="idc-back-info-value">{joiningDate}</p>
+                      </div>
+                    </div>
+                    {/* Region Address */}
+                    <div className="idc-back-info-row">
+                      <div className="idc-back-icon-circle">
+                        <MapPin size={16} />
+                      </div>
+                      <div>
+                        <p className="idc-back-info-label">Region Address</p>
+                        <p className="idc-back-info-value">{regionAddrText || "—"}</p>
                       </div>
                     </div>
                   </>
