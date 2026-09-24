@@ -1,0 +1,19 @@
+{
+  "name": "FlowZen",
+  "short_name": "FlowZen",
+  "description": "All-in-one workflow platform for modern teams",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#0a0a0a",
+  "icons": [
+    {
+      "src": "/Logos/logo.jpg",
+      "sizes": "1024x1024",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}

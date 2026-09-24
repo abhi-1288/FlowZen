@@ -1,5 +1,6 @@
 import { Bell, Check, ExternalLink, Trash2, X } from "lucide-react";
 import { ActionButton, AnyRecord, SectionHeader } from "../shared";
+import { PushNotificationSettings } from "@/components/push-notification-settings";
 
 function getNotificationGroup(date: Date): string {
   const now = new Date();
@@ -49,6 +50,7 @@ export function NotificationsTab({
   return (
     <section className="rounded-xl neu-card p-5">
       <SectionHeader title="Notifications" description="Join requests, project updates, and deadline notices." accent="violet" />
+      <PushNotificationSettings />
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <label className="text-xs font-medium text-slate-500">From</label>

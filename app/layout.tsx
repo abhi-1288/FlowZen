@@ -4,6 +4,7 @@ import { SessionProvider } from "@/components/providers/session-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { ToastProvider } from "@/lib/toast-context";
 import { GlobalNotificationListener } from "@/components/global-notification-listener";
+import { PushNotificationSetup } from "@/components/push-notification-setup";
 import { CookieConsentBanner } from "@/components/cookie-consent-banner";
 import { DevCronProvider } from "@/components/providers/DevCronProvider";
 import "./globals.css";
@@ -79,6 +80,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#0a0a0a" />
         <script
           dangerouslySetInnerHTML={{
             __html: `try{var p=localStorage.getItem('flowzen_theme');if(!['light','dark','system','light-neumorphism','dark-neumorphism'].includes(p))p=localStorage.getItem('flowzen_darkMode')==='true'?'dark':'system';var d=p==='dark'||p==='dark-neumorphism'||(p==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.classList.toggle('dark',d);r.classList.toggle('theme-neu',p==='light-neumorphism'||p==='dark-neumorphism');r.classList.toggle('theme-neu-light',p==='light-neumorphism');r.classList.toggle('theme-neu-dark',p==='dark-neumorphism');r.style.colorScheme=d?'dark':'light'}catch(e){}`,
@@ -91,6 +94,7 @@ export default function RootLayout({
             <ToastProvider>
               <DevCronProvider />
               <GlobalNotificationListener />
+              <PushNotificationSetup />
               {children}
               <CookieConsentBanner />
             </ToastProvider>
