@@ -35,7 +35,6 @@ type ModalState =
   | { type: "edit-candidate"; candidateId: string }
   | { type: "schedule-interview"; candidateId: string }
   | { type: "edit-interview"; interviewId: string }
-  | { type: "view-interview"; interviewId: string }
   | { type: "add-feedback"; interviewId: string }
   | { type: "generate-offer"; candidateId: string }
   | { type: "edit-offer"; offerId: string }
@@ -178,6 +177,7 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
   },
 
   fetchDashboard: async () => {
+    set({ error: null });
     try {
       const data = await apiFetch<DashboardData>("/api/recruitment/dashboard");
       set({ dashboard: data });

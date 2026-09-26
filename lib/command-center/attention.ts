@@ -16,6 +16,7 @@ import { User } from "@/models/User";
 import { WfhRequest } from "@/models/WfhRequest";
 import { CheckOutRequest } from "@/models/CheckOutRequest";
 import { addDays, startOfDay } from "./dates";
+import { startOfUtcDayMs } from "@/lib/date-utils";
 import { getColumnSets, getCompanyBoardIds, getMyBoardIds } from "./trends";
 import type { CommandCenterContext } from "./context";
 import type { AttentionItem } from "./types";
@@ -440,11 +441,15 @@ async function offersAwaiting(ctx: CommandCenterContext): Promise<AttentionItem[
 async function jobsClosing(ctx: CommandCenterContext): Promise<AttentionItem[]> {
   const companyId = ctx.companyId;
   if (!companyId) return [];
-  const end = addDays(ctx.now, 14);
+  // `autoCloseDate` is a wall clock, and the shared startOfDay/addDays helpers
+  // build local-time boundaries (payroll and attendance depend on that), so the
+  // window for this query is computed on UTC day boundaries instead.
+  const dayStart = startOfUtcDayMs(ctx.now);
+  const end = dayStart + 14 * 86_400_000 + 86_400_000 - 1;
   const count = await ATSJob.countDocuments({
     company: companyId,
     status: "open",
-    autoCloseDate: { $gte: startOfDay(ctx.now), $lte: end },
+    autoCloseDate: { $gte: new Date(dayStart), $lte: new Date(end) },
   });
   if (count === 0) return [];
   return [

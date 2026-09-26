@@ -13,7 +13,6 @@ import {
   Mail,
   CalendarDays,
   FileText,
-  StickyNote,
   Video,
   ExternalLink,
   Loader2,
@@ -36,10 +35,14 @@ import QRCode from "qrcode";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
+import { getInterviewJoinCountdownMs, isInterviewJoinWindowOpen, isInterviewJoinable, formatInterviewCountdown } from "@/lib/interview-timing";
 import { JobDescription } from "@/components/recruitment/job-description";
 import { DEFAULT_ACCENT, hexToRgba, salarySuffix } from "@/lib/accent";
 import { AssessmentPanel } from "@/components/candidate-portal/assessment-panel";
 import EditApplicationModal from "@/components/candidate-portal/edit-application-modal";
+import { InterviewRoom, type RoomCredentials } from "@/components/recruitment/interview-room/interview-room";
+import { MediaDevicesProvider, useMediaDevices } from "@/components/recruitment/interview-room/media-devices";
+import { DeviceCheckPanel } from "@/components/recruitment/interview-room/device-check-panel";
 
 type CandidateData = {
   id: string;
@@ -84,6 +87,10 @@ type InterviewData = {
   roundType: string;
   scheduledAt: string;
   meetingLink: string;
+  meetingType?: "video" | "in-person";
+  videoProvider?: "flowzen" | "zoom" | "google-meet";
+  meetingPassword?: string;
+  videoProviderLabel?: string;
   location?: string;
   status: string;
   interviewer: { id: string; name: string; companyIdentityCode?: string } | string;
@@ -247,26 +254,29 @@ function getTimelineDetails(entry: TimelineEntry): {
         ],
       };
     case "interview-completed":
+      // No verdict here. The endpoint withholds `recommendation` (see
+      // lib/candidate-visibility.ts) and this branch must not reintroduce it, or
+      // a future API regression would put the hiring decision back in front of
+      // the candidate.
       return {
         title: "Interview Completed",
-        description: m.recommendation
-          ? `Interview completed. Recommendation: ${String(m.recommendation).replace(/-/g, " ")}.`
-          : m.feedback
-            ? `Feedback submitted for the ${String(m.roundType || "")} round.`
-            : "Your interview has been completed and is being reviewed.",
+        description: m.roundType
+          ? `Your ${String(m.roundType)} round interview is complete. We'll be in touch with next steps.`
+          : "Your interview has been completed and is being reviewed.",
         icon: <CheckCircle {...iconProps} />,
         iconBg: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400",
         meta: [
           ...(m.roundType ? [{ icon: <Briefcase size={11} />, label: `Round: ${String(m.roundType)}` }] : []),
-          ...(m.recommendation ? [{ icon: <Send size={11} />, label: `Verdict: ${String(m.recommendation).replace(/-/g, " ")}` }] : []),
         ],
       };
     case "stage-changed":
       return {
         title: "Stage Updated",
-        description: m.reason
-          ? `${String(m.reason)}`
-          : `Your application moved from ${formatStage(String(m.from || ""))} to ${formatStage(String(m.to || ""))}.`,
+        // No `reason`: internal flows write values like "ats-rejection" here,
+        // which would disclose that automated screening filtered the candidate.
+        description: m.from && m.to
+          ? `Your application moved from ${formatStage(String(m.from))} to ${formatStage(String(m.to))}.`
+          : "Your application stage has been updated.",
         icon: <ArrowRight {...iconProps} />,
         iconBg: "bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400",
         meta: [
@@ -322,14 +332,11 @@ function getTimelineDetails(entry: TimelineEntry): {
         iconBg: "bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-400",
         meta: [],
       };
-    case "note-added":
-      return {
-        title: "Note Added",
-        description: String(m.content || m.note || "A note was added to your application."),
-        icon: <StickyNote {...iconProps} />,
-        iconBg: "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400",
-        meta: [],
-      };
+    // `note-added` and `assessment-graded` are intentionally not handled here.
+    // Both are withheld by the endpoint: HR's notes (which include the ATS
+    // scorer's score and reasoning) and any grading pass/fail decision are
+    // internal. They fall through to the default branch, which renders the
+    // action label with no description or metadata.
     case "assessment-started":
       return { title: "Assessment Started", description: "You have started the online assessment.", icon: <Clock {...iconProps} />, iconBg: "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400", meta: [] };
     case "assessment-submitted":
@@ -395,9 +402,16 @@ function CandidatePortalInner() {
   const [offerActionError, setOfferActionError] = useState("");
   const [confirmAction, setConfirmAction] = useState<"accept" | "reject" | null>(null);
   const [activePass, setActivePass] = useState<InterviewData | null>(null);
+  const [activeVideoInterview, setActiveVideoInterview] = useState<InterviewData | null>(null);
   const [assessmentData, setAssessmentData] = useState<any>(null);
   const [editAppOpen, setEditAppOpen] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
   const assessmentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!token) { setError("No access token provided."); setLoading(false); return; }
@@ -729,7 +743,7 @@ function CandidatePortalInner() {
                         label="Salary range"
                         value={`${CURRENCY_SYMBOLS[candidate.job.currency] || "₹"}${candidate.job.salaryRangeMin.toLocaleString()} - ${CURRENCY_SYMBOLS[candidate.job.currency] || "₹"}${candidate.job.salaryRangeMax.toLocaleString()} ${salarySuffix(candidate.job.salaryType)}`}
                       />
-                    ) : (
+          ) : (
                       <FactTile accent={accent} icon={ShieldCheck} label="Stage" value={formatStage(candidate.stage)} />
                     )}
                   </div>
@@ -895,15 +909,22 @@ function CandidatePortalInner() {
                 </ul>
               </div>
 
-              {/* Upcoming interviews */}
+              {/* Interviews the candidate can still take part in */}
               {interviews.length > 0 && (
                 <div className="rounded-2xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] dark:bg-[#000000] p-6 shadow-sm">
                   <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-zinc-100">
-                    <Video size={15} style={{ color: accent }} /> Upcoming interviews
+                    <Video size={15} style={{ color: accent }} /> Your interviews
                   </h3>
                   <div className="mt-4 space-y-3">
                     {interviews.map((iv) => {
                       const interviewerName = typeof iv.interviewer === "object" ? iv.interviewer.name : "";
+                      const joinOpen = isInterviewJoinWindowOpen(iv.scheduledAt, now);
+                      // An interview stays listed — and rejoinable — until the
+                      // interviewer submits feedback, which is what moves it to
+                      // "completed". Gating on the time window alone used to offer
+                      // "Join Meeting" on an interview that was already done.
+                      const rejoinable = isInterviewJoinable(iv.status);
+                      const started = iv.status === "in-progress";
                       return (
                         <div
                           key={iv.id}
@@ -911,11 +932,18 @@ function CandidatePortalInner() {
                           style={{ backgroundColor: accentSofter }}
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <span
-                              className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold capitalize"
-                              style={{ backgroundColor: accentSoft, color: accent }}
-                            >
-                              {iv.roundType} Round
+                            <span className="flex items-center gap-1.5">
+                              <span
+                                className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold capitalize"
+                                style={{ backgroundColor: accentSoft, color: accent }}
+                              >
+                                {iv.roundType} Round
+                              </span>
+                              {started ? (
+                                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                  In progress
+                                </span>
+                              ) : null}
                             </span>
                             {interviewerName && (
                               <span className="truncate text-[11px] text-slate-500 dark:text-zinc-400">{interviewerName}</span>
@@ -929,17 +957,31 @@ function CandidatePortalInner() {
                               {new Date(iv.scheduledAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
                             </span>
                           </div>
-                          {iv.meetingLink && (
-                            <a
-                              href={iv.meetingLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-white transition-all hover:opacity-90"
-                              style={{ backgroundColor: accent }}
-                            >
-                              <Video size={13} /> Join Meeting <ExternalLink size={11} />
-                            </a>
-                          )}
+                          {iv.meetingLink &&
+                            (rejoinable && joinOpen ? (
+                              <button
+                                type="button"
+                                onClick={() => setActiveVideoInterview(iv)}
+                                className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-white transition-all hover:opacity-90"
+                                style={{ backgroundColor: accent }}
+                              >
+                                <Video size={13} /> {started ? "Rejoin call" : "Join Meeting"}
+                              </button>
+                            ) : rejoinable ? (
+                              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2.5 text-center dark:border-amber-900/60 dark:bg-amber-950/30">
+                                <p className="text-[11px] font-medium text-amber-700 dark:text-amber-300">Call opens in</p>
+                                <p className="mt-0.5 text-lg font-bold tabular-nums text-amber-800 dark:text-amber-200">
+                                  {formatInterviewCountdown(getInterviewJoinCountdownMs(iv.scheduledAt, now))}
+                                </p>
+                                <p className="mt-0.5 text-[10px] leading-snug text-amber-600 dark:text-amber-400">
+                                  Join becomes available five minutes before the scheduled time.
+                                </p>
+                              </div>
+                            ) : (
+                              <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-center text-[11px] text-slate-500 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-400">
+                                This round is {iv.status === "cancelled" ? "cancelled" : "finished"}.
+                              </p>
+                            ))}
                           {!iv.meetingLink && iv.location && (
                             <div className="mt-3">
                               <p className="text-xs text-slate-500">Location: {iv.location}</p>
@@ -972,6 +1014,19 @@ function CandidatePortalInner() {
           companyInitials={companyInitials}
           onClose={() => setActivePass(null)}
         />
+      )}
+
+      {activeVideoInterview && candidate && token && (
+        <MediaDevicesProvider>
+          <VideoInterviewModal
+            key={activeVideoInterview.id}
+            interview={activeVideoInterview}
+            candidate={candidate}
+            token={token}
+            accent={accent}
+            onClose={() => setActiveVideoInterview(null)}
+          />
+        </MediaDevicesProvider>
       )}
 
       {editAppOpen && candidate && (
@@ -1248,6 +1303,225 @@ function IdCardModal({
           >
             Close
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function VideoInterviewModal({
+  interview,
+  candidate,
+  token,
+  accent,
+  onClose,
+}: {
+  interview: InterviewData;
+  candidate: CandidateData;
+  token: string;
+  accent: string;
+  onClose: () => void;
+}) {
+  const [credentials, setCredentials] = useState<RoomCredentials | null>(null);
+  const [joining, setJoining] = useState(false);
+  const [callError, setCallError] = useState("");
+  const [callMessage, setCallMessage] = useState("");
+  const [now, setNow] = useState(() => Date.now());
+  const media = useMediaDevices();
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const isExternalMeeting =
+    interview.meetingType !== "in-person" &&
+    Boolean(interview.videoProvider) &&
+    interview.videoProvider !== "flowzen";
+
+  // Declared before the `if (credentials)` early return below: that return is the
+  // render that mounts InterviewRoom, and `access` is read by joinCall. Keeping
+  // it after the return left it in the temporal dead zone for exactly that render.
+  const access = String(interview.meetingLink).split("access=")[1]?.split("&")[0];
+
+  // The `interview` prop is a snapshot taken when the portal first loaded, so it
+  // never learns that the interview ended. Nothing pushes it: the feedback
+  // endpoint only notifies HR. Poll while the camera is open — which also covers
+  // a candidate previewing in the device check without having joined — and track
+  // just the status, since that is what decides whether the call is still live.
+  const [liveStatus, setLiveStatus] = useState(interview.status);
+  const mediaOpen = credentials !== null || media.status === "ready";
+  const terminal = !isInterviewJoinable(liveStatus);
+
+  const { release } = media;
+  useEffect(() => {
+    if (!mediaOpen || terminal) return;
+    const timer = window.setInterval(async () => {
+      try {
+        const res = await fetch(`/api/public/candidate/me?token=${encodeURIComponent(token)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const match = (data.interviews ?? []).find((i: InterviewData) => i.id === interview.id);
+        if (match?.status) setLiveStatus(match.status);
+      } catch {
+        // A failed poll just means we learn about it on the next tick.
+      }
+    }, 15000);
+    return () => window.clearInterval(timer);
+  }, [interview.id, mediaOpen, terminal, token]);
+
+  // MediaDevicesProvider is mounted per modal, so closing it stops the hardware
+  // — but a candidate sitting in a call when the interview completes has no way
+  // out, and the device panel is replaced by the "unavailable" notice, leaving
+  // the camera light on with nothing to switch it off. Release it here.
+  const releasedRef = useRef(false);
+  useEffect(() => {
+    if (!terminal) {
+      releasedRef.current = false;
+      return;
+    }
+    if (releasedRef.current) return;
+    releasedRef.current = true;
+    // Unmounting InterviewRoom closes the peer connection and drops the remote
+    // video (use-webrtc-call.ts), then release() stops the local camera and mic.
+    // No message: the panel already renders the "no longer available for joining"
+    // state below, so a second notice would just repeat it.
+    setCredentials(null);
+    release();
+  }, [terminal, release]);
+
+  async function joinCall() {
+    if (!interview || joining) return;
+    setJoining(true);
+    setCallError("");
+    setCallMessage("");
+    try {
+      if (!access) throw new Error("Invalid interview link.");
+      const res = await fetch(`/api/recruitment/interviews/${encodeURIComponent(interview.id)}/webrtc-session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ access }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Unable to join the call.");
+      }
+      const data = await res.json();
+      setCredentials(data);
+    } catch (e: any) {
+      setCallError(e.message || "Unable to join the call.");
+    } finally {
+      setJoining(false);
+    }
+  }
+
+  function endCall() {
+    setCredentials(null);
+    setCallMessage("You left the call. You can rejoin while the interview remains in progress.");
+  }
+
+  if (credentials) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-sm">
+        <div className="h-[min(80vh,44rem)] w-full max-w-5xl">
+          <InterviewRoom
+            credentials={credentials}
+            candidateName={`${candidate.firstName} ${candidate.lastName}`.trim()}
+            jobTitle={`${interview.roundType} round`}
+            onEnd={endCall}
+            onPeerEnded={() => setCallMessage("The interviewer ended the call.")}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const scheduledAt = new Date(interview.scheduledAt);
+  const withinWindow = isInterviewJoinWindowOpen(interview.scheduledAt, now);
+  const canJoin = withinWindow && !terminal;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-8 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-2xl border border-[var(--c-border-light)] bg-[var(--c-bg-card)] shadow-xl dark:bg-[#0d0d0d]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-[var(--c-border-light)] px-5 py-4">
+          <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100">Join Interview</h2>
+          <button onClick={onClose} className="rounded-md p-1.5 text-slate-500 hover:bg-[var(--c-bg-muted)]" type="button">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <Video size={18} className="text-indigo-600" />
+            <div>
+              <p className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                {candidate.firstName} {candidate.lastName}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-zinc-400">
+                {interview.roundType} round · {scheduledAt.toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+              </p>
+            </div>
+          </div>
+
+          {!canJoin ? (
+            <div className="rounded-xl bg-amber-50 p-4 text-center dark:bg-amber-950/30">
+              <Clock className="mx-auto text-amber-600" size={24} />
+              {withinWindow ? (
+                <>
+                  <p className="mt-2 text-sm font-medium text-amber-800 dark:text-amber-200">This interview is no longer available for joining.</p>
+                  <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">It is marked {interview.status}.</p>
+                </>
+              ) : (
+                <>
+                  <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-300">Call opens in</p>
+                  <p className="mt-1 text-2xl font-bold tabular-nums text-amber-800 dark:text-amber-200">
+                    {formatInterviewCountdown(getInterviewJoinCountdownMs(interview.scheduledAt, now))}
+                  </p>
+                  <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">Join becomes available five minutes before the scheduled time.</p>
+                </>
+              )}
+            </div>
+          ) : isExternalMeeting ? (
+            <div className="space-y-3">
+              <p className="text-center text-sm text-slate-600 dark:text-zinc-400">
+                This interview runs on {interview.videoProviderLabel || interview.videoProvider}. Use the link below to join.
+              </p>
+              <a
+                href={interview.meetingLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition hover:bg-indigo-700"
+              >
+                <Video size={17} /> Open {interview.videoProviderLabel || interview.videoProvider}
+              </a>
+              {interview.meetingPassword ? (
+                <div className="rounded-xl border border-[var(--c-border-light)] bg-[var(--c-bg-muted)] px-3 py-2.5 text-center">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-zinc-400">Passcode</p>
+                  <p className="mt-0.5 font-mono text-sm tracking-wider text-slate-900 dark:text-zinc-100">{interview.meetingPassword}</p>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <>
+              {callError && (
+                <p className="text-sm text-rose-600 dark:text-rose-400 text-center">{callError}</p>
+              )}
+              {callMessage && (
+                <p className="text-sm text-emerald-600 dark:text-emerald-400 text-center">{callMessage}</p>
+              )}
+              <div className="rounded-2xl bg-slate-950 p-3">
+                <DeviceCheckPanel />
+              </div>
+              <button
+                type="button"
+                onClick={joinCall}
+                disabled={joining || credentials !== null || media.status === "error" || media.status === "requesting"}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-60"
+              >
+                <Video size={17} />
+                {joining ? "Joining…" : credentials ? "In call" : "Join Meeting"}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

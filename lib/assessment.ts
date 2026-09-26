@@ -1,3 +1,10 @@
+import {
+  getAssessmentPhase,
+  resolveAssessmentSlots,
+  type AssessmentTimeSlot,
+  type AssessmentWindowMode,
+} from "@/lib/assessment-timing";
+
 // Build the flattened question list delivered to a candidate: general (non-domain)
 // questions first, then the questions of the candidate's chosen domain (if any).
 // Order is deterministic and MUST match the order used at /start.
@@ -25,22 +32,31 @@ export function pickDomain(
   return { name: found.name, questions: found.questions || [] };
 }
 
-// Whether the online assessment can currently be started (the assessment date's calendar day).
+// Whether the online assessment can currently be started. The window honours the
+// configured time (plus the pre-open lobby) rather than the whole calendar day.
 export function assessmentIsOpen(
-  opts: { assessment?: boolean; assessmentDate?: Date | string | null },
+  opts: {
+    assessment?: boolean;
+    assessmentDate?: Date | string | null;
+    timeSlots?: AssessmentTimeSlot[] | null;
+    windowMode?: AssessmentWindowMode;
+    durationMinutes?: number | null;
+  },
   now: Date = new Date()
 ): boolean {
   if (!opts?.assessment || !opts.assessmentDate) return false;
-  const date = new Date(opts.assessmentDate);
-  if (Number.isNaN(date.getTime())) return false;
-  const start = new Date(date);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(date);
-  end.setHours(23, 59, 59, 999);
-  return now >= start && now <= end;
+  const mode = opts.windowMode === "uniform" ? "uniform" : "relief";
+  const slots = resolveAssessmentSlots(opts.assessmentDate, opts.timeSlots, {
+    mode,
+    durationMinutes: opts.durationMinutes ?? null,
+  });
+  if (!slots.length) return false;
+  const info = getAssessmentPhase(slots, mode, null, now.getTime());
+  return info.phase === "lobby" || info.phase === "open";
 }
 
-// Whether assessment results/apply are unlocked (assessment date + 1 day, i.e. next calendar day >= date).
+// Whether assessment results/apply are unlocked (the day after the assessment date).
+// Day boundaries are computed in UTC to match the slot arithmetic above.
 export function assessmentResultsUnlocked(
   opts: { assessment?: boolean; assessmentDate?: Date | string | null },
   now: Date = new Date()
@@ -48,10 +64,9 @@ export function assessmentResultsUnlocked(
   if (!opts?.assessment || !opts.assessmentDate) return false;
   const date = new Date(opts.assessmentDate);
   if (Number.isNaN(date.getTime())) return false;
-  const unlock = new Date(date);
-  unlock.setDate(unlock.getDate() + 1);
-  unlock.setHours(0, 0, 0, 0);
-  return now >= unlock;
+  const dayMs = 86_400_000;
+  const assessmentDay = Math.floor(date.getTime() / dayMs) * dayMs;
+  return now.getTime() >= assessmentDay + dayMs;
 }
 
 // Grade answers against the question key with per-question marks and an optional

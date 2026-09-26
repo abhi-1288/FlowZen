@@ -21,6 +21,23 @@ type DomainSection = {
   questions: Question[];
 };
 
+type WindowMode = "uniform" | "relief";
+
+const TIME_RE = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+
+/** "16:00" + 60 min -> "5:00 PM", so HR can see each slot's fixed end. */
+function formatSlotEnd(start: string, durationMinutes: number): string {
+  const match = TIME_RE.exec(start);
+  if (!match) return "—";
+  const total = Number(match[1]) * 60 + Number(match[2]) + (Number(durationMinutes) || 0);
+  const wrapped = ((total % 1440) + 1440) % 1440;
+  const hours24 = Math.floor(wrapped / 60);
+  const minutes = wrapped % 60;
+  const suffix = hours24 >= 12 ? "PM" : "AM";
+  const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
+  return `${hours12}:${String(minutes).padStart(2, "0")} ${suffix}`;
+}
+
 function baseQuestion(): Question {
   return { text: "", options: ["", "", "", ""], correctIndex: 0, type: "mcq", answer: "", marks: 1, required: false };
 }
@@ -50,6 +67,9 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
   const [passScore, setPassScore] = useState(50);
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [negativeMarking, setNegativeMarking] = useState(0);
+  const [windowMode, setWindowMode] = useState<WindowMode>("relief");
+  const [timeSlots, setTimeSlots] = useState<string[]>([]);
+  const [instructions, setInstructions] = useState("");
   const [general, setGeneral] = useState<Question[]>([]);
   const [domains, setDomains] = useState<DomainSection[]>([]);
   const [step, setStep] = useState<"menu" | "manual" | "pdf-upload" | "pdf-review">("menu");
@@ -73,6 +93,13 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
         if (data.assessment) {
           setPassScore(data.assessment.passScore ?? 50);
           setNegativeMarking(Math.max(0, Number(data.assessment.negativeMarking) || 0));
+          setWindowMode(data.assessment.windowMode === "uniform" ? "uniform" : "relief");
+          setTimeSlots(
+            Array.isArray(data.assessment.timeSlots)
+              ? data.assessment.timeSlots.map((s: any) => String(s?.start || "")).filter(Boolean)
+              : []
+          );
+          setInstructions(String(data.assessment.instructions || ""));
           const pickedGeneral: Question[] = Array.isArray(data.assessment.questions)
             ? data.assessment.questions.map(normalizeQuestion)
             : [];
@@ -113,10 +140,36 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
     setDomains((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
   }
 
+  function updateTimeSlot(idx: number, value: string) {
+    setTimeSlots((prev) => prev.map((s, i) => (i === idx ? value : s)));
+  }
+
+  function removeTimeSlot(idx: number) {
+    setTimeSlots((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function addTimeSlot() {
+    // Seed from the first gap so HR rarely has to type a whole list by hand.
+    setTimeSlots((prev) => {
+      const taken = new Set(prev.filter(Boolean));
+      for (let h = 8; h <= 20; h++) {
+        for (const m of ["00", "30"]) {
+          const candidate = `${String(h).padStart(2, "0")}:${m}`;
+          if (!taken.has(candidate)) return [...prev, candidate];
+        }
+      }
+      return [...prev, "09:00"];
+    });
+  }
+
   function validate(): string {
     const hasAny =
       general.length > 0 || domains.some((d) => d.questions.length > 0);
     if (!hasAny) return "Add at least one question across the general section or the domain sections.";
+
+    if (windowMode === "uniform" && timeSlots.length && timeSlots.some((s) => !TIME_RE.test(s))) {
+      return "Every time slot needs a valid HH:MM start time.";
+    }
 
     const sectionQ = (title: string, list: Question[]) => {
       for (let i = 0; i < list.length; i++) {
@@ -159,6 +212,9 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
       passScore,
       durationMinutes,
       negativeMarking: Math.max(0, Number(negativeMarking) || 0),
+      windowMode,
+      timeSlots: timeSlots.filter((s) => TIME_RE.test(s)).map((start) => ({ start })),
+      instructions: instructions.trim(),
       questions: general.map(buildQuestion),
       domains: domains
         .filter((d) => d.name.trim() && d.questions.length > 0)
@@ -428,8 +484,104 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
     </div>
   );
 
+  const renderScheduling = () => (
+    <div className="space-y-3 rounded-xl border border-slate-200 p-4 dark:border-zinc-800">
+      <div>
+        <span className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-zinc-300">Timing mode</span>
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              {
+                value: "relief" as WindowMode,
+                label: "Flexible duration",
+                hint: "The candidate can start any time once the assessment date arrives, and the full duration runs from their own start.",
+              },
+              {
+                value: "uniform" as WindowMode,
+                label: "Fixed slots",
+                hint: "The candidate picks a start time and is held to that slot's fixed end. Offer several times so they can choose.",
+              },
+            ]
+          ).map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setWindowMode(opt.value)}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium ${windowMode === opt.value ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-zinc-800"}`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-1.5 text-xs text-slate-400">
+          {windowMode === "relief"
+            ? "The waiting room opens ten minutes before the assessment date on the job. Starting stays open until the end of that day."
+            : "The waiting room opens ten minutes before the earliest slot. Each candidate stops at their chosen slot's start plus the duration above."}
+        </p>
+      </div>
+
+      {windowMode === "uniform" && (
+        <div>
+          <span className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-zinc-300">
+            Start times <span className="text-xs font-normal text-slate-400">on the assessment date</span>
+          </span>
+          {timeSlots.length === 0 && (
+            <p className="mb-2 text-xs text-slate-400">
+              No extra times set — the assessment date and time on the job is used as the single slot.
+            </p>
+          )}
+          <div className="space-y-2">
+            {timeSlots.map((slot, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input
+                  type="time"
+                  value={slot}
+                  onChange={(e) => updateTimeSlot(i, e.target.value)}
+                  className="w-32 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800"
+                />
+                <span className="text-xs text-slate-400">
+                  stops at{" "}
+                  {formatSlotEnd(slot, durationMinutes)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeTimeSlot(i)}
+                  className="ml-auto rounded p-1.5 text-rose-500 hover:bg-rose-50"
+                  title="Remove time slot"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={addTimeSlot}
+            className="mt-2 inline-flex items-center gap-1 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 dark:border-zinc-700 dark:text-zinc-400"
+          >
+            <Plus size={14} /> Add time
+          </button>
+        </div>
+      )}
+
+      <div>
+        <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">
+          Instructions for candidates <span className="text-xs font-normal text-slate-400">(optional)</span>
+        </span>
+        <textarea
+          rows={3}
+          value={instructions}
+          onChange={(e) => setInstructions(e.target.value)}
+          placeholder="Shown in the waiting room before the assessment opens, e.g. rules on switching tabs, permitted materials, who to contact."
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800"
+        />
+      </div>
+    </div>
+  );
+
   const renderSettings = () => (
-    <div className="grid gap-4 sm:grid-cols-3">
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-3">
       <label className="block">
         <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Passing Score (%)</span>
         <input type="number" min="0" max="100" value={passScore} onChange={(e) => setPassScore(Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
@@ -444,6 +596,8 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
         </span>
         <input type="number" min="0" step="0.01" value={negativeMarking} onChange={(e) => setNegativeMarking(Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" placeholder="e.g. 0.25" />
       </label>
+      </div>
+      {renderScheduling()}
     </div>
   );
 
@@ -693,7 +847,7 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
 
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-2 dark:border-zinc-800">
             <button onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700">Cancel</button>
-            {(step === "manual") && (
+            {(step === "manual" || step === "menu") && (
               <button onClick={() => void handleSave()} disabled={saving} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-zinc-200">
                 {saving ? "Saving..." : "Save Assessment"}
               </button>

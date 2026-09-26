@@ -5,8 +5,15 @@ import { useSession } from "next-auth/react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { apiFetch } from "@/lib/client-utils";
 import { InterviewLocationFields } from "@/components/recruitment/interview-location-fields";
+import {
+  MeetingModeFields,
+  useFlowZenQuota,
+  type MeetingMode,
+} from "@/components/recruitment/interview-room/meeting-mode-fields";
+import { isExternalVideoProvider, normalizeVideoProvider, type VideoProvider } from "@/lib/interview-provider";
+import { ResumeViewerModal } from "@/components/recruitment/resume-viewer-modal";
 import { JobDescription } from "@/components/recruitment/job-description";
-import { Download, Lock } from "lucide-react";
+import { Download, Lock, Video } from "lucide-react";
 
 const INTERVIEWER_ROLES: Record<string, string> = {
   "project-manager": "Project Manager",
@@ -61,7 +68,12 @@ function ScheduleInterviewModal({
   const [pickerUsers, setPickerUsers] = useState<any[]>([]);
   const [pickerLoading, setPickerLoading] = useState(false);
   const [availableRoles, setAvailableRoles] = useState<string[]>(Object.keys(INTERVIEWER_ROLES));
-  const [meetingType, setMeetingType] = useState("online");
+  const [mode, setMode] = useState<MeetingMode>("flowzen");
+  const [provider, setProvider] = useState<Exclude<VideoProvider, "flowzen">>("zoom");
+  const [meetingLink, setMeetingLink] = useState("");
+  const [meetingPassword, setMeetingPassword] = useState("");
+  const [formError, setFormError] = useState("");
+  const quota = useFlowZenQuota();
 
   const isRemoteJob = !!jobLocation && /^remote$/i.test(jobLocation.trim());
 
@@ -105,17 +117,36 @@ function ScheduleInterviewModal({
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (saving) return;
+    setFormError("");
     const form = new FormData(e.currentTarget);
-    await createInterview({
-      candidate: candidateId,
-      interviewer: String(form.get("interviewer") || ""),
-      roundType: String(form.get("roundType") || "screening") as any,
-      scheduledAt: String(form.get("scheduledAt") || ""),
-      meetingLink: String(form.get("meetingLink") || ""),
-      location: String(form.get("location") || ""),
-    });
-    onIvChange();
-    setModal(null);
+
+    if (quota?.exhausted && mode === "flowzen") {
+      setFormError(
+        "You have used all FlowZen video rooms this month. Choose Zoom, Google Meet or an in-person interview."
+      );
+      return;
+    }
+    if (mode === "external" && !meetingLink.trim()) {
+      setFormError(`Enter the ${provider === "zoom" ? "Zoom" : "Google Meet"} meeting link.`);
+      return;
+    }
+
+    try {
+      await createInterview({
+        candidate: candidateId,
+        interviewer: String(form.get("interviewer") || ""),
+        roundType: String(form.get("roundType") || "screening") as any,
+        scheduledAt: String(form.get("scheduledAt") || ""),
+        videoProvider: mode === "external" ? provider : "flowzen",
+        meetingLink: mode === "external" ? meetingLink : "",
+        meetingPassword: mode === "external" ? meetingPassword : "",
+        location: mode === "in-person" ? String(form.get("location") || "") : "",
+      });
+      onIvChange();
+      setModal(null);
+    } catch (submitError) {
+      setFormError(submitError instanceof Error ? submitError.message : "Failed to schedule the interview.");
+    }
   }
 
   return (
@@ -215,34 +246,19 @@ function ScheduleInterviewModal({
               className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
             />
           </label>
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">
-              Meeting Type
-            </span>
-            <select
-              name="meetingType"
-              value={meetingType}
-              onChange={(e) => setMeetingType(e.target.value)}
-              className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
-            >
-              <option value="online">Online (meeting link)</option>
-              <option value="in-person">In-person (location)</option>
-            </select>
-          </label>
-          {meetingType === "online" ? (
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">
-                Meeting Link
-              </span>
-              <input
-                name="meetingLink"
-                placeholder="https://meet.google.com/..."
-                className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
-              />
-            </label>
-          ) : (
-            <InterviewLocationFields jobLocation={jobLocation} />
-          )}
+          <MeetingModeFields
+            mode={mode}
+            onModeChange={setMode}
+            provider={provider}
+            onProviderChange={setProvider}
+            meetingLink={meetingLink}
+            onMeetingLinkChange={setMeetingLink}
+            meetingPassword={meetingPassword}
+            onMeetingPasswordChange={setMeetingPassword}
+            quota={quota}
+            locationFields={<InterviewLocationFields jobLocation={jobLocation} />}
+          />
+          {formError ? <p className="text-sm text-rose-600">{formError}</p> : null}
           <button
             type="submit"
             disabled={saving}
@@ -368,6 +384,18 @@ function AddFeedbackModal({
   );
 }
 
+/**
+ * Formats an ISO timestamp for a datetime-local input, keeping the wall-clock
+ * time the interview was scheduled at instead of shifting it through UTC.
+ */
+function toDatetimeLocal(value: unknown) {
+  if (!value) return "";
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 function EditInterviewModal({
   interviewId,
   candidateInterviews,
@@ -379,31 +407,76 @@ function EditInterviewModal({
 }) {
   const { setModal, updateInterview, saving } = useRecruitmentStore();
   const interview = candidateInterviews.find((i) => i.id === interviewId);
-  const [meetingType, setMeetingType] = useState(interview?.meetingLink ? "online" : "in-person");
+  const existingProvider = normalizeVideoProvider(interview?.videoProvider);
+  const isInPerson = interview?.meetingType === "in-person" || Boolean(interview?.location);
+  const [mode, setMode] = useState<MeetingMode>(
+    isInPerson ? "in-person" : isExternalVideoProvider(existingProvider) ? "external" : "flowzen"
+  );
+  const [provider, setProvider] = useState<Exclude<VideoProvider, "flowzen">>(
+    isExternalVideoProvider(existingProvider) ? existingProvider : "zoom"
+  );
+  const [meetingLink, setMeetingLink] = useState<string>(interview?.meetingLink || "");
+  const [meetingPassword, setMeetingPassword] = useState<string>(interview?.meetingPassword || "");
+  const [formError, setFormError] = useState("");
+  const quota = useFlowZenQuota();
+  // A FlowZen room that is already attached to this interview does not consume
+  // a new quota slot, so an exhausted allowance must not block editing it.
+  const hasFlowZenRoom = String(interview?.meetingLink || "").includes("/recruitment/interview/");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (saving) return;
+    setFormError("");
     const form = new FormData(e.currentTarget);
     const updates: Record<string, any> = {};
     const scheduledAt = String(form.get("scheduledAt") || "");
     if (scheduledAt) updates.scheduledAt = scheduledAt;
-    const meetingLink = String(form.get("meetingLink") || "");
-    if (meetingLink) updates.meetingLink = meetingLink;
     const location = String(form.get("location") || "");
-    if (location) updates.location = location;
+
+    if (mode === "in-person" && !location) {
+      setFormError("Enter the interview location.");
+      return;
+    }
+    if (mode === "external" && !meetingLink.trim()) {
+      setFormError(`Enter the ${provider === "zoom" ? "Zoom" : "Google Meet"} meeting link.`);
+      return;
+    }
+    if (quota?.exhausted && mode === "flowzen" && !hasFlowZenRoom) {
+      setFormError(
+        "You have used all FlowZen video rooms this month. Choose Zoom, Google Meet or an in-person interview."
+      );
+      return;
+    }
+
+    updates.meetingType = mode === "in-person" ? "in-person" : "video";
+    if (mode === "in-person") {
+      updates.location = location;
+    } else {
+      updates.location = "";
+      updates.videoProvider = mode === "external" ? provider : "flowzen";
+      if (mode === "external") {
+        updates.meetingLink = meetingLink;
+        updates.meetingPassword = meetingPassword;
+      }
+    }
+
     const status = String(form.get("status") || "");
     if (status) updates.status = status;
-    await updateInterview(interviewId, updates);
-    onIvChange();
-    setModal(null);
+    try {
+      await updateInterview(interviewId, updates);
+      onIvChange();
+      setModal(null);
+    } catch (submitError) {
+      setFormError(submitError instanceof Error ? submitError.message : "Failed to update the interview.");
+    }
   }
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center neu-overlay px-4">
-      <div className="w-full max-w-md rounded-lg neu-card">
-        <header className="flex items-center justify-between border-b border-[var(--c-border-light)] px-5 py-4">
+      <div className="flex max-h-[90vh] w-full max-w-md flex-col rounded-lg neu-card">
+        <header className="flex shrink-0 items-center justify-between border-b border-[var(--c-border-light)] px-5 py-4">
           <h2 className="text-base font-semibold">Update Interview</h2>
+
           <button
             className="rounded-md p-1.5 text-slate-500 hover:bg-[var(--c-bg-muted)]"
             onClick={() => setModal(null)}
@@ -421,7 +494,7 @@ function EditInterviewModal({
             </svg>
           </button>
         </header>
-        <form className="space-y-4 p-5" onSubmit={handleSubmit}>
+        <form className="space-y-4 overflow-y-auto p-5" onSubmit={handleSubmit}>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">
               Reschedule At
@@ -429,37 +502,22 @@ function EditInterviewModal({
             <input
               name="scheduledAt"
               type="datetime-local"
+              defaultValue={toDatetimeLocal(interview?.scheduledAt)}
               className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
             />
           </label>
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">
-              Meeting Type
-            </span>
-            <select
-              name="meetingType"
-              value={meetingType}
-              onChange={(e) => setMeetingType(e.target.value)}
-              className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
-            >
-              <option value="online">Online (meeting link)</option>
-              <option value="in-person">In-person (location)</option>
-            </select>
-          </label>
-          {meetingType === "online" ? (
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">
-                Meeting Link
-              </span>
-              <input
-                name="meetingLink"
-                defaultValue={interview?.meetingLink || ""}
-                className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
-              />
-            </label>
-          ) : (
-            <InterviewLocationFields jobLocation="" defaultValue={interview?.location || ""} />
-          )}
+          <MeetingModeFields
+            mode={mode}
+            onModeChange={setMode}
+            provider={provider}
+            onProviderChange={setProvider}
+            meetingLink={meetingLink}
+            onMeetingLinkChange={setMeetingLink}
+            meetingPassword={meetingPassword}
+            onMeetingPasswordChange={setMeetingPassword}
+            quota={quota}
+            locationFields={<InterviewLocationFields jobLocation="" defaultValue={interview?.location || ""} />}
+          />
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">
               Status
@@ -468,16 +526,18 @@ function EditInterviewModal({
               name="status"
               className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm"
             >
-              <option value="">Keep current</option>
-              <option value="cancelled">Cancel</option>
-              <option value="rescheduled">Rescheduled</option>
-            </select>
-          </label>
-          <button
-            type="submit"
-            disabled={saving}
-            className="neu-btn neu-btn-primary w-full rounded-full px-4 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
-          >
+            <option value="">Keep current</option>
+            <option value="cancelled">Cancel</option>
+            <option value="rescheduled">Rescheduled</option>
+          </select>
+        </label>
+        {formError ? <p className="text-sm text-rose-600">{formError}</p> : null}
+        <button
+          type="submit"
+          disabled={saving}
+          className="neu-btn neu-btn-primary w-full rounded-full px-4 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
+        >
+
             {saving ? "Updating…" : "Update"}
           </button>
         </form>
@@ -500,6 +560,7 @@ function ViewInterviewModal({
   const isFullAccess =
     session?.user?.role === "admin" || session?.user?.role === "human-resource";
   const [actionError, setActionError] = useState("");
+  const [resumeOpen, setResumeOpen] = useState(false);
 
   const interview = candidateInterviews.find((i) => i.id === interviewId);
 
@@ -528,6 +589,7 @@ function ViewInterviewModal({
 
   const isFrozen = interview?.status === "in-progress";
   const isOnline = !!(interview?.meetingLink && String(interview.meetingLink).trim());
+  const isFlowZenRoom = Boolean(interview?.meetingLink && String(interview.meetingLink).includes("/recruitment/interview/"));
 
   useEffect(() => {
     if (!isFrozen || isOnline) return;
@@ -580,208 +642,229 @@ function ViewInterviewModal({
   const canAction = interview.status === "scheduled" || interview.status === "rescheduled" || interview.status === "in-progress";
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center neu-overlay px-4">
-      <div className={`w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-lg neu-card ${isFrozen ? "ring-2 ring-amber-300/60" : ""}`}>
-        <header className="flex items-center justify-between border-b border-[var(--c-border-light)] px-5 py-4">
-          <h2 className="text-base font-semibold">Interview Details</h2>
-          {!isFrozen && (
-            <button
-              className="rounded-md p-1.5 text-slate-500 hover:bg-[var(--c-bg-muted)]"
-              onClick={() => setModal(null)}
-              type="button"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
-            </button>
-          )}
-        </header>
+    <>
+      <div className="fixed inset-0 z-50 grid place-items-center neu-overlay px-4">
+        <div className={`w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-lg neu-card ${isFrozen ? "ring-2 ring-amber-300/60" : ""}`}>
+          <header className="flex items-center justify-between border-b border-[var(--c-border-light)] px-5 py-4">
+            <h2 className="text-base font-semibold">Interview Details</h2>
+            {!isFrozen && (
+              <button
+                className="rounded-md p-1.5 text-slate-500 hover:bg-[var(--c-bg-muted)]"
+                onClick={() => setModal(null)}
+                type="button"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </header>
 
-        <div className="flex flex-col gap-5 p-5 md:flex-row">
-          {/* Left column */}
-          <div className="flex-1 space-y-4 min-w-0">
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-semibold text-slate-900">{candidateName}</h3>
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium capitalize">{round} Round</span>
-              </div>
-              {jobTitle && <p className="mt-0.5 text-sm text-slate-500">{jobTitle}</p>}
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 rounded-lg border border-[var(--c-border-light)] p-3 text-sm">
+          <div className="flex flex-col gap-5 p-5 md:flex-row">
+            {/* Left column */}
+            <div className="flex-1 space-y-4 min-w-0">
               <div>
-                <p className="text-xs text-slate-500">Email</p>
-                {cand?.email ? <a className="text-indigo-600 hover:underline break-all" href={`mailto:${cand.email}`}>{cand.email}</a> : <p className="text-slate-400">—</p>}
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">Phone</p>
-                {cand?.phone ? <a className="text-indigo-600 hover:underline" href={`tel:${cand.phone}`}>{cand.phone}</a> : <p className="text-slate-400">—</p>}
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">Stage</p>
-                <p className="capitalize">{cand?.stage || "—"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">Status</p>
-                <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${getStatusClasses(interview.status)}`}>
-                  {statusLabel}
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-1.5 text-sm">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Scheduled At</span>
-                <span className="text-slate-900">{dateTime}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Interviewer</span>
-                <span className="text-slate-900">{interviewer} {interviewerRole ? `· ${interviewerRole}` : ""}</span>
-              </div>
-              {createdBy && (
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Scheduled By</span>
-                  <span className="text-slate-900">{createdBy.name}{createdBy.companyIdentityCode ? ` · ${createdBy.companyIdentityCode}` : ""}</span>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-slate-900">{candidateName}</h3>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium capitalize">{round} Round</span>
                 </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-slate-500">Meeting</span>
-                {interview.meetingLink ? (
-                  <a className="max-w-[60%] truncate text-indigo-600 hover:underline" href={interview.meetingLink} target="_blank" rel="noreferrer">{interview.meetingLink}</a>
-                ) : interview.location ? (
-                  <span className="text-slate-900">{interview.location}</span>
-                ) : (
-                  <span className="text-slate-400">—</span>
-                )}
+                {jobTitle && <p className="mt-0.5 text-sm text-slate-500">{jobTitle}</p>}
               </div>
-            </div>
+
+              <div className="grid grid-cols-2 gap-3 rounded-lg border border-[var(--c-border-light)] p-3 text-sm">
+                <div>
+                  <p className="text-xs text-slate-500">Email</p>
+                  {cand?.email ? <a className="text-indigo-600 hover:underline break-all" href={`mailto:${cand.email}`}>{cand.email}</a> : <p className="text-slate-400">—</p>}
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Phone</p>
+                  {cand?.phone ? <a className="text-indigo-600 hover:underline" href={`tel:${cand.phone}`}>{cand.phone}</a> : <p className="text-slate-400">—</p>}
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Stage</p>
+                  <p className="capitalize">{cand?.stage || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Status</p>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${getStatusClasses(interview.status)}`}>
+                    {statusLabel}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Scheduled At</span>
+                  <span className="text-slate-900">{dateTime}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Interviewer</span>
+                  <span className="text-slate-900">{interviewer} {interviewerRole ? `· ${interviewerRole}` : ""}</span>
+                </div>
+                {createdBy && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Scheduled By</span>
+                    <span className="text-slate-900">{createdBy.name}{createdBy.companyIdentityCode ? ` · ${createdBy.companyIdentityCode}` : ""}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Meeting</span>
+                  {interview.meetingLink ? (
+                    <a className="max-w-[60%] truncate text-indigo-600 hover:underline" href={interview.meetingLink} target="_blank" rel="noreferrer">{interview.meetingLink}</a>
+                  ) : interview.location ? (
+                    <span className="text-slate-900">{interview.location}</span>
+                  ) : (
+                    <span className="text-slate-400">—</span>
+                  )}
+                </div>
+              </div>
+
+              {isFlowZenRoom ? (
+              <a
+                href={interview.meetingLink}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+              >
+                <Video size={17} /> Open FlowZen video room
+              </a>
+            ) : interview.location ? (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                This is an in-person interview. No video room was created.
+              </div>
+            ) : null}
 
             {/* Scores */}
-            <div className="grid grid-cols-2 gap-3 rounded-lg border border-[var(--c-border-light)] p-3">
-              <div>
-                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">ATS Score</p>
-                {cand?.atsScore != null ? (
-                  <div className="mt-1 flex items-center gap-2">
-                    <span className="text-sm font-bold text-slate-900">{cand.atsScore}/100</span>
-                    <AtsStatusBadge status={cand.atsStatus} terminal={cand.stage === "ats-rejected" || cand.stage === "rejected"} />
-                  </div>
-                ) : <p className="mt-1 text-sm text-slate-400">—</p>}
+              <div className="grid grid-cols-2 gap-3 rounded-lg border border-[var(--c-border-light)] p-3">
+                <div>
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">ATS Score</p>
+                  {cand?.atsScore != null ? (
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="text-sm font-bold text-slate-900">{cand.atsScore}/100</span>
+                      <AtsStatusBadge status={cand.atsStatus} terminal={cand.stage === "ats-rejected" || cand.stage === "rejected"} />
+                    </div>
+                  ) : <p className="mt-1 text-sm text-slate-400">—</p>}
+                </div>
+                <div>
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Assessment Score</p>
+                  {cand?.assessmentScore != null ? (
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="text-sm font-bold text-slate-900">
+                        {cand.assessmentScore}/100
+                        {cand.assessmentMaxMarks ? ` · ${cand.assessmentRawMarks ?? 0}/${cand.assessmentMaxMarks}` : ""}
+                        {assessmentPct ? ` · ${assessmentPct}` : ""}
+                      </span>
+                      <ScoreStatusBadge status={cand.assessmentStatus} />
+                    </div>
+                  ) : <p className="mt-1 text-sm text-slate-400">—</p>}
+                </div>
               </div>
-              <div>
-                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Assessment Score</p>
-                {cand?.assessmentScore != null ? (
-                  <div className="mt-1 flex items-center gap-2">
-                    <span className="text-sm font-bold text-slate-900">
-                      {cand.assessmentScore}/100
-                      {cand.assessmentMaxMarks ? ` · ${cand.assessmentRawMarks ?? 0}/${cand.assessmentMaxMarks}` : ""}
-                      {assessmentPct ? ` · ${assessmentPct}` : ""}
-                    </span>
-                    <ScoreStatusBadge status={cand.assessmentStatus} />
-                  </div>
-                ) : <p className="mt-1 text-sm text-slate-400">—</p>}
-              </div>
+
+              {/* Resume */}
+              {cand?.resumeUrl && (
+                <button
+                  type="button"
+                  onClick={() => setResumeOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
+                >
+                  <Download size={14} /> Show Resume
+                </button>
+              )}
             </div>
 
-            {/* Resume */}
-            {cand?.resumeUrl && (
-              <a
-                href={cand.resumeUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
-              >
-                <Download size={14} /> Show Resume
-              </a>
+            {/* Right column — Job skills & description */}
+            {job && (job.requiredSkills?.length > 0 || job.description) && (
+              <div className="flex w-full shrink-0 flex-col gap-4 md:h-[calc(90vh-9rem)] md:w-72 md:min-h-0 md:self-start md:border-l md:border-[var(--c-border-light)] md:pl-5">
+                {job.requiredSkills?.length > 0 && (
+                  <div className="max-h-[250px] overflow-y-auto rounded-lg border border-[var(--c-border-light)] p-3">
+                    <p className="text-[11px] font-medium uppercase tracking-wider  text-slate-400">Required Skills</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {job.requiredSkills.map((skill: string, i: number) => (
+                        <span key={i} className="rounded-full bg-[var(--c-bg-muted)] px-3 py-1 text-[11px] font-medium text-slate-700">
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {job.description && (
+                  <div className="max-h-[250px] overflow-y-auto rounded-lg border border-[var(--c-border-light)] p-3">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Description</p>
+                    <JobDescription content={job.description} className="mt-1" />
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
-          {/* Right column — Job skills & description */}
-          {job && (job.requiredSkills?.length > 0 || job.description) && (
-            <div className="flex w-full shrink-0 flex-col gap-4 md:h-[calc(90vh-9rem)] md:w-72 md:min-h-0 md:self-start md:border-l md:border-[var(--c-border-light)] md:pl-5">
-              {job.requiredSkills?.length > 0 && (
-                <div className="max-h-[250px] overflow-y-auto rounded-lg border border-[var(--c-border-light)] p-3">
-                  <p className="text-[11px] font-medium uppercase tracking-wider  text-slate-400">Required Skills</p>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {job.requiredSkills.map((skill: string, i: number) => (
-                      <span key={i} className="rounded-full bg-[var(--c-bg-muted)] px-3 py-1 text-[11px] font-medium text-slate-700">
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+          {interview.status === "completed" && interview.feedback && (
+            <div className="mx-5 mb-5 rounded-lg border border-[var(--c-border-light)] p-3">
+              <p className="mb-2 text-xs font-medium text-slate-500">Feedback</p>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span className="rounded bg-slate-100 px-2 py-1">Tech: {interview.feedback.technicalSkills}/5</span>
+                <span className="rounded bg-slate-100 px-2 py-1">Comm: {interview.feedback.communication}/5</span>
+                <span className="rounded bg-slate-100 px-2 py-1">Problem: {interview.feedback.problemSolving}/5</span>
+                <span className="rounded bg-slate-100 px-2 py-1">Culture: {interview.feedback.cultureFit}/5</span>
+                <span className={`rounded px-2 py-1 font-medium ${
+                  interview.feedback.overallRecommendation === "strong-hire" ? "bg-emerald-50 text-emerald-700" :
+                  interview.feedback.overallRecommendation === "hire" ? "bg-sky-50 text-sky-700" :
+                  interview.feedback.overallRecommendation === "hold" ? "bg-amber-50 text-amber-700" :
+                  "bg-rose-50 text-rose-700"
+                }`}>{interview.feedback.overallRecommendation.replace("-", " ")}</span>
+              </div>
+            </div>
+          )}
+
+          {isFrozen && (
+            <div className="mx-5 mb-4 flex items-center gap-2 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <Lock size={15} className="shrink-0 text-amber-600" />
+              <span>Interview is in progress — this session is locked. {!isOnline && "Do not close this window or navigate away."}</span>
+            </div>
+          )}
+
+          {actionError && <p className="mx-5 text-sm text-rose-600">{actionError}</p>}
+
+          {canAction && (
+            <div className="flex items-center gap-3 border-t border-[var(--c-border-light)] px-5 py-4">
+              {isFullAccess && !isFrozen && (
+                <button
+                  suppressHydrationWarning
+                  onClick={() => setModal({ type: "edit-interview", interviewId })}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  Edit
+                </button>
               )}
-              {job.description && (
-                <div className="max-h-[250px] overflow-y-auto rounded-lg border border-[var(--c-border-light)] p-3">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Description</p>
-                  <JobDescription content={job.description} className="mt-1" />
-                </div>
+              {interview.status === "in-progress" ? (
+                <button
+                  suppressHydrationWarning
+                  onClick={() => setModal({ type: "add-feedback", interviewId })}
+                  className="flex-1 rounded-full bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600"
+                >
+                  Interview Done
+                </button>
+              ) : locked ? (
+                <span className="flex-1 text-sm italic text-slate-400">Waiting for previous candidate to finish</span>
+              ) : (
+                <button
+                  suppressHydrationWarning
+                  onClick={handleStart}
+                  disabled={saving}
+                  className="flex-1 rounded-full bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {saving ? "Starting…" : "Start Interview"}
+                </button>
               )}
             </div>
           )}
         </div>
-
-        {interview.status === "completed" && interview.feedback && (
-          <div className="mx-5 mb-5 rounded-lg border border-[var(--c-border-light)] p-3">
-            <p className="mb-2 text-xs font-medium text-slate-500">Feedback</p>
-            <div className="flex flex-wrap gap-2 text-xs">
-              <span className="rounded bg-slate-100 px-2 py-1">Tech: {interview.feedback.technicalSkills}/5</span>
-              <span className="rounded bg-slate-100 px-2 py-1">Comm: {interview.feedback.communication}/5</span>
-              <span className="rounded bg-slate-100 px-2 py-1">Problem: {interview.feedback.problemSolving}/5</span>
-              <span className="rounded bg-slate-100 px-2 py-1">Culture: {interview.feedback.cultureFit}/5</span>
-              <span className={`rounded px-2 py-1 font-medium ${
-                interview.feedback.overallRecommendation === "strong-hire" ? "bg-emerald-50 text-emerald-700" :
-                interview.feedback.overallRecommendation === "hire" ? "bg-sky-50 text-sky-700" :
-                interview.feedback.overallRecommendation === "hold" ? "bg-amber-50 text-amber-700" :
-                "bg-rose-50 text-rose-700"
-              }`}>{interview.feedback.overallRecommendation.replace("-", " ")}</span>
-            </div>
-          </div>
-        )}
-
-        {isFrozen && (
-          <div className="mx-5 mb-4 flex items-center gap-2 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            <Lock size={15} className="shrink-0 text-amber-600" />
-            <span>Interview is in progress — this session is locked. {!isOnline && "Do not close this window or navigate away."}</span>
-          </div>
-        )}
-
-        {actionError && <p className="mx-5 text-sm text-rose-600">{actionError}</p>}
-
-        {canAction && (
-          <div className="flex items-center gap-3 border-t border-[var(--c-border-light)] px-5 py-4">
-            {isFullAccess && !isFrozen && (
-              <button
-                suppressHydrationWarning
-                onClick={() => setModal({ type: "edit-interview", interviewId })}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-              >
-                Edit
-              </button>
-            )}
-            {interview.status === "in-progress" ? (
-              <button
-                suppressHydrationWarning
-                onClick={() => setModal({ type: "add-feedback", interviewId })}
-                className="flex-1 rounded-full bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600"
-              >
-                Interview Done
-              </button>
-            ) : locked ? (
-              <span className="flex-1 text-sm italic text-slate-400">Waiting for previous candidate to finish</span>
-            ) : (
-              <button
-                suppressHydrationWarning
-                onClick={handleStart}
-                disabled={saving}
-                className="flex-1 rounded-full bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {saving ? "Starting…" : "Start Interview"}
-              </button>
-            )}
-          </div>
-        )}
       </div>
-    </div>
+      {resumeOpen && cand?.resumeUrl ? (
+        <ResumeViewerModal
+          url={cand.resumeUrl}
+          candidateName={candidateName}
+          onClose={() => setResumeOpen(false)}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -817,14 +900,6 @@ function InterviewModals({
   if (modal.type === "edit-interview")
     return (
       <EditInterviewModal
-        interviewId={modal.interviewId}
-        candidateInterviews={candidateInterviews}
-        onIvChange={onIvChange}
-      />
-    );
-  if (modal.type === "view-interview")
-    return (
-      <ViewInterviewModal
         interviewId={modal.interviewId}
         candidateInterviews={candidateInterviews}
         onIvChange={onIvChange}

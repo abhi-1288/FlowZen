@@ -61,13 +61,25 @@ const ATSCandidateSchema = new Schema(
     assessmentReason: { type: String, default: "" },
     assessmentRejectionNote: { type: String, default: "" },
     assessmentStartedAt: { type: Date, default: null },
+    assessmentSlotStart: { type: Date, default: null },
     assessmentSubmittedAt: { type: Date, default: null },
     assessmentInviteSentAt: { type: Date, default: null },
     assessmentResultPublishedAt: { type: Date, default: null },
     assessmentDomain: { type: String, default: "", trim: true, maxlength: 100 },
     assessmentRawMarks: { type: Number, default: null },
     assessmentMaxMarks: { type: Number, default: null },
-    assessmentAnswers: { type: [{ questionIndex: Number, selectedOption: Number, textAnswer: { type: String, default: "" } }], default: [] },
+    // selectedOption stays null for unanswered questions so an autosaved
+    // partial attempt is not scored as a wrong answer.
+    assessmentAnswers: {
+      type: [
+        {
+          questionIndex: Number,
+          selectedOption: { type: Number, default: null },
+          textAnswer: { type: String, default: "" },
+        },
+      ],
+      default: [],
+    },
     convertedEmail: { type: String, default: "", trim: true, lowercase: true },
     conversionOtpHash: { type: String, default: "", select: false },
     conversionOtpExpiresAt: { type: Date, default: null },

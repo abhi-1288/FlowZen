@@ -4,14 +4,23 @@ import { ATSCandidate } from "@/models/ATSCandidate";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitToUser } from "@/lib/socket-emit";
+import { utcWallClockNow } from "@/lib/date-utils";
 
+/**
+ * Closes open jobs whose `autoCloseDate` has passed and notifies HR.
+ *
+ * `autoCloseDate` is a wall clock (see lib/date-utils), so it is compared against
+ * the current wall clock rather than the raw instant — otherwise a job set to
+ * close at 23:59 would trip five and a half hours early on an IST host.
+ */
 export async function autoCloseOverdueJobs() {
   await connectDb();
   const now = new Date();
+  const wallClockNow = utcWallClockNow(now);
 
   const overdueJobs = await ATSJob.find({
     status: "open",
-    autoCloseDate: { $lt: now },
+    autoCloseDate: { $lt: new Date(wallClockNow) },
   });
 
   if (overdueJobs.length === 0) return 0;
@@ -22,7 +31,9 @@ export async function autoCloseOverdueJobs() {
     { $set: { status: "closed" } }
   );
 
-  const dateStr = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
+  // Read the UTC components so the date in the notification matches the wall
+  // clock the job was scheduled against, not the host's local one.
+  const dateStr = `${now.getUTCDate()}/${now.getUTCMonth() + 1}/${now.getUTCFullYear()}`;
 
   for (const job of overdueJobs) {
     const companyId = job.company;

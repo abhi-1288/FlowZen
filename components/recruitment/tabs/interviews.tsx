@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Calendar, Briefcase, ChevronDown, ChevronUp, ChevronRight, Clock, Users } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
-import { InterviewModals } from "@/app/recruitment/candidates/[id]/components/interview-modals";
+import { interviewSlug } from "@/lib/interview-slug";
 import type { ATSInterview } from "@/lib/recruitment-types";
 
 const ROUND_LABEL: Record<string, string> = {
@@ -76,6 +77,12 @@ function jobKey(iv: ATSInterview) {
   return "_none";
 }
 
+function interviewDetailHref(iv: ATSInterview) {
+  const job = interviewSlug(jobTitle(iv) || "interview");
+  const candidate = interviewSlug(candidateName(iv) || "candidate");
+  return `/recruitment/interview/${job}/${candidate}?interview=${encodeURIComponent(iv.id)}`;
+}
+
 type Grouped = {
   jobTitle: string;
   jobId: string;
@@ -144,10 +151,10 @@ function Accordion({ header, count, children, defaultOpen = false }: {
   );
 }
 
-function TimeSlotRow({ iv, locked, onView }: {
+function TimeSlotRow({ iv, locked, href }: {
   iv: ATSInterview;
   locked: boolean;
-  onView: () => void;
+  href: string;
 }) {
   const time = formatTime(new Date(iv.scheduledAt));
   const name = candidateName(iv);
@@ -155,10 +162,10 @@ function TimeSlotRow({ iv, locked, onView }: {
   const interviewer = interviewerName(iv);
 
   return (
-    <button
+    <Link
       suppressHydrationWarning
-      onClick={onView}
-      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50"
+      href={href}
+      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-slate-50"
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -177,7 +184,7 @@ function TimeSlotRow({ iv, locked, onView }: {
         )}
       </div>
       <ChevronRight size={16} className="shrink-0 text-slate-300" />
-    </button>
+    </Link>
   );
 }
 
@@ -185,7 +192,7 @@ function formatFullDate(iso: string) {
   return `${formatDate(new Date(iso))} · ${formatTime(new Date(iso))}`;
 }
 
-function CandidateInfoRow({ iv }: { iv: ATSInterview }) {
+function CandidateInfoRow({ iv, href }: { iv: ATSInterview; href: string }) {
   const name = candidateName(iv);
   const round = ROUND_LABEL[iv.roundType] || iv.roundType;
   const interviewer = interviewerName(iv);
@@ -204,7 +211,7 @@ function CandidateInfoRow({ iv }: { iv: ATSInterview }) {
             : `Interview on ${formatFullDate(iv.scheduledAt)}`;
 
   return (
-    <div className="px-4 py-3 hover:bg-slate-50">
+    <Link href={href} className="block px-4 py-3 transition hover:bg-slate-50">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium text-slate-900">{name}</span>
         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium capitalize">{round}</span>
@@ -222,12 +229,7 @@ function CandidateInfoRow({ iv }: { iv: ATSInterview }) {
         <div className={iv.status === "cancelled" ? "text-rose-600" : iv.status === "rescheduled" ? "text-amber-600" : "text-slate-600"}>
           {dateNote}
         </div>
-        {iv.meetingLink && (
-          <a className="block max-w-full truncate text-indigo-600 hover:underline" href={iv.meetingLink} target="_blank" rel="noreferrer">
-            {iv.meetingLink}
-          </a>
-        )}
-        {!iv.meetingLink && iv.location && <div>{iv.location}</div>}
+        {iv.location && <div>{iv.location}</div>}
       </div>
       {iv.status === "completed" && iv.feedback && (
         <div className="mt-2 flex flex-wrap gap-2 text-xs">
@@ -243,21 +245,13 @@ function CandidateInfoRow({ iv }: { iv: ATSInterview }) {
           }`}>{iv.feedback.overallRecommendation.replace("-", " ")}</span>
         </div>
       )}
-    </div>
+    </Link>
   );
 }
 
 function GroupedView({ grouped }: {
   grouped: Grouped[];
 }) {
-  const { setModal } = useRecruitmentStore(
-    useShallow((s) => ({ setModal: s.setModal }))
-  );
-
-  const handleView = (iv: ATSInterview) => {
-    setModal({ type: "view-interview", interviewId: iv.id });
-  };
-
   return (
     <div className="mt-4 space-y-4">
       {grouped.map((g) => (
@@ -284,7 +278,7 @@ function GroupedView({ grouped }: {
                   key={iv.id}
                   iv={iv}
                   locked={isBlocked}
-                  onView={() => handleView(iv)}
+                  href={interviewDetailHref(iv)}
                 />
               );
             });
@@ -331,9 +325,10 @@ function CandidatesView({ grouped }: { grouped: Grouped[] }) {
                 <span className="text-xs text-slate-400">({dg.interviews.length})</span>
               </div>
               <div className="divide-y divide-slate-50">
-                {dg.interviews.map((iv) => (
-                  <CandidateInfoRow key={iv.id} iv={iv} />
-                ))}
+                  {dg.interviews.map((iv) => (
+                    <CandidateInfoRow key={iv.id} iv={iv} href={interviewDetailHref(iv)} />
+                  ))}
+
               </div>
             </div>
           ))}
@@ -366,10 +361,6 @@ export function InterviewsTab() {
   useEffect(() => {
     if (userId !== undefined) load(statusFilter, adminTab);
   }, [statusFilter, adminTab, userId, load]);
-
-  const refetch = useCallback(() => {
-    void load(statusFilter, adminTab);
-  }, [load, statusFilter, adminTab]);
 
   const grouped = useMemo(() => groupInterviews(interviews), [interviews]);
 
@@ -440,12 +431,6 @@ export function InterviewsTab() {
       ) : (
         <GroupedView grouped={grouped} />
       )}
-
-      <InterviewModals
-        candidateId=""
-        candidateInterviews={interviews}
-        onIvChange={refetch}
-      />
     </div>
   );
 }

@@ -5,7 +5,9 @@ node_modules/
 
 # Next.js
 .next/
+.next-build/
 out/
+*.tsbuildinfo
 
 # production
 build/

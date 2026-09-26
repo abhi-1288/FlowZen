@@ -8,6 +8,7 @@ import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
+import { purgeSignalingRoom } from "@/lib/signaling/purge";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -26,7 +27,11 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!user) return jsonError("Forbidden", 403);
   if (!user.company) return jsonError("No company found.", 400);
 
-  const interview = await ATSInterview.findOne({ _id: id, company: user.company });
+  // `videoRoomTokenHash` is `select: false`, so it has to be asked for
+  // explicitly — it is the signalling room id needed to clean up on completion.
+  const interview = await ATSInterview.findOne({ _id: id, company: user.company }).select(
+    "+videoRoomTokenHash"
+  );
   if (!interview) return jsonError("Interview not found.", 404);
 
   if (String(interview.interviewer) !== userId && user.role !== "admin" && user.role !== "human-resource") {
@@ -43,6 +48,12 @@ export async function PATCH(request: Request, { params }: Params) {
   };
   interview.status = "completed";
   await interview.save();
+
+  // The interview is over, so its signalling room should not outlive it. Awaited
+  // rather than fired and forgotten — a serverless function can be frozen the
+  // moment the response is sent — but never allowed to fail the feedback itself.
+  const purge = await purgeSignalingRoom(interview.videoRoomTokenHash);
+  if (purge.purged) console.log(`[signaling] ${purge.detail}`);
 
   await ATSTimeline.create({
     candidate: interview.candidate,

@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { ATSCandidate } from "@/models/ATSCandidate";
 import { ATSJob } from "@/models/ATSJob";
-import { ATSAssessment } from "@/models/ATSAssessment";
-import { ATSTimeline } from "@/models/ATSTimeline";
 import { jsonError } from "@/lib/api";
 import { findCandidateByToken } from "@/lib/candidate-portal";
-import { buildAssessmentQuestions, computeAssessmentScore, pickDomain } from "@/lib/assessment";
+import { buildAssessmentQuestions, pickDomain } from "@/lib/assessment";
+import { finalizeAssessmentSubmission, normalizeAssessmentAnswers } from "@/lib/assessment-finalize";
+import { getAssessmentDeadlineMs } from "@/lib/assessment-timing";
+import { loadCandidateAssessment } from "@/lib/assessment-window";
 
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -22,111 +23,78 @@ export async function POST(request: Request) {
   if ((candidate as any).assessmentSubmittedAt) return jsonError("Already submitted.", 400);
   if (!(candidate as any).assessmentStartedAt) return jsonError("You must start the assessment before submitting.", 400);
 
-  const body = await request.json();
-  const answers: Array<{ questionIndex: number; selectedOption?: number; textAnswer?: string }> = Array.isArray(body.answers) ? body.answers : [];
-
-  if (!answers.length) return jsonError("No answers provided.", 400);
+  const body = await request.json().catch(() => ({}));
+  const answers = normalizeAssessmentAnswers(body?.answers);
+  if (!answers.length && !(candidate as any).assessmentAnswers?.length) {
+    return jsonError("No answers provided.", 400);
+  }
 
   const job = await ATSJob.findById(candidate.job);
   if (!job) return jsonError("Job not found.", 404);
 
-  const assessment = await ATSAssessment.findOne({ job: job._id, company: candidate.company });
+  const assessment = await loadCandidateAssessment(job._id, candidate.company);
   if (!assessment) return jsonError("Assessment not available.", 400);
 
   // Rebuild the exact question order the candidate received at /start.
   const chosenDomain = pickDomain((assessment.domains as any[]) || [], (candidate as any).assessmentDomain);
-  const flatQuestions = buildAssessmentQuestions(
+  const questions = buildAssessmentQuestions(
     (assessment.questions as any[]) || [],
-    chosenDomain?.questions as any[] || []
+    (chosenDomain?.questions as any[]) || []
   );
-  if (!flatQuestions.length) return jsonError("Assessment not available.", 400);
+  if (!questions.length) return jsonError("Assessment not available.", 400);
 
-  // Required questions (MCQ or essay) must be answered.
-  const missingRequired: number[] = [];
-  for (let i = 0; i < flatQuestions.length; i++) {
-    const q = flatQuestions[i];
-    if (!q.required) continue;
-    const a = answers.find((x) => x.questionIndex === i);
-    const answered =
-      q.type === "essay"
-        ? Boolean(a && String(a.textAnswer || "").trim())
-        : a != null && typeof a.selectedOption === "number";
-    if (!answered) missingRequired.push(i + 1);
-  }
-  if (missingRequired.length) {
-    return jsonError(
-      `Please answer the required question${missingRequired.length > 1 ? "s" : ""}: ${missingRequired.join(", ")}.`,
-      400
-    );
-  }
-
-  // Auto-grade only multiple-choice questions; essays are stored for manual review.
-  const negativeMarking = Math.max(0, Number((assessment as any).negativeMarking) || 0);
-  const graded = computeAssessmentScore(answers, flatQuestions, negativeMarking);
-  const { score, rawMarks, maxMarks, correct, mcqTotal, essayCount, hasEssays } = graded;
-
-  // Check if auto-submitted (timer expired)
   const startedAt = new Date((candidate as any).assessmentStartedAt);
   const durationMin = job.assessmentDurationMinutes || null;
+  const deadline = getAssessmentDeadlineMs(startedAt.getTime(), durationMin);
   const now = new Date();
-  const autoSubmitted = durationMin ? now.getTime() > startedAt.getTime() + durationMin * 60 * 1000 : false;
+  // A submission at or after the deadline is the hard stop, not a failure: it is
+  // recorded as auto-submitted rather than rejected so a closed tab or a crash
+  // never throws away work the candidate had already answered.
+  const autoSubmitted = deadline !== null && now.getTime() >= deadline;
 
-  let status: string;
-  let reason: string;
-  if (hasEssays) {
-    status = "pending";
-    reason =
-      maxMarks > 0
-        ? `Score: ${score}/100 (${rawMarks}/${maxMarks} marks, multiple-choice). Essay answers require manual review.`
-        : "Essay-only assessment — answers require manual review.";
-  } else {
-    const threshold = assessment.passScore || 50;
-    status = score! >= threshold ? "selected" : "rejected";
-    reason = autoSubmitted
-      ? `Score: ${score}/100 (${rawMarks}/${maxMarks} marks; ${status === "selected" ? "Passed" : "Failed"}). Auto-submitted due to time limit.`
-      : `Score: ${score}/100 (${rawMarks}/${maxMarks} marks; ${status === "selected" ? "Passed" : "Failed"}).`;
+  // Required questions are only enforced while there is still time. The client
+  // auto-submits when its clock hits zero, and rejecting that path would leave
+  // the attempt permanently unsubmittable for anyone who skipped a required
+  // question.
+  if (!autoSubmitted) {
+    const missingRequired: number[] = [];
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      if (!q.required) continue;
+      const a = answers.find((x) => x.questionIndex === i);
+      const answered =
+        q.type === "essay"
+          ? Boolean(a && String(a.textAnswer || "").trim())
+          : a != null && typeof a.selectedOption === "number";
+      if (!answered) missingRequired.push(i + 1);
+    }
+    if (missingRequired.length) {
+      return jsonError(
+        `Please answer the required question${missingRequired.length > 1 ? "s" : ""}: ${missingRequired.join(", ")}.`,
+        400
+      );
+    }
   }
 
-  await ATSCandidate.findByIdAndUpdate(candidate._id, {
-    assessmentScore: score,
-    assessmentRawMarks: rawMarks,
-    assessmentMaxMarks: maxMarks,
-    assessmentDomain: chosenDomain?.name || "",
-    assessmentStatus: status,
-    assessmentReason: reason,
-    assessmentSubmittedAt: now,
-    assessmentAnswers: answers.map((a) => ({
-      questionIndex: a.questionIndex,
-      selectedOption: a.selectedOption ?? 0,
-      textAnswer: String(a.textAnswer || "").trim().slice(0, 5000),
-    })),
-  });
+  // The client sends its live answers; fall back to the last autosave if the
+  // payload was lost so a late submit still reflects real work.
+  const effective = answers.length
+    ? answers
+    : normalizeAssessmentAnswers((candidate as any).assessmentAnswers);
 
-  await ATSTimeline.create({
-    candidate: candidate._id,
-    job: job._id,
-    action: "assessment-submitted",
-    metadata: { score, rawMarks, maxMarks, total: flatQuestions.length, correct, mcqTotal, essayCount, autoSubmitted, hasEssays, domain: chosenDomain?.name || null },
-    company: candidate.company,
-  });
-
-  await ATSTimeline.create({
-    candidate: candidate._id,
-    job: job._id,
-    action: "assessment-graded",
-    metadata: {
-      content: "Your assessment has been submitted. Results will be shared once the assessment has been reviewed.",
-      status: "pending",
-      passed: false,
-      score, // retained for HR; not rendered on the candidate timeline
-      outcome: status,
-    },
-    company: candidate.company,
+  const result = await finalizeAssessmentSubmission({
+    candidate,
+    job,
+    assessment,
+    questions,
+    answers: effective,
+    autoSubmitted,
   });
 
   return NextResponse.json({
     ok: true,
-    submittedAt: now.toISOString(),
+    submittedAt: result.submittedAt,
+    autoSubmitted: result.autoSubmitted,
     message: "Assessment submitted. Results will be shared once the assessment has been reviewed.",
   });
 }

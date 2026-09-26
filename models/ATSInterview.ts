@@ -28,6 +28,19 @@ const ATSInterviewSchema = new Schema(
     },
     scheduledAt: { type: Date, required: true },
     meetingLink: { type: String, default: "" },
+    meetingType: { type: String, enum: ["video", "in-person"], default: "video" },
+    // Which service hosts the online call. "flowzen" uses the built-in
+    // peer-to-peer WebRTC room; the others store an external join link.
+    // Documents written before this field existed are treated as "flowzen".
+    videoProvider: {
+      type: String,
+      enum: ["flowzen", "zoom", "google-meet"],
+      default: "flowzen",
+    },
+    // Passcode required to join an external Zoom/Google Meet room.
+    meetingPassword: { type: String, default: "" },
+    videoRoomTokenHash: { type: String, default: "", select: false },
+    videoRoomTokenExpiresAt: { type: Date, default: null, select: false },
     location: { type: String, default: "" },
     region: { type: String, default: "" },
     regionHr: { type: Schema.Types.ObjectId, ref: "User", default: null },

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -30,11 +31,21 @@ import {
   STAGES,
 } from "@/lib/recruitment-types";
 import { cn, apiFetch } from "@/lib/client-utils";
+import { interviewSlug } from "@/lib/interview-slug";
 import { useSession } from "next-auth/react";
 import { InterviewModals } from "./components/interview-modals";
+import { ResumeViewerModal } from "@/components/recruitment/resume-viewer-modal";
 import OfferModal from "./components/offer-modal";
 import JobDescriptionModal from "./components/job-description-modal";
 import ConvertEmployeeModal from "./components/convert-modal";
+
+function interviewDetailHref(interview: any) {
+  const job = interview?.job && typeof interview.job === "object" ? interview.job.title : "";
+  const candidate = interview?.candidate && typeof interview.candidate === "object"
+    ? `${interview.candidate.firstName ?? ""} ${interview.candidate.lastName ?? ""}`.trim()
+    : "";
+  return `/recruitment/interview/${interviewSlug(job || "interview")}/${interviewSlug(candidate || "candidate")}?interview=${encodeURIComponent(String(interview?.id ?? ""))}`;
+}
 
 export default function CandidateProfilePage() {
   const params = useParams()!;
@@ -86,6 +97,7 @@ export default function CandidateProfilePage() {
   const [stageFeedback, setStageFeedback] = useState("suitable");
   const [submitting, setSubmitting] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
+  const [resumeOpen, setResumeOpen] = useState(false);
 
   const jobId =
     activeCandidate && typeof activeCandidate.job === "object"
@@ -233,7 +245,12 @@ export default function CandidateProfilePage() {
 
   async function handleResumeUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) await uploadResume(id, file);
+    if (file) {
+      await uploadResume(id, file);
+      // The viewer is showing the file this upload replaces, so drop it rather
+      // than leave a stale document on screen.
+      setResumeOpen(false);
+    }
   }
 
   async function handleSaveNote() {
@@ -449,13 +466,13 @@ export default function CandidateProfilePage() {
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {activeCandidate.resumeUrl && (
-            <a
-              href={activeCandidate.resumeUrl}
-              target="_blank"
+            <button
+              type="button"
+              onClick={() => setResumeOpen(true)}
               className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
             >
               <Download size={14} /> Resume
-            </a>
+            </button>
           )}
           <div className="flex flex-col gap-1">
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]">
@@ -919,17 +936,14 @@ export default function CandidateProfilePage() {
                           {interview.status}
                         </span>
                       </div>
-                      {interview.meetingLink && (
-                        <a
-                          href={interview.meetingLink}
-                          target="_blank"
-                          className="mt-2 inline-flex items-center gap-1 text-xs text-sky-600 hover:underline"
-                        >
-                          Join Meeting
-                        </a>
-                      )}
-                      {!interview.meetingLink && interview.location && (
-                        <p className="mt-2 text-xs text-slate-500">Location: {interview.location}</p>
+                      <Link
+                        href={interviewDetailHref(interview)}
+                        className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:underline"
+                      >
+                        View interview
+                      </Link>
+                      {interview.location && (
+                        <p className="mt-1 text-xs text-slate-500">Location: {interview.location}</p>
                       )}
                       {interview.feedback &&
                         interview.feedback.overallRecommendation &&
@@ -1068,6 +1082,13 @@ export default function CandidateProfilePage() {
       />
       <OfferModal candidateId={id} jobId={jobId} />
       <JobDescriptionModal />
+      {resumeOpen && activeCandidate.resumeUrl ? (
+        <ResumeViewerModal
+          url={activeCandidate.resumeUrl}
+          candidateName={`${activeCandidate.firstName ?? ""} ${activeCandidate.lastName ?? ""}`.trim()}
+          onClose={() => setResumeOpen(false)}
+        />
+      ) : null}
       <ConvertEmployeeModal
         isOpen={showConvertModal}
         onClose={() => setShowConvertModal(false)}

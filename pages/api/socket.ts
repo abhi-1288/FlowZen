@@ -13,7 +13,7 @@ export default function handler(_req: NextApiRequest, res: NextApiResponseServer
       addTrailingSlash: false
     });
 
-    io.on("connection", (socket) => {
+    io.on("connection", (socket: any) => {
       socket.on("user:subscribe", (userId: unknown) => {
         const resolved = String(userId ?? "").trim();
         if (!resolved) return;

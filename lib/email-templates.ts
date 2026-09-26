@@ -189,8 +189,11 @@ export function interviewScheduledEmail({
   roundType,
   scheduledAt,
   meetingLink,
+  meetingPassword,
+  meetingProvider,
   location,
   portalLink,
+  hideJoinButton,
   company,
 }: {
   candidateName: string;
@@ -198,8 +201,11 @@ export function interviewScheduledEmail({
   roundType: string;
   scheduledAt: Date;
   meetingLink?: string;
+  meetingPassword?: string;
+  meetingProvider?: string;
   location?: string;
   portalLink?: string;
+  hideJoinButton?: boolean;
   company?: { name?: string; icon?: string };
 }) {
   const dateStr = scheduledAt.toLocaleDateString("en-US", {
@@ -208,6 +214,13 @@ export function interviewScheduledEmail({
   const timeStr = scheduledAt.toLocaleTimeString("en-US", {
     hour: "numeric", minute: "2-digit", hour12: true,
   });
+
+  // Candidates join from the portal, so their copy carries the join button and
+  // the meeting passcode only when the portal is not their entry point.
+  const showJoin = Boolean(meetingLink) && !hideJoinButton;
+  const portalCta = hideJoinButton
+    ? "Join your interview and track your progress in the candidate portal:"
+    : "Need more details? Track your interview progress in the candidate portal:";
 
   const html = baseEmailLayout(`
     <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#1e293b;">Interview Scheduled</h2>
@@ -249,12 +262,13 @@ export function interviewScheduledEmail({
       </tr>
     </table>
 
-    ${meetingLink ? emailButton(meetingLink, "Join Meeting") : ""}
+    ${showJoin ? emailButton(meetingLink!, meetingProvider ? `Join ${meetingProvider}` : "Join Meeting") : ""}
+    ${showJoin && meetingPassword ? `<p style="margin:12px 0 24px;font-size:15px;color:#334155;">Passcode: <strong style="font-family:monospace;letter-spacing:0.5px;">${meetingPassword}</strong></p>` : ""}
     ${!meetingLink && location ? `<p style="margin:0 0 24px;font-size:15px;color:#334155;">Location: <strong>${location}</strong></p>` : ""}
 
     ${portalLink ? `
       <div style="margin:0 0 24px;padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
-        <p style="margin:0 0 8px;font-size:14px;color:#64748b;">Need more details? Track your interview progress in the candidate portal:</p>
+        <p style="margin:0 0 8px;font-size:14px;color:#64748b;">${portalCta}</p>
         ${emailButton(portalLink, "Open Candidate Portal")}
       </div>
     ` : ""}
@@ -264,7 +278,7 @@ export function interviewScheduledEmail({
 
   return {
     subject: `Interview Scheduled for ${jobTitle} (${roundType})`,
-    text: `Dear ${candidateName},\n\nYour interview for ${jobTitle} (${roundType}) has been scheduled.\n\nDate: ${dateStr}\nTime: ${timeStr}${meetingLink ? `\nMeeting: ${meetingLink}` : ""}${!meetingLink && location ? `\nLocation: ${location}` : ""}${portalLink ? `\n\nTrack your application: ${portalLink}` : ""}`,
+    text: `Dear ${candidateName},\n\nYour interview for ${jobTitle} (${roundType}) has been scheduled.\n\nDate: ${dateStr}\nTime: ${timeStr}${showJoin ? `\nMeeting: ${meetingLink}` : ""}${showJoin && meetingPassword ? `\nPasscode: ${meetingPassword}` : ""}${!meetingLink && location ? `\nLocation: ${location}` : ""}${portalLink ? `\n\nTrack your application: ${portalLink}` : ""}`,
     html,
   };
 }
@@ -337,8 +351,11 @@ export function interviewRescheduledEmail({
   roundType,
   scheduledAt,
   meetingLink,
+  meetingPassword,
+  meetingProvider,
   location,
   portalLink,
+  hideJoinButton,
   company,
 }: {
   candidateName: string;
@@ -346,8 +363,11 @@ export function interviewRescheduledEmail({
   roundType: string;
   scheduledAt: Date;
   meetingLink?: string;
+  meetingPassword?: string;
+  meetingProvider?: string;
   location?: string;
   portalLink?: string;
+  hideJoinButton?: boolean;
   company?: { name?: string; icon?: string };
 }) {
   const dateStr = scheduledAt.toLocaleDateString("en-US", {
@@ -356,6 +376,13 @@ export function interviewRescheduledEmail({
   const timeStr = scheduledAt.toLocaleTimeString("en-US", {
     hour: "numeric", minute: "2-digit", hour12: true,
   });
+
+  // Candidates join from the portal, so their copy carries the join button and
+  // the meeting passcode only when the portal is not their entry point.
+  const showJoin = Boolean(meetingLink) && !hideJoinButton;
+  const portalCta = hideJoinButton
+    ? "Join your interview and track your progress in the candidate portal:"
+    : "Track your interview progress in the candidate portal:";
 
   const html = baseEmailLayout(`
     <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#1e293b;">Interview Rescheduled</h2>
@@ -397,12 +424,13 @@ export function interviewRescheduledEmail({
       </tr>
     </table>
 
-    ${meetingLink ? emailButton(meetingLink, "Join Meeting") : ""}
+    ${showJoin ? emailButton(meetingLink!, meetingProvider ? `Join ${meetingProvider}` : "Join Meeting") : ""}
+    ${showJoin && meetingPassword ? `<p style="margin:12px 0 24px;font-size:15px;color:#334155;">Passcode: <strong style="font-family:monospace;letter-spacing:0.5px;">${meetingPassword}</strong></p>` : ""}
     ${!meetingLink && location ? `<p style="margin:0 0 24px;font-size:15px;color:#334155;">Location: <strong>${location}</strong></p>` : ""}
 
     ${portalLink ? `
       <div style="margin:0 0 24px;padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
-        <p style="margin:0 0 8px;font-size:14px;color:#64748b;">Track your interview progress in the candidate portal:</p>
+        <p style="margin:0 0 8px;font-size:14px;color:#64748b;">${portalCta}</p>
         ${emailButton(portalLink, "Open Candidate Portal")}
       </div>
     ` : ""}
@@ -412,7 +440,7 @@ export function interviewRescheduledEmail({
 
   return {
     subject: `Interview Rescheduled – ${jobTitle} (${roundType})`,
-    text: `Dear ${candidateName},\n\nYour interview for ${jobTitle} (${roundType}) has been rescheduled.\n\nNew Date: ${dateStr}\nNew Time: ${timeStr}${meetingLink ? `\nMeeting: ${meetingLink}` : ""}${!meetingLink && location ? `\nLocation: ${location}` : ""}${portalLink ? `\n\nTrack your application: ${portalLink}` : ""}`,
+    text: `Dear ${candidateName},\n\nYour interview for ${jobTitle} (${roundType}) has been rescheduled.\n\nNew Date: ${dateStr}\nNew Time: ${timeStr}${showJoin ? `\nMeeting: ${meetingLink}` : ""}${showJoin && meetingPassword ? `\nPasscode: ${meetingPassword}` : ""}${!meetingLink && location ? `\nLocation: ${location}` : ""}${portalLink ? `\n\nTrack your application: ${portalLink}` : ""}`,
     html,
   };
 }

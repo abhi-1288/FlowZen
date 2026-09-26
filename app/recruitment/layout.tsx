@@ -4,7 +4,9 @@ import { authOptions } from "@/lib/auth";
 import { RecruitmentSidebar } from "@/components/recruitment/recruitment-sidebar";
 import { RecruitmentSSEListener } from "@/components/recruitment/recruitment-sse-listener";
 
-export default async function RecruitmentLayout({ children }: { children: React.ReactNode }) {
+export default async function RecruitmentLayout({ children, params }: { children: React.ReactNode; params: Promise<{ jobSlug?: string; candidateSlug?: string }> }) {
+  const route = await params;
+  if (route.jobSlug && route.candidateSlug) return <>{children}</>;
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/login");
 

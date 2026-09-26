@@ -10,7 +10,6 @@ type Props = {
   token: string;
   assessment: {
     enabled: boolean;
-    date: string | null;
     durationMinutes: number | null;
     passScore: number;
     negativeMarking: number;
@@ -29,6 +28,16 @@ type Props = {
     submittable: boolean;
     endsAt: string | null;
     rejectionNote?: string;
+    windowMode: "uniform" | "relief";
+    instructions?: string;
+    phase: "closed" | "lobby" | "open" | "expired";
+    lobbyOpensAt: string | null;
+    startsAt: string | null;
+    lastEntryAt: string | null;
+    untilLobbyMs: number;
+    untilStartMs: number;
+    slotStart: string | null;
+    slots: { start: string; startMs: string }[];
   };
   accent: string;
   companyName?: string;
@@ -274,29 +283,70 @@ function generateAnswerKeyPdf(data: AnswerKeyPayload, accent: string, companyNam
 }
 
 export function AssessmentPanel({ token, assessment, accent, companyName, onRefresh, autoStart }: Props) {
+  // The portal tab and the exam tab are separate documents, so a domain or slot
+  // picked in one has to travel to the other. The exam tab is opened with these
+  // params so the choice is not silently lost.
+  const [handedOff] = useState(() => {
+    if (typeof window === "undefined") return { domain: "", slot: null as string | null };
+    const params = new URLSearchParams(window.location.search);
+    return { domain: params.get("domain") || "", slot: params.get("slot") };
+  });
+
   const [started, setStarted] = useState(assessment.submittable);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<number, { selectedOption?: number; textAnswer?: string }>>({});
   const [remaining, setRemaining] = useState<number | null>(null);
-  const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(Boolean(assessment.submittedAt));
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [selectedDomain, setSelectedDomain] = useState(assessment.domain || "");
+  const [selectedDomain, setSelectedDomain] = useState(handedOff.domain || assessment.domain || "");
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(handedOff.slot || assessment.slotStart || null);
+  const [inLobby, setInLobby] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
   const [downloading, setDownloading] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoSubmittedRef = useRef(false);
   const autoSubmitRef = useRef<() => void>(() => {});
   const autoStartRef = useRef(false);
+  const lobbyFetchRef = useRef(false);
 
-  // Compute initial remaining
+  // Keep the default selection on a slot that is still open. A candidate who
+  // opens the portal after their slot ended (but before the last slot of the day)
+  // should land on the next usable time rather than on a dead one.
   useEffect(() => {
-    if (started && assessment.endsAt && !submitted) {
-      const endMs = new Date(assessment.endsAt).getTime();
-      const diff = Math.max(0, endMs - Date.now());
-      setRemaining(Math.floor(diff / 1000));
-    }
-  }, [started, assessment.endsAt, submitted]);
+    if (assessment.startedAt || assessment.windowMode !== "uniform" || !assessment.slots.length) return;
+    setSelectedSlot((prev) => {
+      const isUsable = (s: string | null) =>
+        s !== null && assessment.slots.some((slot) => slot.start === s && new Date(slot.startMs).getTime() > Date.now());
+      if (isUsable(prev)) return prev;
+      return assessment.slots.find((slot) => new Date(slot.startMs).getTime() > Date.now())?.start ?? null;
+    });
+  }, [assessment.startedAt, assessment.windowMode, assessment.slots]);
+
+  // ── Phase ──────────────────────────────────────────────────────────────────
+  // Derived from the server's absolute timestamps plus a local ticker, never
+  // from whether questions happen to be loaded — otherwise a lobby entry (which
+  // serves no questions) would be indistinguishable from being ready to start.
+  const startsAtMs = assessment.startsAt ? new Date(assessment.startsAt).getTime() : null;
+  const lobbyOpensAtMs = assessment.lobbyOpensAt ? new Date(assessment.lobbyOpensAt).getTime() : null;
+  const examEndsAtMs = assessment.endsAt ? new Date(assessment.endsAt).getTime() : null;
+
+  const isExam = assessment.phase === "open" && Boolean(assessment.startedAt);
+  const isClosed = assessment.phase === "closed";
+  const isExpired = assessment.phase === "expired";
+  const inExamWindow = isExam && examEndsAtMs !== null && now < examEndsAtMs;
+  const untilLobbyMs = lobbyOpensAtMs === null ? 0 : Math.max(0, lobbyOpensAtMs - now);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  // Exam clock. Anchored to the absolute deadline rather than decremented, so a
+  // backgrounded tab that throttles its timers cannot hand out extra time.
+  useEffect(() => {
+    if (!isExam || examEndsAtMs === null || submitted) return;
+    setRemaining(Math.max(0, Math.ceil((examEndsAtMs - Date.now()) / 1000)));
+  }, [isExam, examEndsAtMs, submitted]);
 
   const doSubmit = useCallback(async () => {
     if (submitting || submitted) return;
@@ -305,7 +355,7 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
     try {
       const answerArray = questions.map((q) => ({
         questionIndex: q.index,
-        selectedOption: answers[q.index]?.selectedOption,
+        selectedOption: answers[q.index]?.selectedOption ?? null,
         ...(q.type === "essay" ? { textAnswer: answers[q.index]?.textAnswer ?? "" } : {}),
       }));
       const res = await fetch(`/api/public/candidate/me/assessment/submit?token=${encodeURIComponent(token)}`, {
@@ -335,43 +385,37 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
     autoSubmitRef.current = autoSubmit;
   }, [autoSubmit]);
 
-  // Countdown
+  // Auto-submit at the deadline. Gated on the exam phase: the lobby also counts
+  // down to zero, and submitting then would grade an empty attempt.
   useEffect(() => {
-    if (remaining === null || remaining <= 0 || submitted) return;
-    timerRef.current = setInterval(() => {
-      setRemaining((prev) => {
-        if (prev === null || prev <= 1) {
-          if (timerRef.current) clearInterval(timerRef.current);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [remaining !== null && remaining > 0 && !submitted]);
+    if (!isExam || remaining !== 0 || submitted || autoSubmittedRef.current) return;
+    autoSubmitRef.current();
+  }, [remaining, submitted, isExam]);
 
-  // Auto-submit when timer hits zero
+  // Leaving the waiting room: when the start instant arrives, fetch the
+  // questions. The server withholds them until then, so this is the moment the
+  // exam actually begins.
   useEffect(() => {
-    if (remaining === 0 && !submitted && !autoSubmittedRef.current) {
-      autoSubmitRef.current();
-    }
-  }, [remaining, submitted]);
+    if (!inLobby || submitted || lobbyFetchRef.current) return;
+    if (startsAtMs === null || now < startsAtMs) return;
+    lobbyFetchRef.current = true;
+    void handleStart();
+  }, [inLobby, now, startsAtMs, submitted]);
 
   // Auto-start when test tab opens (only fires once)
   useEffect(() => {
     if (!autoStart || autoStartRef.current) return;
     autoStartRef.current = true;
 
-    // If already started (re-open), restore from localStorage
-    // If started but no cached questions, fetch them from the start API
-    if (started) {
+    if (isExam) {
+      // Already running: restore from the cache, otherwise refetch.
       try {
         const stored = localStorage.getItem(`ap-${token}`);
         if (stored) {
-          const { q, e } = JSON.parse(stored);
+          const { q, a } = JSON.parse(stored);
           if (Array.isArray(q) && q.length > 0) {
             setQuestions(q);
-            if (e) setRemaining(Math.max(0, Math.floor((new Date(e).getTime() - Date.now()) / 1000)));
+            if (a && typeof a === "object") setAnswers(a);
             return;
           }
         }
@@ -382,18 +426,18 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
 
     if (submitted || !assessment.eligibleToStart) return;
 
-    // When a domain must be selected manually, let the user pick it first
-    if (assessment.domains?.length && !assessment.domain) return;
+    // A domain still has to be chosen before the exam can be served — either one
+    // already stored on the candidate, or one handed over from the portal tab.
+    if (assessment.domains?.length && !assessment.domain && !selectedDomain) return;
 
-    // Check localStorage for previously stored questions
     try {
       const stored = localStorage.getItem(`ap-${token}`);
       if (stored) {
-        const { q, e } = JSON.parse(stored);
+        const { q, a } = JSON.parse(stored);
         if (Array.isArray(q) && q.length > 0) {
           setQuestions(q);
           setStarted(true);
-          if (e) setRemaining(Math.max(0, Math.floor((new Date(e).getTime() - Date.now()) / 1000)));
+          if (a && typeof a === "object") setAnswers(a);
           return;
         }
       }
@@ -402,6 +446,13 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
     void handleStart();
   }, [autoStart]);
 
+  /**
+   * Enter or advance the assessment.
+   *
+   * The endpoint returns no questions while the candidate is in the waiting
+   * room; the same call made after the start instant is what begins the exam, so
+   * this single function covers lobby entry, starting, and resuming.
+   */
   async function handleStart() {
     setError("");
     if (assessment.domains?.length && !selectedDomain && !assessment.domain) {
@@ -409,29 +460,93 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
       return;
     }
 
-    // Normal mode: open the test in a new tab
+    // Normal mode: the exam runs in its own tab so it survives navigating away
+    // from the portal. Carry the pending domain and slot across with it.
     if (!autoStart) {
-      window.open(`/candidate-portal?token=${encodeURIComponent(token)}&test=true`, "_blank");
+      const params = new URLSearchParams({ token, test: "true" });
+      const domain = assessment.domain || selectedDomain;
+      if (domain) params.set("domain", domain);
+      if (selectedSlot) params.set("slot", selectedSlot);
+      window.open(`/candidate-portal?${params.toString()}`, "_blank");
       return;
     }
 
-    // Auto-start mode (new tab): call the start API directly
     try {
+      // Only commit to a slot that has not already closed; otherwise let the
+      // server resolve the next one, so a stale selection is not a dead end.
+      const slotIsOpen =
+        !selectedSlot ||
+        assessment.slots.some((s) => s.start === selectedSlot && new Date(s.startMs).getTime() > Date.now());
+
       const res = await fetch(`/api/public/candidate/me/assessment/start?token=${encodeURIComponent(token)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ domain: assessment.domain || selectedDomain }),
+        body: JSON.stringify({
+          domain: assessment.domain || selectedDomain,
+          slotStart: slotIsOpen ? selectedSlot : null,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to start.");
-      setQuestions(data.questions);
+
+      if (data.waiting) {
+        // In the waiting room: remember the commitments, show no questions.
+        setInLobby(true);
+        setStarted(false);
+        setSelectedDomain(data.domain || selectedDomain);
+        if (data.slotStart) setSelectedSlot(data.slotStart);
+        onRefresh();
+        return;
+      }
+
+      setQuestions(data.questions || []);
       setStarted(true);
+      setInLobby(false);
+      lobbyFetchRef.current = true;
+      setRemaining(
+        data.endsAt ? Math.max(0, Math.ceil((new Date(data.endsAt).getTime() - Date.now()) / 1000)) : null
+      );
+      if (data.domain) setSelectedDomain(data.domain);
+      if (data.slotStart) setSelectedSlot(data.slotStart);
       onRefresh();
-      try { localStorage.setItem(`ap-${token}`, JSON.stringify({ q: data.questions, e: data.endsAt, d: data.domain })); } catch {}
+      try {
+        localStorage.setItem(`ap-${token}`, JSON.stringify({ q: data.questions || [], e: data.endsAt }));
+      } catch {}
     } catch (e: any) {
       setError(e.message);
+      lobbyFetchRef.current = false;
     }
   }
+
+  // Debounced autosave so a closed tab or a crash never loses answered work,
+  // and so the background auto-submit has real answers to grade.
+  const answersRef = useRef(answers);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+
+  useEffect(() => {
+    if (!isExam || submitted) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      const payload = questions.map((q) => ({
+        questionIndex: q.index,
+        selectedOption: answersRef.current[q.index]?.selectedOption ?? null,
+        ...(q.type === "essay" ? { textAnswer: answersRef.current[q.index]?.textAnswer ?? "" } : {}),
+      }));
+      if (!payload.length) return;
+      fetch(`/api/public/candidate/me/assessment/answers?token=${encodeURIComponent(token)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answers: payload }),
+      }).catch(() => {});
+    }, 1200);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [answers, questions, isExam, submitted, token]);
 
   function setAnswer(qIndex: number, selectedOption: number) {
     setAnswers((prev) => ({ ...prev, [qIndex]: { ...prev[qIndex], selectedOption } }));
@@ -475,11 +590,166 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
   }
 
   // ─── Render ────────────────────────────────────────────────
-  const accentSoft = accent + "1a"; // simple alpha
-  const fmtDate = assessment.date ? new Date(assessment.date).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : "";
-  const fmtTime = assessment.date ? new Date(assessment.date).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "UTC" }) : "";
-  const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
+  const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  const fmtClock = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "UTC" });
   const hasDomains = Array.isArray(assessment.domains) && assessment.domains.length > 0;
+
+  // The scheduled anchor: the chosen slot for uniform mode, otherwise the
+  // window's own start. `startsAt` is null in relief mode until they begin.
+  const anchorIso = assessment.slotStart || (assessment.windowMode === "uniform" ? assessment.startsAt : assessment.startsAt);
+  const scheduleText = anchorIso ? `${fmtDay(anchorIso)} at ${fmtClock(anchorIso)}` : assessment.startsAt ? `${fmtDay(assessment.startsAt)}` : "";
+
+  /** Shared date/countdown switch: date when far out, h/m/s inside 24 hours. */
+  function renderCountdown(targetMs: number) {
+    const diff = targetMs - now;
+    if (diff > 24 * 60 * 60 * 1000) {
+      return <span>{fmtDay(new Date(targetMs).toISOString())} at {fmtClock(new Date(targetMs).toISOString())}</span>;
+    }
+    const s = Math.max(0, Math.floor(diff / 1000));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return (
+      <span className="font-mono tabular-nums">
+        {h > 0 ? `${h}h ` : ""}{m}m {String(sec).padStart(2, "0")}s
+      </span>
+    );
+  }
+
+  function closedMessage() {
+    if (untilLobbyMs <= 0) return "The waiting room is open.";
+    return (
+      <span>
+        The waiting room opens in {renderCountdown(assessment.lobbyOpensAt ? new Date(assessment.lobbyOpensAt).getTime() : now + untilLobbyMs)}
+        {scheduleText ? ` · assessment on ${scheduleText}` : ""}.
+      </span>
+    );
+  }
+
+  const renderDomainPicker = () => (
+    <>
+      <p className="flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-zinc-300">
+        <Layers size={14} style={{ color: accent }} /> Select your domain
+      </p>
+      <p className="mt-0.5 text-xs text-slate-400 dark:text-zinc-500">
+        You will answer the general questions plus the questions of your selected domain.
+      </p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {assessment.domains.map((d) => (
+          <label
+            key={d.name}
+            className="flex cursor-pointer items-center gap-3 rounded-xl border border-[var(--c-border-light)] px-3 py-2.5 transition dark:border-zinc-800"
+            style={selectedDomain === d.name ? { borderColor: accent, backgroundColor: accent + "0d" } : {}}
+          >
+            <input
+              type="radio"
+              name="domain"
+              value={d.name}
+              checked={selectedDomain === d.name}
+              onChange={() => setSelectedDomain(d.name)}
+              className="h-3.5 w-3.5 shrink-0"
+            />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-slate-800 dark:text-zinc-200">{d.name}</p>
+              <p className="text-[11px] text-slate-400 dark:text-zinc-500">
+                {d.questionCount} question{d.questionCount === 1 ? "" : "s"}{d.limit > 0 ? ` · limit ${d.limit}` : ""}
+              </p>
+            </div>
+          </label>
+        ))}
+      </div>
+    </>
+  );
+
+  const renderSlotPicker = () => {
+    const dur = assessment.durationMinutes || 0;
+    return (
+      <>
+        <p className="flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-zinc-300">
+          <Clock size={14} style={{ color: accent }} /> Choose a start time
+        </p>
+        <p className="mt-0.5 text-xs text-slate-400 dark:text-zinc-500">
+          Pick the slot that suits you. Your assessment ends {dur} minutes after it starts.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {assessment.slots.map((s) => {
+            const startMs = new Date(s.startMs).getTime();
+            const past = startMs < now;
+            const active = selectedSlot === s.start;
+            return (
+              <button
+                key={s.start}
+                type="button"
+                disabled={past}
+                onClick={() => setSelectedSlot(s.start)}
+                className="rounded-lg border px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40"
+                style={active
+                  ? { borderColor: accent, backgroundColor: accent + "14", color: accent }
+                  : { borderColor: "var(--c-border-light)" }}
+              >
+                {s.start} – {fmtClock(new Date(startMs + dur * 60000).toISOString())}
+                {past && <span className="ml-1 text-[10px]">(passed)</span>}
+              </button>
+            );
+          })}
+        </div>
+      </>
+    );
+  };
+
+  const renderLobby = () => {
+    const dur = assessment.durationMinutes || 0;
+    return (
+      <div className="mt-4 space-y-4">
+        <div className="rounded-xl border p-4 text-center dark:border-zinc-800" style={{ backgroundColor: accent + "08" }}>
+          {startsAtMs !== null && now < startsAtMs ? (
+            <>
+              <p className="text-xs uppercase tracking-wide text-slate-400">Your assessment starts in</p>
+              <p className="mt-1 text-3xl font-bold text-slate-900 dark:text-zinc-100">
+                {renderCountdown(startsAtMs)}
+              </p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
+                Starting at {fmtClock(assessment.startsAt!)}
+                {assessment.slotStart ? ` · ends by ${fmtClock(new Date(startsAtMs + dur * 60000).toISOString())}` : ""}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-xs uppercase tracking-wide text-slate-400">Status</p>
+              <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-zinc-100">Opening your paper…</p>
+            </>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-slate-100 p-3 text-xs leading-relaxed text-slate-600 dark:border-zinc-800 dark:text-zinc-400">
+          <p className="font-semibold text-slate-700 dark:text-zinc-300">Before you begin</p>
+          <ul className="mt-1.5 list-disc space-y-1 pl-4">
+            <li>{dur} minute{dur === 1 ? "" : "s"} total, counted from your start time.</li>
+            <li>Questions appear automatically when the clock reaches zero. Do not close this tab.</li>
+            <li>Your answers save automatically as you go, so you may safely resume if you reconnect.</li>
+            <li>The assessment submits itself at the deadline. Review and submit any time before then.</li>
+          </ul>
+        </div>
+
+        {assessment.instructions && (
+          <div className="rounded-lg border-l-4 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 dark:bg-amber-500/10 dark:text-amber-200" style={{ borderColor: accent }}>
+            <p className="font-semibold">Note from the hiring team</p>
+            <p className="mt-1 whitespace-pre-line">{assessment.instructions}</p>
+          </div>
+        )}
+
+        {hasDomains && (
+          <div className="rounded-lg border border-slate-100 p-3 dark:border-zinc-800">
+            <p className="text-xs text-slate-500 dark:text-zinc-400">Your domain</p>
+            <p className="mt-0.5 text-sm font-semibold text-slate-800 dark:text-zinc-200">
+              {selectedDomain || assessment.domain || "Not selected"}
+            </p>
+          </div>
+        )}
+        {error && <p className="flex items-center gap-1.5 text-sm text-rose-600"><AlertTriangle size={14} /> {error}</p>}
+      </div>
+    );
+  };
 
   // 1. Submitted view
   if (submitted && assessment.submittedAt) {
@@ -560,7 +830,14 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-400 dark:text-zinc-500">
           <span>Passing threshold: {assessment.passScore}%</span>
           {assessment.negativeMarking > 0 && <span>Negative marking: -{assessment.negativeMarking} per wrong answer</span>}
+          <span>Answers save automatically</span>
         </div>
+        {!inExamWindow && (
+          <p className="mt-3 flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+            <AlertTriangle size={14} className="shrink-0" />
+            Time is up — your saved answers are being submitted.
+          </p>
+        )}
         <div className="mt-4 space-y-4">
           {questions.map((q, qi) => (
             <div key={q.index} className="rounded-lg border border-slate-100 dark:border-zinc-800 p-4">
@@ -606,60 +883,44 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
     );
   }
 
-  // 3. Ready to start view
+  // 3. Pre-exam view: closed, waiting room, or expired
   return (
     <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-5">
       <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">Online Assessment</h3>
       {assessment.enabled && (
         <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
-          {fmtDate}{fmtTime ? ` · ${fmtTime}` : ""}{assessment.durationMinutes ? ` · ${assessment.durationMinutes} min time limit` : ""} · Passing threshold {assessment.passScore}%
+          {scheduleText ? `${scheduleText} · ` : ""}{assessment.durationMinutes ? `${assessment.durationMinutes} min time limit · ` : ""}Passing threshold {assessment.passScore}%
         </p>
       )}
 
-      {hasDomains && !submitted && (
-        <div className="mt-4">
-          <p className="flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-zinc-300">
-            <Layers size={14} style={{ color: accent }} /> Select your domain
-          </p>
-          <p className="mt-0.5 text-xs text-slate-400 dark:text-zinc-500">
-            You will answer the general questions plus the questions of your selected domain.
-          </p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {assessment.domains.map((d) => (
-              <label
-                key={d.name}
-                className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 transition dark:border-zinc-800 ${selectedDomain === d.name ? "ring-1" : "border-[var(--c-border-light)]"}`}
-                style={selectedDomain === d.name ? { borderColor: accent, backgroundColor: accent + "0d" } : {}}
-              >
-                <input
-                  type="radio"
-                  name="domain"
-                  value={d.name}
-                  checked={selectedDomain === d.name}
-                  onChange={() => setSelectedDomain(d.name)}
-                  className="h-3.5 w-3.5 shrink-0"
-                />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-800 dark:text-zinc-200">{d.name}</p>
-                  <p className="text-[11px] text-slate-400 dark:text-zinc-500">
-                    {d.questionCount} question{d.questionCount === 1 ? "" : "s"}{d.limit > 0 ? ` · limit ${d.limit}` : ""}
-                  </p>
-                </div>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {assessment.eligibleToStart && (
-        <button onClick={() => void handleStart()} className="mt-4 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90" style={{ backgroundColor: accent }}>
-          <PlayCircle size={16} /> Start Assessment
-        </button>
-      )}
-      {!assessment.eligibleToStart && !submitted && assessment.enabled && assessment.date && (
-        <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">
-          Assessment available on {fmtDate}{fmtTime ? ` at ${fmtTime}` : ""}.
+      {isExpired ? (
+        <p className="mt-3 flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <span>
+            The window to start this assessment has closed{assessment.endsAt ? ` — your time ended at ${fmtClock(assessment.endsAt)}` : ""}.
+            {assessment.stage === "assessment" && " Your saved answers are still available if you contacted the hiring team."}
+          </span>
         </p>
+      ) : inLobby ? (
+        renderLobby()
+      ) : (
+        <>
+          {isClosed && <p className="mt-3 text-sm text-slate-500 dark:text-zinc-400">{closedMessage()}</p>}
+          {hasDomains && !submitted && <div className="mt-4">{renderDomainPicker()}</div>}
+          {assessment.windowMode === "uniform" && assessment.slots.length > 0 && !submitted && (
+            <div className="mt-4">{renderSlotPicker()}</div>
+          )}
+          {assessment.eligibleToStart && (
+            <button
+              onClick={() => void handleStart()}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+              style={{ backgroundColor: accent }}
+            >
+              <PlayCircle size={16} />
+              {assessment.phase === "lobby" ? "Enter Waiting Room" : "Start Assessment"}
+            </button>
+          )}
+        </>
       )}
       {error && <p className="mt-2 flex items-center gap-1.5 text-sm text-rose-600"><AlertTriangle size={14} /> {error}</p>}
     </div>

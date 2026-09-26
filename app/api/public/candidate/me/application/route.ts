@@ -6,6 +6,7 @@ import { ATSTimeline } from "@/models/ATSTimeline";
 import { jsonError, serializeDoc } from "@/lib/api";
 import { findCandidateByToken } from "@/lib/candidate-portal";
 import { saveDocument, deleteFileByUrl } from "@/lib/storage";
+import { publicCandidateProjection } from "@/lib/candidate-visibility";
 
 export async function PATCH(request: Request) {
   const url = new URL(request.url);
@@ -56,7 +57,7 @@ export async function PATCH(request: Request) {
   }
 
   if (changed.length === 0) {
-    return NextResponse.json({ success: true, unchanged: true, candidate: serializeDoc(candidate) });
+    return NextResponse.json({ success: true, unchanged: true, candidate: publicCandidateProjection(serializeDoc(candidate)) });
   }
 
   (candidate as any).firstName = firstName || candidate.firstName;
@@ -83,5 +84,5 @@ export async function PATCH(request: Request) {
     .populate("job", "title department location employmentType salaryRangeMin salaryRangeMax salaryType currency description requiredSkills assessment assessmentDate assessmentDurationMinutes editApplicationsEnabled")
     .populate("company", "name icon primaryColor stageOrder");
 
-  return NextResponse.json({ success: true, candidate: serializeDoc(populated), changed });
+  return NextResponse.json({ success: true, candidate: publicCandidateProjection(serializeDoc(populated)), changed });
 }

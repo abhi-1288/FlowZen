@@ -12,17 +12,18 @@ import { CURRENCY_SYMBOLS, STAGES, STAGE_LABELS, TERMINAL_STAGES, type Stage, ty
 import { formatJobDuration } from "@/lib/format-duration";
 import { JobDescription } from "@/components/recruitment/job-description";
 import { InterviewLocationFields } from "@/components/recruitment/interview-location-fields";
+import {
+  MeetingModeFields,
+  useFlowZenQuota,
+  type MeetingMode,
+} from "@/components/recruitment/interview-room/meeting-mode-fields";
+import type { VideoProvider } from "@/lib/interview-provider";
 import { AssessmentManagerModal } from "@/components/recruitment/assessment-manager";
 import { AssessmentResultsModal } from "@/components/recruitment/assessment-results-modal";
 import { AssessmentCandidatesModal } from "@/components/recruitment/assessment-candidates-modal";
 import { assessmentResultsUnlocked } from "@/lib/assessment";
-
-function fmtDateTime(value: string): string {
-  const d = new Date(value);
-  const date = d.toLocaleDateString("en-IN", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" });
-  const time = d.toLocaleTimeString("en-IN", { timeZone: "UTC", hour: "2-digit", minute: "2-digit", hour12: true });
-  return `${date} ${time}`;
-}
+import { fmtJobDateTime as fmtDateTime, startOfUtcDayMs, utcWallClockNow } from "@/lib/date-utils";
+import { JobModal } from "@/components/recruitment/job-modal";
 
 function formatEmploymentType(type: string): string {
   return type
@@ -34,14 +35,16 @@ function formatEmploymentType(type: string): string {
 // The assessment candidates list is relevant from the day before the assessment
 // onward (remains visible after the test day so HR can review who started/
 // submitted).
+//
+// `assessmentDate` is a wall clock, not a real instant, so both sides of this
+// comparison are resolved on UTC day boundaries — same frame as the formatter
+// above and as lib/assessment-timing.ts, which builds the slot windows.
 function assessmentCandidatesVisible(dateStr: string | null | undefined): boolean {
   if (!dateStr) return false;
   const assess = new Date(dateStr);
   if (isNaN(assess.getTime())) return false;
-  const dayBefore = new Date(assess.getFullYear(), assess.getMonth(), assess.getDate() - 1);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return today.getTime() >= dayBefore.getTime();
+  const dayBefore = startOfUtcDayMs(assess) - 86_400_000;
+  return utcWallClockNow() >= dayBefore;
 }
 
 const INTERVIEWER_ROLES: Record<string, string> = {
@@ -756,7 +759,7 @@ export default function JobDetailPage() {
                   }}
                 />
               )}
-              <ActionButton accent={accent} icon={Pencil} label="Edit job" onClick={() => router.push(`/recruitment/jobs/${id}/edit`)} />
+              <ActionButton accent={accent} icon={Pencil} label="Edit job" onClick={() => setModal({ type: "edit-job", jobId: id })} />
               <ActionButton accent={accent} icon={Columns3} label="Kanban board" onClick={() => router.push(`/recruitment/jobs/${id}/board`)} />
               {activeJob.status !== "open" && (
                 <ActionButton accent={accent} icon={Trash2} label="Delete job" danger onClick={() => setModal({ type: "delete-job", jobId: id })} />
@@ -809,6 +812,7 @@ export default function JobDetailPage() {
       </div>
     </div>
 
+      <JobModal />
       <DeleteJobModal id={id} />
       <CandidateModal jobId={id} employmentType={activeJob?.employmentType} />
       <AtsWarnModal
@@ -1636,7 +1640,11 @@ function BulkInterviewModal({
   const [pickerUsers, setPickerUsers] = useState<any[]>([]);
   const [pickerLoading, setPickerLoading] = useState(false);
   const [availableRoles, setAvailableRoles] = useState<string[]>(Object.keys(INTERVIEWER_ROLES));
-  const [meetingType, setMeetingType] = useState("online");
+  const [mode, setMode] = useState<MeetingMode>("flowzen");
+  const [provider, setProvider] = useState<Exclude<VideoProvider, "flowzen">>("zoom");
+  const [meetingLink, setMeetingLink] = useState("");
+  const [meetingPassword, setMeetingPassword] = useState("");
+  const quota = useFlowZenQuota();
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -1817,7 +1825,19 @@ function BulkInterviewModal({
       setError("Select at least one candidate.");
       return;
     }
-    const isOnline = meetingType === "online";
+    if (quota?.exhausted && mode === "flowzen") {
+      setError("You have used all FlowZen video rooms this month. Choose Zoom, Google Meet or an in-person interview.");
+      return;
+    }
+    if (mode === "external" && !meetingLink.trim()) {
+      setError(`Enter the ${provider === "zoom" ? "Zoom" : "Google Meet"} meeting link.`);
+      return;
+    }
+    if (mode === "in-person" && !String(form.get("location") || "").trim()) {
+      setError("Enter the interview location.");
+      return;
+    }
+
     setSaving(true);
     setError("");
     try {
@@ -1828,8 +1848,10 @@ function BulkInterviewModal({
           interviewer: String(form.get("interviewer") || ""),
           roundType: String(form.get("roundType") || "screening"),
           scheduledAt: String(form.get("scheduledAt") || ""),
-          meetingLink: isOnline ? String(form.get("meetingLink") || "") : "",
-          location: isOnline ? "" : String(form.get("location") || ""),
+          videoProvider: mode === "external" ? provider : "flowzen",
+          meetingLink: mode === "external" ? meetingLink : "",
+          meetingPassword: mode === "external" ? meetingPassword : "",
+          location: mode === "in-person" ? String(form.get("location") || "") : "",
           region: regionFilter,
           regionHr,
           candidateIds,
@@ -1838,8 +1860,8 @@ function BulkInterviewModal({
       setSelected({});
       onClose();
       onDone();
-    } catch {
-      setError("Failed to schedule interviews. Please try again.");
+    } catch (bulkError) {
+      setError(bulkError instanceof Error ? bulkError.message : "Failed to schedule interviews. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -1969,21 +1991,18 @@ function BulkInterviewModal({
             )}
           </label>
 
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">Meeting Type</span>
-            <select value={meetingType} onChange={(e) => setMeetingType(e.target.value)} className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm">
-              <option value="online">Online (meeting link)</option>
-              <option value="in-person">In-person (location)</option>
-            </select>
-          </label>
-          {meetingType === "online" ? (
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Meeting Link</span>
-              <input name="meetingLink" placeholder="https://meet.google.com/..." className="neu-inset w-full rounded-lg px-3 py-2.5 text-sm" />
-            </label>
-          ) : (
-            <InterviewLocationFields jobLocation={regionFilter || jobLocation} />
-          )}
+          <MeetingModeFields
+            mode={mode}
+            onModeChange={setMode}
+            provider={provider}
+            onProviderChange={setProvider}
+            meetingLink={meetingLink}
+            onMeetingLinkChange={setMeetingLink}
+            meetingPassword={meetingPassword}
+            onMeetingPasswordChange={setMeetingPassword}
+            quota={quota}
+            locationFields={<InterviewLocationFields jobLocation={regionFilter || jobLocation} />}
+          />
 
           <div>
             <div className="mb-2 flex items-center justify-between">

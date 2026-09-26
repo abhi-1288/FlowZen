@@ -40,6 +40,7 @@ export async function PATCH(request: Request, { params }: Params) {
   const PRE_ASSESSMENT_STAGES = ["applied", "screening"];
   if (ASSESSMENT_STAGES.includes(fromStage) && PRE_ASSESSMENT_STAGES.includes(toStage)) {
     candidate.assessmentStartedAt = null;
+    candidate.assessmentSlotStart = null;
     candidate.assessmentSubmittedAt = null;
     candidate.assessmentInviteSentAt = null;
     candidate.assessmentResultPublishedAt = null;

@@ -12,6 +12,16 @@ import { emitToUser } from "@/lib/socket-emit";
 import { sendMail } from "@/lib/mailer";
 import { interviewScheduledEmail } from "@/lib/email-templates";
 import { buildOrigin, buildPortalLink, resolveCandidatePortalToken, createUniqueGuestPassCode } from "@/lib/candidate-portal";
+import { createInterviewRoom } from "@/lib/interview-room";
+import {
+  isExternalVideoProvider,
+  normalizeExternalMeetingLink,
+  normalizeMeetingPassword,
+  normalizeVideoProvider,
+  videoProviderLabel,
+  type VideoProvider,
+} from "@/lib/interview-provider";
+import { assertFlowZenQuota } from "@/lib/interview-quota";
 
 type Params = { params: Promise<{ id: string }> };
 const ALL_ROLES = ["admin", "human-resource", "project-manager", "qa-tester", "finance"];
@@ -57,11 +67,40 @@ export async function POST(request: Request, { params }: Params) {
 
   const jobId = candidate.job && typeof candidate.job === "object" ? (candidate.job as any)._id || (candidate.job as any).id : candidate.job;
 
-  const meetingLink = String(body.meetingLink ?? "").trim();
-  const location = String(body.location ?? "").trim();
-  const isInPerson = !meetingLink && location;
-  const passCode = isInPerson ? await createUniqueGuestPassCode(String(user.company)) : "";
   const scheduledAt = new Date(body.scheduledAt);
+  const location = String(body.location ?? "").trim();
+  const isInPerson = Boolean(location);
+
+  // An in-person interview has no provider; otherwise honour the requested one
+  // and default to the built-in FlowZen room.
+  const requestedProvider = normalizeVideoProvider(body.videoProvider);
+  const provider: VideoProvider = requestedProvider ?? "flowzen";
+  const useExternal = !isInPerson && isExternalVideoProvider(provider);
+
+  let meetingLink = "";
+  let meetingPassword = "";
+  let videoRoom: ReturnType<typeof createInterviewRoom> | null = null;
+
+  if (isInPerson) {
+    meetingLink = "";
+  } else if (useExternal) {
+    const normalized = normalizeExternalMeetingLink(provider, body.meetingLink);
+    if (!normalized.ok) return jsonError(normalized.error, 400);
+    meetingLink = normalized.url;
+    meetingPassword = normalizeMeetingPassword(body.meetingPassword);
+  } else {
+    const quota = await assertFlowZenQuota(user.company, 1);
+    if (!quota.ok) return jsonError(quota.error, 409);
+    videoRoom = createInterviewRoom(
+      buildOrigin(request),
+      String((candidate.job as any)?.title ?? "Position"),
+      `${candidate.firstName} ${candidate.lastName}`.trim(),
+      scheduledAt
+    );
+    meetingLink = videoRoom.meetingLink;
+  }
+
+  const passCode = isInPerson ? await createUniqueGuestPassCode(String(user.company)) : "";
 
   const interview = await ATSInterview.create({
     candidate: candidate._id,
@@ -70,6 +109,11 @@ export async function POST(request: Request, { params }: Params) {
     roundType: body.roundType || "screening",
     scheduledAt,
     meetingLink,
+    meetingType: isInPerson ? "in-person" : "video",
+    videoProvider: useExternal ? provider : "flowzen",
+    meetingPassword,
+    videoRoomTokenHash: videoRoom?.tokenHash ?? "",
+    videoRoomTokenExpiresAt: videoRoom?.expiresAt ?? null,
     location,
     passCode,
     passValidFrom: isInPerson ? new Date(scheduledAt.getTime() - 15 * 60 * 1000) : null,
@@ -113,7 +157,7 @@ export async function POST(request: Request, { params }: Params) {
     candidate: candidate._id,
     job: jobId,
     action: "interview-scheduled",
-    metadata: { roundType: body.roundType || "screening", scheduledAt: body.scheduledAt, interviewerId: body.interviewer, location: String(body.location ?? "").trim() },
+    metadata: { roundType: body.roundType || "screening", scheduledAt: body.scheduledAt, interviewerId: body.interviewer, location: String(body.location ?? "").trim(), videoProvider: useExternal ? provider : "flowzen" },
     actor: userId,
     company: user.company,
   });
@@ -153,7 +197,11 @@ export async function POST(request: Request, { params }: Params) {
     }
   }
 
-  const meetingInfo = body.meetingLink ? `\nMeeting Link: ${body.meetingLink}` : body.location ? `\nLocation: ${body.location}` : "";
+  const meetingInfo = isInPerson
+    ? `\nLocation: ${location}`
+    : useExternal
+      ? `\n${videoProviderLabel(provider)} Link: ${meetingLink}${meetingPassword ? `\nPasscode: ${meetingPassword}` : ""}`
+      : `\nMeeting Link: ${meetingLink}`;
   const ivDate = new Date(body.scheduledAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
   emitToUser(String(body.interviewer), "notification:new", {
@@ -185,8 +233,10 @@ export async function POST(request: Request, { params }: Params) {
         jobTitle,
         roundType: body.roundType || "screening",
         scheduledAt: new Date(body.scheduledAt),
-        meetingLink: body.meetingLink,
-        location: String(body.location ?? "").trim(),
+        meetingLink: isInPerson ? "" : meetingLink,
+        meetingPassword,
+        meetingProvider: useExternal ? videoProviderLabel(provider) : undefined,
+        location,
         company: { name: (companyDoc as any)?.name, icon: (companyDoc as any)?.icon },
       });
       await sendMail({ to: interviewerUser.email, subject: interviewerEmail.subject, text: "", html: interviewerEmail.html });
@@ -200,9 +250,12 @@ export async function POST(request: Request, { params }: Params) {
         jobTitle,
         roundType: body.roundType || "screening",
         scheduledAt: new Date(body.scheduledAt),
-        meetingLink: body.meetingLink,
-        location: String(body.location ?? "").trim(),
+        meetingLink: isInPerson ? "" : meetingLink,
+        meetingPassword,
+        meetingProvider: useExternal ? videoProviderLabel(provider) : undefined,
+        location,
         portalLink,
+        hideJoinButton: true,
         company: { name: (companyDoc as any)?.name, icon: (companyDoc as any)?.icon },
       });
       await sendMail({ to: candidate.email, subject: candidateEmail.subject, text: "", html: candidateEmail.html });

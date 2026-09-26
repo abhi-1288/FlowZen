@@ -1,3 +1,5 @@
+export type AssessmentWindowMode = "uniform" | "relief";
+
 export const CURRENCY_SYMBOLS: Record<string, string> = {
   INR: "₹",
   USD: "$",
@@ -158,11 +160,12 @@ export type ATSCandidate = {
   assessmentReason: string;
   assessmentRejectionNote: string;
   assessmentStartedAt: string | null;
+  assessmentSlotStart: string | null;
   assessmentSubmittedAt: string | null;
   assessmentDomain: string;
   assessmentRawMarks: number | null;
   assessmentMaxMarks: number | null;
-  assessmentAnswers: Array<{ questionIndex: number; selectedOption: number }>;
+  assessmentAnswers: Array<{ questionIndex: number; selectedOption: number | null; textAnswer?: string }>;
   notes: string;
   resumeUrl: string;
   portfolioUrl: string;
@@ -196,6 +199,9 @@ export type ATSInterview = {
   roundType: RoundType;
   scheduledAt: string;
   meetingLink: string;
+  meetingType?: "video" | "in-person";
+  videoProvider?: "flowzen" | "zoom" | "google-meet";
+  meetingPassword?: string;
   location: string;
   region?: string;
   regionHr?: { id: string; name: string; email: string } | string | null;
@@ -284,6 +290,9 @@ export type ATSAssessment = {
   job: string;
   passScore: number;
   negativeMarking: number;
+  windowMode: AssessmentWindowMode;
+  timeSlots: Array<{ start: string }>;
+  instructions: string;
   questions: ATSAssessmentQuestion[];
   domains: ATSAssessmentDomain[];
   answerKeyPublished?: boolean;

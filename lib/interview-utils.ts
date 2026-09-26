@@ -1,15 +1,19 @@
 import { connectDb } from "@/lib/db";
+import { isInterviewJoinWindowOpen } from "@/lib/interview-timing";
 import { ATSInterview } from "@/models/ATSInterview";
 
-export async function canStartInterview(interviewId: string): Promise<{ ok: boolean; reason: string }> {
+export async function canStartInterview(interviewId: string, companyId?: string): Promise<{ ok: boolean; reason: string }> {
   await connectDb();
 
-  const interview = await ATSInterview.findById(interviewId).lean();
+  const interview = await ATSInterview.findOne({ _id: interviewId, ...(companyId ? { company: companyId } : {}) }).lean();
   if (!interview) return { ok: false, reason: "Interview not found." };
 
   if (interview.status === "completed") return { ok: false, reason: "This interview is already completed." };
   if (interview.status === "cancelled") return { ok: false, reason: "This interview is cancelled." };
   if (interview.status === "in-progress") return { ok: false, reason: "This interview is already in progress." };
+  if (!isInterviewJoinWindowOpen(interview.scheduledAt)) {
+    return { ok: false, reason: "The call opens five minutes before the scheduled interview time." };
+  }
 
   const scheduled = new Date(interview.scheduledAt);
   const startOfDay = new Date(scheduled.getFullYear(), scheduled.getMonth(), scheduled.getDate(), 0, 0, 0, 0);

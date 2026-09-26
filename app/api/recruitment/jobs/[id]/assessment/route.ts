@@ -145,9 +145,28 @@ export async function POST(request: Request, { params }: Params) {
       ? Math.max(1, Math.min(600, Number(body.durationMinutes)))
       : (job.assessmentDurationMinutes ?? 60);
 
+  // Scheduling mode, extra start times, and the optional pre-exam notice the
+  // candidate reads in the waiting room. Slots are "HH:mm" values on the job's
+  // assessment date; an empty list means a single slot taken from that date.
+  const windowMode: "uniform" | "relief" = body.windowMode === "uniform" ? "uniform" : "relief";
+  const timeSlots = (Array.isArray(body.timeSlots) ? body.timeSlots : [])
+    .map((s: any) => ({ start: String(s?.start || "").trim() }))
+    .filter((s: { start: string }) => /^([01]?\d|2[0-3]):([0-5]\d)$/.test(s.start))
+    .slice(0, 12);
+  const instructions = String(body.instructions || "").trim().slice(0, 2000);
+
   await ATSJob.findByIdAndUpdate(job._id, { assessmentDurationMinutes: durationMinutes });
 
-  const set = { passScore, negativeMarking, questions, domains: cleanDomains, createdBy: userId };
+  const set = {
+    passScore,
+    negativeMarking,
+    windowMode,
+    timeSlots,
+    instructions,
+    questions,
+    domains: cleanDomains,
+    createdBy: userId,
+  };
   let assessment;
   try {
     assessment = await ATSAssessment.findOneAndUpdate(

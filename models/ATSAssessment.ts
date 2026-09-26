@@ -22,12 +22,26 @@ const ATSAssessmentDomainSchema = new Schema(
   { _id: false }
 );
 
+const ATSAssessmentTimeSlotSchema = new Schema(
+  {
+    start: { type: String, required: true, trim: true, maxlength: 5 },
+  },
+  { _id: false }
+);
+
 const ATSAssessmentSchema = new Schema(
   {
     job: { type: Schema.Types.ObjectId, ref: "ATSJob", required: true, unique: true, index: true },
     company: { type: Schema.Types.ObjectId, ref: "Company", required: true, index: true },
     passScore: { type: Number, default: 50, min: 0, max: 100 },
     negativeMarking: { type: Number, default: 0, min: 0, max: 100 },
+    // "uniform" pins every candidate who picks a slot to that slot's fixed end;
+    // "relief" lets each candidate start any time and run the full duration.
+    windowMode: { type: String, enum: ["uniform", "relief"], default: "relief" },
+    // "HH:mm" start times on the assessment date's day. Empty means a single
+    // slot derived from the job's assessmentDate.
+    timeSlots: { type: [ATSAssessmentTimeSlotSchema], default: [] },
+    instructions: { type: String, default: "", trim: true, maxlength: 2000 },
     questions: { type: [ATSAssessmentQuestionSchema], default: [] },
     domains: { type: [ATSAssessmentDomainSchema], default: [] },
     answerKeyPublished: { type: Boolean, default: false },
