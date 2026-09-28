@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { ArrowLeft, Pencil, PencilOff, Trash2, Globe, Archive, Share2, Check, Cog, Briefcase, Building2, MapPin, Clock, Users, Banknote, ShieldCheck, CalendarClock, UserPlus, CalendarPlus, Columns3, ChevronDown, Download, ExternalLink, Upload, Loader2, CheckCircle } from "lucide-react";
+import { ArrowLeft, Pencil, PencilOff, Trash2, Globe, Archive, Share2, Check, Cog, Briefcase, Building2, MapPin, Clock, Users, Banknote, ShieldCheck, CalendarClock, UserPlus, CalendarPlus, Columns3, ChevronDown, Download, ExternalLink, Upload, Loader2, CheckCircle, Layers, ShieldAlert, ShieldOff, ClipboardCheck } from "lucide-react";
 import { DEFAULT_ACCENT, salarySuffix, hexToRgba } from "@/lib/accent";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
@@ -21,8 +21,10 @@ import type { VideoProvider } from "@/lib/interview-provider";
 import { AssessmentManagerModal } from "@/components/recruitment/assessment-manager";
 import { AssessmentResultsModal } from "@/components/recruitment/assessment-results-modal";
 import { AssessmentCandidatesModal } from "@/components/recruitment/assessment-candidates-modal";
+import { MockTestModal } from "@/components/recruitment/mock-test-modal";
 import { assessmentResultsUnlocked } from "@/lib/assessment";
-import { fmtJobDateTime as fmtDateTime, startOfUtcDayMs, utcWallClockNow } from "@/lib/date-utils";
+import { fmtJobDateTime as fmtDateTime, startOfUtcDayMs, utcWallClock, utcWallClockNow, dateInputValue, timeInputValue } from "@/lib/date-utils";
+import { MAX_EDIT_WINDOW_MS, isEditWindowOpen, validateEditWindowDeadline } from "@/lib/edit-window";
 import { JobModal } from "@/components/recruitment/job-modal";
 
 function formatEmploymentType(type: string): string {
@@ -31,6 +33,11 @@ function formatEmploymentType(type: string): string {
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
 }
+
+// `candidateFilter` values for the "By Domain" group. Domain names are free
+// text, so they are carried lowercased after this prefix.
+const DOMAIN_FILTER_PREFIX = "__domain:";
+const NO_DOMAIN_FILTER = "__none__";
 
 // The assessment candidates list is relevant from the day before the assessment
 // onward (remains visible after the test day so HR can review who started/
@@ -92,6 +99,7 @@ export default function JobDetailPage() {
   const [atsApplied, setAtsApplied] = useState<{ moved: number; advanced: number } | null>(null);
   const [bulkIvOpen, setBulkIvOpen] = useState(false);
   const [assessmentManagerOpen, setAssessmentManagerOpen] = useState(false);
+  const [mockTestOpen, setMockTestOpen] = useState(false);
   const [assessmentResultsOpen, setAssessmentResultsOpen] = useState(false);
   const [assessmentCandidatesOpen, setAssessmentCandidatesOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -102,16 +110,18 @@ export default function JobDetailPage() {
     failed: number;
     essayReviews?: { _id: string; firstName: string; lastName: string; email: string; score: number | null; answers: { questionIndex: number; questionText: string; textAnswer: string }[] }[];
   } | null>(null);
+  const [questionBankTotal, setQuestionBankTotal] = useState(0);
   const [assessmentApplied, setAssessmentApplied] = useState<{ moved: number; advanced: number } | null>(null);
   const [assessmentStatsData, setAssessmentStatsData] = useState<{ inAssessment: number; started: number; submitted: number; passed: number; failed: number; pending: number } | null>(null);
   const [answerKeyPublished, setAnswerKeyPublished] = useState(false);
   const [answerKeyBusy, setAnswerKeyBusy] = useState(false);
   const [answerKeyError, setAnswerKeyError] = useState("");
+  const [assessmentDomains, setAssessmentDomains] = useState<{ name: string; questionCount: number }[]>([]);
   const [selectedCandidates, setSelectedCandidates] = useState<Record<string, boolean>>({});
   const [bulkTargetStage, setBulkTargetStage] = useState<Stage>("screening");
   const [stageModal, setStageModal] = useState<{ targets: ATSCandidate[]; target: Stage } | null>(null);
   const [atsDecisionTarget, setAtsDecisionTarget] = useState<ATSCandidate | null>(null);
-  const [editAppsConfirm, setEditAppsConfirm] = useState<"enable" | "disable" | null>(null);
+  const [editAppsConfirm, setEditAppsConfirm] = useState<"enable" | "update" | "disable" | null>(null);
 
   async function handleRunAts(force: boolean) {
     if (!activeJob) return;
@@ -152,6 +162,21 @@ export default function JobDetailPage() {
         setAssessmentStats({ total: data.stats.submitted + data.stats.failed + data.stats.passed, passed: data.stats.passed, failed: data.stats.failed, essayReviews: data.essayReviews || [] });
       }
       setAnswerKeyPublished(Boolean(data.assessment?.answerKeyPublished));
+      // Questions available to draw a paper from. Distinct from
+      // `assessmentStats.total`, which counts graded candidates rather than
+      // questions, so the mock paper estimate is never based on a cohort size.
+      setQuestionBankTotal(
+        (Array.isArray(data.assessment?.questions) ? data.assessment.questions.length : 0) +
+          (Array.isArray(data.assessment?.domains) ? data.assessment.domains : []).reduce(
+            (sum: number, d: any) => sum + (Array.isArray(d?.questions) ? d.questions.length : 0),
+            0
+          )
+      );
+      setAssessmentDomains(
+        (Array.isArray(data.assessment?.domains) ? data.assessment.domains : [])
+          .map((d: any) => ({ name: String(d?.name ?? "").trim(), questionCount: Array.isArray(d?.questions) ? d.questions.length : 0 }))
+          .filter((d: { name: string }) => Boolean(d.name))
+      );
     } catch { /* ignore */ }
   }
 
@@ -221,6 +246,16 @@ export default function JobDetailPage() {
       .catch(() => {});
   }, [id, isHrOrAdmin, fetchCandidates]);
 
+  /**
+   * The application-editing window for this job, evaluated through the same
+   * helper the server and the candidate portal use, so the button, the deadline
+   * line and the API can never disagree about whether editing is open.
+   */
+  const editWindow = useMemo(
+    () => isEditWindowOpen(activeJob, utcWallClockNow()),
+    [activeJob]
+  );
+
   const jobCandidates = useMemo(
     () => candidates.filter((c) => {
       const job = c.job as unknown as { _id?: string; id?: string } | string;
@@ -238,9 +273,25 @@ export default function JobDetailPage() {
     else if (candidateFilter === "__assessment-passed") list = list.filter((c) => (c as any).assessmentStatus === "selected");
     else if (candidateFilter === "__assessment-failed") list = list.filter((c) => (c as any).assessmentStatus === "rejected");
     else if (candidateFilter === "__assessment-pending") list = list.filter((c) => (c as any).assessmentScore == null);
+    else if (candidateFilter.startsWith(DOMAIN_FILTER_PREFIX)) {
+      const wanted = candidateFilter.slice(DOMAIN_FILTER_PREFIX.length);
+      list = wanted === NO_DOMAIN_FILTER
+        ? list.filter((c) => !String(c.assessmentDomain ?? "").trim())
+        : list.filter((c) => String(c.assessmentDomain ?? "").trim().toLowerCase() === wanted);
+    }
     else if (candidateFilter) list = list.filter((c) => c.stage === candidateFilter);
     return list;
   }, [jobCandidates, candidateFilter]);
+
+  const candidateFilterLabel = candidateFilter.startsWith(DOMAIN_FILTER_PREFIX)
+    ? (candidateFilter.slice(DOMAIN_FILTER_PREFIX.length) === NO_DOMAIN_FILTER
+        ? "no domain chosen"
+        : candidateFilter.slice(DOMAIN_FILTER_PREFIX.length))
+    : candidateFilter.startsWith("__ats")
+      ? "ATS status"
+      : candidateFilter.startsWith("__assessment")
+        ? "assessment status"
+        : (STAGE_LABELS[candidateFilter as Stage] ?? candidateFilter);
 
   const schedulableCandidates = useMemo(
     () => jobCandidates.filter((c) => !TERMINAL_STAGES.includes(c.stage) && c.atsStatus !== "rejected"),
@@ -487,7 +538,7 @@ export default function JobDetailPage() {
               <div>
                 <h2 className="text-base font-bold text-slate-900 dark:text-zinc-100">Candidates ({jobCandidates.length})</h2>
                 <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">
-                  {filtered.length} shown{candidateFilter ? ` · ${candidateFilter.startsWith("__ats") ? "ATS status" : candidateFilter.startsWith("__assessment") ? "assessment status" : (STAGE_LABELS[candidateFilter as Stage] ?? candidateFilter)}` : ""}
+                  {filtered.length} shown{candidateFilter ? ` · ${candidateFilterLabel}` : ""}
                 </p>
                 {isHrOrAdmin && filtered.length > 0 && (
                   <div className="mt-1.5 flex items-center gap-1.5">
@@ -524,6 +575,16 @@ export default function JobDetailPage() {
                     <option value="__assessment-passed">Assessment Passed</option>
                     <option value="__assessment-failed">Assessment Failed</option>
                     <option value="__assessment-pending">Not Assessed</option>
+                  </optgroup>
+                )}
+                {activeJob.assessment && assessmentDomains.length > 0 && (
+                  <optgroup label="By Domain">
+                    {assessmentDomains.map((d) => (
+                      <option key={d.name} value={`${DOMAIN_FILTER_PREFIX}${d.name.toLowerCase()}`}>
+                        {d.name} ({d.questionCount})
+                      </option>
+                    ))}
+                    <option value={`${DOMAIN_FILTER_PREFIX}${NO_DOMAIN_FILTER}`}>No domain chosen</option>
                   </optgroup>
                 )}
               </select>
@@ -587,6 +648,27 @@ export default function JobDetailPage() {
                         {(candidate as any).regionLabel && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
                             <MapPin size={10} /> {(candidate as any).regionLabel}
+                          </span>
+                        )}
+                        {activeJob.assessment && String(candidate.assessmentDomain ?? "").trim() && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-medium text-teal-700 dark:bg-teal-950 dark:text-teal-300">
+                            <Layers size={10} /> {candidate.assessmentDomain}
+                          </span>
+                        )}
+                        {activeJob.assessment && (candidate as any).assessmentProctoring?.violations > 0 && (
+                          <span
+                            title={`${(candidate as any).assessmentProctoring.violations} proctoring interruption(s) recorded`}
+                            className="inline-flex cursor-help items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-500/10 dark:text-amber-300"
+                          >
+                            <ShieldAlert size={10} /> {(candidate as any).assessmentProctoring.violations}
+                          </span>
+                        )}
+                        {(candidate as any).assessmentProctoring?.exempt && (
+                          <span
+                            title={String((candidate as any).assessmentProctoring.exemptReason || "Waived by HR")}
+                            className="inline-flex cursor-help items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300"
+                          >
+                            <ShieldOff size={10} /> Exempt
                           </span>
                         )}
                         {candidate.atsScore != null && (
@@ -707,10 +789,41 @@ export default function JobDetailPage() {
               {isHrOrAdmin && (
                 <ActionButton
                   accent={accent}
-                  icon={activeJob?.editApplicationsEnabled ? PencilOff : Pencil}
-                  label={activeJob?.editApplicationsEnabled ? "Disable edit application" : "Enable edit application"}
-                  onClick={() => setEditAppsConfirm(activeJob?.editApplicationsEnabled ? "disable" : "enable")}
+                  icon={editWindow.enabled ? (editWindow.expired ? Clock : PencilOff) : Pencil}
+                  label={
+                    editWindow.enabled
+                      ? editWindow.expired
+                        ? "Reopen editing window"
+                        : "Update editing deadline"
+                      : "Enable edit application"
+                  }
+                  onClick={() =>
+                    setEditAppsConfirm(editWindow.enabled ? (editWindow.expired ? "enable" : "update") : "enable")
+                  }
                 />
+              )}
+              {isHrOrAdmin && editWindow.enabled && !editWindow.expired && (
+                <button
+                  onClick={() => setEditAppsConfirm("disable")}
+                  className="w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-xs font-medium text-slate-500 transition hover:bg-[var(--c-bg-muted)] hover:text-slate-700"
+                >
+                  Disable editing now
+                </button>
+              )}
+              {isHrOrAdmin && editWindow.enabled && editWindow.closeAt && (
+                <p className="rounded-lg bg-[var(--c-bg-muted)] px-3 py-2 text-[11px] text-slate-500">
+                  {editWindow.expired ? (
+                    <>
+                      Application editing closed {fmtDateTime(editWindow.closeAt.toISOString())}. Candidates can no
+                      longer update their details.
+                    </>
+                  ) : (
+                    <>
+                      Editing closes {fmtDateTime(editWindow.closeAt.toISOString())}
+                      {editWindow.msRemaining != null && ` · ${describeRemaining(editWindow.msRemaining)} left`}.
+                    </>
+                  )}
+                </p>
               )}
               {atsDecisionPending && atsLastResult && (
                 <ActionButton accent={accent} icon={Check} label="Review ATS timelines" onClick={() => setAtsResultData(atsLastResult)} />
@@ -720,6 +833,13 @@ export default function JobDetailPage() {
               )}
               {isHrOrAdmin && activeJob.assessment && assessmentStats && assessmentStats.total > 0 && (
                 <ActionButton accent={accent} icon={Check} label="Review Assessment Results" onClick={() => { void loadAssessmentStats(); setAssessmentResultsOpen(true); }} />
+              )}
+              {/* Always offered to HR on an assessment-enabled job. Deliberately not
+                  gated on the question bank: an entry point that disappears when
+                  data is empty or still loading cannot explain itself, and the
+                  modal already handles an empty bank in place. */}
+              {isHrOrAdmin && activeJob.assessment && (
+                <ActionButton accent={accent} icon={ClipboardCheck} label="Mock Test" onClick={() => setMockTestOpen(true)} />
               )}
               {isHrOrAdmin && activeJob.status === "closed" && (
                 <ActionButton accent={accent} icon={Download} label={exporting ? "Exporting…" : "Export Candidates"} disabled={exporting} onClick={() => { void handleExport(); }} />
@@ -866,15 +986,25 @@ export default function JobDetailPage() {
       {editAppsConfirm && (
         <EditApplicationsModal
           mode={editAppsConfirm}
+          currentCloseAt={activeJob?.editApplicationsCloseAt}
           onClose={() => setEditAppsConfirm(null)}
-          onConfirm={async () => {
+          onConfirm={async (payload) => {
             await updateJob(id, {
-              action: editAppsConfirm === "enable" ? "enable-edit-applications" : "disable-edit-applications",
+              action: editAppsConfirm === "disable" ? "disable-edit-applications" : "enable-edit-applications",
+              ...payload,
             });
           }}
         />
       )}
       {assessmentManagerOpen && <AssessmentManagerModal jobId={id} onClose={() => { setAssessmentManagerOpen(false); void loadAssessmentStats(); }} />}
+
+      {mockTestOpen && (
+        <MockTestModal
+          jobId={id}
+          totalQuestions={questionBankTotal}
+          onClose={() => setMockTestOpen(false)}
+        />
+      )}
       {assessmentCandidatesOpen && (
         <AssessmentCandidatesModal
           candidates={jobCandidates.filter((c) => c.stage === "screening" || c.stage === "assessment")}
@@ -1150,26 +1280,67 @@ function AtsDecisionModal({
   );
 }
 
+/** "2d 4h" / "3h 12m" / "18m" for the editing-window countdown. */
+function describeRemaining(ms: number): string {
+  const totalMinutes = Math.max(0, Math.floor(ms / 60000));
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
 function EditApplicationsModal({
   mode,
+  currentCloseAt,
   onClose,
   onConfirm,
 }: {
-  mode: "enable" | "disable";
+  mode: "enable" | "update" | "disable";
+  /** Existing deadline, when the window is already open, so it can be edited. */
+  currentCloseAt?: string | null;
   onClose: () => void;
-  onConfirm: () => Promise<void>;
+  onConfirm: (payload: { editApplicationsCloseAt?: string | null }) => Promise<void>;
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const enabled = mode === "enable";
+  const enabled = mode === "enable" || mode === "update";
+  const isUpdate = mode === "update";
+
+  // A deadline is mandatory when opening the window — the whole point is that
+  // editing stops on its own instead of staying open until someone remembers.
+  // Defaults to a week out so the common case needs no typing.
+  const defaultDate = (() => {
+    const d = currentCloseAt ? new Date(currentCloseAt) : new Date();
+    if (Number.isNaN(d.getTime())) return "";
+    return dateInputValue(d.toISOString());
+  })();
+  const defaultTime = (() => {
+    const d = currentCloseAt ? new Date(currentCloseAt) : new Date();
+    if (Number.isNaN(d.getTime())) return "23:59";
+    return timeInputValue(d.toISOString());
+  })();
+  const [autoClose, setAutoClose] = useState(Boolean(defaultDate));
+  const [closeDate, setCloseDate] = useState(defaultDate || dateInputValue(new Date(Date.now() + 7 * 864e5).toISOString()));
+  const [closeTime, setCloseTime] = useState(defaultTime || "23:59");
 
   async function handleConfirm() {
     if (saving) return;
     setSaving(true);
     setError("");
     try {
-      await onConfirm();
+      // Built here as well as validated server-side: the same rule, run early
+      // enough that HR sees the problem before the request is made.
+      const wallClock = autoClose ? utcWallClock(closeDate, closeTime, "23:59") : null;
+      const check = validateEditWindowDeadline(wallClock);
+      if (!check.ok) {
+        setError(check.error);
+        setSaving(false);
+        return;
+      }
+      await onConfirm({ editApplicationsCloseAt: wallClock });
       onClose();
     } catch {
       setError("Something went wrong. Please try again.");
@@ -1179,16 +1350,70 @@ function EditApplicationsModal({
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center neu-overlay px-4">
-      <div className="w-full max-w-sm rounded-lg neu-card">
+      <div className="w-full max-w-md rounded-lg neu-card">
         <div className="p-5">
           <h2 className="text-base font-semibold text-slate-900">
-            {enabled ? "Enable edit application?" : "Disable edit application?"}
+            {isUpdate ? "Update editing deadline?" : enabled ? "Enable edit application?" : "Disable edit application?"}
           </h2>
           <p className="mt-2 text-sm text-slate-600">
-            {enabled
-              ? "All candidates who applied to this job will receive an email inviting them to update their application (name, phone, resume, portfolio, LinkedIn)."
-              : "Candidates will no longer be able to edit their application. No notification will be sent to candidates."}
+            {isUpdate
+              ? "Editing stays open until the new date. Candidates are emailed the new deadline, and their portal link is refreshed so it stays valid for the whole window."
+              : enabled
+                ? "All candidates who applied to this job will receive an email inviting them to update their application (name, phone, resume, portfolio, LinkedIn)."
+                : "Candidates will no longer be able to edit their application. No notification will be sent to candidates."}
           </p>
+
+          {enabled && (
+            <div className="mt-4 rounded-lg border border-[var(--c-border-light)] p-3">
+              <label className="flex cursor-pointer items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  checked={autoClose}
+                  onChange={(e) => setAutoClose(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600"
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-slate-900">
+                    Auto-close the editing window
+                  </span>
+                  <span className="mt-0.5 block text-xs text-slate-500">
+                    Editing switches itself off at the date and time below, so this does not stay
+                    open until someone remembers to disable it.
+                  </span>
+                </span>
+              </label>
+
+              {autoClose && (
+                <div className="mt-3">
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">
+                      Editing closes on
+                    </span>
+                    <div className="flex gap-2">
+                      <input
+                        type="date"
+                        value={closeDate}
+                        onChange={(e) => setCloseDate(e.target.value)}
+                        className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                      <input
+                        type="time"
+                        value={closeTime}
+                        onChange={(e) => setCloseTime(e.target.value)}
+                        className="w-28 shrink-0 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </label>
+                  <p className="mt-1.5 text-[11px] text-slate-500">
+                    Times are UTC, matching every other date on this job. Maximum{" "}
+                    {Math.round(MAX_EDIT_WINDOW_MS / 864e5)} days, because candidate portal links stop
+                    working after 30.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {error && <p className="mt-3 text-xs text-rose-600">{error}</p>}
           <div className="mt-5 flex justify-end gap-2">
             <button
@@ -1206,7 +1431,17 @@ function EditApplicationsModal({
               }`}
             >
               {saving && <Loader2 size={13} className="animate-spin" />}
-              {saving ? (enabled ? "Enabling…" : "Disabling…") : enabled ? "Yes, Enable" : "Yes, Disable"}
+              {saving
+                ? enabled
+                  ? isUpdate
+                    ? "Saving…"
+                    : "Enabling…"
+                  : "Disabling…"
+                : enabled
+                  ? isUpdate
+                    ? "Yes, Update"
+                    : "Yes, Enable"
+                  : "Yes, Disable"}
             </button>
           </div>
         </div>

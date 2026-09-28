@@ -52,6 +52,26 @@ export async function PATCH(request: Request, { params }: Params) {
     candidate.assessmentRawMarks = null;
     candidate.assessmentMaxMarks = null;
     candidate.assessmentAnswers = [];
+    // Proctoring counters and granted time belong to the attempt being cleared.
+    // Carrying the grace over would silently hand a restarted paper extra time,
+    // and a stale `pausedAt` would strand the next interruption's timer.
+    candidate.assessmentProctoring = {
+      violations: 0,
+      noiseWarnings: 0,
+      graceMs: 0,
+      extensionMs: 0,
+      pausedAt: null,
+      peakNoiseDb: -100,
+      multiFaceEvents: 0,
+      screenShareAttempts: 0,
+      exempt: false,
+      exemptReason: "",
+      extensionRequestStatus: "none",
+      extensionRequestedMs: 0,
+      extensionRequestNote: "",
+      extensionDecidedAt: null,
+      log: [],
+    };
   }
 
   candidate.stage = toStage as typeof candidate.stage;

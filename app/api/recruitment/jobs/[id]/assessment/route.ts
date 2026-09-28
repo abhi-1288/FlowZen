@@ -6,6 +6,12 @@ import { ATSAssessment } from "@/models/ATSAssessment";
 import { ATSCandidate } from "@/models/ATSCandidate";
 import { User } from "@/models/User";
 import { pickDomain } from "@/lib/assessment";
+import { parseNegativeMarking } from "@/lib/assessment-negative-marking";
+import {
+  DEFAULT_PROCTORING,
+  MAX_NOISE_THRESHOLD_DB,
+  MIN_NOISE_THRESHOLD_DB,
+} from "@/lib/assessment-proctoring";
 
 const HR_ROLES = ["admin", "human-resource"];
 
@@ -139,6 +145,17 @@ export async function POST(request: Request, { params }: Params) {
 
   const passScore = Math.max(0, Math.min(100, Number(body.passScore) || 50));
   const negativeMarking = Math.max(0, Math.min(100, Number(body.negativeMarking) || 0));
+  // The label is display-only, so never trust it: keep it only when it really
+  // is the fraction HR meant. Anything else falls back to no label and the
+  // candidate-facing text shows the plain decimal.
+  const requestedLabel = String(body.negativeMarkingLabel ?? "").trim();
+  let negativeMarkingLabel = "";
+  if (requestedLabel && negativeMarking > 0) {
+    const reparsed = parseNegativeMarking(requestedLabel);
+    if (reparsed.ok && Math.abs(reparsed.value - negativeMarking) < 1e-9) {
+      negativeMarkingLabel = requestedLabel.slice(0, 40);
+    }
+  }
 
   const durationMinutes =
     body.durationMinutes != null
@@ -155,13 +172,45 @@ export async function POST(request: Request, { params }: Params) {
     .slice(0, 12);
   const instructions = String(body.instructions || "").trim().slice(0, 2000);
 
+  // Proctoring settings. Camera/mic/face checks are only meaningful while the
+  // paper is proctored, so they collapse to their permissive values when the
+  // whole feature is off — otherwise turning proctoring on and off would leave
+  // a stale "camera required" behind.
+  const requestedProctoring = (body.proctoring ?? {}) as Record<string, unknown>;
+  const proctoringEnabled = requestedProctoring.enabled === true;
+  const proctoring = {
+    enabled: proctoringEnabled,
+    requireCamera: proctoringEnabled && requestedProctoring.requireCamera !== false,
+    requireMic: proctoringEnabled && requestedProctoring.requireMic !== false,
+    requireFullscreen:
+      proctoringEnabled && requestedProctoring.requireFullscreen !== false,
+    blockOnFocusLoss: proctoringEnabled && requestedProctoring.blockOnFocusLoss !== false,
+    noiseThresholdDb: (() => {
+      const raw = Number(requestedProctoring.noiseThresholdDb);
+      if (!Number.isFinite(raw)) return DEFAULT_PROCTORING.noiseThresholdDb;
+      return Math.min(
+        MAX_NOISE_THRESHOLD_DB,
+        Math.max(MIN_NOISE_THRESHOLD_DB, raw)
+      );
+    })(),
+    noiseWarningLimit: (() => {
+      const raw = Number(requestedProctoring.noiseWarningLimit);
+      if (!Number.isFinite(raw)) return DEFAULT_PROCTORING.noiseWarningLimit;
+      return Math.min(20, Math.max(0, Math.round(raw)));
+    })(),
+    requireSingleFace: proctoringEnabled && requestedProctoring.requireSingleFace === true,
+    blockScreenShare: proctoringEnabled && requestedProctoring.blockScreenShare !== false,
+  };
+
   await ATSJob.findByIdAndUpdate(job._id, { assessmentDurationMinutes: durationMinutes });
 
   const set = {
     passScore,
     negativeMarking,
+    negativeMarkingLabel,
     windowMode,
     timeSlots,
+    proctoring,
     instructions,
     questions,
     domains: cleanDomains,

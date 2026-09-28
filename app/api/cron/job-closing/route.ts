@@ -4,7 +4,7 @@ import { ATSJob } from "@/models/ATSJob";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitToUser } from "@/lib/socket-emit";
-import { autoCloseOverdueJobs } from "@/lib/recruitment-utils";
+import { autoCloseOverdueJobs, closeExpiredEditWindows } from "@/lib/recruitment-utils";
 
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
@@ -17,6 +17,14 @@ export async function GET(request: Request) {
   // Auto-close overdue jobs (also sends detailed notifications)
   const autoClosed = await autoCloseOverdueJobs();
 
+  // Shut off application editing whose window has passed. Housekeeping only —
+  // isEditWindowOpen() already refuses the candidate's write at the deadline, so
+  // a missed run here delays the notification but never the cutoff.
+  const editWindowsClosed = await closeExpiredEditWindows();
+
+  // NOTE: these boundaries are local setHours, while autoCloseDate is a UTC wall
+  // clock (lib/date-utils). That mismatch is pre-existing and left alone here,
+  // but it means "closing today" can be off by the host's UTC offset.
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date();
@@ -69,6 +77,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     ok: true,
     autoClosed,
+    editWindowsClosed: editWindowsClosed.closed,
     closingToday: results.length,
     results,
   });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Upload, FileText, Loader2, CheckCircle, Pencil } from "lucide-react";
+import { X, Upload, FileText, Loader2, CheckCircle, Pencil, Clock } from "lucide-react";
 import { hexToRgba } from "@/lib/accent";
 
 type EditCandidate = {
@@ -12,6 +12,7 @@ type EditCandidate = {
   linkedInUrl?: string;
   resumeUrl?: string;
   email: string;
+  job?: { editApplicationsCloseAt?: string | null };
 };
 
 export default function EditApplicationModal({
@@ -35,6 +36,24 @@ export default function EditApplicationModal({
     linkedInUrl: candidate.linkedInUrl ?? "",
     resumeUrl: candidate.resumeUrl ?? "",
   };
+
+  // Shown so a candidate knows what they are editing against, and so the form is
+  // not the only place the deadline is discoverable. Formatted in UTC to match
+  // the stored wall clock (lib/date-utils).
+  const closesAtLabel = (() => {
+    const raw = candidate.job?.editApplicationsCloseAt;
+    if (!raw) return "";
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleString("en-IN", {
+      timeZone: "UTC",
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  })();
 
   const [firstName, setFirstName] = useState(orig.firstName);
   const [lastName, setLastName] = useState(orig.lastName);
@@ -106,7 +125,14 @@ export default function EditApplicationModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-2xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] dark:bg-[#0d0d0d] shadow-xl">
         <div className="flex items-center justify-between border-b border-[var(--c-border-light)] px-6 py-4 dark:border-zinc-800">
-          <h3 className="text-sm font-bold text-slate-900 dark:text-zinc-100">Edit application</h3>
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-zinc-100">Edit application</h3>
+            {closesAtLabel && (
+              <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500 dark:text-zinc-400">
+                <Clock size={10} /> Editing closes {closesAtLabel}
+              </p>
+            )}
+          </div>
           <button onClick={onClose} className="rounded-lg p-1 text-slate-400 transition hover:bg-[var(--c-bg-muted)]">
             <X size={16} />
           </button>

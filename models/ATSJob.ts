@@ -46,6 +46,9 @@ const ATSJobSchema = new Schema(
     requiredExperienceMaxYears: { type: Number, default: null, min: 0, max: 50 },
     atsScoreThreshold: { type: Number, default: null, min: 0, max: 100 },
     editApplicationsEnabled: { type: Boolean, default: false },
+    // When the *editing window* closes, as a UTC wall clock (lib/date-utils).
+    // Unrelated to autoCloseDate, which closes the job itself.
+    editApplicationsCloseAt: { type: Date, default: null },
     autoCloseDate: { type: Date, default: null },
     description: { type: String, default: "", maxlength: 5000 },
     requiredSkills: [{ type: String, trim: true }],
@@ -68,6 +71,10 @@ const ATSJobSchema = new Schema(
 ATSJobSchema.index({ company: 1, status: 1 });
 ATSJobSchema.index({ "workflow.status": 1, company: 1 });
 ATSJobSchema.index({ "workflow.assignedHR": 1, "workflow.status": 1 });
+// Serves the sweep that flips an expired editing window shut.
+ATSJobSchema.index({ editApplicationsEnabled: 1, editApplicationsCloseAt: 1 });
+// The job auto-close sweep filters on status + autoCloseDate together.
+ATSJobSchema.index({ status: 1, autoCloseDate: 1 });
 
 export type ATSJobDocument = InferSchemaType<typeof ATSJobSchema>;
 if (process.env.NODE_ENV === "development") {

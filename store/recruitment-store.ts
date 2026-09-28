@@ -60,6 +60,7 @@ type RecruitmentStore = {
   modal: ModalState;
   totalJobs: number;
   totalCandidates: number;
+  assessmentDomains: string[];
   totalOffers: number;
   totalReferrals: number;
   totalInterviews: number;
@@ -137,6 +138,7 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
   modal: null,
   totalJobs: 0,
   totalCandidates: 0,
+  assessmentDomains: [],
   totalOffers: 0,
   totalReferrals: 0,
   totalInterviews: 0,
@@ -307,8 +309,12 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const query = params ? "?" + new URLSearchParams(params).toString() : "";
-      const { candidates, totalCount } = await apiFetch<{ candidates: ATSCandidate[]; totalCount: number }>(`/api/recruitment/candidates${query}`);
-      set({ candidates, totalCandidates: totalCount });
+      const { candidates, totalCount, domains } = await apiFetch<{ candidates: ATSCandidate[]; totalCount: number; domains?: string[] }>(`/api/recruitment/candidates${query}`);
+      set((state) => ({
+        candidates,
+        totalCandidates: totalCount,
+        assessmentDomains: domains ?? state.assessmentDomains,
+      }));
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "Failed to load candidates." });
     } finally {

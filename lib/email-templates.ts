@@ -343,6 +343,86 @@ export function assessmentInvitationEmail({
   };
 }
 
+// ── Mock Test Invitation ─────────────────────────────────────
+
+export function mockTestInvitationEmail({
+  candidateName,
+  jobTitle,
+  windowLabel,
+  durationMinutes,
+  maxAttempts,
+  attemptNote,
+  portalLink,
+  company,
+}: {
+  candidateName: string;
+  jobTitle: string;
+  windowLabel: string;
+  durationMinutes?: number | null;
+  maxAttempts?: number | null;
+  attemptNote?: string;
+  portalLink?: string;
+  company?: { name?: string; icon?: string };
+}) {
+  const html = baseEmailLayout(`
+    <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#1e293b;">Practice Mock Test Available</h2>
+    <p style="margin:0 0 20px;font-size:14px;color:#64748b;">${jobTitle}</p>
+
+    <p style="margin:0 0 8px;font-size:15px;color:#334155;">Dear ${candidateName},</p>
+    <p style="margin:0 0 16px;font-size:15px;color:#334155;">A <strong>practice mock test</strong> is now available for <strong>${jobTitle}</strong>.</p>
+
+    <div style="margin:0 0 20px;padding:12px 16px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;">
+      <p style="margin:0;font-size:14px;color:#92400e;">This is practice only. It is scored on a short paper drawn from the same question bank, and <strong>it does not affect your application or your assessment result</strong>.</p>
+    </div>
+
+    <table role="presentation" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:4px 16px;width:100%;margin:0 0 24px;">
+      <tr>
+        <td style="padding:12px 0;border-bottom:1px solid #e2e8f0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;width:100px;">Available</td>
+              <td style="font-size:15px;font-weight:600;color:#1e293b;">${windowLabel}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      ${durationMinutes ? `
+      <tr>
+        <td style="padding:12px 0;border-bottom:1px solid #e2e8f0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;width:100px;">Duration</td>
+              <td style="font-size:15px;font-weight:600;color:#1e293b;">${durationMinutes} minutes</td>
+            </tr>
+          </table>
+        </td>
+      </tr>` : ""}
+      ${maxAttempts ? `
+      <tr>
+        <td style="padding:12px 0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;width:100px;">Attempts</td>
+              <td style="font-size:15px;font-weight:600;color:#1e293b;">${maxAttempts}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>` : ""}
+    </table>
+
+    ${portalLink ? emailButton(portalLink, "Open Mock Test") : ""}
+
+    ${attemptNote ? `<p style="margin:0 0 12px;font-size:14px;color:#64748b;">${attemptNote}</p>` : ""}
+    <p style="margin:0;font-size:14px;color:#64748b;">Use it to check your timing and get comfortable with the format before your real assessment. Good luck!</p>
+  `, { title: "Practice Mock Test Available", companyName: company?.name, companyLogo: company?.icon });
+
+  return {
+    subject: `Practice Mock Test Available for ${jobTitle}`,
+    text: `Dear ${candidateName},\n\nA practice mock test is now available for ${jobTitle}.\n\nThis is practice only: it is scored on a short paper from the same question bank and does not affect your application or your assessment result.\n\nAvailable: ${windowLabel}${durationMinutes ? `\nDuration: ${durationMinutes} minutes` : ""}${maxAttempts ? `\nAttempts: ${maxAttempts}` : ""}${portalLink ? `\n\nOpen Mock Test: ${portalLink}` : ""}`,
+    html,
+  };
+}
+
 // ── Interview Rescheduled ────────────────────────────────────
 
 export function interviewRescheduledEmail({
@@ -589,12 +669,26 @@ export function editApplicationsEnabledEmail({
   jobTitle,
   portalLink,
   company,
+  closesAtLabel,
 }: {
   candidateName: string;
   jobTitle: string;
   portalLink?: string;
   company?: { name?: string; icon?: string };
+  /**
+   * Human-readable deadline, already formatted for the candidate's timezone.
+   * Optional so existing callers keep working, but the window is now required in
+   * practice and an invite without it reads as an open-ended invitation.
+   */
+  closesAtLabel?: string;
 }): { subject: string; text: string; html: string } {
+  const deadlineLine = closesAtLabel
+    ? ` Please update by <strong>${closesAtLabel}</strong> — after that the option to edit is switched off.`
+    : "";
+  const deadlineText = closesAtLabel
+    ? ` Please update by ${closesAtLabel} — after that the option to edit is switched off.`
+    : "";
+
   const html = baseEmailLayout(`
     <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#1e293b;">Update your application</h2>
     <p style="margin:0 0 20px;font-size:14px;color:#64748b;">${jobTitle}</p>
@@ -602,7 +696,7 @@ export function editApplicationsEnabledEmail({
     <p style="margin:0 0 8px;font-size:15px;color:#334155;">Dear ${candidateName},</p>
     <p style="margin:0 0 24px;font-size:15px;color:#334155;">
       We have opened <strong>editing</strong> for your application to <strong>${jobTitle}</strong>.
-      You can now update your name, phone number, resume, and portfolio or LinkedIn links.
+      You can now update your name, phone number, resume, and portfolio or LinkedIn links.${deadlineLine}
     </p>
 
     ${portalLink
@@ -617,7 +711,7 @@ export function editApplicationsEnabledEmail({
 
   return {
     subject: `Update your application for ${jobTitle}`,
-    text: `Dear ${candidateName},\n\nWe have opened editing for your application to ${jobTitle}. You can now update your name, phone number, resume, and portfolio or LinkedIn links.${portalLink ? `\n\nUpdate your application: ${portalLink}` : "\n\nLog in to the candidate portal to update your application."}`,
+    text: `Dear ${candidateName},\n\nWe have opened editing for your application to ${jobTitle}. You can now update your name, phone number, resume, and portfolio or LinkedIn links.${deadlineText}${portalLink ? `\n\nUpdate your application: ${portalLink}` : "\n\nLog in to the candidate portal to update your application."}`,
     html,
   };
 }

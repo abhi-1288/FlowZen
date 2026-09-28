@@ -3,8 +3,32 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { PlayCircle, Clock, Send, CheckCircle, XCircle, Layers, AlertTriangle, Download, Loader2 } from "lucide-react";
 import { jsPDF } from "jspdf";
+import { formatMarks, formatNegativeMarking, negativeMarkingShort } from "@/lib/assessment-negative-marking";
+import { MediaDevicesProvider, useMediaDevices } from "@/components/recruitment/interview-room/media-devices";
+import { ProctoringPreflight } from "@/components/candidate-portal/proctoring-preflight";
+import { ProctoringOverlay } from "@/components/candidate-portal/proctoring-overlay";
+import { ProctoringBanner } from "@/components/candidate-portal/proctoring-banner";
+import { SelfieTile } from "@/components/candidate-portal/selfie-tile";
+import { ExtensionRequest } from "@/components/candidate-portal/extension-request";
+import { useProctoring } from "@/components/candidate-portal/use-proctoring";
+import { useMicLevel } from "@/components/candidate-portal/use-mic-level";
 
 type Question = { index: number; text: string; options: string[]; type?: "mcq" | "essay"; marks?: number; required?: boolean };
+
+type ProctoringSettings = {
+  enabled: boolean;
+  requireCamera: boolean;
+  requireMic: boolean;
+  requireFullscreen: boolean;
+  blockOnFocusLoss: boolean;
+  noiseThresholdDb: number;
+  noiseWarningLimit: number;
+  requireSingleFace: boolean;
+  blockScreenShare: boolean;
+  /** False when HR has waived proctoring for this candidate. */
+  exempt?: boolean;
+  active?: boolean;
+};
 
 type Props = {
   token: string;
@@ -13,6 +37,9 @@ type Props = {
     durationMinutes: number | null;
     passScore: number;
     negativeMarking: number;
+    negativeMarkingLabel?: string;
+    proctoring?: ProctoringSettings;
+    extensionRequest?: { status: "none" | "pending" | "approved" | "denied"; requestedMs: number };
     domains: { name: string; limit: number; questionCount: number }[];
     domain: string;
     answerKeyPublished?: boolean;
@@ -38,12 +65,31 @@ type Props = {
     untilStartMs: number;
     slotStart: string | null;
     slots: { start: string; startMs: string }[];
+    // Mock-only. The mock track never writes the real assessment's status or
+    // score fields, so it reports its outcome through these instead.
+    resultRelease?: "immediate" | "delayed" | "never";
+    maxAttempts?: number;
+    attemptsUsed?: number;
+    attemptNumber?: number | null;
+    result?: {
+      attemptNumber: number | null;
+      score: number | null;
+      rawMarks: number | null;
+      maxMarks: number | null;
+      passed: boolean | null;
+    } | null;
+    bestScore?: number | null;
+    resultVisible?: boolean;
+    answerKeyVisible?: boolean;
+    resultVisibleAt?: string | null;
   };
   accent: string;
   companyName?: string;
   onRefresh: () => void;
   /** When true, auto-starts the assessment on mount (used in test tab). */
   autoStart?: boolean;
+  /** Which track this render is for. Defaults to the real assessment. */
+  mode?: "assessment" | "mock";
 };
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
@@ -80,6 +126,7 @@ type AnswerKeyPayload = {
   maxMarks: number | null;
   passScore: number;
   negativeMarking: number;
+  negativeMarkingLabel?: string;
   startedAt: string | null;
   submittedAt: string | null;
   publishedAt: string | null;
@@ -129,7 +176,7 @@ function generateAnswerKeyPdf(data: AnswerKeyPayload, accent: string, companyNam
   doc.text(`Job: ${data.jobTitle}${data.domain ? `  ·  Domain: ${data.domain}` : ""}`, margin, y);
   y += 15;
   doc.text(
-    `Score: ${data.score != null ? `${data.score}/100` : "—"}${data.rawMarks != null ? `  (${data.rawMarks}/${data.maxMarks} marks)` : ""}  ·  Passing threshold: ${data.passScore}%`,
+    `Score: ${data.score != null ? `${data.score}/100` : "—"}${data.rawMarks != null ? `  (${formatMarks(data.rawMarks)}/${formatMarks(data.maxMarks)} marks)` : ""}  ·  Passing threshold: ${data.passScore}%`,
     margin,
     y
   );
@@ -143,7 +190,7 @@ function generateAnswerKeyPdf(data: AnswerKeyPayload, accent: string, companyNam
     y += 15;
   }
   if (data.negativeMarking > 0) {
-    doc.text(`Negative marking: -${data.negativeMarking} per wrong answer`, margin, y);
+    doc.text(`Negative marking: -${formatNegativeMarking(data.negativeMarking, data.negativeMarkingLabel)} per wrong answer`, margin, y);
     y += 15;
   }
   if (data.publishedAt) {
@@ -171,7 +218,7 @@ function generateAnswerKeyPdf(data: AnswerKeyPayload, accent: string, companyNam
   doc.text("Wrong", margin + 175, y + 26);
   doc.setTextColor(...mid);
   doc.setFont("helvetica", "normal");
-  doc.text(data.negativeMarking > 0 ? `-${data.negativeMarking} marks penalty` : "no marks", margin + 230, y + 26);
+  doc.text(data.negativeMarking > 0 ? `-${negativeMarkingShort(data.negativeMarking, data.negativeMarkingLabel)} marks penalty` : "no marks", margin + 230, y + 26);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...mid);
   doc.text("Not answered", margin + 330, y + 26);
@@ -257,7 +304,7 @@ function generateAnswerKeyPdf(data: AnswerKeyPayload, accent: string, companyNam
       resultText = `— Correct  +${q.marks} marks`;
       resultColor = green;
     } else {
-      resultText = data.negativeMarking > 0 ? `— Wrong  -${data.negativeMarking} marks` : "— Wrong (no marks)";
+      resultText = data.negativeMarking > 0 ? `— Wrong  -${negativeMarkingShort(data.negativeMarking, data.negativeMarkingLabel)} marks` : "— Wrong (no marks)";
       resultColor = red;
     }
     doc.setFont("helvetica", "bold");
@@ -282,7 +329,30 @@ function generateAnswerKeyPdf(data: AnswerKeyPayload, accent: string, companyNam
   doc.save(`answer-key-${safeJob}-${safeName}.pdf`);
 }
 
-export function AssessmentPanel({ token, assessment, accent, companyName, onRefresh, autoStart }: Props) {
+/**
+ * Thin provider wrapper.
+ *
+ * The media provider has to sit above the panel so the preflight and the exam
+ * share one acquisition: a device approved on the preflight screen is the same
+ * device the exam uses, and React's StrictMode double-mount must not open the
+ * camera twice (see the notes in media-devices.tsx).
+ */
+export function AssessmentPanel(props: Props) {
+  return (
+    <MediaDevicesProvider>
+      <AssessmentPanelInner {...props} />
+    </MediaDevicesProvider>
+  );
+}
+
+function AssessmentPanelInner({ token, assessment, accent, companyName, onRefresh, autoStart, mode = "assessment" }: Props) {
+  // The mock track is a separate sitting with its own paper, answers and clock,
+  // so every request and every cache key is scoped by mode. Nothing is shared
+  // with the real assessment, and omitting the param keeps the real endpoints.
+  const isMock = mode === "mock";
+  const trackQs = isMock ? "&mode=mock" : "";
+  const cacheKey = `ap-${token}${isMock ? "-mock" : ""}`;
+
   // The portal tab and the exam tab are separate documents, so a domain or slot
   // picked in one has to travel to the other. The exam tab is opened with these
   // params so the choice is not silently lost.
@@ -295,7 +365,6 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
   const [started, setStarted] = useState(assessment.submittable);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<number, { selectedOption?: number; textAnswer?: string }>>({});
-  const [remaining, setRemaining] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(Boolean(assessment.submittedAt));
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -304,10 +373,71 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
   const [inLobby, setInLobby] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [downloading, setDownloading] = useState(false);
+  // Proctoring: `preflight` gates the start behind the device check, and
+  // `proctorReady` is what the preflight's Begin button flips.
+  const [preflight, setPreflight] = useState(false);
+  const [proctorReady, setProctorReady] = useState(false);
+  const [beginBusy, setBeginBusy] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [extension, setExtension] = useState({
+    status: (assessment.extensionRequest?.status ?? "none") as "none" | "pending" | "approved" | "denied",
+    requestedMs: assessment.extensionRequest?.requestedMs ?? 0,
+    grantedMs: 0,
+  });
   const autoSubmittedRef = useRef(false);
   const autoSubmitRef = useRef<() => void>(() => {});
   const autoStartRef = useRef(false);
   const lobbyFetchRef = useRef(false);
+
+  const media = useMediaDevices();
+  const proctoringSettings = assessment.proctoring ?? null;
+  const proctoringWanted = Boolean(proctoringSettings?.active);
+  // A candidate resuming an already-started paper skips the preflight; the
+  // devices are opened in the background and the overlay covers any gap.
+  const sitting = started && questions.length > 0 && !submitted;
+  const proctoring = useProctoring({
+    token,
+    stream: media.stream,
+    running: sitting,
+    config: proctoringSettings,
+    cameraReady: Boolean(media.stream?.getVideoTracks().some((t) => t.enabled)),
+    onRetryCamera: () => void media.retry(),
+  });
+  // The preflight needs its own mic reading, taken before the exam starts, so
+  // this one is deliberately not driven by the sitting flag above.
+  const preflightMic = useMicLevel(media.stream, preflight && proctoringWanted);
+
+  // "The device attempt has settled" — either it worked or it failed with a
+  // message, and in both cases the preflight is ready to be acted on rather than
+  // sitting in a permanent disabled state.
+  useEffect(() => {
+    if (media.status === "ready" || media.status === "error") setProctorReady(true);
+  }, [media.status]);
+
+  /**
+   * Suppress the ways the paper can be copied or printed out.
+   *
+   * This is friction, not a security control: a determined candidate can read the
+   * DOM or the network payload either way, and nothing here stops that. It only
+   * removes the accidental and the lazy paths.
+   */
+  useEffect(() => {
+    if (!sitting || !proctoringWanted) return;
+    const stop = (e: Event) => e.preventDefault();
+    const onContextMenu = (e: MouseEvent) => e.preventDefault();
+    document.addEventListener("copy", stop);
+    document.addEventListener("cut", stop);
+    document.addEventListener("paste", stop);
+    document.addEventListener("contextmenu", onContextMenu);
+    window.addEventListener("beforeprint", stop);
+    return () => {
+      document.removeEventListener("copy", stop);
+      document.removeEventListener("cut", stop);
+      document.removeEventListener("paste", stop);
+      document.removeEventListener("contextmenu", onContextMenu);
+      window.removeEventListener("beforeprint", stop);
+    };
+  }, [sitting, proctoringWanted]);
 
   // Keep the default selection on a slot that is still open. A candidate who
   // opens the portal after their slot ended (but before the last slot of the day)
@@ -341,12 +471,11 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
     return () => window.clearInterval(timer);
   }, []);
 
-  // Exam clock. Anchored to the absolute deadline rather than decremented, so a
-  // backgrounded tab that throttles its timers cannot hand out extra time.
-  useEffect(() => {
-    if (!isExam || examEndsAtMs === null || submitted) return;
-    setRemaining(Math.max(0, Math.ceil((examEndsAtMs - Date.now()) / 1000)));
-  }, [isExam, examEndsAtMs, submitted]);
+  // Exam clock. Derived on every render from the absolute deadline against the
+  // local ticker, rather than held in state and decremented by an effect: a
+  // backgrounded tab that throttles its timers can neither freeze the display
+  // past the deadline nor hand out extra time once it wakes up.
+  const remaining = isExam && examEndsAtMs !== null && !submitted ? Math.max(0, Math.ceil((examEndsAtMs - now) / 1000)) : null;
 
   const doSubmit = useCallback(async () => {
     if (submitting || submitted) return;
@@ -358,7 +487,7 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
         selectedOption: answers[q.index]?.selectedOption ?? null,
         ...(q.type === "essay" ? { textAnswer: answers[q.index]?.textAnswer ?? "" } : {}),
       }));
-      const res = await fetch(`/api/public/candidate/me/assessment/submit?token=${encodeURIComponent(token)}`, {
+      const res = await fetch(`/api/public/candidate/me/assessment/submit?token=${encodeURIComponent(token)}${trackQs}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ answers: answerArray }),
@@ -372,7 +501,7 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
     } finally {
       setSubmitting(false);
     }
-  }, [answers, questions, submitted, submitting, token, onRefresh]);
+  }, [answers, questions, submitted, submitting, token, trackQs, onRefresh]);
 
   const autoSubmit = useCallback(async () => {
     if (autoSubmittedRef.current || submitting || submitted) return;
@@ -410,16 +539,25 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
     if (isExam) {
       // Already running: restore from the cache, otherwise refetch.
       try {
-        const stored = localStorage.getItem(`ap-${token}`);
+        const stored = localStorage.getItem(cacheKey);
         if (stored) {
           const { q, a } = JSON.parse(stored);
           if (Array.isArray(q) && q.length > 0) {
             setQuestions(q);
             if (a && typeof a === "object") setAnswers(a);
+            // Proctoring still has to bring the camera up, even when the paper is
+            // being restored from cache rather than re-fetched.
+            if (proctoringWanted) void media.acquire();
             return;
           }
         }
       } catch {}
+      if (proctoringWanted) {
+        setPreflight(true);
+        setProctorReady(false);
+        void media.acquire();
+        return;
+      }
       void handleStart();
       return;
     }
@@ -430,8 +568,18 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
     // already stored on the candidate, or one handed over from the portal tab.
     if (assessment.domains?.length && !assessment.domain && !selectedDomain) return;
 
+    // A proctored sitting never starts on its own: it waits for the candidate to
+    // pass the device check and press Begin, which is also the only gesture that
+    // can grant fullscreen in a window opened by window.open().
+    if (proctoringWanted) {
+      setPreflight(true);
+      setProctorReady(false);
+      void media.acquire();
+      return;
+    }
+
     try {
-      const stored = localStorage.getItem(`ap-${token}`);
+      const stored = localStorage.getItem(cacheKey);
       if (stored) {
         const { q, a } = JSON.parse(stored);
         if (Array.isArray(q) && q.length > 0) {
@@ -453,7 +601,7 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
    * room; the same call made after the start instant is what begins the exam, so
    * this single function covers lobby entry, starting, and resuming.
    */
-  async function handleStart() {
+  async function handleStart(options?: { proctoringAck?: boolean; devices?: string }) {
     setError("");
     if (assessment.domains?.length && !selectedDomain && !assessment.domain) {
       setError("Please select your domain to start the assessment.");
@@ -461,9 +609,10 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
     }
 
     // Normal mode: the exam runs in its own tab so it survives navigating away
-    // from the portal. Carry the pending domain and slot across with it.
+    // from the portal. Carry the pending domain, slot and track across with it.
     if (!autoStart) {
       const params = new URLSearchParams({ token, test: "true" });
+      if (isMock) params.set("mode", "mock");
       const domain = assessment.domain || selectedDomain;
       if (domain) params.set("domain", domain);
       if (selectedSlot) params.set("slot", selectedSlot);
@@ -478,12 +627,13 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
         !selectedSlot ||
         assessment.slots.some((s) => s.start === selectedSlot && new Date(s.startMs).getTime() > Date.now());
 
-      const res = await fetch(`/api/public/candidate/me/assessment/start?token=${encodeURIComponent(token)}`, {
+      const res = await fetch(`/api/public/candidate/me/assessment/start?token=${encodeURIComponent(token)}${trackQs}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           domain: assessment.domain || selectedDomain,
           slotStart: slotIsOpen ? selectedSlot : null,
+          ...(options?.proctoringAck ? { proctoringAck: true, devices: options.devices } : {}),
         }),
       });
       const data = await res.json();
@@ -503,20 +653,78 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
       setStarted(true);
       setInLobby(false);
       lobbyFetchRef.current = true;
-      setRemaining(
-        data.endsAt ? Math.max(0, Math.ceil((new Date(data.endsAt).getTime() - Date.now()) / 1000)) : null
-      );
       if (data.domain) setSelectedDomain(data.domain);
       if (data.slotStart) setSelectedSlot(data.slotStart);
       onRefresh();
       try {
-        localStorage.setItem(`ap-${token}`, JSON.stringify({ q: data.questions || [], e: data.endsAt }));
+        localStorage.setItem(cacheKey, JSON.stringify({ q: data.questions || [], e: data.endsAt }));
       } catch {}
     } catch (e: any) {
       setError(e.message);
       lobbyFetchRef.current = false;
     }
   }
+
+  /**
+   * The preflight's "Begin assessment".
+   *
+   * Fullscreen is requested here, inside the click handler, because that is the
+   * only context in which a browser will grant it. The request is best-effort:
+   * if it is refused the exam still starts, and the guard downgrades to a
+   * warning rather than a block it could never satisfy.
+   */
+  async function beginProctoredAssessment() {
+    setBeginBusy(true);
+    setError("");
+    try {
+      if (proctoringSettings?.requireFullscreen !== false) {
+        await proctoring.requestFullscreen().catch(() => false);
+      }
+      const devices =
+        media.stream?.getVideoTracks().some((t) => t.enabled) &&
+        media.stream?.getAudioTracks().some((t) => t.enabled)
+          ? "ok"
+          : "partial";
+      await handleStart({ proctoringAck: true, devices });
+      setPreflight(false);
+    } finally {
+      setBeginBusy(false);
+    }
+  }
+
+  /** Overlay "Return to fullscreen", which is also a user gesture. */
+  async function restoreFullscreen() {
+    setRestoring(true);
+    try {
+      await proctoring.requestFullscreen().catch(() => false);
+    } finally {
+      setRestoring(false);
+    }
+  }
+
+  // An HR-approved extension lands in the portal payload on the next refresh;
+  // poll while sitting so a granted request moves the visible clock without the
+  // candidate having to reload.
+  useEffect(() => {
+    if (!sitting || extension.status !== "pending") return;
+    const timer = window.setInterval(async () => {
+      try {
+        const res = await fetch(
+          `/api/public/candidate/me/assessment/extension?token=${encodeURIComponent(token)}`
+        );
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data) return;
+        setExtension((prev) => ({ ...prev, ...data }));
+        if (data.status !== "pending") {
+          onRefresh();
+          window.clearInterval(timer);
+        }
+      } catch {
+        // A failed poll just means the status is checked again shortly.
+      }
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [sitting, extension.status, token, onRefresh]);
 
   // Debounced autosave so a closed tab or a crash never loses answered work,
   // and so the background auto-submit has real answers to grade.
@@ -537,7 +745,7 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
         ...(q.type === "essay" ? { textAnswer: answersRef.current[q.index]?.textAnswer ?? "" } : {}),
       }));
       if (!payload.length) return;
-      fetch(`/api/public/candidate/me/assessment/answers?token=${encodeURIComponent(token)}`, {
+      fetch(`/api/public/candidate/me/assessment/answers?token=${encodeURIComponent(token)}${trackQs}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ answers: payload }),
@@ -546,7 +754,7 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
-  }, [answers, questions, isExam, submitted, token]);
+  }, [answers, questions, isExam, submitted, token, trackQs]);
 
   function setAnswer(qIndex: number, selectedOption: number) {
     setAnswers((prev) => ({ ...prev, [qIndex]: { ...prev[qIndex], selectedOption } }));
@@ -578,7 +786,7 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
     setDownloading(true);
     setError("");
     try {
-      const res = await fetch(`/api/public/candidate/me/assessment/answer-key?token=${encodeURIComponent(token)}`);
+      const res = await fetch(`/api/public/candidate/me/assessment/answer-key?token=${encodeURIComponent(token)}${trackQs}`);
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error((data as { error?: string })?.error || "Could not load the answer key.");
       generateAnswerKeyPdf(data, accent, companyName);
@@ -753,6 +961,55 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
 
   // 1. Submitted view
   if (submitted && assessment.submittedAt) {
+    // The mock track is never reviewed by a human, so it never has an
+    // "under review" state. The server withholds `result` until the release
+    // rule is met, so an absent result here genuinely means "not yet".
+    if (isMock) {
+      const attemptsText =
+        assessment.maxAttempts && assessment.maxAttempts > 1
+          ? ` Attempt ${assessment.result?.attemptNumber ?? assessment.attemptNumber ?? "—"} of ${assessment.maxAttempts} completed.`
+          : "";
+      return (
+        <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-5">
+          <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">Mock Test Complete</h3>
+          <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">
+            Your practice paper has been submitted.{attemptsText} This practice run does not affect your application.
+          </p>
+          {assessment.resultVisible && assessment.result ? (
+            <>
+              <div className={`mt-3 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold ${assessment.result.passed ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
+                {assessment.result.passed ? <CheckCircle size={16} /> : <XCircle size={16} />}
+                {assessment.result.score}/100 — {assessment.result.passed ? "Passed" : "Failed"}
+              </div>
+              {assessment.result.rawMarks != null && (
+                <p className="mt-2 text-xs text-slate-500 dark:text-zinc-400">
+                  {formatMarks(assessment.result.rawMarks)}/{formatMarks(assessment.result.maxMarks ?? 0)} marks · Passing threshold: {assessment.passScore}%
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-600 dark:bg-zinc-800 dark:text-zinc-300">
+              <Clock size={16} />
+              {assessment.resultRelease === "never"
+                ? "Result not released"
+                : `Result available ${assessment.resultVisibleAt ? fmtDay(assessment.resultVisibleAt) : "shortly"}`}
+            </p>
+          )}
+          {assessment.answerKeyVisible && (
+            <button
+              onClick={() => void handleDownloadAnswerKey()}
+              disabled={downloading}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+              style={{ backgroundColor: accent }}
+            >
+              {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              {downloading ? "Preparing PDF…" : "Download Question Paper & Answer Key"}
+            </button>
+          )}
+        </div>
+      );
+    }
+
     const published = Boolean(assessment.resultPublished);
     return (
       <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-5">
@@ -764,7 +1021,7 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
         ) : assessment.status && assessment.status === "pending" ? (
           <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">
             {assessment.score != null ? (
-              <>Assessment submitted. Multiple-choice score: {assessment.score}/100{assessment.rawMarks != null ? ` (${assessment.rawMarks}/${assessment.maxMarks} marks)` : ""}. Your essay answer(s) will be reviewed manually.</>
+              <>Assessment submitted. Multiple-choice score: {assessment.score}/100{assessment.rawMarks != null ? ` (${formatMarks(assessment.rawMarks)}/${formatMarks(assessment.maxMarks)} marks)` : ""}. Your essay answer(s) will be reviewed manually.</>
             ) : (
               <>Your assessment has been submitted and is under review. Results will be shared once evaluated.</>
             )}
@@ -777,7 +1034,7 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
             </div>
             {assessment.rawMarks != null && (
               <p className="mt-2 text-xs text-slate-500 dark:text-zinc-400">
-                {assessment.rawMarks}/{assessment.maxMarks} marks · Passing threshold: {assessment.passScore}%
+                {formatMarks(assessment.rawMarks)}/{formatMarks(assessment.maxMarks)} marks · Passing threshold: {assessment.passScore}%
               </p>
             )}
             {assessment.startedAt && (
@@ -812,26 +1069,71 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
     const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
     return (
       <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-5">
+        {proctoring.active && <SelfieTile stream={media.stream} micDb={proctoring.peakDb} requireMic={proctoringSettings?.requireMic !== false} micLevel={proctoring.micFraction} />}
+        {proctoring.blocked && (
+          <ProctoringOverlay
+            reason={proctoring.blockedReason}
+            remainingMs={remaining !== null ? remaining * 1000 : null}
+            violations={proctoring.violations}
+            graceCapped={proctoring.graceCapped}
+            fullscreenMissing={proctoring.fullscreenMissing ?? false}
+            screenShareDetected={proctoring.screenShareDetected}
+            busy={restoring}
+            onRestore={() => void restoreFullscreen()}
+            onRetryCamera={() => void media.retry()}
+            onDismissScreenShare={proctoring.dismissScreenShare}
+            tone={accent}
+          />
+        )}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">Online Assessment</h3>
+            <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">{isMock ? "Mock Test" : "Online Assessment"}</h3>
             {assessment.domain && (
               <p className="mt-0.5 text-xs text-slate-400">
                 <Layers size={11} className="mr-1 inline" /> {assessment.domain}
               </p>
             )}
           </div>
-          {remaining !== null && remaining > 0 && (
-            <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-mono font-bold ${remaining < 60 ? "bg-rose-50 text-rose-700 animate-pulse" : "bg-amber-50 text-amber-700"}`}>
-              <Clock size={14} /> {formatTime(remaining)}
-            </span>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {proctoring.active && (
+              <ExtensionRequest
+                token={token}
+                status={extension.status}
+                requestedMs={extension.requestedMs}
+                grantedMs={extension.grantedMs}
+                disabled={proctoring.blocked}
+              />
+            )}
+            {remaining !== null && remaining > 0 && (
+              <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-mono font-bold ${remaining < 60 ? "bg-rose-50 text-rose-700 animate-pulse" : "bg-amber-50 text-amber-700"}`}>
+                <Clock size={14} /> {formatTime(remaining)}
+              </span>
+            )}
+          </div>
         </div>
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-400 dark:text-zinc-500">
           <span>Passing threshold: {assessment.passScore}%</span>
-          {assessment.negativeMarking > 0 && <span>Negative marking: -{assessment.negativeMarking} per wrong answer</span>}
+          {assessment.negativeMarking > 0 && <span>Negative marking: -{negativeMarkingShort(assessment.negativeMarking, assessment.negativeMarkingLabel)} per wrong answer</span>}
+          {proctoring.active && <span>Proctored — camera on, no recording</span>}
           <span>Answers save automatically</span>
+          {isMock && <span className="font-semibold text-slate-500 dark:text-zinc-400">Practice run — does not affect your application</span>}
         </div>
+        {proctoring.active && (
+          <div className="mt-3">
+            <ProctoringBanner
+              noiseWarnings={proctoring.noiseWarnings}
+              noiseWarningsLeft={proctoring.noiseWarningsLeft}
+              noiseThresholdDb={proctoringSettings?.noiseThresholdDb ?? -35}
+              peakDb={proctoring.peakDb}
+              multiFaceWarning={proctoring.multiFaceWarning}
+              faceMode={proctoring.faceMode}
+              fullscreenMissing={proctoring.fullscreenMissing}
+              fullscreenSupported={proctoring.fullscreenSupported}
+              onRestore={() => void restoreFullscreen()}
+              onDismissFace={proctoring.dismissFaceWarning}
+            />
+          </div>
+        )}
         {!inExamWindow && (
           <p className="mt-3 flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
             <AlertTriangle size={14} className="shrink-0" />
@@ -877,19 +1179,52 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
         </div>
         {error && <p className="mt-2 flex items-center gap-1.5 text-sm text-rose-600"><AlertTriangle size={14} /> {error}</p>}
         <button onClick={() => void handleSubmitClick()} disabled={submitting} className="mt-4 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: accent }}>
-          <Send size={14} /> {submitting ? "Submitting..." : "Submit Assessment"}
+          <Send size={14} /> {submitting ? "Submitting..." : isMock ? "Submit Mock Test" : "Submit Assessment"}
         </button>
       </div>
     );
   }
 
-  // 3. Pre-exam view: closed, waiting room, or expired
+  // 3. Preflight: the device check a proctored sitting must pass first.
+  if (preflight && !submitted) {
+    return (
+      <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-5">
+        <ProctoringPreflight
+          stream={media.stream}
+          micDb={preflightMic.db}
+          micSupported={preflightMic.supported}
+          requireCamera={proctoringSettings?.requireCamera !== false}
+          requireMic={proctoringSettings?.requireMic !== false}
+          requireFullscreen={proctoringSettings?.requireFullscreen !== false}
+          fullscreenSupported={proctoring.fullscreenSupported}
+          noiseThresholdDb={proctoringSettings?.noiseThresholdDb ?? -35}
+          noiseWarningLimit={proctoringSettings?.noiseWarningLimit ?? 3}
+          status={media.status}
+          error={media.error}
+          ready={proctorReady}
+          busy={beginBusy}
+          onRetry={() => void media.retry()}
+          onBegin={() => void beginProctoredAssessment()}
+          tone={accent}
+        />
+        {error && <p className="mt-2 flex items-center gap-1.5 text-sm text-rose-600"><AlertTriangle size={14} /> {error}</p>}
+      </div>
+    );
+  }
+
+  // 4. Pre-exam view: closed, waiting room, or expired
   return (
     <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-5">
-      <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">Online Assessment</h3>
+      <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">{isMock ? "Mock Test" : "Online Assessment"}</h3>
       {assessment.enabled && (
         <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
           {scheduleText ? `${scheduleText} · ` : ""}{assessment.durationMinutes ? `${assessment.durationMinutes} min time limit · ` : ""}Passing threshold {assessment.passScore}%
+        </p>
+      )}
+      {proctoringWanted && (
+        <p className="mt-1.5 text-xs text-slate-400 dark:text-zinc-500">
+          Proctored: the camera and microphone stay on, and the exam opens fullscreen. Nothing is
+          recorded.
         </p>
       )}
 
@@ -897,8 +1232,8 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
         <p className="mt-3 flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400">
           <AlertTriangle size={16} className="mt-0.5 shrink-0" />
           <span>
-            The window to start this assessment has closed{assessment.endsAt ? ` — your time ended at ${fmtClock(assessment.endsAt)}` : ""}.
-            {assessment.stage === "assessment" && " Your saved answers are still available if you contacted the hiring team."}
+            The window to start this {isMock ? "mock test" : "assessment"} has closed{assessment.endsAt ? ` — your time ended at ${fmtClock(assessment.endsAt)}` : ""}.
+            {!isMock && assessment.stage === "assessment" && " Your saved answers are still available if you contacted the hiring team."}
           </span>
         </p>
       ) : inLobby ? (
@@ -906,18 +1241,37 @@ export function AssessmentPanel({ token, assessment, accent, companyName, onRefr
       ) : (
         <>
           {isClosed && <p className="mt-3 text-sm text-slate-500 dark:text-zinc-400">{closedMessage()}</p>}
+          {isMock && !assessment.eligibleToStart && !isClosed && !isExpired && assessment.attemptsUsed != null && assessment.maxAttempts != null && (
+            <p className="mt-3 text-sm text-slate-500 dark:text-zinc-400">
+              You have used all {assessment.maxAttempts} attempt{assessment.maxAttempts > 1 ? "s" : ""} for this mock test. Contact the hiring team if you need another.
+            </p>
+          )}
           {hasDomains && !submitted && <div className="mt-4">{renderDomainPicker()}</div>}
           {assessment.windowMode === "uniform" && assessment.slots.length > 0 && !submitted && (
             <div className="mt-4">{renderSlotPicker()}</div>
           )}
           {assessment.eligibleToStart && (
             <button
-              onClick={() => void handleStart()}
+              onClick={() => {
+                if (proctoringWanted) {
+                  setPreflight(true);
+                  setProctorReady(false);
+                  void media.acquire();
+                  return;
+                }
+                void handleStart();
+              }}
               className="mt-4 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90"
               style={{ backgroundColor: accent }}
             >
               <PlayCircle size={16} />
-              {assessment.phase === "lobby" ? "Enter Waiting Room" : "Start Assessment"}
+              {assessment.phase === "lobby" && !isMock
+                ? "Enter Waiting Room"
+                : proctoringWanted
+                  ? "Check camera and start"
+                  : isMock
+                    ? "Start Mock Test"
+                    : "Start Assessment"}
             </button>
           )}
         </>

@@ -7,6 +7,20 @@ import { jsonError, serializeDoc } from "@/lib/api";
 import { findCandidateByToken } from "@/lib/candidate-portal";
 import { saveDocument, deleteFileByUrl } from "@/lib/storage";
 import { publicCandidateProjection } from "@/lib/candidate-visibility";
+import { isEditWindowOpen } from "@/lib/recruitment-utils";
+
+/** Deadline label for the "window closed" message, in UTC to match the stored wall clock. */
+function fmtDeadline(closeAt: Date): string {
+  return closeAt.toLocaleString("en-IN", {
+    timeZone: "UTC",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
 
 export async function PATCH(request: Request) {
   const url = new URL(request.url);
@@ -20,8 +34,22 @@ export async function PATCH(request: Request) {
 
   const job = await ATSJob.findById(candidate.job);
   if (!job) return jsonError("Job not found.", 404);
-  if ((job as any).editApplicationsEnabled !== true) {
+
+  // Two different failures, two different messages. "Not enabled" and "the window
+  // closed" are indistinguishable to the candidate from a single generic error,
+  // and a closed window is the one they can act on (by emailing HR) rather than a
+  // dead end.
+  if (job.editApplicationsEnabled !== true) {
     return jsonError("Editing applications is not enabled for this job.", 403);
+  }
+  const window = isEditWindowOpen(job);
+  if (!window.open) {
+    return jsonError(
+      window.closeAt
+        ? `The editing window for this job closed on ${fmtDeadline(window.closeAt)}. Contact the hiring team if you need to make a change.`
+        : "The editing window for this job is closed. Contact the hiring team if you need to make a change.",
+      403
+    );
   }
 
   const form = await request.formData();
@@ -81,7 +109,7 @@ export async function PATCH(request: Request) {
   });
 
   const populated = await ATSCandidate.findById(candidate._id)
-    .populate("job", "title department location employmentType salaryRangeMin salaryRangeMax salaryType currency description requiredSkills assessment assessmentDate assessmentDurationMinutes editApplicationsEnabled")
+    .populate("job", "title department location employmentType salaryRangeMin salaryRangeMax salaryType currency description requiredSkills assessment assessmentDate assessmentDurationMinutes editApplicationsEnabled editApplicationsCloseAt")
     .populate("company", "name icon primaryColor stageOrder");
 
   return NextResponse.json({ success: true, candidate: publicCandidateProjection(serializeDoc(populated)), changed });

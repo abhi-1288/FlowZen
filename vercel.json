@@ -4,6 +4,8 @@
     { "path": "/api/cron/job-closing", "schedule": "0 1 * * *" },
     { "path": "/api/cron/contract-end-disconnect", "schedule": "0 2 * * *" },
     { "path": "/api/cron/assessment-day", "schedule": "0 16 * * *" },
-    { "path": "/api/cron/assessment-answer-key", "schedule": "0 3 * * *" }
+    { "path": "/api/cron/assessment-answer-key", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/mock-test-day", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/edit-application-invites", "schedule": "0 5 * * *" }
   ]
 }

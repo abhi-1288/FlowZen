@@ -151,13 +151,21 @@ export function getAssessmentAnchorMs(
   return mode === "uniform" ? slot.startMs : actualStartMs;
 }
 
-/** The hard deadline for a candidate's exam. */
+/**
+ * The hard deadline for a candidate's exam.
+ *
+ * `graceMs` is extra time handed back for proctoring interruptions (see
+ * lib/assessment-proctoring.ts). It is added here rather than at each call site
+ * so every gate — the client countdown, submit, auto-submit and the sweep —
+ * agrees on one deadline.
+ */
 export function getAssessmentDeadlineMs(
   anchorMs: number,
-  durationMinutes: number | null | undefined
+  durationMinutes: number | null | undefined,
+  graceMs = 0
 ): number | null {
   if (!durationMinutes || durationMinutes <= 0) return null;
-  return anchorMs + durationMinutes * 60 * 1000;
+  return anchorMs + durationMinutes * 60 * 1000 + Math.max(0, graceMs);
 }
 
 /** The slot a candidate should land on, given an optional explicit choice. */

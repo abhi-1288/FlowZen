@@ -1,5 +1,6 @@
 import { ATSAssessment } from "@/models/ATSAssessment";
 import { getAssessmentDeadlineMs, resolveAssessmentSlots, type ResolvedSlot } from "@/lib/assessment-timing";
+import { resolveProctoringConfig, type ProctoringConfig } from "@/lib/assessment-proctoring";
 
 export type CandidateAssessmentWindow = {
   slots: ResolvedSlot[];
@@ -8,7 +9,9 @@ export type CandidateAssessmentWindow = {
   instructions: string;
   passScore: number;
   negativeMarking: number;
+  negativeMarkingLabel: string;
   domains: Array<{ name: string; limit: number; questionCount: number }>;
+  proctoring: ProctoringConfig & { exempt: boolean };
 };
 
 /**
@@ -21,11 +24,13 @@ export type CandidateAssessmentWindow = {
  * assessment has no usable date at all.
  *
  * Pass the lean assessment document in when the caller has already loaded it
- * (question building needs the full domain sections anyway).
+ * (question building needs the full domain sections anyway), and the candidate
+ * when the caller needs the per-candidate proctoring exemption.
  */
 export function resolveCandidateAssessmentWindow(
   job: any,
-  assessment: any
+  assessment: any,
+  candidate?: any
 ): CandidateAssessmentWindow | null {
   if (!job?.assessment) return null;
 
@@ -54,6 +59,8 @@ export function resolveCandidateAssessmentWindow(
     questionCount: Array.isArray(d.questions) ? d.questions.length : 0,
   }));
 
+  const proctoring = resolveProctoringConfig(assessment?.proctoring);
+
   return {
     slots,
     mode,
@@ -61,7 +68,11 @@ export function resolveCandidateAssessmentWindow(
     instructions: String(assessment?.instructions || ""),
     passScore: assessment?.passScore ?? 50,
     negativeMarking: assessment?.negativeMarking ?? 0,
+    negativeMarkingLabel: String(assessment?.negativeMarkingLabel || ""),
     domains,
+    // An HR exemption is recorded per candidate, not per assessment, so it is
+    // resolved here rather than baked into the assessment document.
+    proctoring: { ...proctoring, exempt: candidate?.assessmentProctoring?.exempt === true },
   };
 }
 

@@ -98,6 +98,14 @@ const INTERNAL_ONLY_STAGES = new Set(["ats-rejected", "assessment-rejected"]);
  * `assessmentScore` is intentionally absent: it is already released, correctly,
  * through `assessment.score` behind the `resultPublished` gate in the endpoint.
  * Copying it onto the candidate would bypass that gate.
+ *
+ * `assessmentProctoring` is absent for the same reason and a stronger one. It
+ * holds the violation count, the peak noise reading and the session log, which
+ * HR is expected to weigh rather than act on automatically — a candidate seeing
+ * "3 interruptions recorded" during a live exam would reasonably assume they
+ * have already been failed, and might abandon the attempt. Because this is an
+ * allowlist, adding the field to the schema shipped nothing; it would have taken a
+ * deliberate line here to expose it.
  */
 export const CANDIDATE_VISIBLE_FIELDS = [
   "firstName",

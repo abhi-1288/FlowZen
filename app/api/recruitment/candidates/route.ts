@@ -21,6 +21,13 @@ import { sendMail } from "@/lib/mailer";
 const HR_ROLES = ["admin", "human-resource"];
 const ALL_ROLES = [...HR_ROLES, "project-manager", "qa-tester", "finance"];
 
+/** Domain filter value that means "candidate never picked a domain". */
+const NO_ASSESSMENT_DOMAIN = "__none__";
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export async function GET(request: Request) {
   const userId = await requireUserId();
   if (!userId) return jsonError("Unauthorized", 401);
@@ -35,6 +42,7 @@ export async function GET(request: Request) {
   const stage = searchParams.get("stage");
   const jobId = searchParams.get("jobId");
   const search = searchParams.get("search");
+  const assessmentDomain = (searchParams.get("assessmentDomain") ?? "").trim();
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
   const rawLimit = parseInt(searchParams.get("limit") ?? "10", 10);
   const limit = rawLimit === 0 ? 0 : Math.min(100, Math.max(1, rawLimit));
@@ -43,6 +51,11 @@ export async function GET(request: Request) {
   const filter: Record<string, unknown> = { company: user.company };
   if (stage) filter.stage = stage;
   if (jobId && isObjectId(jobId)) filter.job = jobId;
+  if (assessmentDomain === NO_ASSESSMENT_DOMAIN) {
+    filter.assessmentDomain = { $in: ["", null] };
+  } else if (assessmentDomain) {
+    filter.assessmentDomain = new RegExp(`^${escapeRegExp(assessmentDomain)}$`, "i");
+  }
   if (search) {
     filter.$or = [
       { firstName: { $regex: search, $options: "i" } },
@@ -86,7 +99,20 @@ export async function GET(request: Request) {
     upcomingInterviews: interviewMap[c.id] || [],
   }));
 
-  return NextResponse.json({ candidates: serialized, totalCount, page, limit });
+  // Domain names are free text chosen by the candidate, so build the filter
+  // options from what has actually been used rather than a fixed list.
+  const domains = (await ATSCandidate.distinct("assessmentDomain", {
+    company: user.company,
+    assessmentDomain: { $nin: ["", null] },
+  })) as unknown[];
+
+  return NextResponse.json({
+    candidates: serialized,
+    totalCount,
+    page,
+    limit,
+    domains: domains.map(String).sort((a, b) => a.localeCompare(b)),
+  });
 }
 
 export async function POST(request: Request) {

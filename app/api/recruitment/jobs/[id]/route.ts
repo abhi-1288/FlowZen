@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { connectDb } from "@/lib/db";
 import { ATSJob } from "@/models/ATSJob";
 import { ATSCandidate } from "@/models/ATSCandidate";
@@ -12,11 +12,13 @@ import { User } from "@/models/User";
 import { Company } from "@/models/Company";
 import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
-import { autoCloseOverdueJobs } from "@/lib/recruitment-utils";
+import {
+  autoCloseOverdueJobs,
+  closeExpiredEditWindows,
+  validateEditWindowDeadline,
+} from "@/lib/recruitment-utils";
 import { deleteFileByUrl } from "@/lib/storage";
-import { buildOrigin, buildPortalLink, resolveCandidatePortalToken } from "@/lib/candidate-portal";
-import { sendMail } from "@/lib/mailer";
-import { editApplicationsEnabledEmail } from "@/lib/email-templates";
+import { sendEditApplicationInvites } from "@/lib/edit-application-emails";
 
 type Params = { params: Promise<{ id: string }> };
 const HR_ROLES = ["admin", "human-resource"];
@@ -36,6 +38,9 @@ export async function GET(_request: Request, { params }: Params) {
 
   await connectDb();
   await autoCloseOverdueJobs();
+  // Just-in-time sweep, mirroring autoCloseOverdueJobs above, so opening the job
+  // page is enough to see a lapsed editing window as closed.
+  await closeExpiredEditWindows().catch(() => {});
   const user = await User.findById(userId);
   const isSeniorSecurity = user?.role === "security" && Boolean((user as any).isSeniorSecurity);
   if (!user || (!HR_ROLES.includes(user.role) && !isSeniorSecurity)) return jsonError("Forbidden", 403);
@@ -280,9 +285,23 @@ if (body.requiredExperienceYears !== undefined) updates.requiredExperienceYears 
 
   if (action === "enable-edit-applications" || action === "disable-edit-applications") {
     const enabled = action === "enable-edit-applications";
+    const update: Record<string, unknown> = { editApplicationsEnabled: enabled };
+
+    if (enabled) {
+      // A deadline is mandatory when opening the window. Storing a null one would
+      // leave editing open forever, which is the exact failure this replaces.
+      const validated = validateEditWindowDeadline(body.editApplicationsCloseAt);
+      if (!validated.ok) return jsonError(validated.error, 400);
+      update.editApplicationsCloseAt = validated.closeAt;
+    } else {
+      // Clear the deadline too. Leaving it behind means a later enable could
+      // resurrect a window that was shut days ago.
+      update.editApplicationsCloseAt = null;
+    }
+
     const job = await ATSJob.findOneAndUpdate(
       { _id: id, company: companyId },
-      { $set: { editApplicationsEnabled: enabled } },
+      { $set: update },
       { new: true }
     ).populate("company", "name icon");
     if (!job) return jsonError("Job not found.", 404);
@@ -292,45 +311,55 @@ if (body.requiredExperienceYears !== undefined) updates.requiredExperienceYears 
       action: enabled ? "enable-edit-applications" : "disable-edit-applications",
       entityType: "ATSJob",
       entityId: job._id,
-      metadata: { title: job.title },
+      metadata: {
+        title: job.title,
+        ...(enabled ? { closesAt: (job as any).editApplicationsCloseAt } : {}),
+      },
       company: companyId,
     });
 
     await notifyJobUpdated(companyId);
 
-    if (enabled) {
-      const candidates = await ATSCandidate.find(
-        { job: id, company: companyId, email: { $ne: "" } },
-        "firstName lastName email"
+    if (!enabled) return NextResponse.json({ job: serializeDoc(job) });
+
+    // Re-opening the window is a new invitation round. Clearing the marker makes
+    // every candidate eligible again, and rotating the portal token hands them a
+    // link that is good for the full 30 days the new window runs in — which is
+    // why the deadline is capped at 25 by validateEditWindowDeadline above.
+    const candidates = await ATSCandidate.find(
+      { job: id, company: companyId, email: { $ne: "" } },
+      "_id"
+    );
+    if (candidates.length) {
+      await ATSCandidate.updateMany(
+        { _id: { $in: candidates.map((c: any) => c._id) } },
+        { $set: { editApplicationInviteSentAt: null } }
       );
-      const companyDoc = job.company as any;
-      const brand = {
-        name: (companyDoc as any)?.name,
-        icon: (companyDoc as any)?.icon,
-      };
-      const origin = buildOrigin(request);
-      let emailed = 0;
-      for (const candidate of candidates) {
-        try {
-          const token = await resolveCandidatePortalToken(String(candidate._id));
-          if (!token || !candidate.email) continue;
-          const portalLink = buildPortalLink(origin, token);
-          const emailContent = editApplicationsEnabledEmail({
-            candidateName: `${candidate.firstName} ${candidate.lastName}`.trim(),
-            jobTitle: job.title,
-            portalLink,
-            company: brand,
-          });
-          await sendMail({ to: candidate.email, subject: emailContent.subject, text: "", html: emailContent.html });
-          emailed++;
-        } catch (emailErr) {
-          console.error("Failed to send edit-application email:", emailErr);
-        }
-      }
-      return NextResponse.json({ job: serializeDoc(job), emailed });
     }
 
-    return NextResponse.json({ job: serializeDoc(job) });
+    // The invites themselves are sent by the cron/dev sender, not awaited here.
+    // Sending them inline meant two sequential DB writes plus a mail round-trip
+    // per candidate while the HTTP request was still open, which times out on
+    // any job with a few hundred applicants.
+    //
+    // `after()` kicks the send once the response is already flushed, so HR gets
+    // the effect immediately without paying for it in the request. The daily cron
+    // is the safety net: if the runtime freezes the function before `after()`
+    // finishes, the per-candidate marker means the next run sends whoever is
+    // still missing an invite, and nobody gets a duplicate.
+    after(async () => {
+      try {
+        await sendEditApplicationInvites({ jobId: id });
+      } catch (err) {
+        console.error("Edit-application invites failed:", err);
+      }
+    });
+
+    return NextResponse.json({
+      job: serializeDoc(job),
+      invitesQueued: candidates.length,
+      invitesSending: true,
+    });
   }
 
   // Fallback: regular field updates (for published/open/closed jobs)

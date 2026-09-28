@@ -1,4 +1,5 @@
 import {
+  getAssessmentDeadlineMs,
   getAssessmentPhase,
   resolveAssessmentSlots,
   type AssessmentTimeSlot,
@@ -30,6 +31,34 @@ export function pickDomain(
   const found = domains.find((d) => d.name.trim().toLowerCase() === target.toLowerCase());
   if (!found) return null;
   return { name: found.name, questions: found.questions || [] };
+}
+
+/**
+ * The single source of truth for a candidate's exam deadline.
+ *
+ * The deadline used to be recomputed by hand in five places from
+ * `assessmentStartedAt` + duration, which is exactly the kind of duplication
+ * that silently grants or revokes time. Every gate now calls this instead.
+ *
+ * Two additions sit on top of the base duration:
+ *   - `graceMs`   time handed back for proctoring interruptions
+ *   - `extensionMs` time an HR reviewer approved extending the paper by
+ */
+export function getCandidateDeadlineMs(
+  candidate: {
+    assessmentStartedAt?: Date | string | null;
+    assessmentProctoring?: { graceMs?: number | null; extensionMs?: number | null } | null;
+  } | null | undefined,
+  durationMinutes: number | null | undefined
+): number | null {
+  if (!candidate?.assessmentStartedAt) return null;
+  const started = new Date(candidate.assessmentStartedAt).getTime();
+  if (!Number.isFinite(started)) return null;
+  const proctoring = candidate.assessmentProctoring;
+  const extra =
+    Math.max(0, Number(proctoring?.graceMs) || 0) +
+    Math.max(0, Number(proctoring?.extensionMs) || 0);
+  return getAssessmentDeadlineMs(started, durationMinutes, extra);
 }
 
 // Whether the online assessment can currently be started. The window honours the

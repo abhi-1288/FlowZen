@@ -5,7 +5,8 @@ import { ATSJob } from "@/models/ATSJob";
 import { ATSTimeline } from "@/models/ATSTimeline";
 import { jsonError } from "@/lib/api";
 import { findCandidateByToken } from "@/lib/candidate-portal";
-import { buildAssessmentQuestions, pickDomain } from "@/lib/assessment";
+import { buildAssessmentQuestions, getCandidateDeadlineMs, pickDomain } from "@/lib/assessment";
+import { resolveProctoringConfig } from "@/lib/assessment-proctoring";
 import {
   getAssessmentAnchorMs,
   getAssessmentDeadlineMs,
@@ -15,6 +16,16 @@ import {
   loadCandidateAssessment,
   resolveCandidateAssessmentWindow,
 } from "@/lib/assessment-window";
+import {
+  buildMockPaper,
+  drawMockSample,
+  isMockMode,
+  mockPrefix,
+  mockSampleSeed,
+  resolveMockDomain,
+  resolveMockSitting,
+} from "@/lib/assessment-mock-attempt";
+import { resolveActiveMockAttempt } from "@/lib/assessment-mock";
 
 /**
  * "09:00" -> "9:00 AM", for user-facing error text. UTC on purpose: slot times
@@ -41,6 +52,228 @@ function formatSlotLabel(start: string): string {
  * reaches zero. `assessmentStartedAt` doubles as the exam clock anchor, which is
  * what makes the deadline survive a tab close or a duplicate request.
  */
+/**
+ * Starting a mock test.
+ *
+ * Shares the panel, the clock, the proctoring config and the question bank with
+ * the real assessment, and nothing else. It is a separate path rather than a
+ * parameterised one so that it cannot inherit — even by accident — the real
+ * flow's stage promotion, its already-submitted guard, or its timeline entries.
+ * A practice paper must leave no trace on the recruitment record.
+ *
+ * There is no lobby: the mock window is continuous, so a candidate may start at
+ * any moment inside it and the paper begins when they press the button.
+ */
+async function startMockAttempt(request: Request, candidate: any, job: any) {
+  if (!["screening", "assessment"].includes(candidate.stage))
+    return jsonError("You are not eligible for the mock test.", 400);
+
+  const now = new Date();
+  const nowMs = now.getTime();
+
+  const assessment = await loadCandidateAssessment(job._id, candidate.company);
+  if (!assessment) return jsonError("Mock test questions are not yet available.", 400);
+
+  const sitting = resolveMockSitting(
+    candidate,
+    (assessment as any).mockTest,
+    job.assessmentDurationMinutes ?? null,
+    nowMs
+  );
+
+  // ── Gates ────────────────────────────────────────────────────────────────
+  // An attempt already in progress is governed by its own clock, not by the
+  // window: someone who started an hour before the window shut is still sitting
+  // it, and must not be cut off because the entry window has since closed.
+  if (sitting.activeIndex === null) {
+    if (!sitting.config.enabled) return jsonError("The mock test is not open.", 400);
+    if (sitting.window.phase === "unusable") return jsonError("The mock test is not available.", 400);
+    if (sitting.window.phase === "scheduled") {
+      return jsonError(
+        `The mock test opens at ${new Date(sitting.window.opensAt as number).toISOString()}.`,
+        425
+      );
+    }
+    if (sitting.window.phase === "entry-closed") {
+      return jsonError(
+        `The last time to start the mock test has passed. It closes at ${new Date(
+          sitting.window.closesAt as number
+        ).toISOString()}.`,
+        409
+      );
+    }
+    if (sitting.window.phase !== "open") return jsonError("The mock test is not available.", 400);
+    if (sitting.remainingStarts <= 0) {
+      return jsonError("You have used all of your mock test attempts.", 409);
+    }
+  } else if (sitting.deadlineMs !== null && nowMs >= sitting.deadlineMs) {
+    return jsonError("Your time is up. The mock test has been closed.", 409);
+  }
+
+  // ── Domain ───────────────────────────────────────────────────────────────
+  const body = await request.json().catch(() => ({}));
+  const requestedDomain = typeof body?.domain === "string" ? body.domain : "";
+  const domains = ((assessment as any).domains as any[]) || [];
+  const chosenDomain = resolveMockDomain(domains, requestedDomain, candidate, sitting.active);
+  if (domains.length && !chosenDomain) {
+    return jsonError("Please select your domain to start the mock test.", 400);
+  }
+
+  // ── Proctoring ───────────────────────────────────────────────────────────
+  // The same config, and the same acknowledgement gate, as the real paper: a
+  // client can skip this by calling the endpoint directly, so requiring the
+  // device check before anything is served is what closes the trivial bypass.
+  const proctoring = resolveProctoringConfig((assessment as any).proctoring);
+  const exempt = sitting.active?.proctoring?.exempt === true;
+  const proctoringActive = proctoring.enabled && !exempt;
+
+  if (proctoringActive && sitting.activeIndex === null && body?.proctoringAck !== true) {
+    return jsonError("This mock test is proctored. Complete the camera and microphone check first.", 428);
+  }
+
+  // ── First start: draw the sample and persist it ──────────────────────────
+  // The indices are written as part of the same atomic push that records the
+  // start, so there is no window in which a sitting exists without a paper
+  // behind it. Two concurrent first-starts draw the same seeded sample, so
+  // whichever lands first produces the same paper.
+  let index = sitting.activeIndex;
+  let attempt = sitting.active;
+
+  if (index === null || !attempt) {
+    const poolSize =
+      ((assessment as any).questions as any[])?.length + (chosenDomain?.questions?.length || 0);
+    if (poolSize <= 0) return jsonError("Mock test questions are not yet available.", 400);
+
+    const attemptNumber = sitting.used + 1;
+    const questionIndices = drawMockSample(
+      poolSize,
+      sitting.config,
+      mockSampleSeed(String(candidate._id), String(job._id), attemptNumber)
+    );
+    if (!questionIndices.length) return jsonError("Mock test questions are not yet available.", 400);
+
+    // Both conditions are enforced in the update filter, not merely read above:
+    // two tabs (or a double-clicked Begin) can arrive before either has written,
+    // and a plain read-then-push would let both claim attempt number 1.
+    // `startedAt` counts toward the cap, matching `resolveMockSitting`.
+    const startedCount = {
+      $size: {
+        $filter: {
+          input: { $ifNull: ["$mockTest.attempts", []] },
+          as: "a",
+          cond: { $ne: ["$$a.startedAt", null] },
+        },
+      },
+    };
+    const created = await ATSCandidate.findOneAndUpdate(
+      {
+        _id: candidate._id,
+        // No sitting in progress.
+        "mockTest.attempts": {
+          $not: { $elemMatch: { startedAt: { $ne: null }, submittedAt: null } },
+        },
+        // Still within the attempt limit.
+        $expr: { $lt: [startedCount, sitting.config.maxAttempts] },
+      },
+      {
+        $push: {
+          "mockTest.attempts": {
+            attemptNumber,
+            startedAt: now,
+            submittedAt: null,
+            autoSubmitted: false,
+            domain: chosenDomain?.name || "",
+            questionIndices,
+            answers: [],
+            proctoring: {
+              // Kept to facts: the browser cannot prove a camera is really a
+              // camera, so nothing is recorded that the preflight did not see.
+              log: proctoringActive
+                ? [
+                    {
+                      at: now,
+                      kind: "devices",
+                      detail: [
+                        proctoring.requireCamera ? "camera required" : "camera optional",
+                        proctoring.requireMic ? "microphone required" : "microphone optional",
+                        body?.devices === "ok" ? "both devices opened" : "device state unconfirmed",
+                        proctoring.requireFullscreen ? "fullscreen enforced" : "fullscreen not enforced",
+                      ].join(", "),
+                    },
+                  ]
+                : [],
+            },
+          },
+        },
+      },
+      { new: true }
+    ).select("mockTest.attempts");
+
+    const fresh = (created as any)?.mockTest?.attempts as any[] | undefined;
+    if (!created || !fresh?.length) {
+      // Lost the race. If the winner's attempt is still in progress, serve that
+      // one instead of erroring: two tabs opening together should both be able
+      // to work on the same paper.
+      const reread = await ATSCandidate.findById(candidate._id).select("mockTest.attempts");
+      const attempts = ((reread as any)?.mockTest?.attempts as any[] | undefined)?.filter(Boolean) ?? [];
+      const resumed = resolveActiveMockAttempt(attempts) as { index: number; attempt: any } | null;
+      if (!resumed) {
+        return jsonError("You have used all available attempts for this mock test.", 409);
+      }
+      index = resumed.index;
+      attempt = resumed.attempt;
+    } else {
+      index = fresh.length - 1;
+      attempt = fresh[index];
+    }
+  }
+
+  // ── Serve ────────────────────────────────────────────────────────────────
+  // Replayed from the persisted sample, never re-drawn, so a reload or a second
+  // tab cannot hand the candidate a different paper from the one they answered.
+  const paper = buildMockPaper(
+    ((assessment as any).questions as any[]) || [],
+    (chosenDomain?.questions || []) as any[],
+    Array.isArray(attempt?.questionIndices) ? attempt.questionIndices : null
+  );
+  if (!paper.served.length) return jsonError("Mock test questions are not yet available.", 400);
+
+  const questions = paper.served.map((src: any, i: number) => ({
+    index: i,
+    text: src?.text ?? "",
+    options: Array.isArray(src?.options) ? src.options : [],
+    type: src?.type === "essay" ? "essay" : "mcq",
+    marks: Math.max(0, Number(src?.marks) || 1),
+    required: Boolean(src?.required),
+  }));
+
+  const startedAtMs = new Date(attempt?.startedAt || now).getTime();
+  const deadlineMs = sitting.deadlineMs ?? startedAtMs + (sitting.window.durationMs ?? 0);
+
+  return NextResponse.json({
+    mode: "mock",
+    waiting: false,
+    started: true,
+    attemptNumber: attempt?.attemptNumber ?? 1,
+    maxAttempts: sitting.maxAttempts,
+    windowMode: "relief",
+    durationMinutes: sitting.window.durationMinutes,
+    passScore: (assessment as any).passScore,
+    negativeMarking: (assessment as any).negativeMarking,
+    negativeMarkingLabel: (assessment as any).negativeMarkingLabel,
+    instructions: (assessment as any).instructions,
+    domains,
+    proctoring: { ...proctoring, active: proctoringActive },
+    domain: chosenDomain?.name || attempt?.domain || null,
+    slotStart: new Date(startedAtMs).toISOString(),
+    startsAt: new Date(startedAtMs).toISOString(),
+    lobbyOpensAt: sitting.window.opensAt === null ? null : new Date(sitting.window.opensAt).toISOString(),
+    endsAt: new Date(deadlineMs).toISOString(),
+    slots: [],
+    questions,
+  });
+}
+
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
   const token = searchParams.get("token");
@@ -54,6 +287,10 @@ export async function POST(request: Request) {
   const job = await ATSJob.findById(candidate.job);
   if (!job || !job.assessment) return jsonError("Assessment is not available for this job.", 400);
 
+  if (isMockMode(searchParams)) {
+    return startMockAttempt(request, candidate, job);
+  }
+
   if (!["screening", "assessment"].includes(candidate.stage))
     return jsonError("You are not eligible for the assessment.", 400);
   if ((candidate as any).assessmentSubmittedAt)
@@ -63,10 +300,9 @@ export async function POST(request: Request) {
   const nowMs = now.getTime();
 
   const assessment = await loadCandidateAssessment(job._id, candidate.company);
-  const window = resolveCandidateAssessmentWindow(job, assessment);
-  if (!window) return jsonError("Assessment is not scheduled yet.", 400);
-
-  const { slots, mode, durationMinutes, instructions, passScore, negativeMarking, domains } = window;
+  const window = resolveCandidateAssessmentWindow(job, assessment, candidate);
+  if (!window) return jsonError("This assessment is not open yet.", 400);
+  const { slots, mode, durationMinutes, instructions, passScore, negativeMarking, negativeMarkingLabel, domains, proctoring } = window;
 
   // A candidate moved back to "screening" by HR is treated as not started,
   // even if a stale assessmentStartedAt flag remains.
@@ -113,10 +349,7 @@ export async function POST(request: Request) {
 
   // ── Gate: this candidate's own clock has already run out ─────────────────
   if (alreadyStarted) {
-    const deadline = getAssessmentDeadlineMs(
-      new Date((candidate as any).assessmentStartedAt).getTime(),
-      durationMinutes
-    );
+    const deadline = getCandidateDeadlineMs(candidate, durationMinutes);
     if (deadline !== null && nowMs >= deadline) {
       return jsonError("Your time is up. The assessment has been closed.", 409);
     }
@@ -146,19 +379,26 @@ export async function POST(request: Request) {
   }
 
   const deadlineMs = alreadyStarted
-    ? getAssessmentDeadlineMs(new Date((candidate as any).assessmentStartedAt).getTime(), durationMinutes)
+    ? getCandidateDeadlineMs(candidate, durationMinutes)
     : getAssessmentDeadlineMs(
         getAssessmentAnchorMs(slot, mode, new Date((candidate as any).assessmentStartedAt || now).getTime()),
         durationMinutes
       );
+
+  // Proctoring is requested per assessment, but a candidate HR has exempted is
+  // served an unproctored paper. `proctoring.enabled` still comes back so the
+  // client knows the paper was meant to be proctored.
+  const proctoringActive = proctoring.enabled && !proctoring.exempt;
 
   const responseBase = {
     windowMode: mode,
     durationMinutes,
     passScore,
     negativeMarking,
+    negativeMarkingLabel,
     instructions,
     domains,
+    proctoring: { ...proctoring, active: proctoringActive },
     domain: chosenDomain?.name || (candidate as any).assessmentDomain || null,
     slotStart: new Date(slot.startMs).toISOString(),
     startsAt: new Date(slot.startMs).toISOString(),
@@ -175,9 +415,20 @@ export async function POST(request: Request) {
   // ── Exam ─────────────────────────────────────────────────────────────────
   if (!assessment) return jsonError("Assessment questions are not yet available.", 400);
 
+  // Anything client-side can be skipped by calling this endpoint directly, so a
+  // proctored sitting must be acknowledged before the paper is served. This is
+  // not a security boundary — nothing on the client can be trusted — but it
+  // closes the trivial bypass and leaves an auditable trace in the log.
+  if (proctoringActive && !alreadyStarted && body?.proctoringAck !== true) {
+    return jsonError(
+      "This assessment is proctored. Complete the camera and microphone check first.",
+      428
+    );
+  }
+
   const flatQuestions = buildAssessmentQuestions(
     (assessment.questions as any[]) || [],
-    (chosenDomain?.questions as any[]) || []
+    (chosenDomain?.questions || []) as any[]
   );
   if (!flatQuestions.length) return jsonError("Assessment questions are not yet available.", 400);
 
@@ -191,6 +442,24 @@ export async function POST(request: Request) {
     };
     if (chosenDomain) updates.assessmentDomain = chosenDomain.name;
     if (fromStage === "screening") updates.stage = "assessment";
+    if (proctoringActive) {
+      // Record that the paper was proctored, plus whatever the preflight could
+      // actually see about the devices. Kept to facts: the browser cannot prove
+      // a camera is really a camera, so nothing is claimed that it did not check.
+      updates["assessmentProctoring.log"] = [
+        ...(((candidate as any).assessmentProctoring?.log as any[]) || []),
+        {
+          at: new Date(),
+          kind: "devices",
+          detail: [
+            proctoring.requireCamera ? "camera required" : "camera optional",
+            proctoring.requireMic ? "microphone required" : "microphone optional",
+            body?.devices === "ok" ? "both devices opened" : "device state unconfirmed",
+            proctoring.requireFullscreen ? "fullscreen enforced" : "fullscreen not enforced",
+          ].join(", "),
+        },
+      ].slice(-200);
+    }
     await ATSCandidate.findByIdAndUpdate(candidate._id, updates);
 
     await ATSTimeline.create({

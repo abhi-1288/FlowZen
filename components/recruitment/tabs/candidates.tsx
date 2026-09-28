@@ -2,30 +2,34 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ChevronRight, ChevronDown, Briefcase, ChevronLeft, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, Briefcase, ChevronLeft, ChevronsLeft, ChevronsRight, Layers } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
 import { STAGES, STAGE_LABELS, type Stage } from "@/lib/recruitment-types";
 
 const LIMIT = 10;
+/** Domain filter value that means "candidate never picked a domain". */
+const NO_DOMAIN = "__none__";
 
 export function CandidatesTab() {
   const router = useRouter();
-  const { candidates, jobs, loading, totalCandidates, fetchCandidates, fetchJobs } = useRecruitmentStore(
-    useShallow((s) => ({ candidates: s.candidates, jobs: s.jobs, loading: s.loading, totalCandidates: s.totalCandidates, fetchCandidates: s.fetchCandidates, fetchJobs: s.fetchJobs }))
+  const { candidates, jobs, loading, totalCandidates, assessmentDomains, fetchCandidates, fetchJobs } = useRecruitmentStore(
+    useShallow((s) => ({ candidates: s.candidates, jobs: s.jobs, loading: s.loading, totalCandidates: s.totalCandidates, assessmentDomains: s.assessmentDomains, fetchCandidates: s.fetchCandidates, fetchJobs: s.fetchJobs }))
   );
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("");
+  const [domainFilter, setDomainFilter] = useState("");
   const [page, setPage] = useState(1);
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
   const [expandedCandidate, setExpandedCandidate] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const totalPages = Math.ceil(totalCandidates / LIMIT) || 1;
 
-  const load = useCallback((pg: number, stage: string, q: string) => {
+  const load = useCallback((pg: number, stage: string, q: string, domain: string) => {
     const params: Record<string, string> = { page: String(pg), limit: String(LIMIT) };
     if (stage) params.stage = stage;
     if (q) params.search = q;
+    if (domain) params.assessmentDomain = domain;
     void fetchCandidates(params);
   }, [fetchCandidates]);
 
@@ -34,8 +38,8 @@ export function CandidatesTab() {
   }, [jobs.length, fetchJobs]);
 
   useEffect(() => {
-    load(page, stageFilter, search);
-  }, [page, stageFilter, search, load]);
+    load(page, stageFilter, search, domainFilter);
+  }, [page, stageFilter, search, domainFilter, load]);
 
   const debouncedSearch = (value: string) => {
     setSearch(value);
@@ -71,10 +75,21 @@ export function CandidatesTab() {
     setPage(1);
   };
 
+  const handleDomainChange = (value: string) => {
+    setDomainFilter(value);
+    setPage(1);
+    setExpandedJobs(new Set());
+  };
+
+  const activeDomainLabel =
+    domainFilter === NO_DOMAIN ? "No domain chosen" : domainFilter || null;
+
   return (
     <div className="p-6">
       <h1 className="text-2xl font-semibold text-slate-900">Candidates</h1>
-      <p className="mt-1 text-sm text-slate-500">{totalCandidates} total</p>
+      <p className="mt-1 text-sm text-slate-500">
+        {totalCandidates} total{activeDomainLabel ? ` in ${activeDomainLabel}` : ""}
+      </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <div className="relative flex-1 max-w-xs">
@@ -95,6 +110,28 @@ export function CandidatesTab() {
           <option value="">All Stages</option>
           {stages.map((s) => <option key={s} value={s}>{STAGE_LABELS[s as Stage]}</option>)}
         </select>
+        <select
+          suppressHydrationWarning
+          aria-label="Filter by assessment domain"
+          className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none disabled:opacity-50"
+          value={domainFilter}
+          onChange={(e) => handleDomainChange(e.target.value)}
+          disabled={assessmentDomains.length === 0 && domainFilter === ""}
+        >
+          <option value="">All Domains</option>
+          {assessmentDomains.length === 0 && <option value={NO_DOMAIN}>No domain chosen</option>}
+          {assessmentDomains.map((d) => <option key={d} value={d}>{d}</option>)}
+          {assessmentDomains.length > 0 && <option value={NO_DOMAIN}>No domain chosen</option>}
+        </select>
+        {(domainFilter || stageFilter || search) && (
+          <button
+            suppressHydrationWarning
+            onClick={() => { setDomainFilter(""); setStageFilter(""); setSearch(""); setPage(1); }}
+            className="text-xs font-medium text-slate-500 hover:text-slate-800 hover:underline"
+          >
+            Clear filters
+          </button>
+        )}
       </div>
 
       {loading && candidates.length === 0 ? (
@@ -168,6 +205,11 @@ export function CandidatesTab() {
                                   {candidate.regionLabel && (
                                     <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700">
                                       <Briefcase size={10} className="opacity-60" /> {candidate.regionLabel}
+                                    </span>
+                                  )}
+                                  {candidate.assessmentDomain && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-medium text-teal-700">
+                                      <Layers size={10} className="opacity-60" /> {candidate.assessmentDomain}
                                     </span>
                                   )}
                                   <span>{candidate.email}</span>

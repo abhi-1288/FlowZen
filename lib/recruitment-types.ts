@@ -1,5 +1,40 @@
 export type AssessmentWindowMode = "uniform" | "relief";
 
+/** Candidate-facing proctoring settings, plus the per-candidate exemption. */
+export type AssessmentProctoring = {
+  enabled: boolean;
+  requireCamera: boolean;
+  requireMic: boolean;
+  requireFullscreen: boolean;
+  blockOnFocusLoss: boolean;
+  noiseThresholdDb: number;
+  noiseWarningLimit: number;
+  requireSingleFace: boolean;
+  blockScreenShare: boolean;
+  exempt: boolean;
+  /** Resolved per candidate: false when HR has waived proctoring. */
+  active?: boolean;
+};
+
+/** HR-only record of what the proctoring guards saw during one attempt. */
+export type CandidateProctoringRecord = {
+  violations: number;
+  noiseWarnings: number;
+  graceMs: number;
+  extensionMs: number;
+  pausedAt: string | null;
+  peakNoiseDb: number;
+  multiFaceEvents: number;
+  screenShareAttempts: number;
+  exempt: boolean;
+  exemptReason: string;
+  extensionRequestStatus: "none" | "pending" | "approved" | "denied";
+  extensionRequestedMs: number;
+  extensionRequestNote: string;
+  extensionDecidedAt: string | null;
+  log: Array<{ at: string; kind: string; detail: string }>;
+};
+
 export const CURRENCY_SYMBOLS: Record<string, string> = {
   INR: "₹",
   USD: "$",
@@ -117,6 +152,8 @@ export type ATSJob = {
   requiredExperienceMaxYears: number | null;
   atsScoreThreshold: number | null;
   editApplicationsEnabled: boolean;
+  /** UTC wall clock at which the editing window closes. See lib/date-utils. */
+  editApplicationsCloseAt: string | null;
   salaryRangeMin: number;
   salaryRangeMax: number;
   salaryType: SalaryType;
@@ -165,7 +202,10 @@ export type ATSCandidate = {
   assessmentDomain: string;
   assessmentRawMarks: number | null;
   assessmentMaxMarks: number | null;
+  /** HR/Admin only. Withheld from the candidate projection. */
+  assessmentProctoring: CandidateProctoringRecord;
   assessmentAnswers: Array<{ questionIndex: number; selectedOption: number | null; textAnswer?: string }>;
+  editApplicationInviteSentAt: string | null;
   notes: string;
   resumeUrl: string;
   portfolioUrl: string;
@@ -290,6 +330,8 @@ export type ATSAssessment = {
   job: string;
   passScore: number;
   negativeMarking: number;
+  negativeMarkingLabel: string;
+  proctoring: AssessmentProctoring;
   windowMode: AssessmentWindowMode;
   timeSlots: Array<{ start: string }>;
   instructions: string;

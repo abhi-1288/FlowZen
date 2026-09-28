@@ -38,6 +38,7 @@ import { ResumeViewerModal } from "@/components/recruitment/resume-viewer-modal"
 import OfferModal from "./components/offer-modal";
 import JobDescriptionModal from "./components/job-description-modal";
 import ConvertEmployeeModal from "./components/convert-modal";
+import { ProctoringPanel } from "@/components/recruitment/candidate-proctoring-panel";
 
 function interviewDetailHref(interview: any) {
   const job = interview?.job && typeof interview.job === "object" ? interview.job.title : "";
@@ -627,6 +628,18 @@ export default function CandidateProfilePage() {
             )}
             {(activeCandidate as any).assessmentRejectionNote && (
               <p className="mt-1 text-xs text-rose-600 font-medium">Rejection: {(activeCandidate as any).assessmentRejectionNote}</p>
+            )}
+            {isHr && (
+              <ProctoringPanel
+                candidateId={activeCandidate.id}
+                proctoring={(activeCandidate as any).assessmentProctoring ?? null}
+                isLive={
+                  activeCandidate.stage === "assessment" &&
+                  !(activeCandidate as any).assessmentSubmittedAt &&
+                  Boolean((activeCandidate as any).assessmentStartedAt)
+                }
+                onChanged={() => void fetchCandidate(activeCandidate.id)}
+              />
             )}
             {isHr && activeCandidate.stage === "screening" && (
               <div className="mt-3 border-t border-[var(--c-border-light)] pt-3">

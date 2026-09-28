@@ -88,15 +88,30 @@ export function buildPortalLink(origin: string, token: string | undefined): stri
  *   is expired or absent, the new token replaces it entirely.
  *
  * Returns undefined when no usable token can be produced.
+ *
+ * `force: true` mints a fresh token even when one is already stored. That
+ * deliberately breaks the "never rotate" rule above, and the only caller that
+ * may use it is the handler that opens an application-editing window: the
+ * candidate is being emailed a brand new link at that moment, so the previous
+ * one is superseded by design, and a token that was already inside its last
+ * hours would otherwise leave them unable to reach the form the email points at.
  */
-export async function resolveCandidatePortalToken(candidateId: string): Promise<string | undefined> {
+export async function resolveCandidatePortalToken(
+  candidateId: string,
+  options?: { force?: boolean }
+): Promise<string | undefined> {
   const candidate: any = await ATSCandidate.findById(candidateId).select(
     "+magicTokenHash magicTokenExpiresAt +portalTokenHash portalTokenExpiresAt portalAccessToken"
   );
   if (!candidate) return undefined;
 
-  if (candidate.portalAccessToken) return candidate.portalAccessToken;
+  if (candidate.portalAccessToken && options?.force !== true) {
+    return candidate.portalAccessToken;
+  }
 
+  // Rotating only makes sense against a live token. If the stored one has
+  // already expired there is nothing to preserve, so fall through to minting
+  // rather than keeping a dead original around.
   const originValid =
     candidate.magicTokenHash &&
     (!candidate.magicTokenExpiresAt || new Date(candidate.magicTokenExpiresAt).getTime() > Date.now());

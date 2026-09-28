@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   CheckCircle,
@@ -36,6 +36,8 @@ import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
 import { getInterviewJoinCountdownMs, isInterviewJoinWindowOpen, isInterviewJoinable, formatInterviewCountdown } from "@/lib/interview-timing";
+import { utcWallClockNow } from "@/lib/date-utils";
+import { isEditWindowOpen } from "@/lib/edit-window";
 import { JobDescription } from "@/components/recruitment/job-description";
 import { DEFAULT_ACCENT, hexToRgba, salarySuffix } from "@/lib/accent";
 import { AssessmentPanel } from "@/components/candidate-portal/assessment-panel";
@@ -70,6 +72,7 @@ type CandidateData = {
     assessmentDate?: string | null;
     assessmentDurationMinutes?: number | null;
     editApplicationsEnabled?: boolean;
+    editApplicationsCloseAt?: string | null;
   };
   company: { name: string; icon?: string; primaryColor?: string };
   createdAt: string;
@@ -391,6 +394,9 @@ function CandidatePortalInner() {
   const searchParams = useSearchParams();
   const token = searchParams?.get("token") ?? null;
   const isTestLink = searchParams?.get("test") === "true";
+  // The mock track is a separate sitting with its own paper, clock and result,
+  // so the exam tab has to say which one it is opening.
+  const isMockTest = searchParams?.get("mode") === "mock";
 
   const [candidate, setCandidate] = useState<CandidateData | null>(null);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
@@ -404,14 +410,52 @@ function CandidatePortalInner() {
   const [activePass, setActivePass] = useState<InterviewData | null>(null);
   const [activeVideoInterview, setActiveVideoInterview] = useState<InterviewData | null>(null);
   const [assessmentData, setAssessmentData] = useState<any>(null);
+  const [mockTestData, setMockTestData] = useState<any>(null);
   const [editAppOpen, setEditAppOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const assessmentRef = useRef<HTMLDivElement>(null);
+  const mockTestRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  /**
+   * Application-editing window, via the same helper the server gate and the HR
+   * page use, so the button can never disagree with what the API will allow.
+   *
+   * The deadline is a UTC wall clock, so it has to be compared against
+   * `utcWallClockNow()` rather than `Date.now()`: on a machine not running UTC
+   * those differ by the timezone offset, and the button would vanish hours early
+   * or stay live hours after the window shut. The offset is carried by `now` so
+   * the value still advances on the existing one-second tick, which is what makes
+   * the button disappear on the minute rather than on the next page load —
+   * otherwise a candidate who leaves the tab open past the deadline keeps a live
+   * button that only fails when they click it.
+   */
+  const editWallNow = useMemo(
+    () => Date.now() + (utcWallClockNow() - Date.now()),
+    [now]
+  );
+  const editWindow = useMemo(
+    () => isEditWindowOpen(candidate?.job, editWallNow),
+    [candidate?.job, editWallNow]
+  );
+  const editWindowOpen = editWindow.open;
+  const editWindowExpired = editWindow.expired;
+  const editCloseAt = editWindow.closeAt;
+  const editDeadlineLabel =
+    editCloseAt && !Number.isNaN(editCloseAt.getTime())
+      ? editCloseAt.toLocaleString("en-IN", {
+          timeZone: "UTC",
+          day: "numeric",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        })
+      : "";
 
   useEffect(() => {
     if (!token) { setError("No access token provided."); setLoading(false); return; }
@@ -420,7 +464,7 @@ function CandidatePortalInner() {
         if (!r.ok) { const d = await r.json(); throw new Error(d.error || "Invalid link."); }
         return r.json();
       })
-      .then((data) => { setCandidate({ ...data.candidate, stageOrder: data.stageOrder }); setTimeline(data.timeline ?? []); setInterviews(data.interviews ?? []); setOffer(data.offer ?? null); setAssessmentData(data.assessment ?? null); })
+      .then((data) => { setCandidate({ ...data.candidate, stageOrder: data.stageOrder }); setTimeline(data.timeline ?? []); setInterviews(data.interviews ?? []); setOffer(data.offer ?? null); setAssessmentData(data.assessment ?? null); setMockTestData(data.mockTest ?? null); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [token]);
@@ -430,6 +474,12 @@ function CandidatePortalInner() {
       setTimeout(() => assessmentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
     }
   }, [isTestLink, loading, assessmentData]);
+
+  useEffect(() => {
+    if (isTestLink && isMockTest && !loading && mockTestData && mockTestData.enabled) {
+      setTimeout(() => mockTestRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+    }
+  }, [isTestLink, isMockTest, loading, mockTestData]);
 
   async function handleOfferAction(action: "accept" | "reject") {
     if (!token) return;
@@ -455,6 +505,7 @@ function CandidatePortalInner() {
         setTimeline(refreshData.timeline ?? []);
         setInterviews(refreshData.interviews ?? []);
         setAssessmentData(refreshData.assessment ?? null);
+        setMockTestData(refreshData.mockTest ?? null);
       }
     } catch (e: any) {
       setOfferActionError(e.message);
@@ -496,8 +547,11 @@ function CandidatePortalInner() {
         .toUpperCase()
     : "CO";
 
-  // ─── Test mode: show only the assessment in a minimal shell ───
-  if (isTestLink && assessmentData && assessmentData.enabled) {
+  // ─── Test mode: show only the requested track in a minimal shell ───
+  // A `?mode=mock` link opens the practice track even when the real assessment
+  // is not configured for this candidate, and vice versa.
+  const testTrack = isMockTest ? mockTestData : assessmentData;
+  if (isTestLink && testTrack && testTrack.enabled) {
     return (
       <main className="min-h-screen bg-[#fafafa] dark:bg-[#1a1a1a]">
         <header className="sticky top-0 z-20 border-b border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)]/85 backdrop-blur-md">
@@ -510,16 +564,17 @@ function CandidatePortalInner() {
               </div>
             )}
             <span className="text-sm font-semibold text-slate-900 dark:text-zinc-100">{candidate.company?.name || "FlowZen"}</span>
-            <span className="ml-auto text-xs text-slate-400 dark:text-zinc-500">Online Assessment</span>
+            <span className="ml-auto text-xs text-slate-400 dark:text-zinc-500">{isMockTest ? "Mock Test" : "Online Assessment"}</span>
           </div>
         </header>
         <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
           <AssessmentPanel
             token={token!}
-            assessment={assessmentData}
+            assessment={testTrack}
             accent={accent}
             companyName={candidate.company?.name}
             autoStart
+            mode={isMockTest ? "mock" : "assessment"}
             onRefresh={() => {
               if (!token) return;
               fetch(`/api/public/candidate/me?token=${encodeURIComponent(token)}`)
@@ -528,6 +583,7 @@ function CandidatePortalInner() {
                   setCandidate({ ...d.candidate, stageOrder: d.stageOrder });
                   setTimeline(d.timeline ?? []);
                   setAssessmentData(d.assessment ?? null);
+                  setMockTestData(d.mockTest ?? null);
                 })
                 .catch(() => {});
             }}
@@ -617,7 +673,7 @@ function CandidatePortalInner() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-base font-bold text-slate-900 dark:text-zinc-100">Application progress</h2>
                 <div className="flex items-center gap-2">
-                  {candidate.job?.editApplicationsEnabled && (
+                  {editWindowOpen && (
                     <button
                       onClick={() => setEditAppOpen(true)}
                       className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all hover:opacity-90"
@@ -625,6 +681,16 @@ function CandidatePortalInner() {
                     >
                       <Pencil size={12} /> Edit application
                     </button>
+                  )}
+                  {editWindowExpired && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500 dark:bg-zinc-800 dark:text-zinc-400">
+                      <Clock size={12} /> Editing closed{editDeadlineLabel ? ` ${editDeadlineLabel}` : ""}
+                    </span>
+                  )}
+                  {editWindowOpen && editDeadlineLabel && (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400">
+                      <Clock size={12} /> Editing closes {editDeadlineLabel}
+                    </span>
                   )}
                   <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${stagePill.cls}`}>
                     {STAGE_LABELS[candidate.stage] || formatStage(candidate.stage)}
@@ -699,6 +765,31 @@ function CandidatePortalInner() {
                         setCandidate(d.candidate);
                         setTimeline(d.timeline ?? []);
                         setAssessmentData(d.assessment ?? null);
+                      })
+                      .catch(() => {});
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Mock test: a separate practice track that never touches the real
+                assessment's status, score or stage. */}
+            {mockTestData && mockTestData.enabled && (
+              <div className="mt-4" ref={mockTestRef}>
+                <AssessmentPanel
+                  token={token!}
+                  assessment={mockTestData}
+                  accent={accent}
+                  companyName={candidate.company?.name}
+                  mode="mock"
+                  onRefresh={() => {
+                    if (!token) return;
+                    fetch(`/api/public/candidate/me?token=${encodeURIComponent(token)}`)
+                      .then((r) => r.json())
+                      .then((d) => {
+                        setCandidate(d.candidate);
+                        setTimeline(d.timeline ?? []);
+                        setMockTestData(d.mockTest ?? null);
                       })
                       .catch(() => {});
                   }}
@@ -1045,6 +1136,7 @@ function CandidatePortalInner() {
                 setInterviews(d.interviews ?? []);
                 setOffer(d.offer ?? null);
                 setAssessmentData(d.assessment ?? null);
+                setMockTestData(d.mockTest ?? null);
               })
               .catch(() => {});
           }}

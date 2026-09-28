@@ -18,12 +18,14 @@ const ATSTimelineSchema = new Schema(
         "stage-changed",
         "joined",
         "rejected",
-        "joined",
-        "rejected",
         "note-added",
         "assessment-started",
         "assessment-submitted",
         "assessment-graded",
+        // Written by app/api/public/candidate/me/application/route.ts. This was
+        // missing from the enum, so mongoose rejected the create() and the
+        // candidate's edit saved but the request 500'd.
+        "application-updated",
       ],
       required: true,
       index: true,

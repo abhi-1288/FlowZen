@@ -8,8 +8,16 @@ import { jsonError, serializeDoc } from "@/lib/api";
 import { createUniqueGuestPassCode, findCandidateByToken } from "@/lib/candidate-portal";
 import { normalizeVideoProvider, videoProviderLabel } from "@/lib/interview-provider";
 import { getAssessmentDeadlineMs, getAssessmentPhase } from "@/lib/assessment-timing";
+import { getCandidateDeadlineMs } from "@/lib/assessment";
 import { loadCandidateAssessment, resolveCandidateAssessmentWindow } from "@/lib/assessment-window";
-import { finalizeCandidateIfExpired } from "@/lib/assessment-auto-submit";
+import { finalizeCandidateIfExpired, finalizeMockAttemptIfExpired } from "@/lib/assessment-auto-submit";
+import { resolveProctoringConfig } from "@/lib/assessment-proctoring";
+import {
+  resolveBestMockAttempt,
+  resolveBestReleasedMockAttempt,
+  resolveMockResultVisibility,
+} from "@/lib/assessment-mock";
+import { resolveMockSitting } from "@/lib/assessment-mock-attempt";
 import { INTERVIEW_JOINABLE_STATUSES } from "@/lib/interview-timing";
 import {
   CANDIDATE_VISIBLE_TIMELINE_ACTIONS,
@@ -46,8 +54,23 @@ export async function GET(request: Request) {
     }
   }
 
+  // The same hot path for a mock paper in progress: grading it on the candidate's
+  // next page load means their autosaved answers are not left sitting ungraded
+  // until the nightly sweep.
+  if (((candidate as any).mockTest?.attempts || []).some((a: any) => a?.startedAt && !a?.submittedAt)) {
+    try {
+      const closedOut = await finalizeMockAttemptIfExpired(candidate._id);
+      if (closedOut) {
+        const refreshed = await ATSCandidate.findById(candidate._id);
+        if (refreshed) candidate = refreshed as any;
+      }
+    } catch (err) {
+      console.error("Mock auto-submit (scoped) failed:", err);
+    }
+  }
+
   const more = await ATSCandidate.findById(candidate._id)
-    .populate("job", "title department location employmentType salaryRangeMin salaryRangeMax salaryType currency description requiredSkills assessment assessmentDate assessmentDurationMinutes editApplicationsEnabled")
+    .populate("job", "title department location employmentType salaryRangeMin salaryRangeMax salaryType currency description requiredSkills assessment assessmentDate assessmentDurationMinutes editApplicationsEnabled editApplicationsCloseAt")
     .populate("company", "name icon primaryColor stageOrder");
 
   if (!candidate) return jsonError("Invalid or expired link.", 401);
@@ -102,15 +125,19 @@ export async function GET(request: Request) {
   const now = new Date();
   const nowMs = now.getTime();
   let assessmentPayload: any = null;
+  // Loaded once and shared: the real payload and the mock payload below both need
+  // the same document, and the portal is loaded often enough that a second read
+  // per render is worth avoiding.
+  const assessmentDoc = jobDoc?.assessment
+    ? await loadCandidateAssessment(jobDoc._id, candidate.company)
+    : null;
   if (jobDoc && jobDoc.assessment) {
-    const assessmentDoc = await loadCandidateAssessment(jobDoc._id, candidate.company);
-    const window = resolveCandidateAssessmentWindow(jobDoc, assessmentDoc);
+    const window = resolveCandidateAssessmentWindow(jobDoc, assessmentDoc, candidate);
 
     const isSubmitted = Boolean((candidate as any).assessmentSubmittedAt);
     // A candidate moved back to "screening" by HR should be able to restart,
     // even if a stale assessmentStartedAt flag remains.
     const isStarted = Boolean((candidate as any).assessmentStartedAt) && !isSubmitted && candidate.stage === "assessment";
-    const startedAt = (candidate as any).assessmentStartedAt ? new Date((candidate as any).assessmentStartedAt) : null;
     const storedSlotMs = (candidate as any).assessmentSlotStart
       ? new Date((candidate as any).assessmentSlotStart).getTime()
       : null;
@@ -119,14 +146,16 @@ export async function GET(request: Request) {
     const resultPublished = Boolean((candidate as any).assessmentResultPublishedAt);
 
     if (window) {
-      const { slots, mode, durationMinutes, instructions, passScore, negativeMarking, domains } = window;
+      const { slots, mode, durationMinutes, instructions, passScore, negativeMarking, negativeMarkingLabel, domains, proctoring } = window;
       const info = getAssessmentPhase(slots, mode, storedSlotMs, nowMs);
 
       const durationMin = durationMinutes;
       // Once started the deadline is fixed by the anchored clock; before that
       // the slot's own end is only meaningful in uniform mode.
+      // The candidate's own deadline includes any proctoring grace and any HR
+      // extension, so this is the same value submit and auto-submit will use.
       const endsAt = isStarted
-        ? getAssessmentDeadlineMs(startedAt!.getTime(), durationMin)
+        ? getCandidateDeadlineMs(candidate, durationMin)
         : mode === "uniform"
           ? getAssessmentDeadlineMs(info.startsAt, durationMin)
           : null;
@@ -146,7 +175,15 @@ export async function GET(request: Request) {
         durationMinutes: durationMin,
         passScore,
         negativeMarking,
+        negativeMarkingLabel,
         domains,
+        // Only the settings the portal has to act on. The stored violation log
+        // and counters are HR-only and are deliberately not included.
+        proctoring: { ...proctoring, active: proctoring.enabled && !proctoring.exempt },
+        extensionRequest: {
+          status: (candidate as any).assessmentProctoring?.extensionRequestStatus || "none",
+          requestedMs: (candidate as any).assessmentProctoring?.extensionRequestedMs || 0,
+        },
         domain: (candidate as any).assessmentDomain || "",
         answerKeyPublished: (assessmentDoc as any)?.answerKeyPublished ?? false,
         resultPublished,
@@ -190,6 +227,7 @@ export async function GET(request: Request) {
         durationMinutes: jobDoc.assessmentDurationMinutes ?? null,
         passScore: (assessmentDoc as any)?.passScore ?? 50,
         negativeMarking: (assessmentDoc as any)?.negativeMarking ?? 0,
+        negativeMarkingLabel: (assessmentDoc as any)?.negativeMarkingLabel || "",
         domains: [],
         domain: (candidate as any).assessmentDomain || "",
         answerKeyPublished: (assessmentDoc as any)?.answerKeyPublished ?? false,
@@ -213,6 +251,100 @@ export async function GET(request: Request) {
         slots: [],
         eligibleToStart: false,
         submittable: isStarted,
+      };
+    }
+  }
+
+  // Mock test payload. Shaped like the real one on purpose, so the candidate
+  // panel can render both from the same fields instead of growing a second
+  // parallel component. Null when the feature is off, which is how the portal
+  // decides not to show the card at all.
+  let mockTestPayload: any = null;
+  if (jobDoc?.assessment && assessmentDoc) {
+    const sitting = resolveMockSitting(
+      candidate,
+      (assessmentDoc as any).mockTest,
+      jobDoc.assessmentDurationMinutes ?? null,
+      nowMs
+    );
+
+    if (sitting.config.enabled) {
+      const attempts = ((candidate as any).mockTest?.attempts as any[]) || [];
+      const active = sitting.activeIndex !== null;
+      // Released-first, so a retake can never hide a score that is already
+      // public. `best` is kept only to report whether an attempt exists.
+      const best = resolveBestMockAttempt(attempts);
+      const bestReleased = resolveBestReleasedMockAttempt(attempts, sitting.config, nowMs);
+      // The most recently closed attempt, which is the one "you have submitted a
+      // mock test" refers to even when a better earlier one is the headline.
+      const last = attempts.length ? attempts[attempts.length - 1] : null;
+
+      const expiredForCandidate = active && sitting.deadlineMs !== null && nowMs >= sitting.deadlineMs;
+      const phase =
+        expiredForCandidate
+          ? "expired"
+          : active
+            ? "open"
+            : sitting.window.phase === "open"
+              ? "open"
+              : sitting.window.phase === "expired"
+                ? "expired"
+                : "closed";
+
+      const proctoring = resolveProctoringConfig((assessmentDoc as any).proctoring);
+      const exempt = sitting.active?.proctoring?.exempt === true;
+      const bestVisibility = bestReleased?.visibility ?? (best ? resolveMockResultVisibility(sitting.config, best.attempt, nowMs) : null);
+      const stageOk = ["screening", "assessment"].includes(candidate.stage);
+      const iso = (ms: number | null) => (ms === null ? null : new Date(ms).toISOString());
+
+      mockTestPayload = {
+        enabled: true,
+        phase,
+        windowMode: "relief",
+        instructions: (assessmentDoc as any).instructions || "",
+        durationMinutes: sitting.window.durationMinutes,
+        passScore: (assessmentDoc as any).passScore ?? 50,
+        negativeMarking: (assessmentDoc as any).negativeMarking ?? 0,
+        negativeMarkingLabel: (assessmentDoc as any).negativeMarkingLabel || "",
+        domains: ((assessmentDoc as any).domains as any[]) || [],
+        proctoring: { ...proctoring, active: proctoring.enabled && !exempt },
+        domain: sitting.active?.domain || last?.domain || (candidate as any).assessmentDomain || "",
+        stage: candidate.stage,
+        maxAttempts: sitting.maxAttempts,
+        attemptsUsed: sitting.used,
+        attemptNumber: sitting.active?.attemptNumber ?? last?.attemptNumber ?? null,
+        startedAt: sitting.active?.startedAt ?? null,
+        submittedAt: last?.submittedAt ?? null,
+        // The exact clock the exam will be graded against, including any
+        // proctoring grace — the same number the panel's timer counts down to.
+        endsAt: iso(sitting.deadlineMs),
+        lobbyOpensAt: iso(sitting.window.opensAt),
+        startsAt: iso(sitting.window.opensAt),
+        lastEntryAt: iso(sitting.window.lastEntryAt),
+        untilLobbyMs: sitting.window.opensAt === null ? 0 : Math.max(0, sitting.window.opensAt - nowMs),
+        untilStartMs: sitting.window.opensAt === null ? 0 : Math.max(0, sitting.window.opensAt - nowMs),
+        slots: [],
+        eligibleToStart: !active && stageOk && sitting.window.phase === "open" && sitting.remainingStarts > 0,
+        submittable: active,
+        resultRelease: sitting.config.resultRelease,
+        // The score is withheld entirely until its release rule is met, rather
+        // than sent to the client and hidden in the UI. Nothing in this payload
+        // leaks a result the candidate is not entitled to see. The score itself
+        // comes from the selected released attempt, not the raw best-score
+        // field, so the two can never disagree.
+        result: bestReleased
+          ? {
+              attemptNumber: bestReleased.attempt.attemptNumber ?? null,
+              score: bestReleased.attempt.score ?? null,
+              rawMarks: bestReleased.attempt.rawMarks ?? null,
+              maxMarks: bestReleased.attempt.maxMarks ?? null,
+              passed: bestReleased.attempt.passed ?? null,
+            }
+          : null,
+        bestScore: bestReleased ? bestReleased.attempt.score ?? null : null,
+        resultVisible: bestVisibility?.visible ?? false,
+        answerKeyVisible: bestVisibility?.answerKeyVisible ?? false,
+        resultVisibleAt: iso(bestVisibility?.visibleAt ?? null),
       };
     }
   }
@@ -243,6 +375,7 @@ export async function GET(request: Request) {
     })),
     offer: offer ? serializeDoc(offer) : null,
     assessment: assessmentPayload,
+    mockTest: mockTestPayload,
     stageOrder: companyStageOrder.length ? companyStageOrder : defaultStageOrder,
   });
 }

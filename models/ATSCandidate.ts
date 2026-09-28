@@ -1,5 +1,80 @@
 import { Schema, model, models, type InferSchemaType } from "mongoose";
 
+/**
+ * Proctoring record for one mock attempt. Mirrors the real attempt's
+ * `assessmentProctoring` block, but lives per attempt rather than per candidate
+ * so a retake starts with a clean slate and the first attempt's violations are
+ * not attributed to the second. `graceMs` is folded into the mock deadline by
+ * getMockDeadlineMs() in lib/assessment-mock.ts.
+ */
+const MockTestAttemptProctoringSchema = new Schema(
+  {
+    violations: { type: Number, default: 0, min: 0 },
+    noiseWarnings: { type: Number, default: 0, min: 0 },
+    graceMs: { type: Number, default: 0, min: 0 },
+    pausedAt: { type: Date, default: null },
+    peakNoiseDb: { type: Number, default: -100 },
+    multiFaceEvents: { type: Number, default: 0, min: 0 },
+    screenShareAttempts: { type: Number, default: 0, min: 0 },
+    /** Set by HR to waive proctoring for a locked-down device. */
+    exempt: { type: Boolean, default: false },
+    log: {
+      type: [
+        {
+          at: { type: Date, default: Date.now },
+          kind: { type: String, default: "violation", maxlength: 40 },
+          detail: { type: String, default: "", maxlength: 500 },
+        },
+      ],
+      default: [],
+    },
+  },
+  { _id: false }
+);
+
+/**
+ * One sitting of the mock test.
+ *
+ * `questionIndices` is the load-bearing field: the indices into
+ * `[...general, ...chosenDomain.questions]` that were sampled for this attempt,
+ * in the exact order they were served. Grading, auto-submit and the answer key
+ * all replay it, because answers are keyed by position and the sample cannot be
+ * re-derived from the bank. See lib/assessment-mock.ts.
+ *
+ * The array is append-only and never reordered, so an in-flight attempt is
+ * addressed by its numeric index and that index cannot shift underneath a write.
+ */
+const MockTestAttemptSchema = new Schema(
+  {
+    /** 1-based, so the portal can say "Attempt 2 of 3". */
+    attemptNumber: { type: Number, default: 1, min: 1 },
+    startedAt: { type: Date, default: null },
+    submittedAt: { type: Date, default: null },
+    /** True when the background sweep closed this paper rather than the candidate. */
+    autoSubmitted: { type: Boolean, default: false },
+    domain: { type: String, default: "", trim: true, maxlength: 100 },
+    questionIndices: { type: [Number], default: [] },
+    // selectedOption stays null for unanswered questions, so a partial autosave
+    // is not scored as a run of wrong answers.
+    answers: {
+      type: [
+        {
+          questionIndex: Number,
+          selectedOption: { type: Number, default: null },
+          textAnswer: { type: String, default: "" },
+        },
+      ],
+      default: [],
+    },
+    score: { type: Number, default: null, min: 0, max: 100 },
+    rawMarks: { type: Number, default: null },
+    maxMarks: { type: Number, default: null },
+    passed: { type: Boolean, default: null },
+    proctoring: { type: MockTestAttemptProctoringSchema, default: () => ({}) },
+  },
+  { _id: false }
+);
+
 const ATSCandidateSchema = new Schema(
   {
     firstName: { type: String, required: true, trim: true, maxlength: 60 },
@@ -64,6 +139,10 @@ const ATSCandidateSchema = new Schema(
     assessmentSlotStart: { type: Date, default: null },
     assessmentSubmittedAt: { type: Date, default: null },
     assessmentInviteSentAt: { type: Date, default: null },
+    // Stamped when this candidate is emailed an invite to update their
+    // application. Drives the idempotent send in lib/edit-application-emails.ts,
+    // and is cleared when HR re-enables editing so they are invited again.
+    editApplicationInviteSentAt: { type: Date, default: null },
     assessmentResultPublishedAt: { type: Date, default: null },
     assessmentDomain: { type: String, default: "", trim: true, maxlength: 100 },
     assessmentRawMarks: { type: Number, default: null },
@@ -80,6 +159,68 @@ const ATSCandidateSchema = new Schema(
       ],
       default: [],
     },
+    /**
+     * Proctoring outcome for this candidate's attempt. HR/Admin only — the
+     * candidate projection in lib/candidate-visibility.ts is an allowlist, so
+     * this never reaches the portal payload unless named there deliberately.
+     *
+     * `graceMs` is the extra clock handed back for time lost to fullscreen /
+     * focus interruptions, and is folded into the deadline by
+     * getCandidateDeadlineMs(). `extensionMs` is an HR-approved extension.
+     */
+    assessmentProctoring: {
+      violations: { type: Number, default: 0, min: 0 },
+      noiseWarnings: { type: Number, default: 0, min: 0 },
+      graceMs: { type: Number, default: 0, min: 0 },
+      extensionMs: { type: Number, default: 0, min: 0 },
+      pausedAt: { type: Date, default: null },
+      peakNoiseDb: { type: Number, default: -100 },
+      multiFaceEvents: { type: Number, default: 0, min: 0 },
+      screenShareAttempts: { type: Number, default: 0, min: 0 },
+      /** Set by HR to waive proctoring for a locked-down device. */
+      exempt: { type: Boolean, default: false },
+      exemptReason: { type: String, default: "", trim: true, maxlength: 500 },
+      // Time-extension request flow, driven by the candidate during the exam and
+      // decided by HR. `extensionMs` above is what was actually granted.
+      extensionRequestStatus: {
+        type: String,
+        enum: ["none", "pending", "approved", "denied"],
+        default: "none",
+      },
+      extensionRequestedMs: { type: Number, default: 0, min: 0 },
+      extensionRequestNote: { type: String, default: "", trim: true, maxlength: 500 },
+      extensionDecidedAt: { type: Date, default: null },
+      log: {
+        type: [
+          {
+            at: { type: Date, default: Date.now },
+            kind: { type: String, default: "violation", maxlength: 40 },
+            detail: { type: String, default: "", maxlength: 500 },
+          },
+        ],
+        default: [],
+      },
+    },
+    /**
+     * This candidate's mock-test history, entirely separate from the real
+     * attempt above.
+     *
+     * A mock is practice: it must never write to (or be read as if it were)
+     * `assessmentScore`, `assessmentStatus`, `stage`, or the timeline. The
+     * candidate projection in lib/candidate-visibility.ts is an allowlist, so
+     * this block stays out of the portal payload; the portal reads it only
+     * through the dedicated /me mock payload, behind the release gate.
+     *
+     * `inviteSentAt` is the idempotency latch that stops the daily cron
+     * emailing the same person every morning. `attempts` is capped by the
+     * assessment's `mockTest.maxAttempts` at start time.
+     */
+    mockTest: {
+      attempts: { type: [MockTestAttemptSchema], default: [] },
+      bestScore: { type: Number, default: null, min: 0, max: 100 },
+      lastSubmittedAt: { type: Date, default: null },
+      inviteSentAt: { type: Date, default: null },
+    },
     convertedEmail: { type: String, default: "", trim: true, lowercase: true },
     conversionOtpHash: { type: String, default: "", select: false },
     conversionOtpExpiresAt: { type: Date, default: null },
@@ -94,6 +235,7 @@ const ATSCandidateSchema = new Schema(
 
 ATSCandidateSchema.index({ company: 1, stage: 1 });
 ATSCandidateSchema.index({ company: 1, job: 1 });
+ATSCandidateSchema.index({ company: 1, assessmentDomain: 1 });
 
 const REFERRAL_STAGE_MAP: Record<string, string> = {
   applied: "pending",
