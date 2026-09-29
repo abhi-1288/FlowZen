@@ -64,11 +64,18 @@ const ATSJobSchema = new Schema(
     assessmentDurationMinutes: { type: Number, default: null, min: 1, max: 600 },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     company: { type: Schema.Types.ObjectId, ref: "Company", required: true, index: true },
+    // Display snapshot of the region this requisition was raised for, taken
+    // from the requesting user. Not the read-side boundary: a job has no member
+    // link to filter on, and `workflow.assignedHR` may be a head covering
+    // several regions, so deriving the region from the assignee would be wrong.
+    // `""` means the global/main office.
+    regionLabel: { type: String, default: "", trim: true, maxlength: 200, index: true },
   },
   { timestamps: true }
 );
 
 ATSJobSchema.index({ company: 1, status: 1 });
+ATSJobSchema.index({ company: 1, regionLabel: 1, status: 1 });
 ATSJobSchema.index({ "workflow.status": 1, company: 1 });
 ATSJobSchema.index({ "workflow.assignedHR": 1, "workflow.status": 1 });
 // Serves the sweep that flips an expired editing window shut.

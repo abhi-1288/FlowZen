@@ -125,7 +125,35 @@ const ATSCandidateSchema = new Schema(
     },
     job: { type: Schema.Types.ObjectId, ref: "ATSJob", required: true, index: true },
     company: { type: Schema.Types.ObjectId, ref: "Company", required: true, index: true },
+    // TWO DIFFERENT LABEL SPACES LIVE ON THIS MODEL. Do not conflate them.
+    //
+    // `regionLabel` is a GEOGRAPHIC STATE detected from the candidate's own
+    // address and resume by `lib/candidate-region.ts` ("Maharashtra",
+    // "Uttar Pradesh"). It powers the "State" filter in the bulk interview
+    // scheduler. It says nothing about where the person will work.
+    //
+    // Writers must gate on `isDetectedState()` from that module. The detector
+    // also returns company office labels, and those used to be written here
+    // unchecked, which is the second half of the bug this model was split to fix.
+    // Human edits through the candidate PATCH route are free text and are not
+    // validated; treat an unrecognised value as suspect rather than trusting it.
+    //
+    // `joiningRegionLabel` is a COMPANY OFFICE LABEL from
+    // `Company.addresses[].label` ("Noida Region"). It is set by the bulk
+    // transfer in `app/api/recruitment/jobs/[id]/bulk-region/route.ts` and is
+    // the single source of truth for which region owns the hire. The offer
+    // inherits it, and the join approval is routed to that region's head.
+    //
+    // The two used to share one field, which silently broke the command
+    // centre's Candidates trend: it filtered by office label against state
+    // values and dropped most candidates for a regional viewer.
     regionLabel: { type: String, default: "", trim: true, maxlength: 200, index: true },
+    joiningRegionLabel: { type: String, default: "", trim: true, maxlength: 200, index: true },
+    // The region a candidate was transferred out of, and by whom. Kept so a
+    // re-transfer is legible in the UI without replaying the whole timeline.
+    previousJoiningRegionLabel: { type: String, default: "", trim: true, maxlength: 200 },
+    joiningRegionAssignedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    joiningRegionAssignedAt: { type: Date, default: null },
     atsScore: { type: Number, default: null, min: 0, max: 100 },
     atsStatus: { type: String, enum: ["pending", "selected", "rejected"], default: "pending", index: true },
     atsReason: { type: String, default: "" },

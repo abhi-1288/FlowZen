@@ -5,6 +5,7 @@ import { Company } from "@/models/Company";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
+import { effectiveRegionLabelOf, isUserInEffectiveRegion, type OfficeAddressLike } from "@/lib/company-regions";
 
 const VALID_ROLES = ["employee", "project-manager", "qa-tester", "human-resource", "finance", "admin", "security", "it-admin", "it-administration", "others"];
 const ROLE_LABELS = [
@@ -43,7 +44,11 @@ export async function PATCH(request: Request) {
     return jsonError("You can only update approved members in your company.", 403);
   }
 
-  const company = await Company.findById(member.company).select("owner");
+  const company = (await Company.findById(member.company).select("owner addresses address").lean()) as {
+    owner?: unknown;
+    addresses?: OfficeAddressLike[] | null;
+    address?: string | null;
+  } | null;
   const actorRole = String(actor.role);
   const isCompanyHr =
     actorRole === "human-resource" &&
@@ -61,6 +66,17 @@ export async function PATCH(request: Request) {
 
   if (!isCompanyHr && !isCompanyAdmin && !isSeniorSecurity) {
     return jsonError("Only approved HR, admins, or senior security can update members.", 403);
+  }
+
+  // Regional admins can only change the role of members in their own region.
+  // The company owner, HR and senior security keep the company-wide view.
+  const ownerId = company?.owner ?? null;
+  const isOwner = ownerId != null && String(ownerId) === String(actor._id);
+  if (actorRole === "admin" && !isOwner) {
+    const adminRegion = effectiveRegionLabelOf(company, actor);
+    if (adminRegion && !isUserInEffectiveRegion(company, adminRegion, member)) {
+      return jsonError(`This member is outside your region (${adminRegion}).`, 403);
+    }
   }
 
   if (String(actor._id) === String(member._id)) {

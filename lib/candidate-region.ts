@@ -225,12 +225,32 @@ export function stateNameOf(
   return "";
 }
 
-export function normalizeRegionToken(value: string): string {
+export function normalizeRegionToken(value: string | null | undefined): string {
   const normalized = String(value ?? "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ");
   const asState = STATE_SYNONYMS[normalized] || normalized;
   return asState.trim();
+}
+
+/**
+ * True when `label` is a real geographic state rather than a company office name.
+ *
+ * `closestRegionOf` returns two different kinds of thing from the same string,
+ * depending on which branch wins: a genuine state from `stateNameOf`, or an entry
+ * copied out of the caller's `regions` array — which in the recruitment routes is
+ * `Company.addresses`, i.e. office labels. Both arrived in `ATSCandidate.regionLabel`
+ * unchecked, which is how an office called "Pune" ended up in the field the "State"
+ * filter and the command centre treat as a state.
+ *
+ * Any caller writing to `regionLabel` must pass the result through this, or a
+ * company's office naming will rewrite a candidate's detected geography — and,
+ * because the write is unconditional on re-score, overwrite a state an HR set by
+ * hand. The office-derived value still has a home: the transfer writes it to
+ * `joiningRegionLabel`, where it is meant to live.
+ */
+export function isDetectedState(label: string | null | undefined): boolean {
+  return STATE_NAMES.includes(normalizeRegionToken(label));
 }
 
 export function regionTokenSet(value: string): Set<string> {

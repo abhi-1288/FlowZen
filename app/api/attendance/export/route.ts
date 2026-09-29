@@ -8,6 +8,7 @@ import { LeaveRequest } from "@/models/LeaveRequest";
 import { Team } from "@/models/Team";
 import { User } from "@/models/User";
 import { WfhRequest } from "@/models/WfhRequest";
+import { financeMemberScope } from "@/app/api/finance/helpers";
 
 
 /** Parse a date string and return midnight local time (or null if invalid). */
@@ -73,7 +74,7 @@ export async function GET(request: Request) {
 
   await connectDb();
 
-  const actor = await User.findById(userId).select("role company companyStatus");
+  const actor = await User.findById(userId).select("role company companyStatus regionLabel");
   if (!actor) return jsonError("User not found.", 404);
   if (!actor.company || actor.companyStatus !== "approved") {
     return jsonError("You must belong to an approved company to export attendance.", 403);
@@ -81,12 +82,27 @@ export async function GET(request: Request) {
 
   const role = String(actor.role ?? "");
   let memberIds: string[] = [];
-  if (["admin", "human-resource", "finance"].includes(role)) {
+  let regionFilter: string | null = null;
+  if (["admin", "human-resource"].includes(role)) {
     const members = await User.find({
       company: actor.company,
       companyStatus: "approved",
     }).select("_id");
     memberIds = members.map((member) => String(member._id));
+  } else if (role === "finance") {
+    // Finance exports are scoped to their own region, same rule as the salary
+    // wizard, so one resolver serves both and they cannot drift.
+    const scope = await financeMemberScope(actor);
+    if (scope.memberIds) {
+      memberIds = scope.memberIds;
+      regionFilter = scope.region || null;
+    } else {
+      const members = await User.find({
+        company: actor.company,
+        companyStatus: "approved",
+      }).select("_id");
+      memberIds = members.map((member) => String(member._id));
+    }
   } else if (["project-manager", "qa-tester"].includes(role)) {
     const teams = await Team.find({ manager: userId }).select("employees");
     memberIds = Array.from(
@@ -241,8 +257,11 @@ export async function GET(request: Request) {
   });
 
   const companyName = safeFilenamePart((company as any)?.name);
-  const filename = `${companyName}-${isoDay(from)}-to-${isoDay(to)}.csv`;
-  return new NextResponse(lines.join("\n"), {
+  const regionPart = regionFilter ? `-${safeFilenamePart(regionFilter)}` : "";
+  const filename = `${companyName}${regionPart}-${isoDay(from)}-to-${isoDay(to)}.csv`;
+  // UTF-8 BOM so Excel reads the rupee sign and accented names correctly;
+  // CRLF because Excel expects it in a .csv.
+  return new NextResponse(`\uFEFF${lines.join("\r\n")}`, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,

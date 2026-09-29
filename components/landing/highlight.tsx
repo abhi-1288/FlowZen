@@ -9,6 +9,8 @@ const highlights = [
   "Finance module: salaries, expenses, budgets, invoices, and automated payroll",
   "Full recruitment pipeline: jobs, candidates, interviews, offers, and hiring",
   "Multi-step approval workflows for joins, leaves, and quits",
+  "Document letters with regional HR approval and optional co-approver signatures",
+  "Contract-end settlement, exit notifications, and read-only ex-member document archive",
   "Ten user roles with granular board-level permissions",
   "HR tools: policies, broadcasts, meeting invites, and role changes",
   "Real-time chat with read receipts, online presence, and delivery tracking",

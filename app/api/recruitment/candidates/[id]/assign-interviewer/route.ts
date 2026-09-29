@@ -1,31 +1,26 @@
-import { NextResponse } from "next/server";
-import { connectDb } from "@/lib/db";
+﻿import { NextResponse } from "next/server";
 import { ATSCandidate } from "@/models/ATSCandidate";
 import { ATSTimeline } from "@/models/ATSTimeline";
 import { User } from "@/models/User";
 import { Notification } from "@/models/Notification";
-import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
+import { withCandidateAccess } from "@/lib/recruitment-candidate-access";
+import { jsonError, serializeDoc } from "@/lib/api";
 import { emitNotification } from "@/lib/realtime";
 import { emitToUser } from "@/lib/socket-emit";
 
 type Params = { params: Promise<{ id: string }> };
-const HR_ROLES = ["admin", "human-resource"];
 
 export async function POST(request: Request, { params }: Params) {
   const { id } = await params;
   try {
-    const userId = await requireUserId();
-    if (!userId) return jsonError("Unauthorized", 401);
-    await connectDb();
-    const user = await User.findById(userId);
-    if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
-    if (!user.company) return jsonError("No company found.", 400);
+    // Region-scoped: a recruiter confined to their own office must not be able to
+    // assign an interviewer on another region's candidate by id.
+    const access = await withCandidateAccess(id, "write");
+    if (!access.ok) return access.response;
+    const { user, candidate } = access;
 
     const { role, roundType, assigneeId } = await request.json();
     if (!role || !roundType) return jsonError("role and roundType are required.", 400);
-
-    const candidate = await ATSCandidate.findOne({ _id: id, company: user.company });
-    if (!candidate) return jsonError("Candidate not found.", 404);
 
     let assigneeUser = null;
     if (assigneeId) {
@@ -61,7 +56,7 @@ export async function POST(request: Request, { params }: Params) {
       emitNotification(String(assigneeUser._id));
     }
 
-    const recUsers = await User.find({ company: user.company, role: { $in: ["admin", "human-resource", "project-manager", "qa-tester", "finance"] }, _id: { $ne: userId } });
+    const recUsers = await User.find({ company: user.company, role: { $in: ["admin", "human-resource", "project-manager", "qa-tester", "finance"] }, _id: { $ne: user._id } });
     for (const ru of recUsers) {
       emitToUser(String(ru._id), "recruitment:update", { type: "interviewer-assigned", candidateId: String(candidate._id) });
     }
@@ -76,18 +71,12 @@ export async function POST(request: Request, { params }: Params) {
 export async function DELETE(request: Request, { params }: Params) {
   const { id } = await params;
   try {
-    const userId = await requireUserId();
-    if (!userId) return jsonError("Unauthorized", 401);
-    await connectDb();
-    const user = await User.findById(userId);
-    if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
-    if (!user.company) return jsonError("No company found.", 400);
+    const access = await withCandidateAccess(id, "write");
+    if (!access.ok) return access.response;
+    const { user, candidate } = access;
 
     const { role } = await request.json();
     if (!role) return jsonError("role is required.", 400);
-
-    const candidate = await ATSCandidate.findOne({ _id: id, company: user.company });
-    if (!candidate) return jsonError("Candidate not found.", 404);
 
     const assignedTeam = ((candidate as any).assignedTeam || []).filter((a: any) => a.role !== role);
     (candidate as any).assignedTeam = assignedTeam;
@@ -95,7 +84,7 @@ export async function DELETE(request: Request, { params }: Params) {
 
     const updated = await ATSCandidate.findById(candidate._id).populate("assignedTeam.user", "name email").populate("job", "title").populate("assignedRecruiter", "name email");
 
-    const recUsers = await User.find({ company: user.company, role: { $in: ["admin", "human-resource", "project-manager", "qa-tester", "finance"] }, _id: { $ne: userId } });
+    const recUsers = await User.find({ company: user.company, role: { $in: ["admin", "human-resource", "project-manager", "qa-tester", "finance"] }, _id: { $ne: user._id } });
     for (const ru of recUsers) {
       emitToUser(String(ru._id), "recruitment:update", { type: "interviewer-removed", candidateId: String(candidate._id) });
     }

@@ -6,7 +6,8 @@ import { JoinRequest } from "@/models/JoinRequest";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
-import { mainOfficeLabelOf, regionManagerCaps } from "@/lib/company-regions";
+import { effectiveRegionLabelOf, isMainOfficeLabel, isMainOfficeRegion, regionManagerCaps } from "@/lib/company-regions";
+import { isCompanyOwner } from "@/lib/admin-region-scope";
 
 const cleanIds = (value: unknown): string[] =>
   Array.isArray(value) ? value.map((v) => String(v ?? "").trim()).filter(Boolean) : [];
@@ -60,14 +61,20 @@ export async function GET() {
       : String(user.company);
 
   const company = (await Company.findById(companyId)
-    .select("addresses multiOffice regionMaxHrs regionMaxAdmins")
+    .select("addresses address multiOffice regionMaxHrs regionMaxAdmins")
     .lean()) as any;
 
+  const addresses = (company?.addresses as any[]) || [];
+
   return NextResponse.json({
-    addresses: (company?.addresses as any[]) || [],
+    addresses,
     multiOffice: Boolean(company?.multiOffice),
     regionMaxHrs: Number(company?.regionMaxHrs ?? 5),
     regionMaxAdmins: Number(company?.regionMaxAdmins ?? 2),
+    // Whether the caller sits in the main office, i.e. may delegate a region's
+    // recruitment pipeline. The UI uses it to decide whether to render the
+    // delegation control; the PATCH route re-checks it server-side either way.
+    isMainOffice: isMainOfficeRegion({ addresses, address: company?.address ?? "" }, user),
   });
 }
 
@@ -175,7 +182,29 @@ export async function PATCH(request: Request) {
     const maxHrs = positiveNumberOrNull(body.maxHrs);
     const maxAdmins = positiveNumberOrNull(body.maxAdmins);
 
+    // Update the existing main entry in place rather than replacing the array.
+    //
+    // This used to assign `company.addresses = [mainEntry]`, which destroyed every
+    // other office in the company. That was survivable while offices were only a
+    // display concern, but the main office is now the identity of the recruitment
+    // pipeline: who raises requisitions, who can delegate a region, who sees every
+    // candidate. Wiping the roster on an address correction would silently demote
+    // every regional head to a scoped viewer and unstaff every office besides the
+    // one being edited.
+    //
+    // Staffing, heads, caps and pipeline delegations are carried over from the
+    // entry already there. Only the address fields (and the staffing the caller
+    // explicitly sent) are replaced. Array position is preserved for the same
+    // reason: `isMainOfficeLabel` falls back to index 0 when no entry carries
+    // `isMain`, so reordering would move the HQ.
+    const existing = Array.isArray(company.addresses) ? company.addresses : [];
+    const mainIndex = existing.findIndex((a: any) => Boolean(a?.isMain));
+    const fallbackIndex = mainIndex >= 0 ? mainIndex : existing.findIndex((a: any) => a);
+    const prior: any = fallbackIndex >= 0 ? existing[fallbackIndex] : null;
+
     const mainEntry: any = {
+      ...(prior ?? {}),
+      _id: prior?._id,
       label,
       line1,
       city,
@@ -183,16 +212,29 @@ export async function PATCH(request: Request) {
       zip,
       country,
       isMain: true,
-      hrs: resolved.hrs,
-      admins: resolved.admins,
-      hrHead: hrHead || null,
-      adminHead: adminHead || null,
-      maxHrs,
-      maxAdmins,
-      createdBy: userId,
+      hrs: hrIds.length ? resolved.hrs : (prior ? cleanIds(prior.hrs) : []),
+      admins: adminIds.length ? resolved.admins : (prior ? cleanIds(prior.admins) : []),
+      hrHead: hrHead || prior?.hrHead || null,
+      adminHead: adminHead || prior?.adminHead || null,
+      maxHrs: maxHrs ?? prior?.maxHrs ?? null,
+      maxAdmins: maxAdmins ?? prior?.maxAdmins ?? null,
+      pipelineManagers: prior ? cleanIds(prior.pipelineManagers) : [],
+      createdBy: prior?.createdBy || userId,
     };
 
-    company.addresses = [mainEntry];
+    if (existing.length === 0) {
+      company.addresses = [mainEntry];
+    } else {
+      // Exactly one entry may carry `isMain`; everything else is a plain region.
+      // Nothing enforced this before, so a company that already has two mains gets
+      // normalised on the next save rather than staying ambiguous forever.
+      const next = existing.map((a: any, i: number) => {
+        if (i === fallbackIndex) return mainEntry;
+        return a?.isMain ? { ...a, isMain: false } : a;
+      });
+      company.addresses = next;
+    }
+
     const composed = [label, line1, city, state, zip, country].filter(Boolean).join(", ");
     company.address = composed;
   }
@@ -214,17 +256,13 @@ export async function PATCH(request: Request) {
     if (!region) return jsonError("Region not found.", 404);
 
     if (user.role === "human-resource") {
-      const mainLabel = mainOfficeLabelOf({ addresses: company.addresses, address: company.address });
-      const isMainHr =
-        !mainLabel ||
-        String(user.regionLabel ?? "").trim().toLowerCase() === mainLabel.toLowerCase();
       const regionStaffing = (region as any) ?? {};
       const regionHrs = Array.isArray(regionStaffing.hrs)
         ? regionStaffing.hrs.map((v: any) => String(v))
         : [];
       const isRegionStaffedHr =
         String(regionStaffing.hrHead ?? "") === userId || regionHrs.includes(userId);
-      if (!isMainHr && !isRegionStaffedHr) {
+      if (!isMainOfficeRegion({ addresses: company.addresses, address: company.address }, user) && !isRegionStaffedHr) {
         return jsonError("Only an admin or this region's HR can manage its staff.", 403);
       }
     }
@@ -267,13 +305,66 @@ export async function PATCH(request: Request) {
     company.markModified("addresses");
   }
 
+  // Delegate a region's recruitment pipeline to that region's HR / Admin heads.
+  //
+  // Main office only — and unlike `set-region-caps` below, that includes admins
+  // who are *not* in the main office. Granting pipeline authority is the one
+  // action a region must not be able to take for itself: if a regional admin
+  // could tick themselves here, the delegation would be self-issuing and the whole
+  // main-office tier would collapse into whoever asks first. An admin in a region
+  // they were themselves granted is still refused.
+  if (body.mode === "set-pipeline-managers") {
+    const isMainOfficeActor =
+      isCompanyOwner(company as any, user as any) ||
+      ((user.role === "admin" || user.role === "human-resource") &&
+        isMainOfficeRegion({ addresses: company.addresses, address: company.address }, user));
+    if (!isMainOfficeActor) {
+      return jsonError("Only the main office admin or HR can delegate a region's recruitment pipeline.", 403);
+    }
+
+    const label = String(body.label ?? "").trim();
+    if (!label) return jsonError("Region label is required.", 400);
+    const region = Array.isArray(company.addresses)
+      ? company.addresses.find((a: any) => String(a.label ?? "").trim().toLowerCase() === label.toLowerCase())
+      : null;
+    if (!region) return jsonError("Region not found.", 404);
+
+    const requested = cleanIds(body.pipelineManagers);
+    if (requested.length > 0) {
+      // Reject rather than silently drop. `resolveManagerIds` is built to
+      // sanitise a roster, but a delegation that quietly loses a recipient looks
+      // exactly like a delegation that worked until someone tries to use it.
+      const valid = await User.find({
+        _id: { $in: requested },
+        company: companyId,
+        companyStatus: "approved",
+        role: { $in: ["human-resource", "admin"] },
+      })
+        .select("_id")
+        .lean();
+      const validIds = new Set(valid.map((u: any) => String(u._id)));
+      const rejected = requested.filter((id) => !validIds.has(id));
+      if (rejected.length > 0) {
+        return jsonError(
+          "These users cannot run a recruitment pipeline: they must be approved HR or Admin members of this company.",
+          400,
+        );
+      }
+      (region as any).pipelineManagers = requested;
+    } else {
+      (region as any).pipelineManagers = [];
+    }
+    company.markModified("addresses");
+  }
+
   // Set region staffing caps: company-wide defaults, or per-region override on the main office
   if (body.mode === "set-region-caps") {
-    const mainLabel = mainOfficeLabelOf({ addresses: company.addresses, address: company.address });
+    // Any admin may set company-wide defaults; overriding a single region's cap is
+    // main-office only, so a regional admin cannot lift its own headcount limit.
     const isMainOfficeActor =
       user.role === "admin" ||
       (user.role === "human-resource" &&
-        (!mainLabel || String(user.regionLabel ?? "").trim().toLowerCase() === mainLabel.toLowerCase()));
+        isMainOfficeRegion({ addresses: company.addresses, address: company.address }, user));
     if (!isMainOfficeActor) {
       return jsonError("Only the main office admin or HR can adjust region caps.", 403);
     }
@@ -345,22 +436,51 @@ export async function PATCH(request: Request) {
 
   if (body.addresses !== undefined) {
     if (!Array.isArray(body.addresses)) return jsonError("Addresses must be an array.");
-    company.addresses = body.addresses.map((a: any) => ({
-      label: String(a.label ?? "").trim(),
-      line1: String(a.line1 ?? "").trim(),
-      city: String(a.city ?? "").trim(),
-      state: String(a.state ?? "").trim(),
-      zip: String(a.zip ?? "").trim(),
-      country: String(a.country ?? "").trim(),
-      isMain: Boolean(a.isMain),
-      hrs: cleanIds(a.hrs),
-      admins: cleanIds(a.admins),
-      hrHead: cleanIds([a.hrHead])[0] ?? null,
-      adminHead: cleanIds([a.adminHead])[0] ?? null,
-      maxHrs: positiveNumberOrNull(a.maxHrs),
-      maxAdmins: positiveNumberOrNull(a.maxAdmins),
-      createdBy: cleanIds([a.createdBy])[0] ?? null,
-    }));
+
+    // Bulk replacement of the region roster is a company-level action: only
+    // the owner or a main-office admin may do it. Regional admins must use the
+    // per-region staffing mode instead.
+    const isOwner = isCompanyOwner(company, user);
+    const adminRegion = effectiveRegionLabelOf(company, user);
+    const isMainOfficeActor = !adminRegion || isMainOfficeLabel(company, adminRegion);
+    if (!isOwner && !isMainOfficeActor) {
+      return jsonError("Only the company owner or a main-office admin can replace the addresses list.", 403);
+    }
+
+    const resolvedEntries: any[] = [];
+    for (const a of body.addresses) {
+      const resolved = await resolveManagerIds(companyId, cleanIds(a.hrs), cleanIds(a.admins));
+
+      const entry: any = {
+        label: String(a.label ?? "").trim(),
+        line1: String(a.line1 ?? "").trim(),
+        city: String(a.city ?? "").trim(),
+        state: String(a.state ?? "").trim(),
+        zip: String(a.zip ?? "").trim(),
+        country: String(a.country ?? "").trim(),
+        isMain: Boolean(a.isMain),
+        hrs: resolved.hrs,
+        admins: resolved.admins,
+        hrHead: cleanIds([a.hrHead])[0] ?? null,
+        adminHead: cleanIds([a.adminHead])[0] ?? null,
+        maxHrs: positiveNumberOrNull(a.maxHrs),
+        maxAdmins: positiveNumberOrNull(a.maxAdmins),
+        createdBy: cleanIds([a.createdBy])[0] ?? null,
+      };
+      if (entry.hrHead && !resolved.hrs.includes(entry.hrHead)) entry.hrHead = null;
+      if (entry.adminHead && !resolved.admins.includes(entry.adminHead)) entry.adminHead = null;
+
+      const caps = regionManagerCaps(company, entry);
+      if (resolved.hrs.length > caps.maxHrs) {
+        return jsonError(`Region "${entry.label}" allows at most ${caps.maxHrs} HRs.`, 400);
+      }
+      if (resolved.admins.length > caps.maxAdmins) {
+        return jsonError(`Region "${entry.label}" allows at most ${caps.maxAdmins} admins.`, 400);
+      }
+
+      resolvedEntries.push(entry);
+    }
+    company.addresses = resolvedEntries;
   }
 
   await company.save();

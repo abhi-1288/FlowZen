@@ -11,6 +11,7 @@ import { emitNotification } from "@/lib/realtime";
 import { generateFinalSettlement } from "@/app/api/finance/helpers";
 import { CompanyPolicy } from "@/models/CompanyPolicy";
 import { recordIdentityCodeRelease } from "@/lib/company-identity";
+import { effectiveRegionLabelOf, isUserInEffectiveRegion } from "@/lib/company-regions";
 
 async function cleanupBoardsForUser(userId: any) {
   const boards = await Board.find({ "members.user": userId });
@@ -69,6 +70,17 @@ export async function POST(request: Request) {
   }
   if (String(member.role ?? "") === "admin") {
     return jsonError("You cannot fire an admin.", 403);
+  }
+
+  // Regional admins can only fire members in their own region. The company
+  // owner, HR and senior security keep the company-wide view.
+  const ownerId = company?.owner ?? null;
+  const isOwner = ownerId != null && String(ownerId) === String(actor._id);
+  if (String(actor.role) === "admin" && !isOwner) {
+    const adminRegion = effectiveRegionLabelOf(company, actor);
+    if (adminRegion && !isUserInEffectiveRegion(company, adminRegion, member)) {
+      return jsonError(`This member is outside your region (${adminRegion}).`, 403);
+    }
   }
 
   // Auto-generate a final settlement salary covering any outstanding unpaid

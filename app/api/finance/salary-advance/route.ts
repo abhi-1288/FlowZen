@@ -6,6 +6,7 @@ import { CompanyPolicy } from "@/models/CompanyPolicy";
 import { JoinRequest } from "@/models/JoinRequest";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
+import { resolveRegionPolicy } from "@/lib/region-scope";
 
 export async function POST(req: Request) {
   const userId = await requireUserId();
@@ -14,13 +15,13 @@ export async function POST(req: Request) {
   await connectDb();
 
   const user = await User.findById(userId).select(
-    "name role company companyStatus baseSalary",
+    "name role company companyStatus baseSalary regionLabel",
   );
   if (!user) return jsonError("User not found.", 404);
   if (!user.company || user.companyStatus !== "approved")
     return jsonError("Approved company access is required.", 403);
 
-  const policy = await CompanyPolicy.findOne({ company: user.company }).select("advanceSalaryEnabled");
+  const policy = await resolveRegionPolicy(user.company, user.regionLabel);
   if (!policy?.advanceSalaryEnabled)
     return jsonError("Advance salary is not enabled by your finance team.", 403);
 

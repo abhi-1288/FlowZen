@@ -3,6 +3,8 @@ import { connectDb } from "@/lib/db";
 import { isObjectId, jsonError, requireUserId } from "@/lib/api";
 import { resolveEnrollingHr } from "@/lib/enrolling-hr";
 import { User } from "@/models/User";
+import { Company } from "@/models/Company";
+import { effectiveRegionLabelOf, isUserInEffectiveRegion, type OfficeAddressLike } from "@/lib/company-regions";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -34,7 +36,7 @@ export async function POST(request: Request, { params }: Params) {
 
   await connectDb();
 
-  const actor = await User.findById(userId).select("role company companyStatus name");
+  const actor = await User.findById(userId).select("role company companyStatus name regionLabel");
   if (!actor || !actor.company || actor.companyStatus !== "approved") {
     return jsonError("Approved company access is required.", 403);
   }
@@ -55,6 +57,24 @@ export async function POST(request: Request, { params }: Params) {
     const enrollingHr = await resolveEnrollingHr(member);
     if (enrollingHr?.id && enrollingHr.id !== userId) {
       return jsonError("Only the enrolling HR or admin can set this salary.", 403);
+    }
+  }
+
+  // Regional admins can only set salary for members in their own region.
+  // The company owner and HR keep the company-wide view.
+  if (actorRole === "admin") {
+    const company = (await Company.findById(actor.company).select("owner addresses address").lean()) as {
+      owner?: unknown;
+      addresses?: OfficeAddressLike[] | null;
+      address?: string | null;
+    } | null;
+    const ownerId = company?.owner ?? null;
+    const isOwner = ownerId != null && String(ownerId) === String(actor._id);
+    if (!isOwner) {
+      const adminRegion = effectiveRegionLabelOf(company, actor);
+      if (adminRegion && !isUserInEffectiveRegion(company, adminRegion, member)) {
+        return jsonError(`This member is outside your region (${adminRegion}).`, 403);
+      }
     }
   }
 

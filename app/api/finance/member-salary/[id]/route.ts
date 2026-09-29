@@ -6,6 +6,7 @@ import { User } from "@/models/User";
 import { JoinRequest } from "@/models/JoinRequest";
 import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
+import { canAccessFinanceRecord } from "../../helpers";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -16,12 +17,15 @@ export async function POST(request: Request, { params }: Params) {
   
   await connectDb();
   
-  const actor = await User.findById(userId).select("role company companyStatus name");
+  const actor = await User.findById(userId).select("role company companyStatus name regionLabel");
   if (!actor || !actor.company || actor.companyStatus !== "approved") {
     return jsonError("Approved company access is required.", 403);
   }
   if (String(actor.role) !== "finance") {
     return jsonError("Only finance can update member salary.", 403);
+  }
+  if (!(await canAccessFinanceRecord(actor, memberId))) {
+    return jsonError("This member is outside your region.", 403);
   }
   
   const member = await User.findOne({ _id: memberId, company: actor.company, companyStatus: "approved" });

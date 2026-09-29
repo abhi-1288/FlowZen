@@ -7,7 +7,8 @@ import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 import { ATSTimeline } from "@/models/ATSTimeline";
 import { extractResumeText, scoreResumeWithGemini } from "@/lib/ats-scorer";
-import { closestRegionOf } from "@/lib/candidate-region";
+import { closestRegionOf, isDetectedState } from "@/lib/candidate-region";
+import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
 
 const HR_ROLES = ["admin", "human-resource"];
 
@@ -21,6 +22,8 @@ export async function POST(request: Request, { params }: Params) {
   await connectDb();
   const user = await User.findById(userId);
   if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  const hq = await requireRecruitmentHQ(user as any);
+  if (!hq.ok) return hq.response;
   if (!user.company) return jsonError("No company found.", 400);
 
   const job = await ATSJob.findOne({ _id: id, company: user.company });
@@ -92,7 +95,11 @@ export async function POST(request: Request, { params }: Params) {
         atsStatus: status,
         atsReason: result.reason,
         atsScoredAt: new Date(),
-        ...(regionMatch.label ? { regionLabel: regionMatch.label } : {}),
+        // `closestRegionOf` can also return a company office label; only a real
+        // state may be written to `regionLabel`. Without this guard a re-score
+        // silently overwrote the candidate's state with an office name, and the
+        // "State" filter then matched nothing.
+        ...(isDetectedState(regionMatch.label) ? { regionLabel: regionMatch.label } : {}),
       });
 
       await ATSTimeline.create({
@@ -130,6 +137,8 @@ export async function GET(request: Request, { params }: Params) {
   await connectDb();
   const user = await User.findById(userId);
   if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  const hq = await requireRecruitmentHQ(user as any);
+  if (!hq.ok) return hq.response;
   if (!user.company) return jsonError("No company found.", 400);
 
   const job = await ATSJob.findOne({ _id: id, company: user.company }).select("atsScoreThreshold");

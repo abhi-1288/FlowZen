@@ -605,6 +605,12 @@ Download the offer letter as HTML.
 
 ## App Module
 
+Access is role-based. `Company.owner` is the single global super-admin. The `admin` and `finance`
+roles are region-scoped: their scope is the members whose effective region matches theirs
+(main-office fallback). Holidays, WFH dates, weekends, company policy (PF/ESIC/TDS/salary
+cycle/food/travel) and salary management are per-region; takedown, freeze/hold, brand theme, join
+codes and the region roster stay company-level (owner-only).
+
 ### Dashboard
 
 #### GET /api/company
@@ -638,7 +644,17 @@ Get all users in the company.
 **Query Params:**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| role | string | Optional | Filter by role (admin, human-resource, etc.) |
+| role | string | Optional | Filter by role (admin, human-resource, etc.). Accepts a comma-separated list, e.g. `human-resource,finance`, matched with `$in` |
+| isSeniorSecurity | boolean | Optional | `true` to return only senior security staff |
+| region | string | Optional | `mine` restricts results to the requester's own region (their `regionLabel`, falling back to the main office). Falls back to the company-wide list when that region has no match |
+| regionFallback | string | Optional | `main` (only meaningful with `region=mine`) also counts members with no stored `regionLabel` as being in the main office, so an unset member matches the requester when the requester's own region resolves to the main office. Used by the document-letter co-approver picker so it offers exactly who `POST /api/hr/document-letter` will accept |
+
+A user counts as being in the requester's region when their `regionLabel` matches the
+region, **or** when they are staffed in that region's `Company.addresses[]` entry
+(`hrHead`, `hrs`, `adminHead`, `admins`). Omitting `region` returns the full
+company-wide list. A member with no `regionLabel` is only in the region when
+`regionFallback=main` is passed *and* the requester's region is the main office;
+otherwise they are treated as out of region.
 
 **Response:**
 ```json
@@ -649,12 +665,18 @@ Get all users in the company.
       "name": "John Doe",
       "email": "john@example.com",
       "role": "employee",
+      "regionLabel": "Pune",
       "avatarUrl": "...",
       "company": "companyId"
     }
-  ]
+  ],
+  "region": "Pune",
+  "regionFallback": false
 }
 ```
+
+`region` echoes the resolved requester region and `regionFallback` is `true` when the
+region had no match and the company-wide list was returned instead.
 
 #### GET /api/company/admins
 
@@ -736,10 +758,39 @@ Get current user's full profile.
     },
     "company": "companyId",
     "team": "teamId",
-    "regionLabel": "US-East"
+    "regionLabel": "US-East",
+    "documentCount": 3,
+    "previousEmployment": null
   }
 }
 ```
+
+Two fields exist specifically for members who have been disconnected from their
+company, where the profile otherwise degrades into "Not set" / "none":
+
+| Field | Type | Description |
+|-------|------|-------------|
+| documentCount | number | How many documents the user has uploaded. Drives the read-only Documents tab, which is only shown to a disconnected member when this is greater than 0 |
+| previousEmployment | object \| null | The employment the user actually finished. `null` while they are still an approved member |
+
+`previousEmployment` shape:
+```json
+{
+  "companyId": "...",
+  "companyName": "Acme Corp",
+  "region": "Pune",
+  "role": "qa-tester",
+  "employmentType": "full-time",
+  "joined": "2024-01-15T00:00:00.000Z",
+  "ended": "2025-06-30T00:00:00.000Z"
+}
+```
+
+The disconnect nulls out `company` and `companyJoined`, so `joined` is
+reconstructed from the last `joined-company` entry in `membershipHistory`, while
+`ended` comes from `employmentEndDate` — the `contract-expired` history entry is
+stamped with the cron run time, not the last working day. `region` resolves the
+member's own `regionLabel`, falling back to the main office.
 
 #### PATCH /api/profile
 
@@ -781,48 +832,106 @@ Remove profile avatar. **Response:** `{ "success": true }`
 
 Get user's uploaded documents.
 
-**Response:**
+**Response (200) — current member:**
 ```json
 {
+  "categories": [
+    { "name": "identity", "mandatory": true, "fields": [{ "label": "Document Number", "type": "text" }] }
+  ],
   "documents": [
     {
-      "id": "...",
       "category": "identity",
       "fileName": "passport.pdf",
       "fileType": "application/pdf",
       "fileUrl": "...",
       "fieldValues": {}
     }
-  ]
+  ],
+  "readOnly": false
 }
 ```
 
+**Response (200) — disconnected member:**
+```json
+{
+  "categories": [],
+  "documents": [ ... ],
+  "readOnly": true
+}
+```
+
+A member who has been disconnected has no company left to read the required
+categories from, but their own uploads are immutable history and the blob keys are
+not company-scoped, so they stay downloadable. Such a request gets `categories: []`
+and `readOnly: true` rather than the `403` an approved company used to require.
+`readOnly` is the client's signal to hide upload and delete controls;
+`POST` and `DELETE` below still require an approved company, so an ex-member can
+neither upload nor delete.
+
+**Errors:**
+| Status | Message |
+|--------|---------|
+| 404 | User not found. |
+
 #### POST /api/profile/documents
 
-Add a new document to profile.
+Upload a document against a required category. Requires `multipart/form-data` and an
+approved company.
 
-**Request Body:**
+**Request Body (multipart/form-data):**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| category | string | Required | Document category |
-| fileName | string | Required | Original filename |
-| fileType | string | Required | MIME type |
-| fileSize | number | Required | File size in bytes |
-| fileUrl | string | Required | URL of uploaded file |
-| fieldValues | object | Optional | Additional metadata |
+| file | file | Required | The document. Max 20 MB |
+| category | string | Required | Must match a category configured in the company's `requiredDocuments` |
+| fieldValues | string | Optional | JSON-encoded array of `{ label, value }` |
 
-**Response:** `{ "document": { ... created document } }`
+The category decides which extensions are accepted (`acceptedFileTypes`); a blank
+or `application/pdf` category accepts anything the platform allows. PDF uploads are
+parsed for a blood group, which is written back to the profile if found, and
+`fieldValues` labelled "account number" / "ifsc" are copied onto the profile too.
+Only one document per category is kept, so the existing one must be deleted first.
+
+**Response (200):**
+```json
+{
+  "ok": true,
+  "url": "...",
+  "fileName": "passport.pdf",
+  "fileType": "application/pdf",
+  "fileSize": 245678,
+  "category": "identity",
+  "fieldValues": []
+}
+```
+
+**Errors:**
+| Status | Message |
+|--------|---------|
+| 400 | file and category are required. |
+| 400 | File is empty. |
+| 400 | File exceeds 20 MB limit. |
+| 400 | Category "..." is not valid. |
+| 400 | File type .xyz not accepted. Allowed: .pdf, .png |
+| 400 | Delete the existing document first before uploading a new one. |
+| 403 | Approved company access is required. |
 
 #### DELETE /api/profile/documents
 
-Remove a document from profile.
+Remove the document held against a category. Requires an approved company.
 
-**Request Body:**
+**Query Params:**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| documentId | string | Required | Document ID to delete |
+| category | string | Required | Category whose document should be deleted |
 
-**Response:** `{ "success": true }`
+**Response:** `{ "ok": true }`
+
+**Errors:**
+| Status | Message |
+|--------|---------|
+| 400 | category query param is required. |
+| 403 | Approved company access is required. |
+| 404 | No document found for this category. |
 
 #### POST /api/profile/email/verify
 
@@ -865,7 +974,14 @@ Check ID card request status.
 
 #### POST /api/profile/id-card/request
 
-Request a new ID card.
+Request a new ID card. The selected approver is region-scoped exactly like a
+document letter: an out-of-region pick is rejected with `400`, but only when the
+requester's region actually has an eligible approver — otherwise nobody there could
+submit a request at all.
+
+**Eligible approver roles:** `human-resource`, `finance`, `admin`,
+`project-manager`, `qa-tester`, `it-admin`. A **junior security** requester may
+also assign to a **senior security** member.
 
 **Response:**
 ```json
@@ -876,6 +992,12 @@ Request a new ID card.
   }
 }
 ```
+
+**Errors:**
+| Status | Message |
+|--------|---------|
+| 400 | Selected approver is not in your region (Pune). |
+| 404 | Selected approver not found. |
 
 #### POST /api/profile/identity-code/request
 
@@ -1058,6 +1180,9 @@ Cancel a pending quit request.
 #### GET /api/users
 
 Get all users in the company. (Same as Dashboard)
+
+Supports the `role` (comma-separated), `isSeniorSecurity` and `region=mine` query params
+described under [Dashboard → GET /api/users](#get-apiusers).
 
 #### PATCH /api/hr/member-role
 
@@ -1380,6 +1505,36 @@ Update document categories (HR only).
 
 Get all letter requests for the company.
 
+Pass `?plan=1` to preview the approver plan that would be assigned to the current
+requester: `{ region, primary: { id, name, role } | null, teamOwner: { user, slot, name, role } | null, teamOwnerBlockedReason, maxCoApprovers }`.
+
+`teamOwnerBlockedReason` is `"out-of-region"` when the requester has a team owner who
+cannot be nominated because they are outside the requester's region. The team owner is
+then omitted from `teamOwner` and the modal shows the suggestion disabled with a
+reason instead of a button that would be silently dropped. It is `""` whenever a
+`teamOwner` is returned.
+
+**Visibility:** HR and admins see every letter in the company. Anyone else sees the
+letters they requested **plus** any letter they are listed on in `signatories[]` —
+a nominated co-approver has to be able to open the letter in order to sign it, even
+though they did not request it. Nobody else can see it.
+
+**`signatories[]` shape** (advisory co-approvers, see below):
+```json
+{
+  "signatories": [
+    {
+      "user": "userId",
+      "slot": "team-owner",
+      "name": "Asha Rao",
+      "role": "project-manager",
+      "status": "pending",
+      "signedAt": null
+    }
+  ]
+}
+```
+
 #### POST /api/hr/document-letter
 
 Create a new letter request (experience, salary, etc.).
@@ -1389,6 +1544,43 @@ Create a new letter request (experience, salary, etc.).
 |-------|------|----------|-------------|
 | requester | string | Required | User ID requesting the letter |
 | letterType | string | Required | Type of letter (experience/salary) |
+| approverId | string | Optional | Explicit primary approver. Must be `human-resource` (or a senior security user for junior-security requesters) in the requester's region |
+| coApproverIds | string[] | Optional | Up to 3 optional co-approvers, in the requester's region, in the order picked. A lone string or a single value in `coApproverId` is also accepted. When the requester's region is the main office, a nominee with no `regionLabel` also counts as in-region (same rule as `?plan=1` and the picker, which pass `region=mine&regionFallback=main`) |
+| teamOwnerId | string | Optional | The requester's team owner, taken from the modal's one-click suggestion. Ignored unless it really is their team owner, and ignored when they are out of region |
+
+**Approval model:** the primary approver is always HR and is the only gate — the
+letter is issued as soon as they approve. The primary is never the requester:
+resolution order is another in-region HR, an in-region admin, any company HR,
+then any company admin. Co-approvers are written to `signatories[]` and are
+**advisory only** — they are notified as soon as the letter is requested, may
+sign or decline on `/letter/[id]?draft=1` before HR has approved or on
+`/letter/[id]` after it, and their silence or a decline never blocks, delays or
+reverts the letter. A signature given before approval is kept and appears on the
+letter once it is issued; only a **rejected** letter cannot be signed.
+
+Signatures are recorded with `PATCH /api/approvals/[id]` and a `sign` boolean —
+see [Approvals](#patch-apiapprovalsid). A nominated co-approver's letters also
+appear in their own approvals inbox via `GET /api/approvals`, flagged with
+`signatoryView: true`.
+
+Nothing is ever added automatically: a letter starts with HR alone, and the
+requester decides whether to add co-approvers. `GET /api/hr/document-letter?plan=1`
+previews the resolved primary and the team owner the modal may *offer* as a
+one-click suggestion. The team owner is only added when clicked, is skipped when
+the requester manages that team themselves, and is tagged `slot: "team-owner"` so
+the printed block can say so; everyone else gets `slot: "secondary"`. At most
+`MAX_LETTER_CO_APPROVERS` (3) co-approvers are kept — the team owner counts
+toward that cap — and the primary approver, the requester, duplicates and
+ineligible users are dropped. Manually picked co-approvers must hold an
+approver role (`human-resource`, `finance`, `admin`, `project-manager`,
+`qa-tester`, `it-admin`).
+
+Re-submitting the same letter type while one is pending reuses that request rather
+than failing the unique index, and **keeps signatures that have already been
+collected**: a `signatories[]` row still present in the new plan and already
+`signed` or `declined` retains its status and `signedAt`. Only genuinely new
+nominees start as `pending`, and only the letter's own primary signature
+(`metadata.isSigned`) is reset.
 
 #### PATCH /api/hr/document-letter/[id]
 
@@ -1404,20 +1596,99 @@ Verify bank details for a document.
 
 Get all pending approval requests for the current user.
 
+**Who sees what:**
+
+- Requests where you are the assigned approver are always yours to see.
+- As an HR or admin you additionally see company-wide requests raised by
+  non-HR members — **except** `document-letter`, which is region-scoped: you only
+  see letters from your own region. A user with no `regionLabel` resolves to the
+  main office. If your region has nobody holding an approver role
+  (`human-resource`, `finance`, `admin`, `project-manager`, `qa-tester`,
+  `it-admin`), the company-wide letter list is returned instead rather than
+  leaving you with an empty inbox. `quit-company` requests are never region-scoped.
+- As a **nominated co-approver** on a document letter you get a separate inbox
+  entry for every letter whose `signatories[]` still has a `pending` row for you.
+  The request is listed from the moment it is created, not only once HR issues
+  it, so the "you may sign later" notification always links to something.
+
+Two extra fields decorate a co-approver inbox entry:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| signatoryView | boolean | Always `true` on this entry. Tells the client to render signature actions instead of approve/reject actions |
+| signatureReady | boolean | `true` when the letter is already `approved`. Not an access gate — it only says whether `/letter/[id]` needs `?draft=1` to render at all |
+
+**Response:**
+```json
+{
+  "requests": [
+    {
+      "id": "...",
+      "kind": "document-letter",
+      "requester": { "id": "...", "name": "John Doe" },
+      "status": "pending",
+      "signatories": [
+        { "user": "...", "slot": "team-owner", "name": "Asha Rao", "status": "pending" },
+        { "user": "...", "slot": "secondary", "name": "Neha Iyer", "status": "signed" }
+      ],
+      "signatoryView": true,
+      "signatureReady": false
+    }
+  ]
+}
+```
+
 #### PATCH /api/approvals/[id]
 
-Approve or reject an approval request.
+Approve or reject an approval request, or record an optional co-signature.
 
 **Request Body:**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| status | string | Required | New status (approved/hr-approved/rejected) |
+| status | string | Required\* | New status (approved/hr-approved/rejected) |
 | force | boolean | Optional | Force approval (skip workflow) |
 | reason | string | Optional | Rejection reason |
 | salaryAmount | number | Optional | Approved salary (for salary requests) |
 | salaryCurrency | string | Optional | Currency (for salary requests) |
 | letterContent | string | Optional | Letter content (for letter requests) |
 | signed | boolean | Optional | Mark as signed |
+| sign | boolean | Optional | Record an advisory co-signature. `true` signs, `false` declines |
+
+\* Required unless `sign` is sent — the two are mutually exclusive. Sending
+`sign` takes an early return **before** any status transition, so a co-approver
+can never approve, reject or otherwise advance a request.
+
+**The `sign` branch (co-approvers):**
+
+- Only valid for `kind: "document-letter"` — anything else is `400`.
+- Signable while the request is `pending`, `hr-approved` or `approved`. Any
+  other status is `409`: a rejected letter is the one state that cannot be
+  signed, because it will never be issued.
+- The caller must hold a `signatory` row with `status: "pending"` for this
+  request, otherwise `403`. A row that has already been signed or declined
+  cannot be signed twice.
+- Grants signing rights **immediately**, not on issuance. A signature given
+  before HR approves is retained and appears on the letter once it is issued.
+- Notifies the requester either way, linking to `/letter/[id]`, or
+  `/letter/[id]?draft=1` while the letter is still unissued.
+- When the last outstanding signature resolves, the requester also gets an
+  "All signatures complete" notification. A decline counts as resolved, so a
+  declined co-approver never leaves the letter reading as still waiting.
+
+**Response (200) — sign branch:**
+```json
+{
+  "ok": true,
+  "request": { "id": "...", "status": "pending", "signatories": [] }
+}
+```
+
+**Errors:**
+| Status | Message |
+|--------|---------|
+| 400 | Signatures only apply to document letters. |
+| 403 | Forbidden (caller is not a pending signatory on this request) |
+| 409 | This letter was not approved, so there is nothing to sign. |
 
 ### Messages
 
@@ -1468,9 +1739,11 @@ Get count of unread messages.
 
 ### Finance
 
+Salary management is **region scoped**. A `finance` or `admin` user only sees and manages salaries for members in their own effective region, across `GET`/`POST`/`PATCH /api/finance`, the per-record routes (`salary/[id]`, `salary-slip/[id]`, `member-salary/[id]`, `member-attendance/[id]`) and the cycle-day auto-generation. Companies with no region configured stay company-wide, as does a region that holds no approved members. Employees can always read their own records. Expenses, budgets, bills, invoices and salary advances are not region scoped.
+
 #### GET /api/finance
 
-Get all salary records for the company.
+Get salary records for the month. Finance and admin users receive only their own region's records; everyone else receives their own. The response also carries `region` and `regionFallback`.
 
 #### POST /api/finance
 
@@ -1721,7 +1994,7 @@ Approve, reject, or revoke a WFH request.
 
 #### GET /api/attendance/export
 
-Export attendance data as CSV.
+Export attendance data as CSV (`.csv`, `Content-Type: text/csv`, UTF-8 BOM, CRLF). The `finance` role receives only its own region's members and the region is appended to the filename; `admin`/`human-resource` receive the company, `project-manager`/`qa-tester` their own teams, everyone else themselves. A region with no members falls back to company-wide.
 
 **Query Params:**
 | Field | Type | Required | Description |
@@ -1838,6 +2111,74 @@ Mark a specific notification as read.
 Delete a specific notification.
 
 **Notification Types:** info, approval, project, deadline, system
+
+### Contract End & Offboarding
+
+A scheduled job handles the end of a contract or fixed-term employment period. It
+runs in two independent phases and can be invoked two ways; both share the same
+implementation and response.
+
+#### GET /api/cron/contract-end-disconnect
+
+Run the contract-end job. Requires the `CRON_SECRET` bearer token, and is meant to
+be called on a schedule by your platform.
+
+**Headers:**
+| Header | Value |
+|--------|-------|
+| Authorization | `Bearer <CRON_SECRET>` |
+
+#### GET /api/dev/contract-end-disconnect
+
+Run the same job manually. Only available when `NODE_ENV === "development"`;
+returns `403 Dev only` in every other environment, and takes no auth header.
+
+**Response (200) — both endpoints:**
+```json
+{
+  "ok": true,
+  "generated": ["userId1"],
+  "warned": ["userId2"],
+  "disconnected": ["userId3"]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| generated | string[] | Members for whom a final settlement salary record was generated |
+| warned | string[] | Members whose regional HR/admin/finance were told the employment period expired |
+| disconnected | string[] | Members actually removed from the company |
+
+**The two phases:**
+
+1. **Settlement.** If the company's `settlementEnabled` policy is on, a final
+   settlement salary record is generated for the month the employment period ended.
+   This is governed by the settlement gap (`getSettlementGapDays` for the member's
+   `salaryType`), so the member stays a member while the gap runs.
+2. **Disconnect.** Once the gap has elapsed, the member is removed: company, team
+   and join dates are nulled out, managed teams are handed on, boards are
+   cleaned up, and the released identity code is recorded.
+
+**Exit notices.** Two `system` notifications go to the member's regional HR, admin
+and finance — the same region the approving workflows use, resolved from
+`regionLabel` with the main office as the fallback. A region with nobody in those
+three roles would make the exit invisible, so it widens to the whole company rather
+than silently notifying nobody.
+
+- *"Employment period expired"* fires when the period itself lapses, while the
+  member is still inside the settlement gap, and states that they remain a member
+  until the gap closes. It is deduped via `User.employmentExpiryNotifiedAt`,
+  because the cron re-runs daily for the whole gap.
+- *"Member disconnected"* fires after the disconnect, confirming the exit.
+
+Both messages name the member, their role and region, the employment type, and the
+full period (`companyJoined` — `employmentEndDate`).
+
+**Errors:**
+| Status | Message | Endpoint |
+|--------|---------|----------|
+| 401 | Unauthorized | `/api/cron/contract-end-disconnect` |
+| 403 | Dev only | `/api/dev/contract-end-disconnect` |
 
 ---
 

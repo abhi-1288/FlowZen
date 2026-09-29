@@ -5,19 +5,49 @@ import { CompanyPolicy } from "@/models/CompanyPolicy";
 import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
 import { User } from "@/models/User";
+import { Company } from "@/models/Company";
+import { effectiveRegionLabelOf, isUserInEffectiveRegion, type OfficeAddressLike } from "@/lib/company-regions";
 
-export async function GET() {
+/**
+ * Resolve the policy region for an actor. Regional admins manage their own
+ * region's policy; the company owner may target any region (or global "").
+ */
+async function resolvePolicyRegion(actor: any) {
+  const company = (await Company.findById(actor.company)
+    .select("owner addresses address")
+    .lean()) as {
+    owner?: unknown;
+    addresses?: OfficeAddressLike[] | null;
+    address?: string | null;
+  } | null;
+  const ownerId = company?.owner ?? null;
+  const isOwner = ownerId != null && String(ownerId) === String(actor._id);
+  const adminRegion = effectiveRegionLabelOf(company, actor);
+  return { company, isOwner, adminRegion };
+}
+
+export async function GET(request: Request) {
   const userId = await requireUserId();
   if (!userId) return jsonError("Unauthorized", 401);
   await connectDb();
 
-  const actor = await User.findById(userId).select("role company companyStatus");
+  const actor = await User.findById(userId).select("role company companyStatus regionLabel");
   if (!actor || !actor.company || actor.companyStatus !== "approved")
     return jsonError("Approved company access is required.", 403);
 
-  const policy = await CompanyPolicy.findOne({ company: actor.company })
+  // The actor's own region policy, falling back to the global policy when the
+  // region has no policy of its own. The company owner may target any region.
+  const { company, isOwner, adminRegion } = await resolvePolicyRegion(actor);
+  const requestedRegion = String(new URL(request.url).searchParams.get("region") ?? "").trim();
+  const targetRegion = isOwner && requestedRegion ? requestedRegion : adminRegion;
+  let policy = await CompanyPolicy.findOne({ company: actor.company, region: targetRegion })
     .populate("foodOptedOutMembers", "name email role")
     .populate("travelOptedOutMembers", "name email role");
+  if (!policy && targetRegion) {
+    policy = await CompanyPolicy.findOne({ company: actor.company, region: "" })
+      .populate("foodOptedOutMembers", "name email role")
+      .populate("travelOptedOutMembers", "name email role");
+  }
 
   if (!policy) {
     return NextResponse.json({
@@ -57,13 +87,24 @@ export async function POST(request: Request) {
   if (!userId) return jsonError("Unauthorized", 401);
   await connectDb();
 
-  const actor = await User.findById(userId).select("role company companyStatus");
+  const actor = await User.findById(userId).select("role company companyStatus regionLabel");
   if (!actor || !actor.company || actor.companyStatus !== "approved")
     return jsonError("Approved company access is required.", 403);
   if (!["finance", "admin"].includes(String(actor.role ?? "")))
     return jsonError("Only finance or admin can configure policies.", 403);
 
   const body = await request.json();
+
+  // Regional finance/admin may only configure their own region's policy. The
+  // company owner may target any region or the global policy.
+  const { isOwner, adminRegion } = await resolvePolicyRegion(actor);
+  const requestedRegion = String(body.region ?? "").trim();
+  let targetRegion = adminRegion;
+  if (isOwner && requestedRegion) {
+    targetRegion = requestedRegion;
+  } else if (!isOwner && requestedRegion && requestedRegion !== adminRegion) {
+    return jsonError(`You can only configure policies for your own region (${adminRegion}).`, 403);
+  }
 
   const hasPctFields = "pfPercentage" in body || "esicPercentage" in body || "tdsPercentage" in body;
   if (hasPctFields && String(actor.role) !== "finance") {
@@ -92,7 +133,7 @@ export async function POST(request: Request) {
   if (typeof body.specialAllowancePercentage === "number") update.specialAllowancePercentage = Math.max(0, body.specialAllowancePercentage);
 
   const policy = await CompanyPolicy.findOneAndUpdate(
-    { company: actor.company },
+    { company: actor.company, region: targetRegion },
     { $set: update },
     { new: true, upsert: true },
   );
@@ -138,7 +179,7 @@ export async function PATCH(request: Request) {
   if (!userId) return jsonError("Unauthorized", 401);
   await connectDb();
 
-  const actor = await User.findById(userId).select("role company companyStatus name");
+  const actor = await User.findById(userId).select("role company companyStatus name regionLabel");
   if (!actor || !actor.company || actor.companyStatus !== "approved")
     return jsonError("Approved company access is required.", 403);
 
@@ -154,10 +195,22 @@ export async function PATCH(request: Request) {
     _id: targetMemberId,
     company: actor.company,
     companyStatus: "approved",
-  }).select("_id name email");
+  }).select("_id name email regionLabel");
   if (!member) return jsonError("Member not found in this company.", 404);
 
-  const policy = await CompanyPolicy.findOne({ company: actor.company });
+  // Regional finance/admin may only manage opt-outs for members in their own
+  // region, and only against their region's policy.
+  const { company, isOwner, adminRegion } = await resolvePolicyRegion(actor);
+  if (!isOwner && adminRegion) {
+    if (!isUserInEffectiveRegion(company, adminRegion, member)) {
+      return jsonError(`This member is outside your region (${adminRegion}).`, 403);
+    }
+  }
+
+  let policy = await CompanyPolicy.findOne({ company: actor.company, region: adminRegion });
+  if (!policy && adminRegion) {
+    policy = await CompanyPolicy.findOne({ company: actor.company, region: "" });
+  }
   if (!policy) return jsonError("No policy configured yet.", 404);
 
   const field = type === "food" ? "foodOptedOutMembers" : "travelOptedOutMembers";

@@ -1,33 +1,35 @@
 import { NextResponse } from "next/server";
-import { connectDb } from "@/lib/db";
 import { ATSCandidate } from "@/models/ATSCandidate";
 import { ATSTimeline } from "@/models/ATSTimeline";
 import { ATSAuditLog } from "@/models/ATSAuditLog";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
-import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
+import { withCandidateAccess } from "@/lib/recruitment-candidate-access";
+import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
+import { jsonError, serializeDoc } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
 
 type Params = { params: Promise<{ id: string }> };
-const HR_ROLES = ["admin", "human-resource"];
 const VALID_STAGES = ["applied", "screening", "assessment", "technical-interview", "manager-round", "hr-round", "offer", "joined", "ats-rejected", "rejected"];
 
 export async function PATCH(request: Request, { params }: Params) {
   const { id } = await params;
-  const userId = await requireUserId();
-  if (!userId) return jsonError("Unauthorized", 401);
-  if (!isObjectId(id)) return jsonError("Invalid candidate id.");
+  const access = await withCandidateAccess(id, "write");
+  if (!access.ok) return access.response;
+  const { user, candidate: loaded } = access;
+  const userId = String(user._id);
+
+  // Moving a candidate through the pipeline is the main office's call. A region
+  // can still receive a candidate and take them to offer, but the screening /
+  // assessment / interview progression belongs to whoever raised the requisition.
+  const hq = await requireRecruitmentHQ(user as any);
+  if (!hq.ok) return hq.response;
 
   const body = await request.json();
   const toStage = String(body.stage ?? "");
   if (!VALID_STAGES.includes(toStage)) return jsonError("Invalid stage.");
 
-  await connectDb();
-  const user = await User.findById(userId);
-  if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
-  if (!user.company) return jsonError("No company found.", 400);
-
-  const candidate = await ATSCandidate.findOne({ _id: id, company: user.company })
+  const candidate = await ATSCandidate.findById(loaded._id)
     .populate("assignedRecruiter", "name email")
     .populate("job", "title");
   if (!candidate) return jsonError("Candidate not found.", 404);

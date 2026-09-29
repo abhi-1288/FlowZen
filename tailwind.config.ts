@@ -1,10 +1,16 @@
 import type { Config } from "tailwindcss";
+import animate from "tailwindcss-animate";
 
 const config: Config = {
   darkMode: "class",
+  // `./lib` must stay in this list: `lib/toast-context.tsx` renders the toast
+  // layer, and if it goes unscanned its `z-[9999]` / `z-[200]` classes are never
+  // emitted, so the toasts silently fall back to `z-index: auto` and get painted
+  // underneath every modal.
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./lib/**/*.{js,ts,jsx,tsx,mdx}",
     "./store/**/*.{js,ts,jsx,tsx,mdx}"
   ],
   theme: {
@@ -79,7 +85,9 @@ const config: Config = {
       }
     }
   },
-  plugins: []
+  // `animate-in` / `fade-in` / `slide-in-from-*` (used by toasts and several
+  // modals) are no-ops without this plugin. v1 is the Tailwind 3 line.
+  plugins: [animate]
 };
 
 export default config;

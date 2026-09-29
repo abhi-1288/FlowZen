@@ -17,24 +17,19 @@ export default function LoginPage() {
   const [seedMsg, setSeedMsg] = useState("");
   const [showDemo, setShowDemo] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [pendingDemo, setPendingDemo] = useState<string | null>(null);
+  const [demoError, setDemoError] = useState("");
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setLoading(true);
-    setError("");
+  async function performLogin(loginEmail: string, loginPassword: string): Promise<LoginResult> {
+    const result = await signIn("credentials-login", {
+      email: loginEmail,
+      password: loginPassword,
+      rememberMe: String(rememberMe),
+      redirect: false
+    });
 
-    const result = await signIn("credentials-login", { email, password, rememberMe: String(rememberMe), redirect: false });
-    setLoading(false);
     if (result?.error) {
-      const msg = decodeURIComponent(result.error);
-      if (msg.includes("Too many login attempts")) {
-        setError("Too many login attempts. Please try again later.");
-      } else if (msg === "CredentialsSignin") {
-        setError("Invalid email or password.");
-      } else {
-        setError(msg);
-      }
-      return;
+      return { ok: false, raw: result.error, message: describeLoginError(result.error) };
     }
 
     await fetch("/api/auth/session-mode", {
@@ -43,6 +38,38 @@ export default function LoginPage() {
       body: JSON.stringify({ rememberMe })
     });
     router.push("/profile");
+    return { ok: true };
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+
+    const result = await performLogin(email, password);
+    setLoading(false);
+
+    if (!result.ok) setError(result.message);
+  }
+
+  async function loginAsDemo(demoEmail: string, demoPassword: string) {
+    setPendingDemo(demoEmail);
+    setDemoError("");
+    setError("");
+
+    let result = await performLogin(demoEmail, demoPassword);
+
+    if (!result.ok && isCredentialRejection(result.raw)) {
+      try {
+        const seedRes = await fetch("/api/seed/demo", { method: "POST" });
+        if (seedRes.ok) result = await performLogin(demoEmail, demoPassword);
+      } catch {
+        // fall through to the original failure below
+      }
+    }
+
+    setPendingDemo(null);
+    if (!result.ok) setDemoError(result.message);
   }
 
   return (
@@ -106,7 +133,7 @@ export default function LoginPage() {
           <button
             suppressHydrationWarning
             type="button"
-            onClick={() => setShowDemo(!showDemo)}
+            onClick={() => { setShowDemo(!showDemo); setDemoError(""); }}
             className="flex w-full items-center justify-between text-sm font-medium text-slate-500 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-zinc-300"
           >
             Demo accounts
@@ -136,19 +163,27 @@ export default function LoginPage() {
                     <span className="neu-chip rounded-md px-2 py-0.5 font-mono text-xs text-slate-500 dark:text-zinc-400">{pass}</span>
                     <button
                       type="button"
-                      onClick={() => { setEmail(String(mail)); setPassword(String(pass)); }}
-                      className="neu-btn neu-btn-success rounded-md px-2.5 py-0.5 text-xs font-medium"
+                      onClick={() => loginAsDemo(String(mail), String(pass))}
+                      disabled={pendingDemo !== null}
+                      className="neu-btn neu-btn-success flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-xs font-medium disabled:opacity-50"
                     >
-                      Use
+                      {pendingDemo === String(mail) ? <Loader2 className="animate-spin" size={12} /> : null}
+                      Sign in
                     </button>
                   </div>
                 </div>
               ))}
+              {demoError ? (
+                <div className="rounded-xl bg-rose-50 dark:bg-rose-950 px-4 py-3 text-sm text-rose-600">
+                  {demoError}
+                </div>
+              ) : null}
               <button
                 type="button"
                 onClick={async () => {
                   setSeeding(true);
                   setSeedMsg("");
+                  setDemoError("");
                   try {
                     const res = await fetch("/api/seed/demo", { method: "POST" });
                     const data = await res.json();
@@ -159,7 +194,7 @@ export default function LoginPage() {
                     setSeeding(false);
                   }
                 }}
-                disabled={seeding}
+                disabled={seeding || pendingDemo !== null}
                 className="neu-btn mt-3 flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-slate-600 dark:text-zinc-400"
               >
                 {seeding ? <Loader2 className="animate-spin" size={15} /> : <Database size={15} />}
@@ -172,6 +207,20 @@ export default function LoginPage() {
       </div>
     </main>
   );
+}
+
+type LoginResult = { ok: true } | { ok: false; raw?: string; message: string };
+
+function describeLoginError(raw?: string) {
+  if (!raw) return "Something went wrong. Please try again.";
+  const msg = decodeURIComponent(raw);
+  if (msg.includes("Too many login attempts")) return "Too many login attempts. Please try again later.";
+  if (msg === "CredentialsSignin") return "Invalid email or password.";
+  return msg;
+}
+
+function isCredentialRejection(raw?: string) {
+  return raw ? decodeURIComponent(raw) === "CredentialsSignin" : false;
 }
 
 function Field({ label, value, onChange, type, placeholder }: { label: string; value: string; onChange: (value: string) => void; type: string; placeholder?: string }) {

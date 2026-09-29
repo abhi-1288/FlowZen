@@ -11,7 +11,8 @@ import { User } from "@/models/User";
 import { Task } from "@/models/Task";
 import { emitNotification } from "@/lib/realtime";
 import { ensureCompanyIdentityCode, recordIdentityCodeRelease } from "@/lib/company-identity";
-import { mainOfficeLabelOf } from "@/lib/company-regions";
+import { effectiveRegionLabelOf, isUserInEffectiveRegion, mainOfficeLabelOf, type OfficeAddressLike } from "@/lib/company-regions";
+import { signatorySlotLabel, signatoryCompletion } from "@/lib/document-letter-signatories";
 import { generateFinalSettlement } from "@/app/api/finance/helpers";
 import { CompanyPolicy } from "@/models/CompanyPolicy";
 
@@ -128,6 +129,38 @@ async function transferQuitterBoardAssignments(userId: any, replacementUserId: a
   }
 }
 
+/**
+ * Regional guard for the admin fallback decision paths in PATCH. A regional
+ * admin may only decide a request whose requester sits in their own region;
+ * the company owner and a company with no region config are unaffected.
+ *
+ * The direct-approver path (`joinRequest.approver === userId`) is deliberately
+ * not routed through here: auto-assignment already picks an in-region admin,
+ * and salary auto-assignment is not region-aware, so gating it would strand
+ * salary approvals.
+ */
+async function adminCanDecideInRegion(
+  actor: { _id?: unknown; regionLabel?: string | null },
+  companyId: unknown,
+  requester: { _id?: unknown; regionLabel?: string | null },
+): Promise<boolean> {
+  const companyDoc = (await Company.findById(companyId)
+    .select("owner addresses address")
+    .lean()) as {
+    owner?: unknown;
+    addresses?: OfficeAddressLike[] | null;
+    address?: string | null;
+  } | null;
+  const ownerId = companyDoc?.owner ?? null;
+  const isOwner = ownerId != null && String(ownerId) === String(actor._id);
+  if (isOwner) return true;
+
+  const adminRegion = effectiveRegionLabelOf(companyDoc, actor);
+  if (!adminRegion) return true;
+
+  return isUserInEffectiveRegion(companyDoc, adminRegion, requester);
+}
+
 export async function PATCH(request: Request, { params }: Params) {
   try {
     const { id } = await params;
@@ -155,6 +188,80 @@ export async function PATCH(request: Request, { params }: Params) {
     const requester = await User.findById(joinRequest.requester);
     if (!requester) return jsonError("Requester not found.", 404);
 
+    // Advisory signatories record their signature (or decline) on a document
+    // letter. This branch deliberately returns before any status transition: HR
+    // is the only gate, and a co-approver neither advances nor reverts the
+    // request.
+    if (typeof body.sign === "boolean") {
+      if (joinRequest.kind !== "document-letter") {
+        return jsonError("Signatures only apply to document letters.", 400);
+      }
+      // A nominated co-approver may sign as soon as they are listed, without
+      // waiting for HR. They are advisory either way, so there is nothing to
+      // sequence: the signature is held on the request and shows up on the
+      // letter whenever HR issues it. A rejected letter is the one state that
+      // cannot be signed, since it will never be issued. `hr-approved` is
+      // accepted to match the states the signatory inbox lists.
+      const requestStatus = String(joinRequest.status);
+      const signable = ["approved", "hr-approved", "pending"];
+      if (!signable.includes(requestStatus)) {
+        return jsonError("This letter was not approved, so there is nothing to sign.", 409);
+      }
+      const isIssued = requestStatus === "approved";
+      // The plan dedupes nominees, so each person occupies at most one row and
+      // matching on the user alone is unambiguous. No slot is needed.
+      const entry = (joinRequest.signatories as any[]).find(
+        (s) => String(s.user) === userId && String(s.status) === "pending",
+      );
+      if (!entry) return jsonError("Forbidden", 403);
+
+      const willSign = body.sign === true;
+      entry.status = willSign ? "signed" : "declined";
+      entry.signedAt = new Date();
+      joinRequest.markModified("signatories");
+      await joinRequest.save();
+
+      const letterType = String((joinRequest.metadata as any)?.letterType ?? "document").replace("-", " ");
+      const signer = await User.findById(userId).select("name").lean();
+      const signerName = String((signer as { name?: string } | null)?.name ?? "A co-approver");
+      // An unissued letter is not rendered without `draft=1`, so the link has to
+      // carry it or the requester lands on "not been approved yet".
+      const letterLink = `/letter/${id}${isIssued ? "" : "?draft=1"}`;
+      await Notification.create({
+        user: joinRequest.requester,
+        company: joinRequest.company,
+        type: "info",
+        title: willSign ? "Letter co-signed" : "Letter co-signature declined",
+        message: willSign
+          ? `${signerName} has signed your ${letterType} letter.${isIssued ? "" : " HR still needs to approve it before it is issued."}`
+          : `${signerName} declined to co-sign your ${letterType} letter. The letter is unaffected.`,
+        link: letterLink,
+      });
+      emitNotification(String(joinRequest.requester));
+
+      // Once the last outstanding signature is resolved, mark the letter done for
+      // the requester. `signatories` was just mutated in place, so no re-query is
+      // needed. This can only fire on the signature that empties the pending set:
+      // the 403 above means a row already resolved cannot be signed again, and no
+      // status ever returns to "pending".
+      const completion = signatoryCompletion(joinRequest.signatories);
+      if (completion.complete) {
+        await Notification.create({
+          user: joinRequest.requester,
+          company: joinRequest.company,
+          type: "info",
+          title: "All signatures complete",
+          message: isIssued
+            ? `Every listed signature on your ${letterType} letter is now in and the letter is fully signed.`
+            : `Every listed signature on your ${letterType} letter is now in. HR still needs to approve the letter before it is issued.`,
+          link: letterLink,
+        });
+        emitNotification(String(joinRequest.requester));
+      }
+
+      return NextResponse.json({ ok: true, request: serializeDoc(joinRequest) });
+    }
+
     let canDecide = String(joinRequest.approver) === userId;
 
     // For junior security requesters, only senior security can decide
@@ -181,18 +288,16 @@ export async function PATCH(request: Request, { params }: Params) {
         String(actor.company ?? "") === String(joinRequest.company);
     }
     if (!canDecide && ["company", "quit-company"].includes(String(joinRequest.kind)) && String(requester.role) === "human-resource") {
-      const actor = await User.findById(userId).select("role company companyStatus");
-      canDecide =
-        !!actor &&
-        String(actor.role) === "admin" &&
-        String(actor.company ?? "") === String(joinRequest.company);
+      const actor = await User.findById(userId).select("role regionLabel company companyStatus");
+      if (actor && String(actor.role) === "admin" && String(actor.company ?? "") === String(joinRequest.company)) {
+        canDecide = await adminCanDecideInRegion(actor, joinRequest.company, requester);
+      }
     }
     if (!canDecide && joinRequest.kind === "company" && String(requester.role) === "admin") {
-      const actor = await User.findById(userId).select("role company companyStatus");
-      canDecide =
-        !!actor &&
-        String(actor.role) === "admin" &&
-        String(actor.company ?? "") === String(joinRequest.company);
+      const actor = await User.findById(userId).select("role regionLabel company companyStatus");
+      if (actor && String(actor.role) === "admin" && String(actor.company ?? "") === String(joinRequest.company)) {
+        canDecide = await adminCanDecideInRegion(actor, joinRequest.company, requester);
+      }
     }
     if (!canDecide && joinRequest.kind === "identity-code-range") {
       const actor = await User.findById(userId).select("role regionLabel company companyStatus");
@@ -297,7 +402,7 @@ export async function PATCH(request: Request, { params }: Params) {
             type: "increment",
           });
         }
-        const meta = (joinRequest.metadata ?? {}) as { enrollingHrId?: unknown };
+        const meta = (joinRequest.metadata ?? {}) as { enrollingHrId?: unknown; regionLabel?: unknown };
         let historyInviterId = joinRequest.approver;
         if (meta.enrollingHrId) {
           const enrollingHr = await User.findOne({
@@ -323,7 +428,34 @@ export async function PATCH(request: Request, { params }: Params) {
           }
         }
         const inviterHr = await User.findById(historyInviterId).select("regionLabel");
-        if (inviterHr?.regionLabel) {
+
+        // Prefer the region recorded on the join itself, validated against the
+        // company's real offices. The converting HR writes
+        // `metadata.regionLabel` from the candidate's transferred region and the
+        // accepted offer, so it names the office the hire is actually joining.
+        //
+        // Falling back to the inviter's region is what filed hires under the
+        // wrong office: a regional HR head approving a Noida hire stamped the
+        // employee with their own region. A stale or invented label here is
+        // ignored rather than trusted, because an unresolvable region must not
+        // become a member's permanent region.
+        const metaRegion = String(meta.regionLabel ?? "").trim();
+        if (metaRegion) {
+          const officeMatch = await Company.findOne(
+            { _id: joinRequest.company, "addresses.label": metaRegion },
+            { projection: { "addresses.label": 1 } }
+          )
+            .lean()
+            .catch(() => null);
+          if (officeMatch) {
+            requester.regionLabel = metaRegion;
+          } else {
+            console.warn(
+              `Join approval skipped stale region "${metaRegion}" for request ${joinRequest._id}: no matching office.`,
+            );
+          }
+        }
+        if (!requester.regionLabel && inviterHr?.regionLabel) {
           requester.regionLabel = String(inviterHr.regionLabel);
         }
         await ensureCompanyIdentityCode(requester, joinRequest.company);
@@ -862,6 +994,29 @@ export async function PATCH(request: Request, { params }: Params) {
           metadata.signedAt = new Date().toISOString();
         }
 
+        // HR is the only gate, so the letter is issued here. Now invite the
+        // advisory signatories to add their signature — their silence never
+        // blocks issuance.
+        const awaitingSignature = (joinRequest.signatories as any[]).filter(
+          (s) => String(s.status ?? "pending") === "pending",
+        );
+        if (awaitingSignature.length > 0) {
+          const letterLabel = String(metadata.letterType ?? "document").replace("-", " ");
+          await Notification.create(
+            awaitingSignature.map((s) => ({
+              user: s.user,
+              company: joinRequest.company,
+              type: "info",
+              title: "Letter ready for your signature",
+              message: `HR has approved this ${letterLabel} letter. You are listed as ${signatorySlotLabel(s.slot)} and can add your signature. This is optional and will not hold up the letter.`,
+              link: `/letter/${id}`,
+            })),
+          );
+          for (const s of awaitingSignature) {
+            emitNotification(String(s.user));
+          }
+        }
+
         if (String(metadata.letterType ?? "") === "internship") {
           const internshipEnd = String(metadata.internshipEnd ?? "");
           if (internshipEnd && !requester.employmentEndDate) {
@@ -916,7 +1071,16 @@ export async function PATCH(request: Request, { params }: Params) {
       } else if (status === "rejected" && rejectionReason) {
         metadata.rejectionReason = rejectionReason;
       }
-      joinRequest.metadata = metadata;
+      // `metadata` above is the *same object* as `joinRequest.metadata` whenever
+      // the field already exists, so assigning it straight back leaves mongoose
+      // comparing an identical reference, the Mixed path is never marked
+      // modified, and every write here (approvedAt, isSigned, signedBy,
+      // signedRole, signedAt, letterContent) is silently dropped on save while
+      // `status` still persists. Spreading into a new object plus markModified
+      // is what makes the id-card block above actually work — do not "simplify"
+      // this back to `joinRequest.metadata = metadata`.
+      joinRequest.metadata = { ...metadata };
+      joinRequest.markModified("metadata");
     }
 
     if (joinRequest.kind !== "salary-increment" || status === "approved" || status === "rejected") {

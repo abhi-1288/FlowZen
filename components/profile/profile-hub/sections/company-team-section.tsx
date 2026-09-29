@@ -1,6 +1,11 @@
-﻿import type { AnyRecord } from "../shared";
+import type { AnyRecord } from "../shared";
 import { Row, SectionHeader } from "../shared";
-import { isMainOfficeLabel } from "@/lib/company-regions";
+import {
+  isLegacyMainOfficeLabel,
+  isMainOfficeLabel,
+  mainOfficeLabelOf,
+  regionEntryForMember,
+} from "@/lib/company-regions";
 
 export function CompanyTeamSection({
   profile,
@@ -22,16 +27,16 @@ export function CompanyTeamSection({
   onRequestIdentity: () => Promise<void>;
 }) {
   const joinedBy = (insights?.joinedBy as AnyRecord | undefined) ?? null;
-  const companyAddresses = Array.isArray(company?.addresses)
-    ? (company.addresses as AnyRecord[])
-    : [];
-  const regionLabel = profile?.regionLabel
-    ? String(profile.regionLabel)
-    : companyAddresses.length > 0 ? String(companyAddresses[0].label ?? "") : "";
-  const regionAddress = regionLabel && companyAddresses.length > 0
-    ? companyAddresses.find((a) => String(a.label ?? "") === regionLabel)
-    : null;
-  const regionLabelText = regionLabel ? String(regionLabel) : "";
+  // Resolve the region the same way the rest of the app does, but treat a
+  // stored "Main Office" as the legacy placeholder it is when the office has
+  // since been given a real name — otherwise this section would look up an
+  // address that does not exist and drop the region's HR/admin head.
+  const ownRegionLabel = String(profile?.regionLabel ?? "").trim();
+  const regionLabelText =
+    ownRegionLabel && !isLegacyMainOfficeLabel(company, ownRegionLabel)
+      ? ownRegionLabel
+      : mainOfficeLabelOf(company);
+  const regionAddress = regionEntryForMember(company, profile) as AnyRecord | null;
   const regionAddrText = regionAddress
     ? [String(regionAddress.line1 ?? ""), String(regionAddress.city ?? ""), String(regionAddress.state ?? "")].filter(Boolean).join(", ")
     : "";
@@ -46,6 +51,10 @@ export function CompanyTeamSection({
 
   const regionHrHead = regionAddress ? String(regionAddress.hrHead ?? "") : "";
   const regionAdminHead = regionAddress ? String(regionAddress.adminHead ?? "") : "";
+  // Names resolved server-side for the viewer's own region. `insights.hr` is
+  // only populated for HR/finance/admin/security, so without this a manager or
+  // employee would fall through to a raw ObjectId fragment.
+  const regionHeads = (insights?.regionHeads as AnyRecord | undefined) ?? null;
   const memberNameById = new Map<string, string>();
   const hrMembers = Array.isArray((insights?.hr as AnyRecord | undefined)?.members)
     ? ((insights?.hr as AnyRecord).members as AnyRecord[])
@@ -53,8 +62,60 @@ export function CompanyTeamSection({
   for (const m of hrMembers) {
     if (m) memberNameById.set(String(m?._id ?? m?.id ?? ""), String(m?.name ?? ""));
   }
-  const headName = (id: string) => (id ? memberNameById.get(id) ?? id.slice(-6) : "");
+  const headName = (id: string, key: "hrHead" | "adminHead") => {
+    if (!id) return "";
+    const resolved = regionHeads?.[key] as AnyRecord | undefined;
+    if (resolved) return String(resolved.name ?? "");
+    const fromMembers = memberNameById.get(id);
+    if (fromMembers) return fromMembers;
+    return "Assigned";
+  };
   const hasRegionHeads = Boolean(regionHrHead || regionAdminHead);
+
+  // After a disconnect the member has no company, no team and no join dates, so
+  // the organizational rows below would all read "Not set" / "none". Swap them
+  // for the employment they actually finished.
+  const previous = (profile?.previousEmployment as AnyRecord | undefined) ?? null;
+  const humanize = (value: unknown) => {
+    const text = String(value ?? "").replace(/-/g, " ").trim();
+    return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
+  };
+  const fmtDate = (value: unknown) => {
+    if (!value) return "";
+    const date = new Date(String(value));
+    return Number.isNaN(date.getTime())
+      ? ""
+      : date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  };
+  const previousStart = fmtDate(previous?.joined);
+  const previousEnd = fmtDate(previous?.ended);
+  const previousPeriod = previousStart
+    ? `${previousStart} — ${previousEnd}`
+    : previousEnd || undefined;
+
+  if (!inApprovedCompany && previous?.companyName) {
+    return (
+      <section className="rounded-xl neu-card p-5 dark:bg-[#000000] dark:border-zinc-800">
+        <SectionHeader
+          title="Previous Employment"
+          description="Employment you have completed"
+          accent="emerald"
+        />
+        <dl className="mt-4 space-y-3 text-sm">
+          <Row label="Company" value={String(previous.companyName)} />
+          <Row label="Region" value={String(previous.region ?? "") || undefined} />
+          <Row label="Role" value={humanize(previous.role) || undefined} />
+          <Row
+            label="Employment Type"
+            value={String(previous.employmentType ?? "").trim() || "Not set"}
+          />
+          <Row label="Employment Period" value={previousPeriod} />
+          <Row label="Status" value="Employment ended" />
+        </dl>
+      </section>
+    );
+  }
+
   return (
     <section className="rounded-xl neu-card p-5 dark:bg-[#000000] dark:border-zinc-800">
       <SectionHeader title="Company & Team" description="Organizational structure" accent="emerald" />
@@ -67,12 +128,10 @@ export function CompanyTeamSection({
         <Row label="Company Joined" value={profile?.company && profile?.companyJoined ? new Date(profile.companyJoined as string | Date).toLocaleDateString() : undefined} />
         <Row label="Team Joined" value={profile?.team && profile?.teamJoined ? new Date(profile.teamJoined as string | Date).toLocaleDateString() : undefined} />
         <Row label="Region" value={regionDisplay} />
-        {hasRegionHeads ? (
-          <>
-            <Row label="HR Head" value={regionHrHead ? headName(regionHrHead) : "Not assigned"} />
-            <Row label="Admin Head" value={regionAdminHead ? headName(regionAdminHead) : "Not assigned"} />
-          </>
-        ) : null}
+        <Row label="Region status" value={regionAddress?.status ? String(regionAddress.status) : undefined} />
+        <Row label="Region HR Head" value={regionHrHead ? headName(regionHrHead, "hrHead") : "Not assigned"} />
+        <Row label="Region Admin Head" value={regionAdminHead ? headName(regionAdminHead, "adminHead") : "Not assigned"} />
+    
         {inApprovedCompany && !["human-resource", "admin"].includes(role) ? (
           <Row label={joinedBy?.viaHr ? "Joined By HR" : "Company approved by"} value={joinedBy?.name ? String(joinedBy.name) : undefined} />
         ) : null}

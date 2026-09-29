@@ -226,7 +226,21 @@ export type ATSCandidate = {
   };
   job: { id: string; title: string } | string;
   company: string;
+  /**
+   * The candidate's detected STATE, e.g. "Maharashtra". Powers the "State"
+   * filter in the bulk interview scheduler. Not an office, and not where the
+   * person will work.
+   */
   regionLabel?: string;
+  /**
+   * The company OFFICE this candidate has been transferred to, e.g.
+   * "Noida Region". Set by the bulk transfer. Drives the region visibility
+   * boundary, the offer's region, and which region's head approves the join.
+   * Empty means unassigned and visible to every recruiter.
+   */
+  joiningRegionLabel?: string;
+  previousJoiningRegionLabel?: string;
+  joiningRegionAssignedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -279,6 +293,8 @@ export type ATSOffer = {
   signedBy: { id: string; name: string; role: string } | string | null;
   signedAt: string | null;
   isSigned: boolean;
+  /** Company office this hire joins; drives which region's head approves the join. */
+  regionLabel?: string;
   createdBy: string;
   company: string;
   createdAt: string;

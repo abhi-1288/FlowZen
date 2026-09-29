@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { apiFetch } from "@/lib/client-utils";
+import { signatorySlotLabel } from "@/lib/document-letter-signatories";
+import { useNotificationToast } from "@/lib/toast-context";
 
 type LetterData = {
   _id: string;
@@ -51,6 +53,14 @@ type LetterData = {
     tdsExempted?: boolean;
   };
   approver?: { _id: string; name: string; role: string };
+  signatories?: Array<{
+    user: string;
+    slot: "team-owner" | "secondary";
+    name: string;
+    role: string;
+    status: "pending" | "signed" | "declined";
+    signedAt: string | null;
+  }>;
   company: { _id: string; name: string; icon?: string };
   createdAt: string;
 };
@@ -150,35 +160,52 @@ function isOptedOut(members: { _id?: string }[] | undefined, userId: string): bo
   return members.some((m) => String(m._id ?? "") === userId);
 }
 
-function LetterSignature({
-  signer,
-  className = "",
+function formatSignedDate(value: string | null | undefined) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+/**
+ * One signature column: either a signature in the script face with a caption
+ * and date, or a blank ruled line for a signature still to be added.
+ *
+ * `caption` is the small line under the name, so the caller decides what to
+ * call this column — the primary signatory is always "Authorized Signatory",
+ * while a co-approver is named by slot or role.
+ */
+function SignatureColumn({
+  name,
+  role,
+  signedAt,
+  declined,
+  caption,
+  emphasised,
 }: {
-  signer: LetterSigner | null;
-  className?: string;
+  name?: string;
+  role?: string;
+  signedAt?: string | null;
+  declined?: boolean;
+  caption: string;
+  emphasised?: boolean;
 }) {
-  if (signer && signer.name) {
-    const signedDate = signer.signedAt
-      ? new Date(signer.signedAt).toLocaleDateString("en-IN", {
-          day: "numeric",
-          month: "long",
-          year: "numeric",
-        })
-      : "";
+  const signedDate = formatSignedDate(signedAt);
+  if (name) {
     return (
-      <div className={`mt-10 print:mt-4 ${className}`}>
-        <p className="mb-6 text-[10px] font-semibold uppercase tracking-widest text-slate-400 print:mb-2">
-          Authorized Signatory
-        </p>
+      <div className="min-w-[150px] flex-1">
         <p
-          className="mb-1 text-2xl leading-none text-slate-700 print:text-xl"
+          className={`mb-1 leading-none text-slate-700 print:text-lg ${emphasised ? "text-2xl print:text-xl" : "text-xl"}`}
           style={{ fontFamily: SIGNATURE_FONT }}
         >
-          {signer.name}
+          {name}
         </p>
-        <p className="text-xs capitalize text-slate-500">
-          {signer.role ? signer.role.replace(/-/g, " ") : ""}
-        </p>
+        <p className="text-xs capitalize text-slate-500">{caption}</p>
+        {role ? <p className="text-[10px] capitalize text-slate-400">{role}</p> : null}
         {signedDate ? (
           <p className="mt-1 text-[10px] text-slate-400">Signed on {signedDate}</p>
         ) : null}
@@ -186,20 +213,89 @@ function LetterSignature({
     );
   }
   return (
-    <div className={`mt-10 print:mt-4 ${className}`}>
-      <p className="mb-6 text-[10px] font-semibold uppercase tracking-widest text-slate-400 print:mb-2">
-        Authorized Signatory
+    <div className="min-w-[150px] flex-1">
+      <div
+        className={`mb-2 h-10 w-44 print:h-6 print:w-32 ${emphasised ? "border-b border-slate-400" : "border-b border-slate-300"}`}
+      />
+      <p className={`text-xs ${declined ? "text-slate-500" : "text-slate-400"}`}>
+        {declined ? "Declined to sign" : caption}
       </p>
-      <div className="mb-2 h-10 w-48 border-b border-slate-400 print:h-6 print:w-36" />
-      <p className="text-xs capitalize text-slate-400">Human Resource</p>
     </div>
   );
 }
 
-function InternshipCertificateContent({
-  data, signer,
+/**
+ * Every signature on the letter in a single horizontal row: the primary
+ * authorized signatory first, then each co-approver. Rendering them together
+ * keeps the page to one signature band instead of a per-body block followed by
+ * a separate "Co-approvers" section further down.
+ *
+ * Always rendered — even unsigned, the primary's blank ruled line belongs on an
+ * issued letter. The row wraps rather than scrolling, so three or more
+ * co-approvers flow onto a second line on A4.
+ */
+function SignaturesSection({
+  signer,
+  signatories,
+  approverRole,
 }: {
-  data: LetterData; signer: LetterSigner | null;
+  signer: LetterSigner | null;
+  signatories: LetterData["signatories"];
+  approverRole?: string;
+}) {
+  const list = Array.isArray(signatories) ? signatories : [];
+  const primarySigned = Boolean(signer && signer.name);
+  // The primary is identified by its authority, not its name, so the column
+  // always reads "Authorized Signatory" and the person's role sits beneath.
+  const primaryRole = primarySigned
+    ? signer?.role || ""
+    : approverRole
+      ? formatRole(approverRole)
+      : "Human Resource";
+
+  return (
+    <div className="mt-10 border-t border-slate-200 pt-6 print:mt-5 print:pt-3">
+      <p className="mb-6 text-[10px] font-semibold uppercase tracking-widest text-slate-400 print:mb-2">
+        Signatures
+      </p>
+      <div className="flex flex-wrap gap-x-8 gap-y-6 print:gap-x-4">
+        <SignatureColumn
+          emphasised
+          name={primarySigned ? signer?.name : ""}
+          role={primaryRole}
+          signedAt={primarySigned ? signer?.signedAt : null}
+          caption="Authorized Signatory"
+        />
+        {list.map((entry) => {
+          const signed = entry.status === "signed" && Boolean(entry.signedAt);
+          // A team owner was added via the modal's suggestion button, so say so;
+          // everyone else is labelled by their role.
+          const caption =
+            entry.slot === "team-owner"
+              ? signatorySlotLabel("team-owner")
+              : entry.role
+                ? entry.role.replace(/-/g, " ")
+                : signatorySlotLabel(entry.slot);
+          return (
+            <SignatureColumn
+              key={`${entry.user}-${entry.slot}`}
+              name={signed ? entry.name : ""}
+              signedAt={signed ? entry.signedAt : null}
+              declined={entry.status === "declined"}
+              caption={caption}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
+function InternshipCertificateContent({
+  data,
+}: {
+  data: LetterData;
 }) {
   const name = data.metadata?.requesterName ?? data.requester?.name ?? "Employee";
   const role = data.metadata?.requesterRole ?? data.requester?.role ?? "Member";
@@ -295,15 +391,14 @@ function InternshipCertificateContent({
         </div>
       ) : null}
 
-      <LetterSignature signer={signer} />
     </div>
   );
 }
 
 function EmployeeRecognitionContent({
-  data, signer,
+  data,
 }: {
-  data: LetterData; signer: LetterSigner | null;
+  data: LetterData;
 }) {
   const name = data.metadata?.requesterName ?? data.requester?.name ?? "Employee";
   const role = data.metadata?.requesterRole ?? data.requester?.role ?? "Member";
@@ -382,7 +477,6 @@ function EmployeeRecognitionContent({
         This recognition is issued upon request and verified by the company.
       </p>
 
-      <LetterSignature signer={signer} />
     </div>
   );
 }
@@ -391,12 +485,10 @@ function SalaryCertificateContent({
   data,
   salary,
   policy,
-  signer,
 }: {
   data: LetterData;
   salary: SalaryInfo | null;
   policy: PolicyInfo | null;
-  signer: LetterSigner | null;
 }) {
   const name = data.metadata?.requesterName ?? data.requester?.name ?? "Employee";
   const role = data.metadata?.requesterRole ?? data.requester?.role ?? "Member";
@@ -555,12 +647,11 @@ function SalaryCertificateContent({
         This certificate is issued upon request and verified by the company.
       </p>
 
-      <LetterSignature signer={signer} />
     </div>
   );
 }
 
-function LetterBody({ data, signer }: { data: LetterData; signer: LetterSigner | null }) {
+function LetterBody({ data }: { data: LetterData }) {
   const name = data.metadata?.requesterName ?? data.requester?.name ?? "Employee";
   const role = data.metadata?.requesterRole ?? data.requester?.role ?? "Member";
   const companyName = data.company?.name ?? "Company";
@@ -620,12 +711,11 @@ function LetterBody({ data, signer }: { data: LetterData; signer: LetterSigner |
       <p className="mt-2 font-medium">{data.approver?.name ?? companyName}</p>
       <p className="text-xs capitalize text-slate-500">{data.approver?.role ? `(${data.approver.role.replace("-", " ")})` : ""}</p>
 
-      <LetterSignature signer={signer} />
     </>
   );
 }
 
-function ResignationLetterContent({ data, signer }: { data: LetterData; signer: LetterSigner | null }) {
+function ResignationLetterContent({ data }: { data: LetterData }) {
   const name = data.metadata?.requesterName ?? data.requester?.name ?? "Employee";
   const role = data.metadata?.requesterRole ?? data.requester?.role ?? "Member";
   const companyName = data.company?.name ?? "Company";
@@ -684,7 +774,6 @@ function ResignationLetterContent({ data, signer }: { data: LetterData; signer: 
       <p>{companyName}</p>
       {teamName ? <p>Team: {teamName}</p> : null}
       <p className="text-slate-500">{data.requester?.email ?? ""}</p>
-      <LetterSignature signer={signer} />
     </div>
   );
 }
@@ -693,6 +782,7 @@ export default function LetterPage() {
   const params = useParams();
   const id = params?.id as string | undefined;
   const { data: session } = useSession();
+  const { showSuccessToast, showErrorToast } = useNotificationToast();
   const [data, setData] = useState<LetterData | null>(null);
   const [salary, setSalary] = useState<SalaryInfo | null>(null);
   const [policy, setPolicy] = useState<PolicyInfo | null>(null);
@@ -704,8 +794,8 @@ export default function LetterPage() {
   const [signed, setSigned] = useState(false);
   const [signing, setSigning] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [coSigning, setCoSigning] = useState(false);
   const [justApproved, setJustApproved] = useState(false);
-  const [toast, setToast] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   const editableTypes = [
     "experience",
@@ -723,7 +813,11 @@ export default function LetterPage() {
     const draft = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("draft") === "1";
     setIsDraft(draft);
 
-    apiFetch<{ requests: LetterData[] }>("/api/hr/document-letter")
+    // `scope=company` widens the lookup for HR and admins, who otherwise only
+    // ever get their own letters and would see "Letter not found" for a
+    // colleague's. Everyone else still gets only their own letters plus any
+    // they were nominated to co-sign.
+    apiFetch<{ requests: LetterData[] }>("/api/hr/document-letter?scope=company")
       .then((res) => {
         const found = res.requests.find(
           (r) => r._id === id || r.id === id,
@@ -759,6 +853,16 @@ export default function LetterPage() {
     Boolean(session?.user?.id) &&
     Boolean(approverId) &&
     String(session?.user?.id) === String(approverId);
+
+  // Whether the current user is an advisory co-approver still owing a signature.
+  const canCoSign = (data?.signatories ?? []).some(
+    (entry) =>
+      String(entry.user) === String(session?.user?.id ?? "") && entry.status === "pending",
+  );
+  const mySignatorySigned = (data?.signatories ?? []).some(
+    (entry) =>
+      String(entry.user) === String(session?.user?.id ?? "") && entry.status === "signed",
+  );
 
   const signerName = data?.metadata?.signedBy || (signed ? (session?.user?.name ?? "") : "");
   const signerRole = data?.metadata?.signedRole || (signed ? (session?.user?.role ?? "") : "");
@@ -821,14 +925,42 @@ export default function LetterPage() {
             }
           : d,
       );
-      setToast({ text: "Letter approved and signed.", type: "success" });
+      showSuccessToast("Letter approved and signed.");
     } catch (err) {
-      setToast({
-        text: err instanceof Error ? err.message : "Could not approve letter.",
-        type: "error",
-      });
+      showErrorToast(err instanceof Error ? err.message : "Could not approve letter.");
     } finally {
       setApproving(false);
+    }
+  }
+
+  async function doCoSign(sign: boolean) {
+    if (!id || !canCoSign) return;
+    setCoSigning(true);
+    try {
+      await apiFetch(`/api/approvals/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ sign }),
+      });
+      const myId = String(session?.user?.id ?? "");
+      setData((d) =>
+        d
+          ? {
+              ...d,
+              signatories: (d.signatories ?? []).map((entry) =>
+                String(entry.user) === myId && entry.status === "pending"
+                  ? { ...entry, status: sign ? "signed" : "declined", signedAt: new Date().toISOString() }
+                  : entry,
+              ),
+            }
+          : d,
+      );
+      showSuccessToast(
+        sign ? "Your signature has been added to the letter." : "Signature declined. The letter is unaffected.",
+      );
+    } catch (err) {
+      showErrorToast(err instanceof Error ? err.message : "Could not record your signature.");
+    } finally {
+      setCoSigning(false);
     }
   }
 
@@ -856,16 +988,6 @@ export default function LetterPage() {
 
   return (
     <div className="min-h-screen bg-slate-100 print:bg-white">
-      {toast ? (
-        <div
-          className={`fixed bottom-8 left-1/2 z-[60] -translate-x-1/2 rounded-xl px-5 py-3 text-sm font-semibold shadow-lg ${
-            toast.type === "success" ? "bg-emerald-600 text-white" : "bg-rose-600 text-white"
-          }`}
-        >
-          {toast.text}
-        </div>
-      ) : null}
-
       <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-6 py-3 print:hidden">
         <div className="flex items-center gap-3">
           <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
@@ -885,8 +1007,12 @@ export default function LetterPage() {
         ) : null}
       </div>
 
+      {/* One sticky stack, so the draft toolbar and the co-sign bar cannot
+          overlap at the same `top` offset when a co-approver opens a letter
+          that HR has not approved yet. */}
+      <div className="sticky top-[57px] z-10 print:hidden">
       {isDraft && !justApproved ? (
-        <div className="sticky top-[57px] z-10 flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-6 py-3 print:hidden">
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-6 py-3">
           {editing ? (
             <button
               onClick={() => setEditing(false)}
@@ -931,13 +1057,44 @@ export default function LetterPage() {
             </>
           ) : null}
 
-          {!canSign ? (
+          {!canSign && !canCoSign ? (
             <p className="text-xs text-slate-500">
               Only the assigned approver can sign and approve this request.
             </p>
           ) : null}
         </div>
       ) : null}
+
+      {canCoSign ? (
+        <div className="flex flex-wrap items-center gap-2 border-b border-indigo-100 bg-indigo-50 px-6 py-3">
+          <p className="text-sm text-indigo-900">
+            {data?.status === "approved"
+              ? "You are listed as a co-approver on this letter. HR has already approved it, so your signature is optional and will not hold anything up."
+              : "You are listed as a co-approver on this letter. You can add your optional signature now — HR still has to approve the letter before it is issued."}
+          </p>
+          <button
+            onClick={() => doCoSign(true)}
+            disabled={coSigning}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {coSigning ? "Saving..." : "Add my signature"}
+          </button>
+          <button
+            onClick={() => doCoSign(false)}
+            disabled={coSigning}
+            className="rounded-lg border border-indigo-200 bg-white px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+          >
+            Decline to sign
+          </button>
+        </div>
+      ) : null}
+
+      {!canCoSign && mySignatorySigned ? (
+        <div className="border-b border-emerald-100 bg-emerald-50 px-6 py-3 text-sm text-emerald-800">
+          Thank you — your signature has been added to this letter.
+        </div>
+      ) : null}
+      </div>
 
       <div className="mx-auto max-w-[210mm] bg-white p-10 shadow-lg print:mx-auto print:min-h-screen print:shadow-none print:p-6 print:text-[11px]">
         {justApproved ? (
@@ -990,20 +1147,26 @@ export default function LetterPage() {
             <p className="text-xs text-slate-400">Edits are saved when you approve the letter.</p>
           </div>
         ) : type === "salary-certificate" ? (
-          <SalaryCertificateContent data={data} salary={salary} policy={policy} signer={activeSigner} />
+          <SalaryCertificateContent data={data} salary={salary} policy={policy} />
         ) : type === "internship" ? (
-          <InternshipCertificateContent data={data} signer={activeSigner} />
+          <InternshipCertificateContent data={data} />
         ) : type === "resignation" ? (
           <div className="space-y-4 text-sm leading-relaxed text-slate-800">
-            <ResignationLetterContent data={data} signer={activeSigner} />
+            <ResignationLetterContent data={data} />
           </div>
         ) : type === "employee-recognition" ? (
-          <EmployeeRecognitionContent data={data} signer={activeSigner} />
+          <EmployeeRecognitionContent data={data} />
         ) : (
           <div className="space-y-4 text-sm leading-relaxed text-slate-800">
-            <LetterBody data={data} signer={activeSigner} />
+            <LetterBody data={data} />
           </div>
         )}
+
+        <SignaturesSection
+          signer={activeSigner}
+          signatories={data.signatories}
+          approverRole={data.approver?.role}
+        />
 
         <div className="mt-12 border-t border-slate-200 pt-4 text-center text-xs text-slate-400 print:mt-6 print:pt-2 print:text-[9px]">
           Generated by FlowZen  ·  {new Date().toLocaleDateString("en-IN")}

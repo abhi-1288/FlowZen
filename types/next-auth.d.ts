@@ -36,6 +36,14 @@ declare module "next-auth" {
       passwordResetRequired?: boolean;
       rememberMe?: boolean;
       isSeniorSecurity?: boolean;
+      /** True when the user owns their company, regardless of their role. */
+      isCompanyOwner?: boolean;
+      /**
+       * True when the user runs the recruitment pipeline: main office, company
+       * owner, or a region head the main office has delegated their region to.
+       * UX only — every server route re-derives this from the database.
+       */
+      isRecruitmentHQ?: boolean;
     };
   }
 }
@@ -46,5 +54,6 @@ declare module "next-auth/jwt" {
     passwordResetRequired?: boolean;
     rememberMe?: boolean;
     isSeniorSecurity?: boolean;
+    isRecruitmentHQ?: boolean;
   }
 }

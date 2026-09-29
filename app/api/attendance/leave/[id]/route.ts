@@ -3,8 +3,10 @@ import { connectDb } from "@/lib/db";
 import { requireUserId, jsonError } from "@/lib/api";
 import { LeaveRequest } from "@/models/LeaveRequest";
 import { User } from "@/models/User";
+import { Company } from "@/models/Company";
 import { Notification } from "@/models/Notification";
 import { emitToUser } from "@/lib/socket-emit";
+import { effectiveRegionLabelOf, isUserInEffectiveRegion, type OfficeAddressLike } from "@/lib/company-regions";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -19,6 +21,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const approver = await User.findById(userId);
     const leave = await LeaveRequest.findById(id).populate("requester");
     if (!leave) return jsonError("Request not found.");
+
+    // Cross-tenant guard: the actor must belong to the leave's company. The
+    // request is looked up by id alone, so without this any admin in any
+    // company could approve another company's request.
+    if (String(approver?.company ?? "") !== String(leave.company)) {
+      return jsonError("Request not found.", 404);
+    }
 
     const approverRole = String(approver?.role ?? "");
     const requesterId = typeof leave.requester === "object" ? leave.requester._id : leave.requester;
@@ -49,6 +58,23 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (leave.currentStep === "admin") {
       if (approverRole !== "admin") {
         return jsonError("Only admins can approve the final leave step.", 403);
+      }
+      // Regional admins may only approve leave for requesters in their own
+      // region. The company owner may approve any.
+      const companyDoc = (await Company.findById(leave.company)
+        .select("owner addresses address")
+        .lean()) as {
+        owner?: unknown;
+        addresses?: OfficeAddressLike[] | null;
+        address?: string | null;
+      } | null;
+      const ownerId = companyDoc?.owner ?? null;
+      const isOwner = ownerId != null && String(ownerId) === String(userId);
+      if (!isOwner) {
+        const adminRegion = effectiveRegionLabelOf(companyDoc, approver);
+        if (adminRegion && !isUserInEffectiveRegion(companyDoc, adminRegion, leave.requester)) {
+          return jsonError(`This request is outside your region (${adminRegion}).`, 403);
+        }
       }
     } else {
       if (approverRole !== "human-resource" && approverRole !== "admin") {

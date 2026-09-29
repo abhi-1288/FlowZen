@@ -70,10 +70,20 @@ const UserSchema = new Schema(
             "board-invite",
             "board-remove",
             "contract-expired",
+            // A region was corrected after the fact. Join approval used to copy
+            // the *approver's* region onto the new member, so members were filed
+            // under whichever office happened to approve them; the repair script
+            // (`scripts/backfill-join-approval-regions.js`) writes one of these
+            // per correction, and `fromRegionLabel` / `toRegionLabel` are what
+            // make the change reviewable.
+            "region-corrected",
           ],
           required: true,
         },
         at: { type: Date, default: Date.now },
+        fromRegionLabel: { type: String, default: "" },
+        toRegionLabel: { type: String, default: "" },
+        reason: { type: String, default: "" },
       },
     ],
 
@@ -84,6 +94,12 @@ const UserSchema = new Schema(
     },
 
     employmentEndDate: { type: Date, default: null },
+    // Set the first time the "employment period expired" notice goes out to the
+    // member's regional HR/admin/finance. The contract-end cron re-runs daily
+    // while the member sits inside the settlement gap, so this is what stops the
+    // warning from repeating every day. The exit confirmation needs no marker:
+    // once `company` is nulled the cron no longer matches the member.
+    employmentExpiryNotifiedAt: { type: Date, default: null },
     employmentType: { type: String, default: "" },
     durationMonths: { type: Number, default: null },
     durationDays: { type: Number, default: null },
@@ -159,7 +175,7 @@ const UserSchema = new Schema(
     phone: { type: String, default: "", trim: true, maxlength: 20 },
     dob: { type: Date, default: null },
     address: { type: String, default: "", trim: true, maxlength: 500 },
-    regionLabel: { type: String, default: "", trim: true },
+    regionLabel: { type: String, default: "", trim: true, index: true },
     emergencyContact: { type: String, default: "", trim: true, maxlength: 20 },
     bloodGroup: { type: String, default: "", trim: true, maxlength: 5 },
     bankAccountNumber: { type: String, default: "", trim: true },

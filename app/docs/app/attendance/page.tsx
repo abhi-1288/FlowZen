@@ -59,6 +59,15 @@ export default function AttendanceDocsPage() {
         </section>
 
         <section className="docs-section">
+          <h2>Region Scope for Holidays, WFH and Weekends</h2>
+          <div className="docs-card">
+            <p>Holidays, WFH dates and weekends are per-region. A <code>finance</code> or <code>admin</code> user sees and manages the holidays, WFH dates and weekend dates for their own effective region only, resolved from their <code>regionLabel</code> with the main-office fallback.</p>
+
+            <p>This applies to <code>/api/attendance/holidays</code>, <code>/api/company/wfh</code> and <code>/api/company/weekends</code>. Companies with no region configured stay company-wide, as does a region that holds no approved members.</p>
+          </div>
+        </section>
+
+        <section className="docs-section">
           <h2>Check In</h2>
           <div className="docs-card">
             <div className="docs-card-header">
@@ -592,7 +601,11 @@ export default function AttendanceDocsPage() {
             </table>
 
             <div className="docs-info">
-              <p>Returns CSV file with Content-Type: text/csv</p>
+              <p>Returns a CSV file (<code>.csv</code>) with Content-Type: text/csv and a Content-Disposition attachment header. The body is UTF-8 with a BOM and CRLF line endings so Excel opens the rupee sign and accented names correctly.</p>
+            </div>
+
+            <div className="docs-info">
+              <p><strong>Region scope:</strong> the <code>finance</code> role only receives members from its own effective region, and the region is included in the filename. <code>admin</code> and <code>human-resource</code> receive the whole company, <code>project-manager</code> and <code>qa-tester</code> receive their own teams, and everyone else receives only themselves. When the requester&apos;s region holds no members, the export falls back to company-wide.</p>
             </div>
           </div>
         </section>

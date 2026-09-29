@@ -1,5 +1,8 @@
-import { Attendance, Company, CompanyPolicy, FinanceSalary, Holiday, JoinRequest, LeaveRequest, Notification, User } from "@/models";
+import { Attendance, Company, CompanyPolicy, FinanceSalary, Holiday, JoinRequest, LeaveRequest, Notification, ProcurementRequest, User } from "@/models";
 import { emitNotification } from "@/lib/realtime";
+import { pushProcurementActivity } from "@/lib/procurement";
+import { effectiveRegionLabelOf } from "@/lib/company-regions";
+import { resolveRegionPolicy } from "@/lib/region-scope";
 
 const FINANCE_ROLES = new Set(["finance", "admin"]);
 
@@ -58,7 +61,7 @@ export function getSalaryPeriod(month: string, policy: { salaryCycleDay?: number
 
 export async function actorWithCompany(userId: string) {
   const actor = await User.findById(userId).select(
-    "name role company companyStatus",
+    "name role company companyStatus regionLabel",
   );
   if (!actor) return null;
   if (!actor.company || actor.companyStatus !== "approved") return null;
@@ -69,7 +72,63 @@ export function canManageFinance(role: string) {
   return FINANCE_ROLES.has(role);
 }
 
+// The regional boundary for finance-managed records lives in `lib/finance-scope`
+// so `lib/procurement` can reuse it without importing an API route. Re-exported
+// here because the finance routes have always imported it from this module.
+export {
+  assertSalaryTargetInFinanceScope,
+  canAccessFinanceRecord,
+  financeMemberSalaryFilter,
+  financeMemberScope,
+  financeMemberUserFilter,
+  financeRegionClause,
+  type FinanceMemberScope,
+  type FinanceRegionClause,
+} from "@/lib/finance-scope";
+
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Keep the IT-side record in step when finance acts on the linked expense of an
+ * approved purchase. Finance drives its own leg from the Finance tab, so this
+ * is the single place the procurement status advances past `IT_APPROVED` —
+ * `/api/procurement/[id]` deliberately refuses finance transitions to avoid two
+ * write paths for the same decision.
+ */
+export async function syncProcurementFromExpense(
+  expense: { procurement?: unknown; requestNumber?: string } | null,
+  status: "accepted" | "disbursed" | "rejected",
+  actor: { _id: unknown; name?: string | null },
+  detail: string,
+): Promise<void> {
+  if (!expense?.procurement) return;
+
+  const target =
+    status === "accepted"
+      ? "ACCEPTED_FIN"
+      : status === "disbursed"
+        ? "DISBURSED"
+        : "REJECTED_FIN";
+
+  const request = await ProcurementRequest.findById(expense.procurement as any);
+  if (!request) return;
+
+  request.status = target;
+  if (status === "rejected") {
+    request.financeRejectionReason = detail.slice(0, 500);
+  }
+  pushProcurementActivity(
+    request,
+    { _id: actor._id, name: actor.name ?? undefined },
+    status === "disbursed"
+      ? "Paid out by finance"
+      : status === "accepted"
+        ? "Accepted by finance"
+        : "Rejected by finance",
+    detail,
+  );
+  await request.save();
+}
 
 export function startOfDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -136,7 +195,7 @@ export async function computeSalaryBreakdown(params: {
     _id: employeeId,
     company: actorCompany,
     companyStatus: "approved",
-  }).select("_id name baseSalary salaryType hourlyRate dailyRate companyJoined createdAt pfNumber pfDeductionAmount esicNumber esicDeductionAmount pfExempted esicExempted tdsDeductionAmount tdsExempted");
+  }).select("_id name baseSalary salaryType hourlyRate dailyRate companyJoined createdAt regionLabel pfNumber pfDeductionAmount esicNumber esicDeductionAmount pfExempted esicExempted tdsDeductionAmount tdsExempted");
   if (!employee)
     return { error: "Employee not found in this company." as const };
 
@@ -183,6 +242,19 @@ export async function computeSalaryBreakdown(params: {
   ).getDate();
   const dailySalary = monthlySalary / totalDaysInMonth;
 
+  // The employee's own region decides which holidays, weekends and policy
+  // apply to their salary — never the actor's region. Loaded once here and
+  // reused for the weekend filtering below.
+  const companyDoc = (await Company.findById(actorCompany)
+    .select("addresses address weekendDates minWorkHours")
+    .lean()) as {
+    addresses?: { label?: string | null }[] | null;
+    address?: string | null;
+    weekendDates?: { date: Date; reason?: string; region?: string | null }[] | null;
+    minWorkHours?: number | null;
+  } | null;
+  const employeeRegion = effectiveRegionLabelOf(companyDoc, employee);
+
   const [attendanceRecords, leaveRecords, holidays] = await Promise.all([
     Attendance.find({
       user: employeeId,
@@ -198,14 +270,15 @@ export async function computeSalaryBreakdown(params: {
       company: actorCompany,
       startDate: { $lte: endOfDay(effectiveEnd) },
       endDate: { $gte: effectiveStart },
+      // Global holidays (region "" / unset) plus the employee's own region.
+      $or: [{ region: { $in: ["", null] } }, { region: employeeRegion }],
     }).select("startDate endDate"),
   ]);
 
   const presentDays = new Set<string>();
   const halfDayAttendance = new Set<string>();
   let workedHours = 0;
-  const companyDoc = await Company.findById(actorCompany).select("weekendDates minWorkHours");
-  const minWorkHours = Math.max(1, Number((companyDoc as any)?.minWorkHours ?? 8));
+  const minWorkHours = Math.max(1, Number(companyDoc?.minWorkHours ?? 8));
   const halfDayThreshold = minWorkHours / 2;
   for (const record of attendanceRecords as any[]) {
     const dayKey = toDateKey(new Date(record.date));
@@ -264,8 +337,12 @@ export async function computeSalaryBreakdown(params: {
     }
   }
 
-  const manualWeekendsKeys = new Set((companyDoc?.weekendDates ?? []).map((item: any) => toDateKey(new Date(item.date))));
-  const monthsWithManualWeekends = new Set((companyDoc?.weekendDates ?? []).map((item: any) => {
+  const applicableWeekendDates = (companyDoc?.weekendDates ?? []).filter((item: any) => {
+    const r = String(item?.region ?? "").trim();
+    return !r || r === employeeRegion;
+  });
+  const manualWeekendsKeys = new Set(applicableWeekendDates.map((item: any) => toDateKey(new Date(item.date))));
+  const monthsWithManualWeekends = new Set(applicableWeekendDates.map((item: any) => {
     const wd = new Date(item.date);
     return `${wd.getFullYear()}-${wd.getMonth()}`;
   }));
@@ -316,7 +393,7 @@ export async function computeSalaryBreakdown(params: {
     grossSalary = roundCurrency(dailySalary * payableDays);
   }
 
-  const policy = await CompanyPolicy.findOne({ company: actorCompany });
+  const policy = await resolveRegionPolicy(actorCompany, employee.regionLabel);
   let foodDeduction = 0;
   let travelDeduction = 0;
   let pfDeduction = 0;
@@ -435,6 +512,8 @@ export async function autoGenerateSalariesForMonth(params: {
   actorName: string;
   month: string;
   policy: any;
+  /** Restrict generation to the actor's region; `null` means company-wide. */
+  memberIds?: string[] | null;
 }): Promise<boolean> {
   const { actorCompany, userId, actorName, month, policy } = params;
   const existingSalaries = await FinanceSalary.find({
@@ -450,6 +529,7 @@ export async function autoGenerateSalariesForMonth(params: {
   const approvedMembers = await User.find({
     company: actorCompany,
     companyStatus: "approved",
+    ...(params.memberIds ? { _id: { $in: params.memberIds } } : {}),
   }).select("_id name");
 
   const { periodStart, periodEnd } = getSalaryPeriod(month, policy || {});

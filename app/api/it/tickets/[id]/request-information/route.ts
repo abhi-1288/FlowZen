@@ -26,12 +26,8 @@ export async function POST(request: Request, { params }: Params) {
     throw error;
   }
 
-  const [actor, ticket] = await Promise.all([
-    User.findById(userId).select("role company companyStatus name"),
-    ITTicket.findById(id),
-  ]);
+  const actor = await User.findById(userId).select("role company companyStatus name");
   if (!actor) return jsonError("User not found.", 404);
-  if (!ticket) return jsonError("Ticket not found.", 404);
   if (!actor.company || actor.companyStatus !== "approved") {
     return jsonError("You must be an approved company member to request information.", 403);
   }
@@ -41,6 +37,8 @@ export async function POST(request: Request, { params }: Params) {
   const companyId =
     typeof actor.company === "object" && actor.company ? (actor.company as any)._id : actor.company;
 
+  const ticket = await ITTicket.findOne({ _id: id, company: companyId });
+  if (!ticket) return jsonError("Ticket not found.", 404);
   if (ticket.status !== "IN_PROGRESS" && ticket.status !== "QUEUED" && ticket.status !== "ASSIGNED") {
     return jsonError(`Cannot request information from status ${ticket.status}.`, 400);
   }
@@ -73,6 +71,6 @@ export async function POST(request: Request, { params }: Params) {
     emitNotification(requesterId);
   }
 
-  const refreshed = await ITTicket.findById(id);
+  const refreshed = await ITTicket.findOne({ _id: id, company: companyId });
   return NextResponse.json({ ticket: serializeDoc(refreshed) });
 }

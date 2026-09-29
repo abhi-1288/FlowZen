@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { connectDb } from "@/lib/db";
 import { ATSCandidate } from "@/models/ATSCandidate";
 import { ATSInterview } from "@/models/ATSInterview";
 import { ATSTimeline } from "@/models/ATSTimeline";
@@ -7,7 +6,9 @@ import { ATSAuditLog } from "@/models/ATSAuditLog";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { Company } from "@/models/Company";
-import { isObjectId, jsonError, requireUserId, serializeDocs } from "@/lib/api";
+import { withCandidateAccess } from "@/lib/recruitment-candidate-access";
+import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
+import { jsonError, serializeDocs } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
 import { sendMail } from "@/lib/mailer";
 import { interviewScheduledEmail } from "@/lib/email-templates";
@@ -24,19 +25,12 @@ import {
 import { assertFlowZenQuota } from "@/lib/interview-quota";
 
 type Params = { params: Promise<{ id: string }> };
-const ALL_ROLES = ["admin", "human-resource", "project-manager", "qa-tester", "finance"];
 
 export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
-  const userId = await requireUserId();
-  if (!userId) return jsonError("Unauthorized", 401);
-  if (!isObjectId(id)) return jsonError("Invalid candidate id.");
-
-  await connectDb();
-  const user = await User.findById(userId);
-  const isSeniorSecurity = user?.role === "security" && Boolean((user as any).isSeniorSecurity);
-  if (!user || (!ALL_ROLES.includes(user.role) && !isSeniorSecurity)) return jsonError("Forbidden", 403);
-  if (!user.company) return jsonError("No company found.", 400);
+  const access = await withCandidateAccess(id, "read");
+  if (!access.ok) return access.response;
+  const { user } = access;
 
   const interviews = await ATSInterview.find({ candidate: id, company: user.company })
     .sort({ scheduledAt: -1 })
@@ -49,20 +43,23 @@ export async function GET(_request: Request, { params }: Params) {
 
 export async function POST(request: Request, { params }: Params) {
   const { id } = await params;
-  const userId = await requireUserId();
-  if (!userId) return jsonError("Unauthorized", 401);
-  if (!isObjectId(id)) return jsonError("Invalid candidate id.");
-
   const body = await request.json();
   if (!body.interviewer) return jsonError("Interviewer is required.");
   if (!body.scheduledAt) return jsonError("Scheduled date is required.");
 
-  await connectDb();
-  const user = await User.findById(userId);
-  if (!user || !ALL_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
-  if (!user.company) return jsonError("No company found.", 400);
+  const access = await withCandidateAccess(id, "write");
+  if (!access.ok) return access.response;
+  const { user } = access;
+  const userId = String(user._id);
 
-  const candidate = await ATSCandidate.findOne({ _id: id, company: user.company }).populate("job", "title");
+  // Scheduling is pipeline work. Note the asymmetry this creates on purpose: a
+  // region head can be *placed on* a panel by the main office without being able
+  // to schedule one, and `candidateRegionClause` lets them see the candidate that
+  // panel concerns. Reading and being assessed is theirs; running the round is not.
+  const hq = await requireRecruitmentHQ(user as any);
+  if (!hq.ok) return hq.response;
+
+  const candidate = await ATSCandidate.findById(access.candidate._id).populate("job", "title");
   if (!candidate) return jsonError("Candidate not found.", 404);
 
   const jobId = candidate.job && typeof candidate.job === "object" ? (candidate.job as any)._id || (candidate.job as any).id : candidate.job;

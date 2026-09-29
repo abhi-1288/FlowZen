@@ -6,7 +6,8 @@ import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 import { isObjectId, jsonError, requireUserId } from "@/lib/api";
 import { extractResumeText } from "@/lib/ats-scorer";
-import { closestRegionOf, fixedRegionLabel } from "@/lib/candidate-region";
+import { closestRegionOf, fixedRegionLabel, isDetectedState } from "@/lib/candidate-region";
+import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
 
 type Params = { params: Promise<{ id: string }> };
 const HR_ROLES = ["admin", "human-resource"];
@@ -24,6 +25,8 @@ export async function POST(request: Request, { params }: Params) {
   await connectDb();
   const user = await User.findById(userId);
   if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  const hq = await requireRecruitmentHQ(user as any);
+  if (!hq.ok) return hq.response;
   if (!user.company) return jsonError("No company found.", 400);
 
   const job = await ATSJob.findOne({ _id: id, company: user.company }).select("_id title location");
@@ -67,7 +70,10 @@ export async function POST(request: Request, { params }: Params) {
         regions,
       });
       perCandidateStates[String(candidate._id)] = result;
-      if (result.label && result.label !== candidate.regionLabel) {
+      // Only a real state is persisted. `closestRegionOf` also returns company
+      // office labels, and this route overwrites unconditionally, so without the
+      // guard a single run could replace every detected state with an office name.
+      if (isDetectedState(result.label) && result.label !== candidate.regionLabel) {
         await ATSCandidate.findByIdAndUpdate(candidate._id, {
           $set: { regionLabel: result.label },
         });

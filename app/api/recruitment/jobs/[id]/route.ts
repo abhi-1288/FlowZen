@@ -19,6 +19,7 @@ import {
 } from "@/lib/recruitment-utils";
 import { deleteFileByUrl } from "@/lib/storage";
 import { sendEditApplicationInvites } from "@/lib/edit-application-emails";
+import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
 
 type Params = { params: Promise<{ id: string }> };
 const HR_ROLES = ["admin", "human-resource"];
@@ -71,6 +72,14 @@ export async function PATCH(request: Request, { params }: Params) {
 
   const existingJob = await ATSJob.findOne({ _id: id, company: companyId });
   if (!existingJob) return jsonError("Job not found.", 404);
+
+  // Every action below mutates the requisition — drafting, publishing, the edit
+  // window — so they share one gate. Checking per-branch would let the workflow
+  // actions (accept / forward / set-salary / publish) remain open to any region
+  // HR while the plain field edit was closed, which is not a distinction anyone
+  // could act on. See `lib/recruitment-hq.ts`.
+  const hq = await requireRecruitmentHQ(user as any);
+  if (!hq.ok) return hq.response;
 
   const action = body.action;
 
@@ -242,7 +251,9 @@ if (body.requiredExperienceYears !== undefined) updates.requiredExperienceYears 
   }
 
   if (action === "publish") {
-    if (user.role !== "admin") return jsonError("Only admins can publish jobs.", 403);
+    // No role check: `requireRecruitmentHQ` above already narrowed this handler to
+    // the main office and the regions it delegated. The `draft-ready` precondition
+    // is the request chain's own gate and stays.
     if ((existingJob as any).workflow?.status !== "draft-ready") return jsonError("Job must be draft-ready before publishing.", 400);
     const job = await ATSJob.findOneAndUpdate(
       { _id: id, company: companyId },
@@ -386,10 +397,32 @@ if (body.requiredExperienceYears !== undefined) updates.requiredExperienceYears 
   if (body.assessmentDurationMinutes !== undefined) updates.assessmentDurationMinutes = body.assessmentDurationMinutes != null ? Number(body.assessmentDurationMinutes) : null;
   if (body.description !== undefined) updates.description = String(body.description).trim();
   if (body.requiredSkills !== undefined) updates.requiredSkills = Array.isArray(body.requiredSkills) ? body.requiredSkills.map(String) : [];
-  const wasPublished = body.status === "open" && user.role === "admin";
+  // Publishing is part of running the pipeline, so it follows the delegation
+  // rather than the role string. A regional head the main office granted can open
+  // their own requisition; without this they could draft and screen an entire
+  // pipeline and still be unable to make the job live, which is not a delegation
+  // anyone would accept. The `requireRecruitmentHQ` gate at the top of this
+  // handler has already refused anyone who is not main-office or delegated, so
+  // there is nothing left to check here.
+  const wasPublished = body.status === "open";
   if (body.status !== undefined) {
-    if (body.status === "open" && user.role !== "admin") return jsonError("Only admins can publish jobs.", 403);
     updates.status = body.status;
+    // Keep the requisition log honest. Opening a job used to move only `status`,
+    // leaving `workflow.status` on its `"requested"` default, so a live job on the
+    // careers page reported itself as an unapproved request. The workflow subdoc
+    // always exists (schema default), so the list serialiser's "no workflow"
+    // branch never fired and the lie was permanent.
+    //
+    // Only stamped when the job is not already recorded as published, and it
+    // deliberately jumps whatever chain state the job was in rather than
+    // asserting one — the caller published it, and the audit trail should say so
+    // even if that skipped `draft-ready`.
+    const currentWorkflowStatus = (existingJob as any).workflow?.status;
+    if (body.status === "open" && currentWorkflowStatus !== "published") {
+      updates["workflow.status"] = "published";
+      updates["workflow.publishedBy"] = userId;
+      updates["workflow.publishedAt"] = new Date();
+    }
   }
 
   let job = await ATSJob.findOneAndUpdate(
@@ -444,6 +477,11 @@ export async function DELETE(_request: Request, { params }: Params) {
 
   const job = await ATSJob.findOne({ _id: id, company: user.company });
   if (!job) return jsonError("Job not found.", 404);
+
+  // Deleting a requisition destroys every candidate, interview, offer and timeline
+  // row under it, so it sits squarely in the pipeline owner's remit.
+  const hq = await requireRecruitmentHQ(user as any);
+  if (!hq.ok) return hq.response;
 
   const candidates = await ATSCandidate.find({ job: id, company: user.company });
   const candidateIds = (candidates as any[]).map((c) => c._id);

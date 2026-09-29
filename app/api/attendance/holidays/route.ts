@@ -7,6 +7,7 @@ import { User } from "@/models/User";
 import { Company } from "@/models/Company";
 import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
+import { effectiveRegionApproverClause, effectiveRegionLabelOf } from "@/lib/company-regions";
 
 const formatHolidayDate = (date: Date) => date.toLocaleDateString("en-GB");
 const buildHolidayNotificationBody = (companyName: string, title: string, start: Date, end: Date, duration: number) => {
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
     if (!user) return jsonError("User not found.", 404);
     if (user.role !== "admin") return jsonError("Only admins can add holidays.", 403);
 
-    const { title, description, startDate, endDate } = await req.json();
+    const { title, description, startDate, endDate, region } = await req.json();
     if (!startDate || !endDate) return jsonError("Start date and end date are required.");
 
     const start = new Date(startDate);
@@ -38,6 +39,29 @@ export async function POST(req: Request) {
 
     if (!user.company) return jsonError("Only company-associated admins can add holidays.", 400);
 
+    // Regional admins create holidays for their own region; the company owner
+    // may also create global holidays (region "") or any region's holidays.
+    const company = (await Company.findById(user.company)
+      .select("name owner addresses address members")
+      .lean()) as {
+      _id?: unknown;
+      name?: string | null;
+      owner?: unknown;
+      addresses?: { label?: string | null }[] | null;
+      address?: string | null;
+      members?: unknown[] | null;
+    } | null;
+    const ownerId = company?.owner ?? null;
+    const isOwner = ownerId != null && String(ownerId) === String(user._id);
+    const adminRegion = effectiveRegionLabelOf(company, user);
+    const requestedRegion = String(region ?? "").trim();
+    let holidayRegion = adminRegion;
+    if (isOwner && requestedRegion) {
+      holidayRegion = requestedRegion;
+    } else if (!isOwner && requestedRegion && requestedRegion !== adminRegion) {
+      return jsonError(`You can only create holidays for your own region (${adminRegion}).`, 403);
+    }
+
     const holiday = await Holiday.create({
       title: title || "Company Holiday",
       description: description || "",
@@ -46,16 +70,22 @@ export async function POST(req: Request) {
       duration: diffDays,
       createdBy: userId,
       company: user.company,
+      region: holidayRegion,
     });
 
-    const company = user.company
-      ? await Company.findById(user.company).select("name owner members")
-      : null;
-
     if (company) {
-      const targets = new Set<string>(
-        (company.members ?? []).map((member: any) => String(member))
-      );
+      // Global holidays notify everyone; regional holidays notify only that
+      // region's members (plus the owner).
+      const targets = new Set<string>();
+      if (holidayRegion) {
+        const regionClause = effectiveRegionApproverClause(company, holidayRegion);
+        const regionMembers = regionClause
+          ? await User.find({ company: user.company, companyStatus: "approved", ...regionClause }).select("_id")
+          : [];
+        regionMembers.forEach((m: any) => targets.add(String(m._id)));
+      } else {
+        (company.members ?? []).forEach((member: any) => targets.add(String(member)));
+      }
       if (company.owner) targets.add(String(company.owner));
 
       const body = buildHolidayNotificationBody(
@@ -100,6 +130,27 @@ export async function PUT(req: Request) {
     const holiday = await Holiday.findById(id);
     if (!holiday) return jsonError("Holiday not found.", 404);
 
+    // Regional admins can only edit holidays in their own region. The company
+    // owner may edit global and any region's holidays.
+    const company = (await Company.findById(user.company)
+      .select("name owner addresses address")
+      .lean()) as {
+      _id?: unknown;
+      name?: string | null;
+      owner?: unknown;
+      addresses?: { label?: string | null }[] | null;
+      address?: string | null;
+    } | null;
+    const ownerId = company?.owner ?? null;
+    const isOwner = ownerId != null && String(ownerId) === String(user._id);
+    if (!isOwner) {
+      const adminRegion = effectiveRegionLabelOf(company, user);
+      const holidayRegion = String(holiday.region ?? "").trim();
+      if (holidayRegion !== adminRegion) {
+        return jsonError(`You can only edit holidays in your own region (${adminRegion}).`, 403);
+      }
+    }
+
     if (title !== undefined) holiday.title = title;
     if (description !== undefined) holiday.description = description;
     if (startDate !== undefined) holiday.startDate = new Date(startDate);
@@ -127,12 +178,32 @@ export async function DELETE(req: Request) {
 
     const { id } = await req.json();
     if (!id || !Types.ObjectId.isValid(id)) return jsonError("Invalid holiday ID.");
-    const holiday = await Holiday.findByIdAndDelete(id);
+    const holiday = await Holiday.findById(id);
     if (!holiday) return jsonError("Holiday not found.", 404);
 
-    const company = user.company
-      ? await Company.findById(user.company).select("name owner members")
-      : null;
+    // Regional admins can only delete holidays in their own region. The company
+    // owner may delete global and any region's holidays.
+    const company = (await Company.findById(user.company)
+      .select("name owner addresses address members")
+      .lean()) as {
+      _id?: unknown;
+      name?: string | null;
+      owner?: unknown;
+      addresses?: { label?: string | null }[] | null;
+      address?: string | null;
+      members?: unknown[] | null;
+    } | null;
+    const ownerId = company?.owner ?? null;
+    const isOwner = ownerId != null && String(ownerId) === String(user._id);
+    if (!isOwner) {
+      const adminRegion = effectiveRegionLabelOf(company, user);
+      const holidayRegion = String(holiday.region ?? "").trim();
+      if (holidayRegion !== adminRegion) {
+        return jsonError(`You can only delete holidays in your own region (${adminRegion}).`, 403);
+      }
+    }
+
+    await holiday.deleteOne();
 
     if (company) {
       const targets = new Set<string>(
@@ -180,6 +251,18 @@ export async function GET() {
     query.company = user.company;
   } else {
     query.company = null;
+  }
+
+  // Everyone sees global holidays plus their own region's holidays. A user
+  // with no stored regionLabel resolves to the main office.
+  if (user.company) {
+    const company = (await Company.findById(user.company)
+      .select("addresses address")
+      .lean()) as { addresses?: { label?: string | null }[] | null; address?: string | null } | null;
+    const userRegion = effectiveRegionLabelOf(company, user);
+    if (userRegion) {
+      query.$or = [{ region: { $in: ["", null] } }, { region: userRegion }];
+    }
   }
 
   const holidays = await Holiday.find(query).sort({ startDate: 1 });

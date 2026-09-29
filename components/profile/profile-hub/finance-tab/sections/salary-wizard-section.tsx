@@ -20,6 +20,8 @@ export function SalaryWizardSection({
   memberTdsExempted,
   salaryGenerating,
   members,
+  region,
+  regionFallback,
   pfPercentage,
   esicPercentage,
   tdsPercentage,
@@ -47,6 +49,10 @@ export function SalaryWizardSection({
   memberTdsExempted: boolean;
   salaryGenerating: boolean;
   members: AnyRecord[];
+  /** Actor's effective region; "" when the company has no region configured. */
+  region: string;
+  /** True when the region has no members so the list is company-wide. */
+  regionFallback: boolean;
   pfPercentage: number;
   esicPercentage: number;
   tdsPercentage: number;
@@ -79,6 +85,11 @@ export function SalaryWizardSection({
         {salaryStep === 2 && (
           <form onSubmit={onCalculate} className="grid gap-3">
             <p className="text-sm font-medium text-slate-700">Step 2: Select Employee</p>
+            {regionFallback && region ? (
+              <p className="text-xs text-slate-500">Showing all members (no members in {region})</p>
+            ) : region ? (
+              <p className="text-xs text-slate-500">Showing members in {region}</p>
+            ) : null}
             <select className="rounded-lg border border-[var(--c-border-light)] px-3 py-2" required value={salaryEmployeeId} onChange={(e) => onEmployeeChange(e.target.value)}>
               <option value="">Select employee</option>
               {members.map((member) => (

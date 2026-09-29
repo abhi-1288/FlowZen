@@ -129,7 +129,7 @@ export async function PATCH(request: Request, { params }: Params) {
     emitNotification(createdBy);
   }
 
-  const refreshed = await ITProvisioningRequest.findById(id)
+  const refreshed = await ITProvisioningRequest.findOne({ _id: id, company: companyId })
     .populate("employee", "name email")
     .populate("createdBy", "name")
     .populate("manager", "name");

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client-utils";
 import { Send, Clock, CheckCircle, MapPin, ToggleLeft, ToggleRight, UserCheck, UserX, Users, Shield, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
 import type { AnyRecord } from "../shared";
-import { mainOfficeLabelOf, regionManagerCaps } from "@/lib/company-regions";
+import { isMainOfficeRegion, mainOfficeLabelOf, regionManagerCaps } from "@/lib/company-regions";
 
 interface AdminOption {
   id: string;
@@ -134,7 +134,10 @@ function AddressModal({
   const isMainOfficeHr =
     role === "human-resource" &&
     !!multiOffice &&
-    (!mainLabel || String(userRegionLabel ?? "").trim().toLowerCase() === mainLabel.toLowerCase());
+    isMainOfficeRegion(
+      { addresses: (company?.addresses as AnyRecord[] | null) ?? [], address: String(company?.address ?? "") },
+      { regionLabel: userRegionLabel ?? "" },
+    );
   const canEditCaps = isAdmin || isMainOfficeHr;
 
   useEffect(() => {
@@ -620,6 +623,125 @@ function staffIdsOf(value: unknown): string[] {
   return Array.isArray(value) ? value.map((v) => String(v ?? "")).filter(Boolean) : [];
 }
 
+function PipelineAccessRow({
+  label,
+  isMainOffice,
+  canDelegate,
+  delegableOptions,
+  currentHrHead,
+  currentAdminHead,
+  draft,
+  saving,
+  onToggle,
+  onSave,
+}: {
+  label: string;
+  isMainOffice: boolean;
+  canDelegate: boolean;
+  delegableOptions: { id: string; kind: "hr" | "admin"; name: string }[];
+  currentHrHead: string;
+  currentAdminHead: string;
+  draft: string[];
+  saving: boolean;
+  onToggle: (id: string) => void;
+  onSave: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const granted = draft.length > 0;
+  const names = delegableOptions.filter((o) => draft.includes(o.id)).map((o) => o.name);
+
+  // The main office has nothing to delegate — it already holds the authority — so
+  // it says so rather than showing an empty panel that invites the reader to
+  // wonder what they are meant to tick.
+  if (isMainOffice) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+        <CheckCircle size={13} />
+        Runs every region&apos;s requisitions
+      </span>
+    );
+  }
+
+  // A fragment, not a wrapper element: the caller is a `flex-wrap` row, and the
+  // panel has to be a *direct* child of it to take the full width and wrap onto
+  // its own line. Nesting it inside the trigger's span would pin it to the
+  // trigger's inline box.
+  return (
+    <>
+      <span className="inline-flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => (canDelegate ? setOpen((v) => !v) : undefined)}
+          title={
+            canDelegate
+              ? "Choose who at this region may raise requisitions and run the pipeline"
+              : "Only the main office can grant pipeline access for this region"
+          }
+          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-medium transition-colors ${
+            canDelegate
+              ? "border border-[var(--c-border-light)] text-slate-700 hover:bg-[var(--c-bg-muted)] dark:border-zinc-700 dark:text-zinc-200"
+              : "cursor-default border border-dashed text-slate-400 dark:text-zinc-500"
+          }`}
+        >
+          {granted ? <UserCheck size={13} className="text-emerald-600" /> : <UserX size={13} />}
+          {granted
+            ? `Can create jobs: ${names.length === 1 ? names[0] : `${names.length} staff`}`
+            : "Cannot create jobs"}
+          {!canDelegate && <span className="font-normal">— main office only</span>}
+          {canDelegate && (
+            <ChevronDown size={12} className={open ? "rotate-180 transition-transform" : "transition-transform"} />
+          )}
+        </button>
+      </span>
+
+      {canDelegate && open && (
+        <span className="block w-full rounded-lg border border-dashed border-slate-300 p-3 dark:border-zinc-800 dark:bg-[#0b0b0b]">
+          <span className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">
+            Recruitment Pipeline — {label}
+          </span>
+          <span className="mt-0.5 block text-xs text-slate-400 dark:text-zinc-500">
+            Tick this region&apos;s staff to let them raise requisitions and run ATS, assessments and
+            interviews for <span className="font-medium text-slate-600 dark:text-zinc-300">{label}</span>.
+            Without this they can only act on candidates once the main office distributes them here,
+            and they always keep the offer and the join approval.
+          </span>
+          <span className="mt-2 block space-y-1.5">
+            {delegableOptions.length === 0 && (
+              <span className="block text-xs italic text-slate-400">
+                Assign this region&apos;s HR or admin staff under Manage Staff first.
+              </span>
+            )}
+            {delegableOptions.map((o) => (
+              <label key={`${o.kind}-${o.id}`} className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={draft.includes(o.id)}
+                  onChange={() => onToggle(o.id)}
+                  className="accent-indigo-600"
+                />
+                <span className="text-slate-700 dark:text-zinc-200">{o.name}</span>
+                <span className="text-[10px] uppercase tracking-wide text-slate-400">
+                  {o.kind === "hr" ? "HR" : "Admin"}
+                </span>
+                {o.id === currentHrHead && <span className="text-[10px] text-indigo-500">HR head</span>}
+                {o.id === currentAdminHead && <span className="text-[10px] text-emerald-600">Admin head</span>}
+              </label>
+            ))}
+          </span>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={onSave}
+            className="mt-2 rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
+          >
+            {saving ? "Saving..." : "Save Pipeline Access"}
+          </button>
+        </span>
+      )}
+    </>
+  );
+}
+
 function RegionStaffingBlock({
   addr,
   company,
@@ -665,6 +787,50 @@ function RegionStaffingBlock({
   const currentHrHead = String(addr.hrHead ?? "");
   const currentAdminHead = String(addr.adminHead ?? "");
   const label = String(addr.label ?? "").trim() || "Main Office";
+
+  // Pipeline delegation, saved on its own so granting it does not also rewrite
+  // the staffing roster — a head who is ticked here but never given a seat on the
+  // region's staff would hold a grant they cannot be removed from, and the two
+  // lists answer different questions.
+  const [pipelineDraft, setPipelineDraft] = useState<string[]>(staffIdsOf(addr.pipelineManagers));
+  const [savingPipeline, setSavingPipeline] = useState(false);
+
+  // Only this region's own staff can be delegated. A company-wide picker would
+  // let a head be granted authority over a region they do not work in, and the
+  // grant is read off the region's own entry, so it would have no effect anyway.
+  const delegableOptions = [
+    ...currentHrs.map((id) => ({ id, kind: "hr" as const, name: nameOf(hrOptions, id) || "Unknown" })),
+    ...currentAdmins.map((id) => ({ id, kind: "admin" as const, name: nameOf(adminOptions, id) || "Unknown" })),
+  ].filter((o, i, arr) => arr.findIndex((x) => x.id === o.id) === i);
+
+  const togglePipelineManager = (id: string) => {
+    setPipelineDraft((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const savePipelineManagers = async () => {
+    setSavingPipeline(true);
+    try {
+      await apiFetch("/api/company/address", {
+        method: "PATCH",
+        body: JSON.stringify({
+          mode: "set-pipeline-managers",
+          label,
+          pipelineManagers: pipelineDraft,
+        }),
+      });
+      await refresh();
+      showToast(
+        pipelineDraft.length === 0
+          ? "Pipeline access removed. Only the main office can run this region's requisitions."
+          : "Pipeline access updated.",
+        "success",
+      );
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to update pipeline access.", "error");
+    } finally {
+      setSavingPipeline(false);
+    }
+  };
 
   const isMainOfficeHr =
     role === "human-resource" &&
@@ -792,6 +958,18 @@ function RegionStaffingBlock({
           Admin Head: <span className="font-medium text-slate-800 dark:text-zinc-100">{nameOf(adminOptions, currentAdminHead) || "—"}</span>
           <span className="text-slate-400">({currentAdmins.length}/{caps.maxAdmins})</span>
         </span>
+        <PipelineAccessRow
+          label={label}
+          isMainOffice={label.toLowerCase() === mainLabel.toLowerCase()}
+          canDelegate={canEditCaps}
+          delegableOptions={delegableOptions}
+          currentHrHead={currentHrHead}
+          currentAdminHead={currentAdminHead}
+          draft={pipelineDraft}
+          saving={savingPipeline}
+          onToggle={togglePipelineManager}
+          onSave={savePipelineManagers}
+        />
         {canManage && (
           <button
             type="button"

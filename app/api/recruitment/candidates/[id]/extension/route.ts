@@ -5,6 +5,7 @@ import { ATSJob } from "@/models/ATSJob";
 import { User } from "@/models/User";
 import { jsonError, requireUserId } from "@/lib/api";
 import { MAX_EXTENSION_MS, trimProctoringLog } from "@/lib/assessment-proctoring";
+import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
 
 /**
  * HR deciding a candidate's request for extra time.
@@ -29,6 +30,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   await connectDb();
   const user = await User.findById(userId);
   if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  const hq = await requireRecruitmentHQ(user as any);
+  if (!hq.ok) return hq.response;
 
   const body = await request.json().catch(() => ({}));
   const decision = String(body?.decision ?? "");

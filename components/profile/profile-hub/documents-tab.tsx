@@ -13,15 +13,24 @@ const FILE_TYPE_OPTIONS = ["pdf", "png", "jpg", "jpeg", "doc", "docx", "xls", "x
 
 export function DocumentsTab({
   actorRole,
+  readOnly = false,
   showToast,
 }: {
   actorRole?: string;
+  readOnly?: boolean;
   showToast: (text: string, type?: "success" | "error") => void;
 }) {
   const isHrOrAdmin = ["human-resource", "admin", "finance"].includes(String(actorRole ?? ""));
   const [subTab, setSubTab] = useState<"required" | "upload">("upload");
 
   const sectionClass = "rounded-xl neu-card p-5";
+
+  // A member who has left the company keeps read-only access to what they
+  // uploaded while they were a member. There is no company left to read the
+  // required categories from, so the list is rendered from the documents alone.
+  if (readOnly) {
+    return <ArchivedDocuments />;
+  }
 
   return (
     <div className="space-y-6">
@@ -57,6 +66,100 @@ export function DocumentsTab({
           <DocumentsUploadSection showToast={showToast} />
         </section>
       )}
+    </div>
+  );
+}
+
+/* ─── Ex-member: download-only view of documents uploaded while a member ─── */
+
+function ArchivedDocuments() {
+  const [documents, setDocuments] = useState<(DocInfo & { category: string; uploadedAt?: string })[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await apiFetch<{
+          documents: (DocInfo & { category: string; uploadedAt?: string })[];
+        }>("/api/profile/documents");
+        if (active) setDocuments(res.documents ?? []);
+      } catch {
+        if (active) setDocuments([]);
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (loading) return <p className="text-sm text-slate-400">Loading...</p>;
+
+  if (documents.length === 0) {
+    return <p className="text-sm text-slate-400">You did not upload any documents while you were a member.</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl neu-card p-5">
+        <div className="mb-1 border-l-4 border-violet-500 pl-4">
+          <h3 className="text-base font-semibold text-slate-900">My Documents</h3>
+          <p className="mt-0.5 text-sm text-slate-500">
+            The documents you uploaded while you were a member. These are read-only now that you have left
+            the company.
+          </p>
+        </div>
+      </div>
+
+      {documents.map((doc, i) => (
+        <div key={`${doc.category}-${i}`} className="rounded-lg neu-card p-4">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-sm font-medium text-slate-800">{doc.category}</span>
+            {doc.uploadedAt ? (
+              <span className="text-[10px] text-slate-400">
+                uploaded {new Date(doc.uploadedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+              </span>
+            ) : null}
+          </div>
+
+          {doc.fieldValues?.length ? (
+            <dl className="mb-3 space-y-1">
+              {doc.fieldValues.map((fv, fi) => (
+                <div key={fi} className="flex gap-2 text-xs">
+                  <dt className="text-slate-500">{fv.label}</dt>
+                  <dd className="font-medium text-slate-800">{fv.value}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
+
+          <div className="flex items-center gap-2">
+            <div className="flex-1 text-xs text-slate-500">
+              <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                {doc.fileName}
+              </a>
+              <span className="ml-1">({(doc.fileSize / 1024).toFixed(0)} KB)</span>
+            </div>
+            <a
+              href={doc.fileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-[var(--c-bg-muted)]"
+            >
+              View
+            </a>
+            <a
+              href={doc.fileUrl}
+              download={doc.fileName}
+              className="rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-[var(--c-bg-muted)]"
+            >
+              Download
+            </a>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -1,6 +1,15 @@
 import type { Types } from "mongoose";
 import { User } from "@/models/User";
 import { Company } from "@/models/Company";
+import {
+  effectiveRegionLabelOf,
+  regionApproverClause,
+  regionEntryOf,
+  regionStaffingOf,
+  type OfficeAddressLike,
+} from "@/lib/company-regions";
+
+type RegionCompanyLike = { addresses?: OfficeAddressLike[] | null; address?: string | null };
 
 /** Company join codes tied to HR-distributed role invites → approve via HR, not company owner. */
 const COMPANY_JOIN_ROLES_USING_HR = new Set([
@@ -183,6 +192,112 @@ export async function listApprovedAdminUserIds(
     companyStatus: "approved",
   }).select("_id");
   return admins.map((a) => String(a._id));
+}
+
+/**
+ * Oldest approved approver for a document letter / ID card request, preferring
+ * the requester's own region and widening to the whole company only when that
+ * region has nobody. `regionClause` is built by `regionApproverClause` in
+ * `lib/company-regions`; pass null to skip region scoping entirely.
+ */
+export async function findApprovedApproverIdForRequester(options: {
+  companyId: Types.ObjectId | string;
+  roles: readonly string[];
+  regionClause?: Record<string, unknown> | null;
+  excludeUserId?: string;
+}): Promise<string | null> {
+  const { companyId, roles, regionClause, excludeUserId } = options;
+  if (!roles.length) return null;
+
+  const base: Record<string, unknown> = {
+    company: companyId,
+    role: { $in: [...roles] },
+    companyStatus: "approved",
+  };
+  if (excludeUserId) base._id = { $ne: excludeUserId };
+
+  if (regionClause) {
+    const inRegion = await User.findOne({ ...base, ...regionClause })
+      .select("_id")
+      .sort({ createdAt: 1 });
+    if (inRegion) return String(inRegion._id);
+  }
+
+  const anyRegion = await User.findOne(base)
+    .select("_id")
+    .sort({ createdAt: 1 });
+  return anyRegion ? String(anyRegion._id) : null;
+}
+
+/**
+ * Region scope for a requester: their effective region label, the matching
+ * Mongo clause, and the loaded company so callers can run further
+ * `isUserInRegion` checks without another query.
+ */
+export async function requesterRegionScope(
+  companyId: Types.ObjectId | string,
+  requester: { regionLabel?: string | null } | null | undefined,
+): Promise<{
+  region: string;
+  clause: Record<string, unknown> | null;
+  company: RegionCompanyLike | null;
+}> {
+  if (!requester) return { region: "", clause: null, company: null };
+  const company = (await Company.findById(companyId)
+    .select("addresses address")
+    .lean()) as RegionCompanyLike | null;
+  const region = effectiveRegionLabelOf(company, requester);
+  return { region, clause: regionApproverClause(company, region), company };
+}
+
+/**
+ * The approver for a hire routed to a specific region: that region's HR head,
+ * then its Admin head.
+ *
+ * This exists because the offer knows which office the hire joins but the
+ * conversion used to name whoever clicked "Convert" as the approver. A Pune HR
+ * head converting a candidate whose offer said Noida then produced a JoinRequest
+ * approved by Pune, and `app/api/approvals/[id]/route.ts` files the new
+ * employee's `regionLabel` from the approver — so the hire landed in the wrong
+ * office on arrival.
+ *
+ * Returns `""` when the region has neither head. Callers must then fall back to
+ * the converting HR rather than block: an unconfigured head is a company setup
+ * problem, and refusing to onboard someone over it is worse than routing the
+ * approval to the person who raised it.
+ *
+ * Both heads are validated as approved users of this company. A `hrHead` left
+ * pointing at a deleted or unapproved account resolves to nothing, which is the
+ * same as having no head — the alternative is a JoinRequest nobody can action.
+ */
+export async function regionJoinApproverId(
+  companyId: Types.ObjectId | string,
+  regionLabel: string | null | undefined,
+): Promise<string> {
+  const raw = String(regionLabel ?? "").trim();
+  if (!raw) return "";
+
+  const company = (await Company.findById(companyId)
+    .select("addresses address")
+    .lean()) as unknown as RegionCompanyLike | null;
+  if (!company) return "";
+
+  const entry = regionEntryOf(company, raw);
+  if (!entry) return "";
+  const staffing = regionStaffingOf(entry);
+
+  for (const candidateId of [staffing.hrHead, staffing.adminHead]) {
+    if (!candidateId) continue;
+    const valid = (await User.findOne({
+      _id: candidateId,
+      company: companyId,
+      companyStatus: "approved",
+    })
+      .select("_id")
+      .lean()) as unknown as { _id?: unknown } | null;
+    if (valid?._id) return String(valid._id);
+  }
+  return "";
 }
 
 export async function resolveCompanyJoinApproverId(

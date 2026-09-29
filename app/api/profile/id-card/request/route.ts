@@ -5,7 +5,8 @@ import { JoinRequest } from "@/models/JoinRequest";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
-import { resolveSeniorSecurityApprover } from "@/lib/join-approvers";
+import { resolveSeniorSecurityApprover, findApprovedApproverIdForRequester, requesterRegionScope } from "@/lib/join-approvers";
+import { DOCUMENT_LETTER_APPROVER_ROLES, isUserInRegion } from "@/lib/company-regions";
 
 export async function POST(request: Request) {
   const userId = await requireUserId();
@@ -35,19 +36,39 @@ export async function POST(request: Request) {
   };
   if (isJuniorRequester) {
     approverFilter.$or = [
-      { role: "human-resource" },
+      { role: { $in: [...DOCUMENT_LETTER_APPROVER_ROLES] } },
       { role: "security", isSeniorSecurity: true },
     ];
   } else {
-    approverFilter.role = "human-resource";
+    approverFilter.role = { $in: [...DOCUMENT_LETTER_APPROVER_ROLES] };
   }
 
-  const admin = await User.findOne(approverFilter).select("_id name role isSeniorSecurity");
+  const admin = await User.findOne(approverFilter).select("_id name role regionLabel isSeniorSecurity");
   if (!admin) return jsonError("Selected approver not found.", 404);
 
   const companyId = typeof user.company === "object" && user.company
     ? String((user.company as any)._id ?? "")
     : String(user.company);
+
+  // Region enforcement, mirroring the document letter flow: reject an
+  // out-of-region approver, but only when the requester's region has one.
+  const { region: requesterRegion, clause: regionClause, company: regionCompany } =
+    await requesterRegionScope(companyId, user);
+  if (regionClause && !isUserInRegion(regionCompany, requesterRegion, admin)) {
+    const regionHasApprover = await findApprovedApproverIdForRequester({
+      companyId,
+      roles: DOCUMENT_LETTER_APPROVER_ROLES,
+      regionClause,
+    });
+    if (regionHasApprover) {
+      return jsonError(
+        requesterRegion
+          ? `Selected approver is not in your region (${requesterRegion}).`
+          : "Selected approver is not in your region.",
+        400,
+      );
+    }
+  }
 
   const existing = await JoinRequest.findOne({
     requester: userId,

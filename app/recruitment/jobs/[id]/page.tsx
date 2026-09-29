@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { ArrowLeft, Pencil, PencilOff, Trash2, Globe, Archive, Share2, Check, Cog, Briefcase, Building2, MapPin, Clock, Users, Banknote, ShieldCheck, CalendarClock, UserPlus, CalendarPlus, Columns3, ChevronDown, Download, ExternalLink, Upload, Loader2, CheckCircle, Layers, ShieldAlert, ShieldOff, ClipboardCheck } from "lucide-react";
+import { ArrowLeft, Pencil, PencilOff, Trash2, Globe, Archive, Share2, Check, Cog, Briefcase, Building2, MapPin, Clock, Users, Banknote, ShieldCheck, CalendarClock, UserPlus, CalendarPlus, Columns3, ChevronDown, Download, ExternalLink, Upload, Loader2, CheckCircle, Layers, ShieldAlert, ShieldOff, ClipboardCheck, Send } from "lucide-react";
 import { DEFAULT_ACCENT, salarySuffix, hexToRgba } from "@/lib/accent";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
@@ -26,6 +26,11 @@ import { assessmentResultsUnlocked } from "@/lib/assessment";
 import { fmtJobDateTime as fmtDateTime, startOfUtcDayMs, utcWallClock, utcWallClockNow, dateInputValue, timeInputValue } from "@/lib/date-utils";
 import { MAX_EDIT_WINDOW_MS, isEditWindowOpen, validateEditWindowDeadline } from "@/lib/edit-window";
 import { JobModal } from "@/components/recruitment/job-modal";
+import {
+  BulkRegionModal,
+  type RegionTransferResult,
+} from "@/components/recruitment/bulk-region-modal";
+import { DistributeCandidateModal } from "@/components/recruitment/distribute-candidate-modal";
 
 function formatEmploymentType(type: string): string {
   return type
@@ -83,10 +88,20 @@ export default function JobDetailPage() {
   const router = useRouter();
   const { data: session } = useSession();
   const role = session?.user?.role ?? "";
-  const isAdmin = role === "admin";
-  const isHrOrAdmin = role === "admin" || role === "human-resource";
+  // Pipeline actions — scoring, assessments, interviews, stage moves, publishing
+  // and distribution — belong to the main office, or to a region the main office
+  // has explicitly delegated. A regional HR/Admin reaching this page is a viewer
+  // until the owner grants their region, which is why this flag replaces the bare
+  // role check on every write control in the sidebar.
+  const canRunPipeline = Boolean(session?.user?.isRecruitmentHQ);
+
+  const canTransferRegion = canRunPipeline;
   const { activeJob, candidates, loading, fetchJob, fetchCandidates, setModal, updateJob, moveCandidateStage, setAtsDecision } = useRecruitmentStore(
     useShallow((s) => ({ activeJob: s.activeJob, candidates: s.candidates, loading: s.loading, fetchJob: s.fetchJob, fetchCandidates: s.fetchCandidates, setModal: s.setModal, updateJob: s.updateJob, moveCandidateStage: s.moveCandidateStage, setAtsDecision: s.setAtsDecision }))
+  );
+  const isPanOrRemote = !!activeJob?.location && /^(pan|remote)$/i.test(activeJob.location.trim());
+  const hasDistributeCandidates = candidates.some(
+    (c) => c.stage === "offer" || c.stage === "joined" || c.atsStatus === "selected" || c.assessmentStatus === "selected",
   );
   const [candidateFilter, setCandidateFilter] = useState("");
   const [copied, setCopied] = useState(false);
@@ -98,6 +113,7 @@ export default function JobDetailPage() {
   const [atsAction, setAtsAction] = useState<"auto" | "manual">("auto");
   const [atsApplied, setAtsApplied] = useState<{ moved: number; advanced: number } | null>(null);
   const [bulkIvOpen, setBulkIvOpen] = useState(false);
+  const [distributeOpen, setDistributeOpen] = useState(false);
   const [assessmentManagerOpen, setAssessmentManagerOpen] = useState(false);
   const [mockTestOpen, setMockTestOpen] = useState(false);
   const [assessmentResultsOpen, setAssessmentResultsOpen] = useState(false);
@@ -120,6 +136,8 @@ export default function JobDetailPage() {
   const [selectedCandidates, setSelectedCandidates] = useState<Record<string, boolean>>({});
   const [bulkTargetStage, setBulkTargetStage] = useState<Stage>("screening");
   const [stageModal, setStageModal] = useState<{ targets: ATSCandidate[]; target: Stage } | null>(null);
+  const [regionModalTargets, setRegionModalTargets] = useState<ATSCandidate[] | null>(null);
+  const [regionResult, setRegionResult] = useState<RegionTransferResult | null>(null);
   const [atsDecisionTarget, setAtsDecisionTarget] = useState<ATSCandidate | null>(null);
   const [editAppsConfirm, setEditAppsConfirm] = useState<"enable" | "update" | "disable" | null>(null);
 
@@ -233,7 +251,7 @@ export default function JobDetailPage() {
 
   const autoDetectRanRef = useRef(false);
   useEffect(() => {
-    if (!id || !isHrOrAdmin || autoDetectRanRef.current) return;
+    if (!id || !canRunPipeline || autoDetectRanRef.current) return;
     autoDetectRanRef.current = true;
     apiFetch<{ skipped?: boolean }>(`/api/recruitment/jobs/${id}/detect-regions`, {
       method: "POST",
@@ -244,7 +262,7 @@ export default function JobDetailPage() {
         if (!res.skipped) void fetchCandidates({ jobId: id });
       })
       .catch(() => {});
-  }, [id, isHrOrAdmin, fetchCandidates]);
+  }, [id, canRunPipeline, fetchCandidates]);
 
   /**
    * The application-editing window for this job, evaluated through the same
@@ -315,6 +333,23 @@ export default function JobDetailPage() {
     const targets = filtered.filter((c) => selectedCandidates[c.id]);
     if (targets.length === 0) return;
     setStageModal({ targets, target: bulkTargetStage });
+  }
+
+  function openBulkRegionModal() {
+    const targets = filtered.filter((c) => selectedCandidates[c.id]);
+    if (targets.length === 0) return;
+    setRegionResult(null);
+    setRegionModalTargets(targets);
+  }
+
+  function handleRegionTransferred(result: RegionTransferResult) {
+    setRegionModalTargets(null);
+    setSelectedCandidates({});
+    setRegionResult(result);
+    // The transferred rows leave the unassigned pool, so a regional recruiter's
+    // list shrinks; refetch rather than assuming which side of the boundary this
+    // user is on.
+    void fetchCandidates({ jobId: id });
   }
 
   async function confirmStageChange(toStage: Stage) {
@@ -540,7 +575,7 @@ export default function JobDetailPage() {
                 <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">
                   {filtered.length} shown{candidateFilter ? ` · ${candidateFilterLabel}` : ""}
                 </p>
-                {isHrOrAdmin && filtered.length > 0 && (
+                {canRunPipeline && filtered.length > 0 && (
                   <div className="mt-1.5 flex items-center gap-1.5">
                     <input
                       type="checkbox"
@@ -590,28 +625,67 @@ export default function JobDetailPage() {
               </select>
             </div>
 
-            {isHrOrAdmin && selectedCount > 0 && (
+            {canTransferRegion && selectedCount > 0 && (
               <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-900/50 dark:bg-indigo-950/40">
                 <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">{selectedCount} selected</span>
-                <select
-                  value={bulkTargetStage}
-                  onChange={(e) => setBulkTargetStage(e.target.value as Stage)}
-                  className="neu-inset rounded-lg px-3 py-1.5 text-sm"
-                >
-                  {STAGES.map((s) => (
-                    <option key={s} value={s}>{STAGE_LABELS[s]}</option>
-                  ))}
-                </select>
+                {/* Stage changes stay HR/admin-only; only the region routing is
+                    widened to the owner. */}
+                {canRunPipeline && (
+                  <>
+                    <select
+                      value={bulkTargetStage}
+                      onChange={(e) => setBulkTargetStage(e.target.value as Stage)}
+                      className="neu-inset rounded-lg px-3 py-1.5 text-sm"
+                    >
+                      {STAGES.map((s) => (
+                        <option key={s} value={s}>{STAGE_LABELS[s]}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={openBulkStageModal}
+                      className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-700"
+                    >
+                      Change Stage
+                    </button>
+                  </>
+                )}
                 <button
                   type="button"
-                  onClick={openBulkStageModal}
-                  className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-700"
+                  onClick={openBulkRegionModal}
+                  className="rounded-lg border border-indigo-300 bg-white px-4 py-1.5 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-800 dark:bg-transparent dark:text-indigo-300 dark:hover:bg-indigo-950/50"
                 >
-                  Change Stage
+                  Send to Region
                 </button>
                 <button type="button" onClick={() => setSelectedCandidates({})} className="ml-auto text-xs font-medium text-indigo-600 hover:underline">
                   Clear
                 </button>
+              </div>
+            )}
+
+            {regionResult && (
+              <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300">
+                Sent {regionResult.moved} candidate{regionResult.moved === 1 ? "" : "s"} to{" "}
+                <span className="font-medium">{regionResult.regionLabel || regionResult.region}</span>.
+                {regionResult.unchanged > 0 && (
+                  <> {regionResult.unchanged} already there and left unchanged.</>
+                )}
+                {regionResult.skipped > 0 && (
+                  <> {regionResult.skipped} could not be sent.</>
+                )}
+                {regionResult.notVisible > 0 && (
+                  <span className="mt-1 block text-amber-700 dark:text-amber-300">
+                    {regionResult.notVisible} of the selected candidates could not be
+                    found. They may have been moved to another region since the page
+                    loaded — reload to see the current pipeline.
+                  </span>
+                )}
+                {!regionResult.regionHasApprover && (
+                  <span className="mt-1 block text-amber-700 dark:text-amber-300">
+                    That region has no HR or Admin head, so the join will fall back to whoever
+                    converts the candidate.
+                  </span>
+                )}
               </div>
             )}
 
@@ -628,7 +702,7 @@ export default function JobDetailPage() {
                   className="flex flex-col gap-3 rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] dark:bg-[#000000] p-4 transition-all hover:shadow-md sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="flex min-w-0 items-start gap-3">
-                    {isHrOrAdmin && (
+                    {canRunPipeline && (
                       <input
                         type="checkbox"
                         checked={!!selectedCandidates[candidate.id]}
@@ -645,9 +719,20 @@ export default function JobDetailPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm font-semibold text-slate-900 dark:text-zinc-100">{candidate.firstName} {candidate.lastName}</span>
-                        {(candidate as any).regionLabel && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-                            <MapPin size={10} /> {(candidate as any).regionLabel}
+                        {candidate.regionLabel && (
+                          <span
+                            title="Detected from the candidate's own address. Not the office they will join."
+                            className="inline-flex cursor-help items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-zinc-800 dark:text-slate-300"
+                          >
+                            <MapPin size={10} /> State: {candidate.regionLabel}
+                          </span>
+                        )}
+                        {candidate.joiningRegionLabel && (
+                          <span
+                            title="Office this candidate was sent to. Their offer and join approval follow this region."
+                            className="inline-flex cursor-help items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+                          >
+                            <Building2 size={10} /> Joining: {candidate.joiningRegionLabel}
                           </span>
                         )}
                         {activeJob.assessment && String(candidate.assessmentDomain ?? "").trim() && (
@@ -711,7 +796,7 @@ export default function JobDetailPage() {
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    {isHrOrAdmin && candidate.atsStatus === "rejected" && candidate.stage !== "ats-rejected" && candidate.stage !== "rejected" && (
+                    {canRunPipeline && candidate.atsStatus === "rejected" && candidate.stage !== "ats-rejected" && candidate.stage !== "rejected" && (
                       <>
                         <button
                           onClick={() => void atsMarkOk(candidate)}
@@ -729,7 +814,7 @@ export default function JobDetailPage() {
                         </button>
                       </>
                     )}
-                    {isHrOrAdmin ? (
+                    {canRunPipeline ? (
                       <span className="relative inline-flex items-center">
                         <select
                           value={candidate.stage}
@@ -770,23 +855,34 @@ export default function JobDetailPage() {
           <div className="rounded-2xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] dark:bg-[#000000] p-6 shadow-sm">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Quick actions</h3>
             <div className="mt-4 space-y-2.5">
-              <button
-                onClick={() => setModal({ type: "create-candidate", jobId: id })}
-                className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-white transition-all duration-200 hover:opacity-90"
-                style={{ backgroundColor: accent }}
-              >
-                <UserPlus size={16} /> Add Candidate
-              </button>
-              {isHrOrAdmin && (
+              {canRunPipeline ? (
+                <button
+                  onClick={() => setModal({ type: "create-candidate", jobId: id })}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-white transition-all duration-200 hover:opacity-90"
+                  style={{ backgroundColor: accent }}
+                >
+                  <UserPlus size={16} /> Add Candidate
+                </button>
+              ) : (
+                <p className="rounded-lg bg-[var(--c-bg-muted)] px-3 py-2.5 text-[11px] leading-relaxed text-slate-500">
+                  Your main office runs this requisition. You will be able to act on candidates
+                  once they are distributed to your region — the offer and the join approval are
+                  yours.
+                </p>
+              )}
+              {canRunPipeline && (
                 <ActionButton accent={accent} icon={CalendarPlus} label="Schedule Interview" onClick={() => setBulkIvOpen(true)} />
               )}
-              {isHrOrAdmin && (
+              {canRunPipeline && isPanOrRemote && hasDistributeCandidates && (
+                <ActionButton accent={accent} icon={Send} label="Distribute to Region" onClick={() => setDistributeOpen(true)} />
+              )}
+              {canRunPipeline && (
                 <ActionButton accent={accent} icon={Cog} label={atsLoading ? "Scoring…" : "Run ATS Score"} disabled={atsLoading} onClick={() => { if (!atsLoading) void handleRunAts(false); }} />
               )}
-              {isHrOrAdmin && (
+              {canRunPipeline && (
                 <ActionButton accent={accent} icon={Cog} label="Re-score All" disabled={atsLoading} onClick={() => { if (!atsLoading) void handleRunAts(true); }} />
               )}
-              {isHrOrAdmin && (
+              {canRunPipeline && (
                 <ActionButton
                   accent={accent}
                   icon={editWindow.enabled ? (editWindow.expired ? Clock : PencilOff) : Pencil}
@@ -802,7 +898,7 @@ export default function JobDetailPage() {
                   }
                 />
               )}
-              {isHrOrAdmin && editWindow.enabled && !editWindow.expired && (
+              {canRunPipeline && editWindow.enabled && !editWindow.expired && (
                 <button
                   onClick={() => setEditAppsConfirm("disable")}
                   className="w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-xs font-medium text-slate-500 transition hover:bg-[var(--c-bg-muted)] hover:text-slate-700"
@@ -810,7 +906,7 @@ export default function JobDetailPage() {
                   Disable editing now
                 </button>
               )}
-              {isHrOrAdmin && editWindow.enabled && editWindow.closeAt && (
+              {canRunPipeline && editWindow.enabled && editWindow.closeAt && (
                 <p className="rounded-lg bg-[var(--c-bg-muted)] px-3 py-2 text-[11px] text-slate-500">
                   {editWindow.expired ? (
                     <>
@@ -828,26 +924,26 @@ export default function JobDetailPage() {
               {atsDecisionPending && atsLastResult && (
                 <ActionButton accent={accent} icon={Check} label="Review ATS timelines" onClick={() => setAtsResultData(atsLastResult)} />
               )}
-              {isHrOrAdmin && activeJob.assessment && (
+              {canRunPipeline && activeJob.assessment && (
                 <ActionButton accent={accent} icon={Cog} label="Manage Assessment" onClick={() => setAssessmentManagerOpen(true)} />
               )}
-              {isHrOrAdmin && activeJob.assessment && assessmentStats && assessmentStats.total > 0 && (
+              {canRunPipeline && activeJob.assessment && assessmentStats && assessmentStats.total > 0 && (
                 <ActionButton accent={accent} icon={Check} label="Review Assessment Results" onClick={() => { void loadAssessmentStats(); setAssessmentResultsOpen(true); }} />
               )}
               {/* Always offered to HR on an assessment-enabled job. Deliberately not
                   gated on the question bank: an entry point that disappears when
                   data is empty or still loading cannot explain itself, and the
                   modal already handles an empty bank in place. */}
-              {isHrOrAdmin && activeJob.assessment && (
+              {canRunPipeline && activeJob.assessment && (
                 <ActionButton accent={accent} icon={ClipboardCheck} label="Mock Test" onClick={() => setMockTestOpen(true)} />
               )}
-              {isHrOrAdmin && activeJob.status === "closed" && (
+              {canRunPipeline && activeJob.status === "closed" && (
                 <ActionButton accent={accent} icon={Download} label={exporting ? "Exporting…" : "Export Candidates"} disabled={exporting} onClick={() => { void handleExport(); }} />
               )}
-              {isHrOrAdmin && activeJob.assessment && assessmentCandidatesVisible(activeJob.assessmentDate) && (
+              {canRunPipeline && activeJob.assessment && assessmentCandidatesVisible(activeJob.assessmentDate) && (
                 <ActionButton accent={accent} icon={Users} label="Assessment Candidates" onClick={() => { void fetchCandidates({ jobId: id }); setAssessmentCandidatesOpen(true); }} />
               )}
-              {isHrOrAdmin && activeJob.assessment && assessmentResultsUnlocked({ assessment: activeJob.assessment, assessmentDate: activeJob.assessmentDate }) && (
+              {canRunPipeline && activeJob.assessment && assessmentResultsUnlocked({ assessment: activeJob.assessment, assessmentDate: activeJob.assessmentDate }) && (
                 <ActionButton
                   accent={accent}
                   icon={Check}
@@ -861,10 +957,10 @@ export default function JobDetailPage() {
             </div>
 
             <div className="mt-4 space-y-2.5 border-t border-[var(--c-border-light)] dark:border-zinc-800 pt-4">
-              {activeJob.status === "draft" && isAdmin && (
+              {activeJob.status === "draft" && canRunPipeline && (
                 <ActionButton accent={accent} icon={Globe} label="Publish Job" onClick={() => { void updateJob(id, { status: "open" as JobStatus }); }} />
               )}
-              {activeJob.status === "open" && isAdmin && (
+              {activeJob.status === "open" && canRunPipeline && (
                 <ActionButton accent={accent} icon={Archive} label="Close Job" onClick={() => { void updateJob(id, { status: "closed" as JobStatus }); }} />
               )}
               {activeJob.status === "open" && (
@@ -879,9 +975,11 @@ export default function JobDetailPage() {
                   }}
                 />
               )}
-              <ActionButton accent={accent} icon={Pencil} label="Edit job" onClick={() => setModal({ type: "edit-job", jobId: id })} />
+              {canRunPipeline && (
+                <ActionButton accent={accent} icon={Pencil} label="Edit job" onClick={() => setModal({ type: "edit-job", jobId: id })} />
+              )}
               <ActionButton accent={accent} icon={Columns3} label="Kanban board" onClick={() => router.push(`/recruitment/jobs/${id}/board`)} />
-              {activeJob.status !== "open" && (
+              {canRunPipeline && activeJob.status !== "open" && (
                 <ActionButton accent={accent} icon={Trash2} label="Delete job" danger onClick={() => setModal({ type: "delete-job", jobId: id })} />
               )}
             </div>
@@ -972,6 +1070,25 @@ export default function JobDetailPage() {
           data={stageModal}
           onClose={() => setStageModal(null)}
           onConfirm={confirmStageChange}
+        />
+      )}
+      {regionModalTargets && (
+        <BulkRegionModal
+          jobId={id}
+          targets={regionModalTargets}
+          onClose={() => setRegionModalTargets(null)}
+          onDone={handleRegionTransferred}
+        />
+      )}
+      {distributeOpen && (
+        <DistributeCandidateModal
+          jobId={id}
+          candidates={candidates}
+          onClose={() => setDistributeOpen(false)}
+          onDone={(result) => {
+            setDistributeOpen(false);
+            void fetchCandidates({ jobId: id });
+          }}
         />
       )}
       <AtsDecisionModal

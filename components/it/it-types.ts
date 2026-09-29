@@ -94,6 +94,103 @@ export type ItTicket = {
   updatedAt: string;
 };
 
+export type ProcurementStatus =
+  | "PENDING_IT"
+  | "ASSIGNED_IT"
+  | "IT_APPROVED"
+  | "ACCEPTED_FIN"
+  | "DISBURSED"
+  | "REJECTED_IT"
+  | "REJECTED_FIN"
+  | "CANCELLED";
+
+export type ProcurementCategory =
+  | "laptop"
+  | "desktop"
+  | "software"
+  | "electronics"
+  | "internet-service"
+  | "email-service"
+  | "office-resources";
+
+export type ProcurementRequest = {
+  id: string;
+  requestNumber: string;
+  title: string;
+  category: ProcurementCategory;
+  vendor?: string;
+  reason?: string;
+  amount: number;
+  quantity: number;
+  currency: string;
+  status: ProcurementStatus;
+  regionLabel?: string;
+  requester: { id: string; name: string; email: string; role?: string } | string;
+  itAssignedTo: { id: string; name: string; email: string } | null;
+  itReviewedBy?: { id: string; name: string; email: string } | null;
+  financeAssignedTo?: { id: string; name: string; email: string } | null;
+  expense?: { id: string; requestNumber: string; status: string; amount: number; currency: string } | null;
+  itRejectionReason?: string | null;
+  financeRejectionReason?: string | null;
+  cancelReason?: string | null;
+  activity?: ItTicketActivity[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const PROCUREMENT_STATUS_LABELS: Record<ProcurementStatus, string> = {
+  PENDING_IT: "Awaiting IT",
+  ASSIGNED_IT: "With IT",
+  IT_APPROVED: "IT approved",
+  ACCEPTED_FIN: "Accepted",
+  DISBURSED: "Paid",
+  REJECTED_IT: "Rejected by IT",
+  REJECTED_FIN: "Rejected by finance",
+  CANCELLED: "Withdrawn",
+};
+
+export const PROCUREMENT_STATUS_COLORS: Record<ProcurementStatus, string> = {
+  PENDING_IT: "bg-slate-100 text-slate-700",
+  ASSIGNED_IT: "bg-blue-50 text-blue-700",
+  IT_APPROVED: "bg-teal-50 text-teal-700",
+  ACCEPTED_FIN: "bg-indigo-50 text-indigo-700",
+  DISBURSED: "bg-emerald-50 text-emerald-700",
+  REJECTED_IT: "bg-rose-50 text-rose-700",
+  REJECTED_FIN: "bg-rose-50 text-rose-700",
+  CANCELLED: "bg-zinc-100 text-zinc-500",
+};
+
+export const PROCUREMENT_CATEGORY_LABELS: Record<ProcurementCategory, string> = {
+  laptop: "Laptop",
+  desktop: "Desktop",
+  software: "Software",
+  electronics: "Electronic item",
+  "internet-service": "Internet service",
+  "email-service": "Email service",
+  "office-resources": "Office resources",
+};
+
+export const ALL_PROCUREMENT_CATEGORIES: ProcurementCategory[] = [
+  "laptop",
+  "desktop",
+  "software",
+  "electronics",
+  "internet-service",
+  "email-service",
+  "office-resources",
+];
+
+export const ALL_PROCUREMENT_STATUSES: ProcurementStatus[] = [
+  "PENDING_IT",
+  "ASSIGNED_IT",
+  "IT_APPROVED",
+  "ACCEPTED_FIN",
+  "DISBURSED",
+  "REJECTED_IT",
+  "REJECTED_FIN",
+  "CANCELLED",
+];
+
 export type ItCode = {
   id: string;
   code: string;

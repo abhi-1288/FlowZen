@@ -6,6 +6,7 @@ import { User } from "@/models/User";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { isObjectId, jsonError, requireUserId } from "@/lib/api";
+import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
 
 type Params = { params: Promise<{ id: string }> };
 const HR_ROLES = ["admin", "human-resource"];
@@ -19,6 +20,8 @@ export async function POST(request: Request, { params }: Params) {
   await connectDb();
   const user = await User.findById(userId);
   if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  const hq = await requireRecruitmentHQ(user as any);
+  if (!hq.ok) return hq.response;
   if (!user.company) return jsonError("No company found.", 400);
 
   const candidate = await ATSCandidate.findOne({ _id: id, company: user.company });

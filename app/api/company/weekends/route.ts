@@ -5,6 +5,7 @@ import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
+import { effectiveRegionLabelOf } from "@/lib/company-regions";
 
 function normalizeDate(value: string) {
   const date = new Date(value);
@@ -32,16 +33,18 @@ function monthDates(month: string, days: number[]) {
 }
 
 async function getAdminCompany(userId: string) {
-  const user = await User.findById(userId).select("company role");
+  const user = await User.findById(userId).select("company role regionLabel");
   if (!user?.company) return { error: jsonError("User not assigned to company", 400) };
 
   const company = await Company.findById(user.company);
   if (!company) return { error: jsonError("Company not found", 404) };
-  if (String(company.owner) !== String(userId) || String(user.role) !== "admin") {
+  if (String(user.role) !== "admin") {
     return { error: jsonError("Only company admin can manage weekends", 403) };
   }
 
-  return { company };
+  const isOwner = String(company.owner) === String(userId);
+  const adminRegion = effectiveRegionLabelOf(company, user);
+  return { company, isOwner, adminRegion };
 }
 
 export async function POST(request: Request) {
@@ -49,10 +52,20 @@ export async function POST(request: Request) {
   if (!userId) return jsonError("Unauthorized", 401);
 
   await connectDb();
-  const { company, error } = await getAdminCompany(userId);
+  const { company, isOwner, adminRegion, error } = await getAdminCompany(userId);
   if (error) return error;
 
   const body = await request.json();
+
+  // Regional admins may only add weekends for their own region. The owner may
+  // add global weekends (region "") or any region's weekends.
+  const requestedRegion = String(body.region ?? "").trim();
+  let dateRegion = adminRegion;
+  if (isOwner) {
+    dateRegion = requestedRegion || "";
+  } else if (requestedRegion && requestedRegion !== adminRegion) {
+    return jsonError(`You can only add weekends for your own region (${adminRegion}).`, 403);
+  }
 
   // Single date mode
   if (body.date) {
@@ -67,7 +80,7 @@ export async function POST(request: Request) {
     );
 
     if (!existing.has(target.getTime())) {
-      (company as any).weekendDates.push({ date: target, reason: "Manual weekend" });
+      (company as any).weekendDates.push({ date: target, reason: "Manual weekend", region: dateRegion });
       await company.save();
     }
 
@@ -93,7 +106,7 @@ export async function POST(request: Request) {
 
   const additions = dates
     .filter((date) => !existing.has(date.getTime()))
-    .map((date) => ({ date, reason: "Manual weekend" }));
+    .map((date) => ({ date, reason: "Manual weekend", region: dateRegion }));
 
   (company as any).weekendDates.push(...additions);
   await company.save();
@@ -133,16 +146,20 @@ export async function DELETE(request: Request) {
   if (!userId) return jsonError("Unauthorized", 401);
 
   await connectDb();
-  const { company, error } = await getAdminCompany(userId);
+  const { company, isOwner, adminRegion, error } = await getAdminCompany(userId);
   if (error) return error;
 
   const body = await request.json();
   const targetDate = normalizeDate(String(body.date ?? ""));
   if (!targetDate) return jsonError("Date is required.");
 
+  // A regional admin may only delete weekends for their own region; the owner
+  // may delete any. Entries for other regions are left untouched.
   (company as any).weekendDates = ((company as any).weekendDates ?? []).filter((item: any) => {
     const date = normalizeDate(String(item.date));
-    return !date || date.getTime() !== targetDate.getTime();
+    if (!date || date.getTime() !== targetDate.getTime()) return true;
+    if (isOwner) return false;
+    return String(item?.region ?? "").trim() !== adminRegion;
   });
 
   await company.save();

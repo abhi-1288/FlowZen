@@ -5,6 +5,7 @@ import { User } from "@/models/User";
 import { Company } from "@/models/Company";
 import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
+import { effectiveRegionLabelOf } from "@/lib/company-regions";
 
 const formatDate = (date: Date) => date.toLocaleDateString("en-GB");
 
@@ -28,13 +29,21 @@ export async function GET() {
   const company = await Company.findById(user.company);
   if (!company) return jsonError("Company not found", 404);
 
+  // Dates are global ("" / unset) or regional. Everyone sees global dates
+  // plus their own region's dates.
+  const userRegion = effectiveRegionLabelOf(company, user);
+  const inRegion = (d: any) => {
+    const r = String(d?.region ?? "").trim();
+    return !r || !userRegion || r === userRegion;
+  };
+
   return NextResponse.json({
     wfhDays: company.wfhDays ?? 0,
     wfhPeriod: company.wfhPeriod ?? "monthly",
     wfhCheckInMode: company.wfhCheckInMode || "all-day",
     carryForwardWfhDays: company.carryForwardWfhDays ?? false,
-    wfhDates: company.wfhDates || [],
-    weekendDates: company.weekendDates || [],
+    wfhDates: (company.wfhDates || []).filter(inRegion),
+    weekendDates: (company.weekendDates || []).filter(inRegion),
   });
 }
 
@@ -50,11 +59,25 @@ export async function POST(request: Request) {
   const company = await Company.findById(user.company);
   if (!company) return jsonError("Company not found", 404);
 
-  if (String(company.owner) !== String(userId) && user.role !== "human-resource") {
-    return jsonError("Only company owner or HR can manage WFH settings", 403);
+  const isOwner = String(company.owner) === String(userId);
+  const isHr = user.role === "human-resource";
+  const isAdmin = user.role === "admin";
+  if (!isOwner && !isHr && !isAdmin) {
+    return jsonError("Only company owner, HR, or admins can manage WFH settings", 403);
   }
 
-  const { wfhDays, wfhPeriod, mode, startDate, endDate, reason, carryForwardWfhDays } = await request.json();
+  const { wfhDays, wfhPeriod, mode, startDate, endDate, reason, carryForwardWfhDays, region } = await request.json();
+
+  // Regional admins may only add dates for their own region. The owner and HR
+  // may add global dates (region "") or any region's dates.
+  const adminRegion = effectiveRegionLabelOf(company, user);
+  const requestedRegion = String(region ?? "").trim();
+  let dateRegion = adminRegion;
+  if (isOwner || isHr) {
+    dateRegion = requestedRegion || "";
+  } else if (requestedRegion && requestedRegion !== adminRegion) {
+    return jsonError(`You can only add WFH dates for your own region (${adminRegion}).`, 403);
+  }
 
   let quotaUpdated = false;
 
@@ -106,10 +129,10 @@ export async function POST(request: Request) {
   if (startDate) {
     const start = new Date(startDate);
     const end = endDate ? new Date(endDate) : new Date(start);
-    const dates: { date: Date; reason: string }[] = [];
+    const dates: { date: Date; reason: string; region: string }[] = [];
     const current = new Date(start);
     while (current <= end) {
-      dates.push({ date: new Date(current), reason: reason || "" });
+      dates.push({ date: new Date(current), reason: reason || "", region: dateRegion });
       current.setDate(current.getDate() + 1);
     }
     company.wfhDates.push(...dates);
@@ -166,8 +189,11 @@ export async function DELETE(request: Request) {
   const company = await Company.findById(user.company);
   if (!company) return jsonError("Company not found", 404);
 
-  if (String(company.owner) !== String(userId)) {
-    return jsonError("Only company owner can delete WFH dates", 403);
+  const isOwner = String(company.owner) === String(userId);
+  const isHr = user.role === "human-resource";
+  const isAdmin = user.role === "admin";
+  if (!isOwner && !isHr && !isAdmin) {
+    return jsonError("Only company owner, HR, or admins can delete WFH dates", 403);
   }
 
   const { date } = await request.json();
@@ -176,10 +202,15 @@ export async function DELETE(request: Request) {
   const targetDate = new Date(date);
   targetDate.setHours(0, 0, 0, 0);
 
+  // A regional admin may only delete dates for their own region; the owner and
+  // HR may delete any. Entries for other regions are left untouched.
+  const adminRegion = effectiveRegionLabelOf(company, user);
   company.wfhDates = company.wfhDates.filter((d: any) => {
     const dDate = new Date(d.date);
     dDate.setHours(0, 0, 0, 0);
-    return dDate.getTime() !== targetDate.getTime();
+    if (dDate.getTime() !== targetDate.getTime()) return true;
+    if (isOwner || isHr) return false;
+    return String(d?.region ?? "").trim() !== adminRegion;
   });
 
   await company.save();

@@ -6,6 +6,7 @@ import { CompanyPolicy } from "@/models/CompanyPolicy";
 import { User } from "@/models/User";
 import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
+import { effectiveRegionLabelOf } from "@/lib/company-regions";
 
 const ALLOWED_NOTICE_PERIOD_DAYS = new Set([5, 15, 30, 45, 60, 90]);
 const ALLOWED_PAID_LEAVE_PERIODS = new Set(["monthly", "yearly"]);
@@ -22,18 +23,22 @@ export async function GET() {
     throw error;
   }
 
-  const user = await User.findById(userId).select("company companyStatus role");
+  const user = await User.findById(userId).select("company companyStatus role regionLabel");
   if (!user) return jsonError("User not found.", 404);
   if (!user.company || user.companyStatus !== "approved" || !["human-resource", "admin"].includes(String(user.role))) {
     return jsonError("Only approved HR or admins can view policy.", 403);
   }
 
   const company = await Company.findById(user.company).select(
-    "noticePeriodDays paidLeaveDays paidLeavePeriod wfhDays wfhPeriod carryForwardLeaveDays carryForwardWfhDays minWorkHours",
+    "owner noticePeriodDays paidLeaveDays paidLeavePeriod wfhDays wfhPeriod carryForwardLeaveDays carryForwardWfhDays minWorkHours",
   );
-  let policy = await CompanyPolicy.findOne({ company: user.company });
+  const adminRegion = effectiveRegionLabelOf(company, user);
+  let policy = await CompanyPolicy.findOne({ company: user.company, region: adminRegion });
+  if (!policy && adminRegion) {
+    policy = await CompanyPolicy.findOne({ company: user.company, region: "" });
+  }
   if (!policy) {
-    policy = await CompanyPolicy.create({ company: user.company });
+    policy = await CompanyPolicy.create({ company: user.company, region: adminRegion });
   }
 
   return NextResponse.json({
@@ -121,6 +126,19 @@ export async function PATCH(request: Request) {
   const company = await Company.findById(hr.company);
   if (!company) return jsonError("Company not found.", 404);
 
+  // Regional HR/admin may only configure their own region's policy. The company
+  // owner may target any region, or the global policy via region "".
+  const isOwner = String(company.owner) === String(hr._id);
+  const adminRegion = effectiveRegionLabelOf(company, hr);
+  const hasRequestedRegion = Object.prototype.hasOwnProperty.call(body, "region");
+  const requestedRegion = String((body as any).region ?? "").trim();
+  let targetRegion = adminRegion;
+  if (isOwner && hasRequestedRegion) {
+    targetRegion = requestedRegion;
+  } else if (!isOwner && hasRequestedRegion && requestedRegion !== adminRegion) {
+    return jsonError(`You can only configure policies for your own region (${adminRegion}).`, 403);
+  }
+
   if (hasNoticePeriod) company.noticePeriodDays = noticePeriodDays;
   if (hasPaidLeaveDays) company.paidLeaveDays = Math.floor(paidLeaveDays);
   if (hasPaidLeavePeriod) company.paidLeavePeriod = paidLeavePeriod;
@@ -136,7 +154,7 @@ export async function PATCH(request: Request) {
 
   if (Object.keys(settlementFields).length > 0) {
     await CompanyPolicy.findOneAndUpdate(
-      { company: hr.company },
+      { company: hr.company, region: targetRegion },
       { $set: settlementFields },
       { upsert: true },
     );

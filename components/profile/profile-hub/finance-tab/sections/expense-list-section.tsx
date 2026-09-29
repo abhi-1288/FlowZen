@@ -60,6 +60,9 @@ export function ExpenseListSection({
                 <p className="font-medium">{String(expense.title)} x {Number(expense.quantity ?? 1)} - ₹{Number(expense.amount ?? 0).toLocaleString("en-IN")}</p>
                 <p className="text-sm text-slate-500">
                   {displayNested(expense.requester, "name", "Requester")} • {String(expense.category)} • <span className={expStatus === "accepted" ? "text-amber-600 font-semibold" : ""}>{String(expense.status)}{expStatus === "accepted" ? " (Not Disbursed)" : ""}</span>
+                  {expense.procurement ? (
+                    <> • <span className="font-medium text-indigo-600 dark:text-indigo-400">via {displayNested(expense.procurement, "requestNumber", "IT request")}</span></>
+                  ) : null}
                   {expense.assignedTo ? <> • Assigned: {displayNested(expense.assignedTo, "name", "Finance")}</> : null}
                   {expense.forwardedBy ? <> • Forwarded: {displayNested(expense.forwardedBy, "name", "Finance")}</> : null}
                   {expense.rejectionReason ? <> • Reason: {String(expense.rejectionReason)}</> : null}

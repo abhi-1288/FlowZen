@@ -30,9 +30,24 @@ const ATSOfferSchema = new Schema(
     signedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     signedAt: { type: Date, default: null },
     isSigned: { type: Boolean, default: false },
+    // The OFFICE the hire joins, and the region whose head approves the
+    // conversion. Resolved in `candidates/[id]/offer/route.ts` as
+    // `candidate.joiningRegionLabel` -> `job.regionLabel` -> the generating
+    // HR's own region.
+    //
+    // The candidate is now the primary source, which it deliberately was not
+    // before: the bulk transfer in `jobs/[id]/bulk-region/route.ts` assigns the
+    // region, and "send these to Pune, then Pune raises the offer" only holds
+    // if the offer inherits the transfer rather than re-deciding it.
+    //
+    // `officeLocation` is still not a usable source — it is recruiter free text,
+    // not an office label.
+    regionLabel: { type: String, default: "", trim: true, maxlength: 200, index: true },
   },
   { timestamps: true }
 );
+
+ATSOfferSchema.index({ company: 1, regionLabel: 1, status: 1 });
 
 export type ATSOfferDocument = InferSchemaType<typeof ATSOfferSchema>;
 if (process.env.NODE_ENV === "development") {

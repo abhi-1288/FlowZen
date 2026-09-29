@@ -21,6 +21,7 @@ export * from "./LeaveRequest";
 export * from "./Notification";
 export * from "./PushSubscription";
 export * from "./ProjectBudget";
+export * from "./ProcurementRequest";
 export * from "./ResourceRequest";
 export * from "./Task";
 export * from "./Team";

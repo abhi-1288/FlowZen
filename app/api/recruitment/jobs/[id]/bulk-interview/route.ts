@@ -23,6 +23,8 @@ import {
   type VideoProvider,
 } from "@/lib/interview-provider";
 import { assertFlowZenQuota } from "@/lib/interview-quota";
+import { candidateRegionClause } from "@/lib/candidate-region-scope";
+import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
 
 type Params = { params: Promise<{ id: string }> };
 const HR_ROLES = ["admin", "human-resource"];
@@ -45,7 +47,13 @@ export async function POST(request: Request, { params }: Params) {
   await connectDb();
   const user = await User.findById(userId);
   if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  const hq = await requireRecruitmentHQ(user as any);
+  if (!hq.ok) return hq.response;
   if (!user.company) return jsonError("No company found.", 400);
+
+  const companyScope = (await Company.findById(user.company)
+    .select("owner addresses address")
+    .lean()) as any;
 
   const job = await ATSJob.findOne({ _id: id, company: user.company }).select("_id title");
   if (!job) return jsonError("Job not found.", 404);
@@ -67,6 +75,10 @@ export async function POST(request: Request, { params }: Params) {
     _id: { $in: candidateIds },
     job: job._id,
     company: user.company,
+    // Same region boundary as the list this batch was selected from. Without it
+    // a regional recruiter could schedule interviews for another region's
+    // candidates by posting their ids directly.
+    ...candidateRegionClause(companyScope, user),
   }).populate("job", "title");
 
   const byId = new Map<string, any>(candidates.map((c) => [String(c._id), c]));

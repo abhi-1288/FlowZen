@@ -26,13 +26,15 @@ const CompanySchema = new Schema(
     wfhDates: [
       {
         date: { type: Date, index: true },
-        reason: { type: String }
+        reason: { type: String },
+        region: { type: String, default: "", trim: true }
       }
     ],
     weekendDates: [
       {
         date: { type: Date, index: true },
-        reason: { type: String }
+        reason: { type: String },
+        region: { type: String, default: "", trim: true }
       }
     ],
     carryForwardLeaveDays: { type: Boolean, default: false },
@@ -65,6 +67,7 @@ const CompanySchema = new Schema(
       adminHead: { type: Schema.Types.ObjectId, ref: "User" },
       maxHrs: { type: Number, default: null },
       maxAdmins: { type: Number, default: null },
+      pipelineManagers: [{ type: Schema.Types.ObjectId, ref: "User" }],
       createdBy: { type: Schema.Types.ObjectId, ref: "User" }
     }],
     startDate: { type: Date, default: null },

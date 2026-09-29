@@ -8,6 +8,7 @@ import { WfhRequest } from "@/models/WfhRequest";
 import { FinanceSalary } from "@/models/FinanceSalary";
 import { Holiday } from "@/models/Holiday";
 import { Company } from "@/models/Company";
+import { canAccessFinanceRecord } from "../../helpers";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -16,9 +17,10 @@ export async function GET(request: Request, { params }: Params) {
   const userId = await requireUserId();
   if (!userId) return jsonError("Unauthorized", 401);
   await connectDb();
-  const actor = await User.findById(userId).select("role company companyStatus");
+  const actor = await User.findById(userId).select("role company companyStatus regionLabel");
   if (!actor || !actor.company || actor.companyStatus !== "approved") return jsonError("Approved company access is required.", 403);
   if (String(actor.role) !== "finance") return jsonError("Only finance can view member attendance.", 403);
+  if (!(await canAccessFinanceRecord(actor, memberId))) return jsonError("This member is outside your region.", 403);
   const member = await User.findOne({ _id: memberId, company: actor.company, companyStatus: "approved" }).select("name email role baseSalary salaryType hourlyRate dailyRate companyJoined createdAt");
   if (!member) return jsonError("Member not found.", 404);
 

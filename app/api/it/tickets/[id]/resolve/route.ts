@@ -38,12 +38,8 @@ export async function POST(request: Request, { params }: Params) {
     throw error;
   }
 
-  const [actor, ticket] = await Promise.all([
-    User.findById(userId).select("role company companyStatus name"),
-    ITTicket.findById(id),
-  ]);
+  const actor = await User.findById(userId).select("role company companyStatus name");
   if (!actor) return jsonError("User not found.", 404);
-  if (!ticket) return jsonError("Ticket not found.", 404);
   if (!actor.company || actor.companyStatus !== "approved") {
     return jsonError("You must be an approved company member to resolve IT tickets.", 403);
   }
@@ -51,12 +47,14 @@ export async function POST(request: Request, { params }: Params) {
     return jsonError("Only IT staff can resolve IT tickets.", 403);
   }
   if (!RESOLUTION_TYPES.has(resolutionType)) return jsonError("Invalid resolution type.", 400);
-  if (ticket.status !== "IN_PROGRESS" && ticket.status !== "WAITING_FOR_USER" && ticket.status !== "QUEUED" && ticket.status !== "ASSIGNED") {
-    return jsonError(`Cannot resolve ticket from status ${ticket.status}.`, 400);
-  }
 
   const companyId =
     typeof actor.company === "object" && actor.company ? (actor.company as any)._id : actor.company;
+  const ticket = await ITTicket.findOne({ _id: id, company: companyId });
+  if (!ticket) return jsonError("Ticket not found.", 404);
+  if (ticket.status !== "IN_PROGRESS" && ticket.status !== "WAITING_FOR_USER" && ticket.status !== "QUEUED" && ticket.status !== "ASSIGNED") {
+    return jsonError(`Cannot resolve ticket from status ${ticket.status}.`, 400);
+  }
   const isAssigned = ticket.assignedTo ? String(ticket.assignedTo) === userId : false;
   if (String(actor.role) !== "it-admin" && !isAssigned) {
     return jsonError("You can only resolve tickets assigned to you.", 403);
@@ -83,6 +81,6 @@ export async function POST(request: Request, { params }: Params) {
     emitNotification(requesterId);
   }
 
-  const refreshed = await ITTicket.findById(id);
+  const refreshed = await ITTicket.findOne({ _id: id, company: companyId });
   return NextResponse.json({ ticket: serializeDoc(refreshed) });
 }

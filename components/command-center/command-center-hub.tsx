@@ -35,12 +35,18 @@ function formatToday() {
 
 export function CommandCenterHub() {
   const [period, setPeriod] = useState<Period>("7d");
+  // Empty means "whatever the server resolves to" — the viewer's own region,
+  // or the global rollup for an owner who has not picked one. Only meaningful
+  // when the response says `canSwitchRegion`.
+  const [region, setRegion] = useState("");
   const [data, setData] = useState<CommandCenterResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    apiFetch<CommandCenterResponse>(`/api/command-center?period=${period}`, undefined, { toast: false })
+    const params = new URLSearchParams({ period });
+    if (region) params.set("region", region);
+    apiFetch<CommandCenterResponse>(`/api/command-center?${params}`, undefined, { toast: false })
       .then((res) => {
         if (!cancelled) setData(res);
       })
@@ -51,9 +57,14 @@ export function CommandCenterHub() {
     return () => {
       cancelled = true;
     };
-  }, [period]);
+  }, [period, region]);
 
-  const title = data?.companyName ? `${data.companyName} Command Centre` : "Command Centre";
+  const scopedToRegion = data?.regionScope === "region";
+  const title = data?.companyName
+    ? `${data.companyName} ${scopedToRegion ? data.regionLabel : ""} Command Centre`
+        .replace(/\s+/g, " ")
+        .trim()
+    : "Command Centre";
 
   if (loading || !data) {
     return (
@@ -73,6 +84,31 @@ export function CommandCenterHub() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {data.canSwitchRegion && data.regionOptions.length > 0 ? (
+            <select
+              aria-label="Region"
+              // With no explicit pick the server resolves to the viewer's own
+              // region. The owner resolves to the global rollup instead, which
+              // is why "All offices" is the "" option there and absent here.
+              value={region || (data.allowGlobalRegion ? "" : data.region)}
+              onChange={(e) => {
+                setLoading(true);
+                setRegion(e.target.value);
+              }}
+              className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+            >
+              {data.allowGlobalRegion ? <option value="">All offices</option> : null}
+              {data.regionOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-zinc-800 dark:text-zinc-300">
+              {scopedToRegion ? data.regionLabel : "All offices"}
+            </span>
+          )}
           <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
             {data.variantLabel}
           </span>
@@ -97,6 +133,18 @@ export function CommandCenterHub() {
           </div>
         </div>
       </div>
+
+      {data.regionFallback ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          No members in {data.regionLabel}, so these numbers cover the whole company.
+        </p>
+      ) : null}
+
+      {data.regionForced ? (
+        <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-400">
+          These numbers are limited to {data.regionLabel}.
+        </p>
+      ) : null}
 
       <KpiCards kpis={data.kpis} />
 

@@ -1,47 +1,43 @@
 import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { ATSCandidate } from "@/models/ATSCandidate";
-import { User } from "@/models/User";
-import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
+import { withCandidateAccess } from "@/lib/recruitment-candidate-access";
+import { jsonError, serializeDoc } from "@/lib/api";
 
 type Params = { params: Promise<{ id: string }> };
-const HR_ROLES = ["admin", "human-resource"];
-const ALL_ROLES = [...HR_ROLES, "project-manager", "qa-tester", "finance"];
 
 export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
-  const userId = await requireUserId();
-  if (!userId) return jsonError("Unauthorized", 401);
-  if (!isObjectId(id)) return jsonError("Invalid candidate id.");
+  const access = await withCandidateAccess(id, "read");
+  if (!access.ok) return access.response;
+  const { candidate } = access;
 
-  await connectDb();
-  const user = await User.findById(userId);
-  const isSeniorSecurity = user?.role === "security" && Boolean((user as any).isSeniorSecurity);
-  if (!user || (!ALL_ROLES.includes(user.role) && !isSeniorSecurity)) return jsonError("Forbidden", 403);
-  if (!user.company) return jsonError("No company found.", 400);
-
-  const candidate = await ATSCandidate.findOne({ _id: id, company: user.company })
+  const populated = await ATSCandidate.findById(candidate._id)
     .populate("assignedRecruiter", "name email")
     .populate("assignedTeam.user", "name email")
     .populate("job", "title department location")
     .populate("notes.author", "name email");
 
-  if (!candidate) return jsonError("Candidate not found.", 404);
-
-  return NextResponse.json({ candidate: serializeDoc(candidate) });
+  return NextResponse.json({ candidate: serializeDoc(populated!) });
 }
 
 export async function PATCH(request: Request, { params }: Params) {
   const { id } = await params;
-  const userId = await requireUserId();
-  if (!userId) return jsonError("Unauthorized", 401);
-  if (!isObjectId(id)) return jsonError("Invalid candidate id.");
+  const access = await withCandidateAccess(id, "write");
+  if (!access.ok) return access.response;
+  const { user } = access;
 
   const body = await request.json();
   const allowedFields = [
     "firstName", "lastName", "email", "phone", "currentCompany", "experienceYears",
     "currentCTC", "expectedCTC", "noticePeriod", "source", "rating",
     "portfolioUrl", "linkedInUrl", "assignedRecruiter", "dob", "address",
+    // The candidate's detected STATE. Free text on purpose — it is written by
+    // `detect-regions` from the candidate's own address, and the "State" filter
+    // matches whatever was detected. It is deliberately NOT the joining region:
+    // `joiningRegionLabel` is absent from this allowlist so the bulk transfer
+    // endpoint stays the only writer and the offer can keep inheriting one
+    // source of truth.
     "regionLabel",
   ];
   const updates: Record<string, unknown> = {};
@@ -49,17 +45,12 @@ export async function PATCH(request: Request, { params }: Params) {
     if (body[field] !== undefined) updates[field] = body[field];
   }
 
-  await connectDb();
-  const user = await User.findById(userId);
-  if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
-  if (!user.company) return jsonError("No company found.", 400);
-
   // Handle structured notes
   if (body.notes && typeof body.notes === "object") {
     if (body.notes.action === "add") {
       const updateResult = await ATSCandidate.findOneAndUpdate(
         { _id: id, company: user.company },
-        { $push: { notes: { author: userId, content: String(body.notes.content).trim(), createdAt: new Date() } } },
+        { $push: { notes: { author: user._id, content: String(body.notes.content).trim(), createdAt: new Date() } } },
         { new: true }
       )
         .populate("assignedRecruiter", "name email")
@@ -76,7 +67,7 @@ export async function PATCH(request: Request, { params }: Params) {
           job: updateResult.job,
           action: "note-added",
           metadata: { note: String(body.notes.content).trim().slice(0, 100) },
-          actor: userId,
+          actor: user._id,
           company: user.company,
         });
       } catch { /* best-effort */ }
@@ -86,7 +77,7 @@ export async function PATCH(request: Request, { params }: Params) {
 
     if (body.notes.action === "delete" && body.notes.noteId) {
       const updateResult = await ATSCandidate.findOneAndUpdate(
-        { _id: id, company: user.company, "notes._id": body.notes.noteId, "notes.author": userId },
+        { _id: id, company: user.company, "notes._id": body.notes.noteId, "notes.author": user._id },
         { $pull: { notes: { _id: body.notes.noteId } } },
         { new: true }
       )
@@ -115,17 +106,16 @@ export async function PATCH(request: Request, { params }: Params) {
 
 export async function DELETE(_request: Request, { params }: Params) {
   const { id } = await params;
-  const userId = await requireUserId();
-  if (!userId) return jsonError("Unauthorized", 401);
-  if (!isObjectId(id)) return jsonError("Invalid candidate id.");
+  // Deletion stays admin-only, so the reader gate resolves the region boundary
+  // and the role is re-checked here.
+  const access = await withCandidateAccess(id, "read");
+  if (!access.ok) return access.response;
+  const { user } = access;
+
+  if (user.role !== "admin") return jsonError("Forbidden", 403);
 
   await connectDb();
-  const user = await User.findById(userId);
-  if (!user || user.role !== "admin") return jsonError("Forbidden", 403);
-  if (!user.company) return jsonError("No company found.", 400);
-
-  const candidate = await ATSCandidate.findOneAndDelete({ _id: id, company: user.company });
-  if (!candidate) return jsonError("Candidate not found.", 404);
+  await ATSCandidate.findOneAndDelete({ _id: id, company: user.company });
 
   return NextResponse.json({ ok: true });
 }

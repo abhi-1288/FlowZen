@@ -1,5 +1,23 @@
 import { Schema, model, models, type InferSchemaType } from "mongoose";
 
+/**
+ * Advisory approvers on a document letter. `approver` remains the single
+ * required primary (HR) approver; these are the optional extra signatures a
+ * nominated co-approver can give as soon as they are listed, or any time after.
+ * They never block issuance — see `lib/document-letter-approvers.ts`.
+ */
+const SignatorySchema = new Schema(
+  {
+    user: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    slot: { type: String, enum: ["team-owner", "secondary"], required: true },
+    name: { type: String, default: "" },
+    role: { type: String, default: "" },
+    status: { type: String, enum: ["pending", "signed", "declined"], default: "pending" },
+    signedAt: { type: Date, default: null },
+  },
+  { _id: false },
+);
+
 const JoinRequestSchema = new Schema(
   {
     requester: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
@@ -13,6 +31,7 @@ const JoinRequestSchema = new Schema(
     noticeEndedNotifiedAt: { type: Date, default: null, index: true },
     cancelReason: { type: String, default: "" },
     cancelledAt: { type: Date, default: null, index: true },
+    signatories: { type: [SignatorySchema], default: [] },
     metadata: { type: Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
@@ -23,6 +42,8 @@ JoinRequestSchema.index(
   { requester: 1, company: 1, kind: 1, "metadata.letterType": 1, status: 1 },
   { unique: true, partialFilterExpression: { status: "pending" } }
 );
+// Serves the "letters awaiting your signature" inbox query.
+JoinRequestSchema.index({ "signatories.user": 1, "signatories.status": 1 });
 
 export type JoinRequestDocument = InferSchemaType<typeof JoinRequestSchema>;
 

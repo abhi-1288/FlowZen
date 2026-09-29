@@ -12,6 +12,7 @@ import {
   MAX_NOISE_THRESHOLD_DB,
   MIN_NOISE_THRESHOLD_DB,
 } from "@/lib/assessment-proctoring";
+import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
 
 const HR_ROLES = ["admin", "human-resource"];
 
@@ -50,6 +51,8 @@ export async function GET(_request: Request, { params }: Params) {
   await connectDb();
   const user = await User.findById(userId);
   if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  const hq = await requireRecruitmentHQ(user as any);
+  if (!hq.ok) return hq.response;
   if (!user.company) return jsonError("No company found.", 400);
 
   const job = await ATSJob.findOne({ _id: id, company: user.company }).select("assessment assessmentDate assessmentDurationMinutes");
@@ -123,6 +126,8 @@ export async function POST(request: Request, { params }: Params) {
   await connectDb();
   const user = await User.findById(userId);
   if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  const hq = await requireRecruitmentHQ(user as any);
+  if (!hq.ok) return hq.response;
   if (!user.company) return jsonError("No company found.", 400);
 
   const job = await ATSJob.findOne({ _id: id, company: user.company });

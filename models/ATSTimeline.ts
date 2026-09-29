@@ -16,6 +16,10 @@ const ATSTimelineSchema = new Schema(
         "offer-rejected",
         "offer-recalled",
         "stage-changed",
+        // Written by app/api/recruitment/jobs/[id]/bulk-region/route.ts when a
+        // batch of candidates is transferred to a region. metadata carries
+        // { regionLabel, previousRegionLabel, movedCount }.
+        "region-assigned",
         "joined",
         "rejected",
         "note-added",

@@ -359,10 +359,41 @@ export function PersonalInfoSection({
         ) : null}
         <Row label="Unique Identity" value={profile?.companyIdentityCode ? String(profile.companyIdentityCode) : undefined} />
         {profile?.employmentEndDate ? (
-          <Row
-            label="Employment Period"
-            value={`${profile.employmentType ? String(profile.employmentType).replace(/-/g, " ") : ""}${profile.durationMonths ? ` · ${profile.durationMonths} months` : ""} · ${profile.companyJoined ? new Date(String(profile.companyJoined)).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "?"} — ${new Date(String(profile.employmentEndDate)).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`}
-          />
+          (() => {
+            // After a disconnect `companyJoined` is nulled, so fall back to the
+            // start date reconstructed from `membershipHistory`. Build the
+            // descriptor from the parts that exist so an empty employment type
+            // or missing duration cannot leave a dangling " · ".
+            const previous = profile?.previousEmployment as
+              | { joined?: string | null; ended?: string | null }
+              | undefined;
+            const fmt = (value: unknown) =>
+              new Date(String(value)).toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              });
+            const descriptor = [
+              profile.employmentType ? String(profile.employmentType).replace(/-/g, " ") : "",
+              profile.durationMonths ? `${profile.durationMonths} months` : "",
+            ]
+              .filter(Boolean)
+              .join(" · ");
+            const start = profile.companyJoined
+              ? fmt(profile.companyJoined)
+              : previous?.joined
+                ? fmt(previous.joined)
+                : null;
+            const period = start
+              ? `${start} — ${fmt(profile.employmentEndDate)}`
+              : fmt(profile.employmentEndDate);
+            return (
+              <Row
+                label="Employment Period"
+                value={descriptor ? `${descriptor} · ${period}` : period}
+              />
+            );
+          })()
         ) : null}
       </dl>
       {Array.isArray(profile?.roleHistory) && profile.roleHistory.length > 0 ? (

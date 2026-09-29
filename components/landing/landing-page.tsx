@@ -42,7 +42,7 @@ const jsonLd = {
   applicationCategory: "BusinessApplication",
   operatingSystem: "Web",
   description:
-    "All-in-one workflow platform for managing kanban boards, attendance, finance, HR, recruitment, IT support, and chat.",
+    "All-in-one workflow platform for managing kanban boards, attendance, finance, HR, document letters, recruitment, IT support, and chat.",
   offers: {
     "@type": "Offer",
     price: "0",
@@ -58,6 +58,7 @@ const jsonLd = {
     "Attendance Tracking",
     "Finance & Invoicing",
     "HR Module",
+    "Document Letters & Co-signatures",
     "Recruitment Pipeline",
     "Team Chat",
     "IT Support Helpdesk",

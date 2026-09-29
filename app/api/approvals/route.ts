@@ -7,7 +7,8 @@ import { Notification } from "@/models/Notification";
 import { Team } from "@/models/Team";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
-import { listApprovedHrUserIds } from "@/lib/join-approvers";
+import { listApprovedHrUserIds, findApprovedApproverIdForRequester, requesterRegionScope } from "@/lib/join-approvers";
+import { DOCUMENT_LETTER_APPROVER_ROLES, effectiveRegionLabelOf, isUserInEffectiveRegion } from "@/lib/company-regions";
 
 type RequestDoc = Record<string, any>;
 
@@ -45,7 +46,7 @@ export async function GET() {
   try {
     await connectDb();
 
-    const actor = await User.findById(userId).select("role company companyStatus");
+    const actor = await User.findById(userId).select("role company companyStatus regionLabel");
     if (!actor) return jsonError("User not found.", 404);
 
     const directRequests = await JoinRequest.find({ 
@@ -70,22 +71,38 @@ export async function GET() {
         .map((request) => request.requester)
         .filter(Boolean);
       const requesters = await User.find({ _id: { $in: requesterIds } })
-        .select("name email role")
+        .select("name email role regionLabel")
         .lean();
       const rolesByUserId = new Map(requesters.map((requester) => [String(requester._id), String(requester.role ?? "")]));
+      const requesterById = new Map(
+        requesters.map((requester) => [String(requester._id), requester as RequestDoc]),
+      );
+
+      // Region scope: a regional admin only sees requests from requesters in
+      // their own region. The company owner keeps the company-wide view, and a
+      // company with no region config is unaffected.
+      const adminCompany = await Company.findById(actor.company)
+        .select("owner addresses address")
+        .lean() as RequestDoc | null;
+      const ownerId = adminCompany?.owner ?? null;
+      const isOwner = ownerId != null && String(ownerId) === String(actor._id);
+      const adminRegion = effectiveRegionLabelOf(adminCompany, actor);
+      const scopeAdminToRegion = Boolean(adminRegion) && !isOwner;
 
       const adminVisibleRequests = companyPendingRequests.filter((request) => {
         const requesterRole = rolesByUserId.get(String(request.requester ?? ""));
+        let roleVisible;
         if (["quit-company-board-transfer", "role-transfer"].includes(String(request.kind))) {
-          return true;
+          roleVisible = true;
+        } else if (String(request.kind) === "identity-code") {
+          roleVisible = requesterRole === "human-resource";
+        } else {
+          roleVisible = requesterRole === "admin" || requesterRole === "human-resource";
         }
-        if (String(request.kind) === "identity-code") {
-          return requesterRole === "human-resource";
-        }
-        if (requesterRole === "admin") {
-          return true;
-        }
-        return requesterRole === "human-resource";
+        if (!roleVisible) return false;
+        if (!scopeAdminToRegion) return true;
+        const requester = requesterById.get(String(request.requester ?? ""));
+        return isUserInEffectiveRegion(adminCompany, adminRegion, requester);
       });
 
       requests = [...requests, ...adminVisibleRequests].filter((request, index, all) => {
@@ -111,11 +128,36 @@ export async function GET() {
         .map((request) => request.requester)
         .filter(Boolean);
       const requesters = await User.find({ _id: { $in: requesterIds } })
-        .select("name email role")
+        .select("name email role regionLabel")
         .lean();
-      const rolesByUserId = new Map(requesters.map((requester) => [String(requester._id), String(requester.role ?? "")]));
+      const requesterById = new Map(
+        requesters.map((requester) => [String(requester._id), requester as RequestDoc]),
+      );
 
-      requests = [...directRequests, ...hrCompanyRequests.filter((request) => rolesByUserId.get(String(request.requester ?? "")) !== "human-resource")]
+      // Document letters are region-scoped: an HR only sees letters from their
+      // own region (falling back to the company-wide list if the region has no
+      // approver at all). `quit-company` is unaffected.
+      const { region: hrRegion, clause: regionClause, company: regionCompany } =
+        await requesterRegionScope(actor.company, actor);
+      const regionHasLetterApprover = regionClause
+        ? await findApprovedApproverIdForRequester({
+            companyId: String(actor.company),
+            roles: DOCUMENT_LETTER_APPROVER_ROLES,
+            regionClause,
+          })
+        : null;
+      const scopeLettersToRegion = Boolean(regionClause) && Boolean(regionHasLetterApprover);
+
+      const visibleHrRequests = hrCompanyRequests.filter((request) => {
+        const requester = requesterById.get(String(request.requester ?? ""));
+        if (String(requester?.role ?? "") === "human-resource") return false;
+        if (String(request.kind) === "document-letter" && scopeLettersToRegion) {
+          return isUserInEffectiveRegion(regionCompany, hrRegion, requester);
+        }
+        return true;
+      });
+
+      requests = [...directRequests, ...visibleHrRequests]
         .filter((request, index, all) => {
           const id = String(request._id);
           return all.findIndex((r) => String(r._id) === id) === index;
@@ -154,6 +196,34 @@ export async function GET() {
           (request) => !issuedRequestIds.some((id) => String(id) === String(request._id)),
         );
       }
+    }
+
+    // Letters this user is listed to co-sign. A nominated signatory is listed as
+    // soon as the request is made, not only once it is issued, otherwise the
+    // "you may sign later" notification points at nothing and the letter is
+    // invisible until HR acts. Signing is also open before issuance, so
+    // `signatureReady` is not an access gate — it only says whether the letter
+    // page needs `?draft=1` to render at all.
+    const signatureRequests = await JoinRequest.find({
+      kind: "document-letter",
+      // A rejected letter never collects signatures.
+      status: { $in: ["pending", "hr-approved", "approved"] },
+      signatories: { $elemMatch: { user: userId, status: "pending" } },
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (signatureRequests.length > 0) {
+      // No slot is needed: the PATCH matches the caller by user id.
+      const decorated = signatureRequests.map((request) => ({
+        ...request,
+        signatoryView: true,
+        signatureReady: String(request.status) === "approved",
+      }));
+      requests = [...requests, ...decorated].filter((request, index, all) => {
+        const id = String(request._id);
+        return all.findIndex((r) => String(r._id) === id) === index;
+      });
     }
 
     for (const request of requests) {

@@ -13,15 +13,7 @@ export async function GET() {
   try {
     await connectDb();
     const user = await User.findById(userId).select("company companyStatus documents");
-    if (!user || !user.company || user.companyStatus !== "approved")
-      return jsonError("Approved company access is required.", 403);
-
-    const company = await Company.findById(user.company).select("requiredDocuments");
-    const categories = (company?.requiredDocuments ?? []).map((c: any) => ({
-      name: String(c.name),
-      mandatory: Boolean(c.mandatory),
-      fields: Array.isArray(c.fields) ? c.fields.map((f: any) => ({ label: String(f.label), type: String(f.type) })) : [],
-    }));
+    if (!user) return jsonError("User not found.", 404);
 
     const uploaded = (user.documents ?? []).map((d: any) => ({
       category: String(d.category),
@@ -33,7 +25,23 @@ export async function GET() {
       fieldValues: Array.isArray(d.fieldValues) ? d.fieldValues.map((fv: any) => ({ label: String(fv.label), value: String(fv.value) })) : [],
     }));
 
-    return NextResponse.json({ categories, documents: uploaded });
+    // A member who has been disconnected has no company to read the required
+    // categories from, but their own uploaded files are immutable history and
+    // the blob keys are not company-scoped, so they stay downloadable. Hand
+    // back the files read-only: POST and DELETE below still require an approved
+    // company, so an ex-member can neither upload nor delete.
+    if (!user.company || user.companyStatus !== "approved") {
+      return NextResponse.json({ categories: [], documents: uploaded, readOnly: true });
+    }
+
+    const company = await Company.findById(user.company).select("requiredDocuments");
+    const categories = (company?.requiredDocuments ?? []).map((c: any) => ({
+      name: String(c.name),
+      mandatory: Boolean(c.mandatory),
+      fields: Array.isArray(c.fields) ? c.fields.map((f: any) => ({ label: String(f.label), type: String(f.type) })) : [],
+    }));
+
+    return NextResponse.json({ categories, documents: uploaded, readOnly: false });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Something went wrong.";
     return jsonError(message, 500);

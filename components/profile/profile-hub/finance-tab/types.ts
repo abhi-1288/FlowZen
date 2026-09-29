@@ -86,7 +86,8 @@ export type BudgetForm = {
 };
 
 export type ExpenseForm = {
-  category: string;
+  /** Travel is the only expense a member can raise here; purchases go to /profile/it. */
+  category: "travel";
   title: string;
   amount: string;
   quantity: string;
@@ -98,6 +99,10 @@ export type FinanceData = {
   month: string;
   canManage: boolean;
   monthEndGenerated: boolean;
+  /** Actor's effective region; "" when the company has no region configured. */
+  region: string;
+  /** True when no regional boundary applied and the view is company-wide. */
+  regionFallback: boolean;
   dashboard: FinanceDashboard;
   salaries: AnyRecord[];
   expenses: AnyRecord[];
@@ -105,6 +110,8 @@ export type FinanceData = {
   boards: AnyRecord[];
   members: AnyRecord[];
   financeMembers: AnyRecord[];
+  /** Company-wide admin/HR/finance identities; not region scoped. */
+  people: AnyRecord[];
 };
 
 export type RejectTarget = {

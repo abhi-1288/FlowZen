@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { FileText } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
+import { pendingSignatureSummary, signatoryCompletion } from "@/lib/document-letter-signatories";
 
 type AnyRecord = Record<string, any>;
 
@@ -63,6 +64,7 @@ export function MyLetters({ currentUserId }: { currentUserId: string }) {
             const status = String(req.status ?? "");
             const reqId = String(req._id ?? req.id ?? "");
             const isApproved = status === "approved";
+            const completion = signatoryCompletion((req as AnyRecord).signatories);
             return (
               <div
                 key={reqId}
@@ -89,6 +91,16 @@ export function MyLetters({ currentUserId }: { currentUserId: string }) {
                     >
                       {status}
                     </span>
+                    {status === "approved" && pendingSignatureSummary((req as AnyRecord).signatories) ? (
+                      <span className="ml-2 inline-block rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-indigo-700">
+                        Awaiting {pendingSignatureSummary((req as AnyRecord).signatories)}
+                      </span>
+                    ) : null}
+                    {status === "approved" && completion.complete ? (
+                      <span className="ml-2 inline-block rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-emerald-700">
+                        Fully signed
+                      </span>
+                    ) : null}
                   </p>
                 </div>
                 <div className="flex gap-2">

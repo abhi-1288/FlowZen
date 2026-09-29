@@ -16,8 +16,13 @@ export function JobsTab() {
   const router = useRouter();
   const { data: session } = useSession();
   const role = session?.user?.role ?? "";
-  const isAdmin = role === "admin";
-  const isHr = role === "human-resource";
+  // Raising a requisition is the pipeline owner's job, not merely an HR/admin one.
+  // A regional HR reaches this tab and sees every job in the company; without
+  // this they would find a "New Job" button, fill the whole form, and be refused
+  // on submit. The session flag is refreshed with the token, so revoking a
+  // delegation takes effect at the next refresh rather than instantly — which is
+  // why the server re-derives it on every write.
+  const canCreateJobs = Boolean(session?.user?.isRecruitmentHQ);
   const { jobs, loading, totalJobs, fetchJobs, updateJob, setModal } = useRecruitmentStore(
     useShallow((s) => ({ jobs: s.jobs, loading: s.loading, totalJobs: s.totalJobs, fetchJobs: s.fetchJobs, updateJob: s.updateJob, setModal: s.setModal }))
   );
@@ -67,12 +72,18 @@ export function JobsTab() {
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-zinc-100">Job Openings</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">{mounted ? totalJobs : "\u00A0"} jobs</p>
         </div>
-        <button suppressHydrationWarning
-          onClick={() => setModal({ type: "create-job" })}
-          className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
-        >
-          + New Job
-        </button>
+        {canCreateJobs ? (
+          <button suppressHydrationWarning
+            onClick={() => setModal({ type: "create-job" })}
+            className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+          >
+            + New Job
+          </button>
+        ) : (
+          <p className="max-w-xs text-right text-xs text-slate-400 dark:text-zinc-500">
+            Requisitions are raised by your main office.
+          </p>
+        )}
       </div>
 
       <section>
@@ -171,14 +182,16 @@ export function JobsTab() {
                   >
                     <Eye size={14} /> View
                   </button>
-                  <button suppressHydrationWarning
-                    onClick={() => { setModal({ type: "edit-job", jobId: job.id }); }}
-                    className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                  >
-                    <Pencil size={14} /> Edit
-                  </button>
+                  {canCreateJobs && (
+                    <button suppressHydrationWarning
+                      onClick={() => { setModal({ type: "edit-job", jobId: job.id }); }}
+                      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                    >
+                      <Pencil size={14} /> Edit
+                    </button>
+                  )}
                   <div className="ml-auto flex flex-wrap items-center gap-2">
-                    {job.status === "draft" && isAdmin && (
+                    {job.status === "draft" && canCreateJobs && (
                       <button suppressHydrationWarning
                         onClick={() => { void updateJob(job.id, { status: "open" as JobStatus }); }}
                         className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-medium text-white hover:bg-emerald-700"
@@ -199,7 +212,7 @@ export function JobsTab() {
                         {copiedJobId === job.id ? <Check size={14} /> : <Share2 size={14} />} {copiedJobId === job.id ? "Copied" : "Share"}
                       </button>
                     )}
-                    {job.status === "open" && isAdmin && (
+                    {job.status === "open" && canCreateJobs && (
                       <button suppressHydrationWarning
                         onClick={() => { void updateJob(job.id, { status: "closed" as JobStatus }); }}
                         className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-rose-200 px-3 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:border-rose-900 dark:text-rose-400 dark:hover:bg-rose-950"
@@ -207,7 +220,7 @@ export function JobsTab() {
                         <Globe size={14} /> Close
                       </button>
                     )}
-                    {(job.status === "closed" || job.status === "draft") && <button suppressHydrationWarning
+                    {canCreateJobs && (job.status === "closed" || job.status === "draft") && <button suppressHydrationWarning
                       onClick={() => setModal({ type: "delete-job", jobId: job.id })}
                       className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-red-200 px-3 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
                     >

@@ -6,13 +6,11 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import {
-  AlertCircle,
   Bell,
   Briefcase,
   Building2,
   Calendar,
   CalendarCheck,
-  CheckCircle2,
   CheckSquare,
   ChevronRight,
   ClipboardList,
@@ -202,10 +200,6 @@ export function ProfileHub() {
   const [notificationFromDate, setNotificationFromDate] = useState("");
   const [notificationToDate, setNotificationToDate] = useState("");
   const [unreadCount, setUnreadCount] = useState(0);
-  const [toast, setToast] = useState<{
-    text: string;
-    type: "success" | "error";
-  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [attendanceHistory, setAttendanceHistory] = useState<AnyRecord[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<AnyRecord[]>([]);
@@ -267,6 +261,25 @@ export function ProfileHub() {
     profile?.company && profile?.companyStatus === "approved",
   );
   const actorIsSeniorSecurity = role === "security" && Boolean((session?.user as any)?.isSeniorSecurity);
+  const actorRegionLabel = String(profile?.regionLabel ?? "").trim();
+  const companyOwnerId = company?.owner ? String(company.owner) : "";
+  const actorIsCompanyOwner = Boolean(companyOwnerId) && companyOwnerId === String(session?.user?.id ?? profile?.id ?? "");
+  // Describes region *access*, not the person's role. "Global admin" read as a
+  // job title and made an owner scoped to one office look like they had lost
+  // their admin rights; the scope the command centre actually applies is what
+  // belongs here.
+  const adminRegionBadge = ["admin", "finance"].includes(String(role))
+    ? actorIsCompanyOwner
+      ? "All regions"
+      : actorRegionLabel
+        ? `Scoped to ${actorRegionLabel}`
+        : "Region not set"
+    : null;
+  const adminRegionBadgeTitle = actorIsCompanyOwner
+    ? "Company owner — can view every region and the company-wide rollup."
+    : actorRegionLabel
+      ? "Limited to this one region. There is no way to widen it from the UI."
+      : "No region is set on your profile, so there is nothing to scope to.";
   const canViewMembersTab = hasCompany && (["human-resource", "admin", "finance"].includes(String(role)) || actorIsSeniorSecurity);
   const canCreatePass = role !== "employee" && (role !== "security" || actorIsSeniorSecurity);
   const canViewVisitorsTab = hasCompany && canCreatePass;
@@ -274,6 +287,11 @@ export function ProfileHub() {
   const canViewSecurityTab = hasCompany && ["human-resource", "admin", "security"].includes(String(role));
   const canViewCompanyTabs = hasCompany;
   const canViewGamesTab = hasCompany;
+  // A member who has been disconnected loses every company tab, including
+  // Documents. Their own uploads are immutable history, so give them back a
+  // read-only Documents tab — but only when there is actually something to show.
+  const canViewArchivedDocumentsTab =
+    !hasCompany && Number(profile?.documentCount ?? 0) > 0;
   const mobileTabs: Tab[] = [
     "command-center",
     "profile",
@@ -283,7 +301,7 @@ export function ProfileHub() {
     ...(canViewVisitorsTab ? (["visitors"] as Tab[]) : []),
     ...(canViewSecurityTab ? (["security"] as Tab[]) : []),
     "careers",
-    ...(canViewCompanyTabs ? (["documents"] as Tab[]) : []),
+    ...(canViewCompanyTabs || canViewArchivedDocumentsTab ? (["documents"] as Tab[]) : []),
     ...(canViewCompanyTabs ? (["messages"] as Tab[]) : []),
     ...(canViewFinanceTab ? (["finance"] as Tab[]) : []),
     ...(canViewFinanceTab && ["finance", "admin"].includes(String(role)) ? (["finance-policy"] as Tab[]) : []),
@@ -296,15 +314,17 @@ export function ProfileHub() {
     ...(canViewCompanyTabs ? (["it"] as Tab[]) : []),
   ];
 
-  const { showNotificationToast, showErrorToast } = useNotificationToast();
+  const { showNotificationToast, showSuccessToast, showErrorToast } = useNotificationToast();
 
+  // Both branches go to the shared, portaled toast host so toasts stay visible
+  // above any open modal. The signature is unchanged because ~40 tab/section
+  // components receive this as a prop.
   const showToast = (text: string, type: "success" | "error" = "success") => {
     if (type === "error") {
       showErrorToast(text);
       return;
     }
-    setToast({ text, type });
-    setTimeout(() => setToast(null), 4000);
+    showSuccessToast(text);
   };
 
   const setMessage = (text: string) => showToast(text, "success");
@@ -707,6 +727,22 @@ export function ProfileHub() {
           }
         }
 
+        if (item.action === "region-corrected") {
+          const from = String(item.fromRegionLabel ?? "").trim();
+          const to = String(item.toRegionLabel ?? "").trim();
+          if (to) {
+            return {
+              title: "Region Corrected",
+              body: from
+                ? `Region changed from ${from} to ${to}${
+                    item.reason ? ` — ${item.reason}` : ""
+                  }`
+                : `Region set to ${to}${item.reason ? ` — ${item.reason}` : ""}`,
+              date: item.at ? String(item.at) : undefined,
+            };
+          }
+        }
+
         const actionLabels: Record<string, string> = {
           "joined-company": "Joined company",
           "joined-team": "Joined team",
@@ -804,7 +840,17 @@ export function ProfileHub() {
           {canViewMembersTab || canViewCompanyTabs ? (
             <>
               <div className="neu-divider my-2" />
-              <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Admin</p>
+              <div className="mb-1 flex items-center justify-between gap-2 px-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Admin</p>
+                {adminRegionBadge ? (
+                  <span
+                    title={adminRegionBadgeTitle}
+                    className="rounded-md bg-[var(--c-bg-muted)] px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-zinc-700 dark:text-zinc-400"
+                  >
+                    {adminRegionBadge}
+                  </span>
+                ) : null}
+              </div>
             </>
           ) : null}
           {canViewMembersTab ? (
@@ -1076,28 +1122,6 @@ export function ProfileHub() {
             <ProfileSkeleton />
           ) : (
             <>
-              {toast && (
-                <div
-                  className={`fixed bottom-8 left-1/2 z-[1000] -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4 duration-300`}
-                >
-                  <div
-                    className={`flex items-center gap-2.5 rounded-xl px-5 py-3 shadow-lg ${toast.type === "success"
-                      ? "bg-emerald-600 text-white dark:bg-emerald-500"
-                      : "bg-rose-600 text-white dark:bg-rose-500"
-                      }`}
-                  >
-                    {toast.type === "success" ? (
-                      <CheckCircle2 size={20} />
-                    ) : (
-                      <AlertCircle size={20} />
-                    )}
-                    <p className="text-sm font-semibold tracking-wide">
-                      {toast.text}
-                    </p>
-                  </div>
-                </div>
-              )}
-
               {showInvalidRoute ? (
                 <div className="grid min-h-[60vh] place-items-center px-4">
                   <div className="max-w-md text-center">
@@ -1119,8 +1143,13 @@ export function ProfileHub() {
               ) : <>
                 {tab === "dashboard" || tab === "command-center" ? (
                   LEADER_DASH_ROLES.has(String(role)) ? (
-                    <>
+                    // The command centre is its own view. The legacy dashboard is
+                    // still reachable at /profile/dashboard, but stacking the two
+                    // on the command-centre route made one page carry two
+                    // greetings, two sets of KPIs and two region readouts.
+                    tab === "command-center" ? (
                       <CommandCenterHub />
+                    ) : (
                       <DashboardTab
                         profile={profile}
                         insights={insights}
@@ -1134,9 +1163,8 @@ export function ProfileHub() {
                         role={String(role)}
                         company={company}
                         showToast={showToast}
-                        hideGreeting
                       />
-                    </>
+                    )
                   ) : (
                     <DashboardTab
                       profile={profile}
@@ -1188,7 +1216,6 @@ export function ProfileHub() {
 
                 {tab === "members" && canViewMembersTab ? (
                   <MembersTab
-                    insights={insights}
                     actorRole={String(role)}
                     company={company}
                     showToast={showToast}
@@ -1203,12 +1230,18 @@ export function ProfileHub() {
                   />
                 ) : null}
 
-                {tab === "documents" && canViewCompanyTabs ? (
+                {tab === "documents" && (canViewCompanyTabs || canViewArchivedDocumentsTab) ? (
                   <>
-                    <DocumentsTab actorRole={String(role)} showToast={showToast} />
-                    <div className="mt-6">
-                      <MyLetters currentUserId={String(session?.user?.id ?? profile?.id ?? profile?._id ?? "")} />
-                    </div>
+                    <DocumentsTab
+                      actorRole={String(role)}
+                      readOnly={canViewArchivedDocumentsTab}
+                      showToast={showToast}
+                    />
+                    {canViewCompanyTabs ? (
+                      <div className="mt-6">
+                        <MyLetters currentUserId={String(session?.user?.id ?? profile?.id ?? profile?._id ?? "")} />
+                      </div>
+                    ) : null}
                   </>
                 ) : null}
 
@@ -1249,7 +1282,7 @@ export function ProfileHub() {
                 ) : null}
 
                 {tab === "finance" ? (
-                  <FinanceTab actorRole={String(role)} profileId={String(profile?.id ?? session?.user?.id ?? "")} showToast={showToast} />
+                  <FinanceTab actorRole={String(role)} profileId={String(profile?.id ?? session?.user?.id ?? "")} showToast={showToast} region={actorRegionLabel} regionOptions={Array.isArray(company?.addresses) && (company.addresses as AnyRecord[]).length > 0 ? (company.addresses as AnyRecord[]).map((a: AnyRecord) => String(a.label ?? "")).filter(Boolean) : company?.address ? ["Main Office"] : []} isOwner={actorIsCompanyOwner} />
                 ) : null}
 
                 {tab === "finance-policy" && ["finance", "admin"].includes(String(role)) ? (

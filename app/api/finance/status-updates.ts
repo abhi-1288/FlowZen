@@ -2,8 +2,11 @@ import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { jsonError, requireUserId } from "@/lib/api";
 import { emitNotification } from "@/lib/realtime";
+import { formatAmount } from "@/lib/procurement";
 import { CompanyPolicy, FinanceSalary, ExpenseRequest, Notification, ProjectBudget, ExpenseBill, User } from "@/models";
-import { actorWithCompany, autoGenerateSalariesForMonth, canManageFinance } from "./helpers";
+import { Company } from "@/models/Company";
+import { effectiveRegionLabelOf, type OfficeAddressLike } from "@/lib/company-regions";
+import { actorWithCompany, assertSalaryTargetInFinanceScope, autoGenerateSalariesForMonth, canManageFinance, syncProcurementFromExpense } from "./helpers";
 
 export async function handleStatusUpdates(request: Request) {
   const userId = await requireUserId();
@@ -13,7 +16,7 @@ export async function handleStatusUpdates(request: Request) {
   const actor = await actorWithCompany(userId);
   if (!actor) return jsonError("Approved company access is required.", 403);
   if (!canManageFinance(String(actor.role ?? ""))) {
-    return jsonError("Only finance, HR, or admins can approve payouts.", 403);
+    return jsonError("Only finance or admins can approve payouts.", 403);
   }
 
   const body = await request.json();
@@ -29,6 +32,8 @@ export async function handleStatusUpdates(request: Request) {
       company: actor.company,
     }).select("status employee month");
     if (!existing) return jsonError("Salary record not found.", 404);
+    const outOfRegion = await assertSalaryTargetInFinanceScope(actor, String(existing.employee));
+    if (outOfRegion) return jsonError(outOfRegion, 403);
     if (status === "paid" && existing.status !== "approved")
       return jsonError("Salary must be approved before marking as paid.", 400);
     if (status === "rejected") {
@@ -197,7 +202,7 @@ export async function handleStatusUpdates(request: Request) {
     const existing = await ExpenseRequest.findOne({
       _id: id,
       company: actor.company,
-    }).select("status requester assignedTo adminApprover title amount quantity");
+    }).select("status requester assignedTo adminApprover title amount quantity currency procurement");
     if (!existing) return jsonError("Expense request not found.", 404);
 
     const isAssigned =
@@ -275,6 +280,12 @@ export async function handleStatusUpdates(request: Request) {
         message: `Your expense request "${existing.title}" was rejected: ${rejectionReason}`,
       });
       emitNotification(String(requesterId));
+      await syncProcurementFromExpense(
+        existing,
+        "rejected",
+        actor,
+        rejectionReason,
+      );
       return NextResponse.json({ expense });
     }
 
@@ -346,6 +357,12 @@ export async function handleStatusUpdates(request: Request) {
         message: `Your expense request "${existing.title}" has been accepted and received by finance.`,
       });
       emitNotification(String(requesterId));
+      await syncProcurementFromExpense(
+        existing,
+        "accepted",
+        actor,
+        `Accepted by ${actor.name ?? "finance"}`,
+      );
       return NextResponse.json({ expense });
     }
 
@@ -371,9 +388,15 @@ export async function handleStatusUpdates(request: Request) {
         company: actor.company,
         type: "info",
         title: "Expense disbursed",
-        message: `Your expense request "${existing.title}" x ${existing.quantity ?? 1} for ₹${existing.amount ?? 0} has been disbursed by finance.`,
+        message: `Your expense request "${existing.title}" x ${existing.quantity ?? 1} for ${formatAmount(existing.amount, existing.currency)} has been disbursed by finance.`,
       });
       emitNotification(String(requesterId));
+      await syncProcurementFromExpense(
+        existing,
+        "disbursed",
+        actor,
+        `Disbursed ${formatAmount(existing.amount, existing.currency)}`,
+      );
       return NextResponse.json({ expense });
     }
 
@@ -535,7 +558,19 @@ export async function handleStatusUpdates(request: Request) {
     if (String(actor.role) !== "admin")
       return jsonError("Only admin can approve salary cycle changes.", 403);
 
-    const policy = await CompanyPolicy.findOne({ company: actor.company });
+    // Regional admins may only approve cycle changes for their own region.
+    const company = (await Company.findById(actor.company)
+      .select("addresses address")
+      .lean()) as {
+      addresses?: OfficeAddressLike[] | null;
+      address?: string | null;
+    } | null;
+    const adminRegion = effectiveRegionLabelOf(company, actor);
+
+    let policy = await CompanyPolicy.findOne({ company: actor.company, region: adminRegion });
+    if (!policy && adminRegion) {
+      policy = await CompanyPolicy.findOne({ company: actor.company, region: "" });
+    }
     if (!policy) return jsonError("No policy found.", 404);
     if (policy.salaryCycleChangeStatus !== "pending")
       return jsonError("No pending salary cycle change.", 400);

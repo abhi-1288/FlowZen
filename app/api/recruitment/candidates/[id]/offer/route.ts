@@ -1,26 +1,22 @@
 import { NextResponse } from "next/server";
-import { connectDb } from "@/lib/db";
 import { ATSCandidate } from "@/models/ATSCandidate";
 import { ATSOffer } from "@/models/ATSOffer";
 import { ATSTimeline } from "@/models/ATSTimeline";
 import { ATSAuditLog } from "@/models/ATSAuditLog";
 import { User } from "@/models/User";
-import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
+import { regionLabelsOf } from "@/lib/company-regions";
+import { withCandidateAccess } from "@/lib/recruitment-candidate-access";
+import { jsonError, serializeDoc } from "@/lib/api";
+import { effectiveRegionOf } from "@/lib/region-scope";
 import { emitToUser } from "@/lib/socket-emit";
 
 type Params = { params: Promise<{ id: string }> };
-const HR_ROLES = ["admin", "human-resource"];
 
 export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
-  const userId = await requireUserId();
-  if (!userId) return jsonError("Unauthorized", 401);
-  if (!isObjectId(id)) return jsonError("Invalid candidate id.");
-
-  await connectDb();
-  const user = await User.findById(userId);
-  if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
-  if (!user.company) return jsonError("No company found.", 400);
+  const access = await withCandidateAccess(id, "write");
+  if (!access.ok) return access.response;
+  const { user } = access;
 
   const offer = await ATSOffer.findOne({ candidate: id, company: user.company })
     .sort({ createdAt: -1 })
@@ -34,9 +30,6 @@ export async function GET(_request: Request, { params }: Params) {
 
 export async function POST(request: Request, { params }: Params) {
   const { id } = await params;
-  const userId = await requireUserId();
-  if (!userId) return jsonError("Unauthorized", 401);
-  if (!isObjectId(id)) return jsonError("Invalid candidate id.");
 
   const body = await request.json();
   if (
@@ -50,15 +43,43 @@ export async function POST(request: Request, { params }: Params) {
   }
   if (!body.designation) return jsonError("Designation is required.");
 
-  await connectDb();
-  const user = await User.findById(userId);
-  if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
-  if (!user.company) return jsonError("No company found.", 400);
+  const access = await withCandidateAccess(id, "write");
+  if (!access.ok) return access.response;
+  const { user, company } = access;
+  const userId = String(user._id);
 
-  const candidate = await ATSCandidate.findOne({ _id: id, company: user.company }).populate("job", "title");
+  const candidate = await ATSCandidate.findById(access.candidate._id).populate("job", "title regionLabel");
   if (!candidate) return jsonError("Candidate not found.", 404);
 
   const jobId = candidate.job && typeof candidate.job === "object" ? (candidate.job as any)._id || (candidate.job as any).id : candidate.job;
+
+  // Region precedence, strongest first.
+  //
+  // 1. `candidate.joiningRegionLabel` — set by the bulk transfer. This is the
+  //    answer, because "send these candidates to Pune, then Pune raises the
+  //    offer" only holds if the offer cannot disagree with the transfer.
+  // 2. The job's own region, for candidates never transferred — a job scoped to
+  //    one office is the closest thing to an intent.
+  // 3. The generating HR's region, which is the historical behaviour and a poor
+  //    last resort: a regional HR head raising an offer for another region would
+  //    file the hire under their own office. `officeLocation` is recruiter free
+  //    text and is not an office label, so it cannot stand in for one either.
+  const jobRegionLabel =
+    candidate.job && typeof candidate.job === "object"
+      ? String((candidate.job as any).regionLabel ?? "").trim()
+      : "";
+  const transferredRegion = String(candidate.joiningRegionLabel ?? "").trim();
+  const regionLabel =
+    transferredRegion || jobRegionLabel || (await effectiveRegionOf(user));
+
+  // A stored region that no longer names a real office cannot be relied on for
+  // the join approval, which routes to that region's head. Surface it rather
+  // than silently writing a letter that will be signed by nobody.
+  if (regionLabel && !regionLabelsOf(company).some((l) => l.toLowerCase() === regionLabel.toLowerCase())) {
+    return jsonError(
+      `This candidate's joining region ("${regionLabel}") is no longer a configured office. Update the region before generating the offer.`,
+    );
+  }
 
   const offer = await ATSOffer.create({
     candidate: candidate._id,
@@ -78,6 +99,7 @@ export async function POST(request: Request, { params }: Params) {
     status: "draft",
     createdBy: userId,
     company: user.company,
+    regionLabel,
   });
 
   await ATSTimeline.create({

@@ -4,6 +4,7 @@ import { jsonError, requireUserId } from "@/lib/api";
 import { ATSJob } from "@/models/ATSJob";
 import { User } from "@/models/User";
 import { parseAssessmentPdf } from "@/lib/assessment-pdf-parser";
+import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
 
 const HR_ROLES = ["admin", "human-resource"];
 const MAX_SIZE_BYTES = 10 * 1024 * 1024;
@@ -35,6 +36,8 @@ export async function POST(request: Request, { params }: Params) {
   await connectDb();
   const user = await User.findById(userId);
   if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  const hq = await requireRecruitmentHQ(user as any);
+  if (!hq.ok) return hq.response;
   if (!user.company) return jsonError("No company found.", 400);
 
   const job = await ATSJob.findOne({ _id: id, company: user.company }).select("_id assessment");

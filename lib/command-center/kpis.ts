@@ -17,28 +17,52 @@ import { WfhRequest } from "@/models/WfhRequest";
 import { CheckOutRequest } from "@/models/CheckOutRequest";
 import { addDays, leaveWindow, overlapDays, startOfDay } from "./dates";
 import { formatCount, formatInrCompact, formatPct, trendFrom } from "./format";
-import { getColumnSets, getCompanyBoardIds, getMyBoardIds } from "./trends";
+import { getColumnSets, getMyBoardIds } from "./trends";
+import { buildFilters, type CommandCenterFilters } from "./filters";
 import type { CommandCenterContext } from "./context";
 import type { Kpi } from "./types";
 
 const PENDING_STATUSES = ["pending", "hr-approved", "manager-approved"];
 const PENDING_JOIN = ["pending", "hr-approved"];
 
-async function countActiveMembers(companyId: string | null): Promise<number> {
+async function countActiveMembers(
+  companyId: string | null,
+  filters: CommandCenterFilters,
+): Promise<number> {
   if (!companyId) return 0;
-  return User.countDocuments({ company: companyId, companyStatus: "approved" });
+  return User.countDocuments({ company: companyId, companyStatus: "approved", ...filters.byUser() });
 }
 
-async function attendanceToday(companyId: string | null): Promise<number> {
+/**
+ * `Attendance` carries no `company` column, so the tenant boundary has to be
+ * the set of user ids. Without this both of these were counting every other
+ * tenant's present users.
+ */
+async function attendanceToday(
+  companyId: string | null,
+  filters: CommandCenterFilters,
+): Promise<number> {
   if (!companyId) return 0;
   const today = startOfDay(new Date());
-  const members = await Attendance.distinct("user", { date: today, status: "present" });
+  const members = await Attendance.distinct("user", {
+    date: today,
+    status: "present",
+    ...filters.byVisibleMember("user"),
+  });
   return members.length;
 }
 
-async function presentOn(companyId: string | null, date: Date): Promise<number> {
+async function presentOn(
+  companyId: string | null,
+  date: Date,
+  filters: CommandCenterFilters,
+): Promise<number> {
   if (!companyId) return 0;
-  const members = await Attendance.distinct("user", { date, status: "present" });
+  const members = await Attendance.distinct("user", {
+    date,
+    status: "present",
+    ...filters.byVisibleMember("user"),
+  });
   return members.length;
 }
 
@@ -52,13 +76,14 @@ async function buildScoped(ctx: CommandCenterContext): Promise<BoardScoped> {
   const boardIds =
     ctx.variant === "personal"
       ? await getMyBoardIds(ctx.userId)
-      : await getCompanyBoardIds(ctx.companyId);
+      : (ctx.boardIds ?? await getMyBoardIds(ctx.userId));
   const sets = await getColumnSets(boardIds);
   return { boardIds, doneIds: sets.doneIds, blockedIds: sets.blockedIds };
 }
 
 export async function buildKpis(ctx: CommandCenterContext): Promise<Kpi[]> {
   const { companyId, variant, now } = ctx;
+  const filters = buildFilters(ctx);
   const today = startOfDay(now);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const yesterday = addDays(today, -1);
@@ -66,14 +91,15 @@ export async function buildKpis(ctx: CommandCenterContext): Promise<Kpi[]> {
   if (variant === "admin" || variant === "hr") {
     const [activeMembers, presentToday, yPresent, joinedThisMonth] =
       await Promise.all([
-        countActiveMembers(companyId),
-        attendanceToday(companyId),
-        presentOn(companyId, yesterday),
+        countActiveMembers(companyId, filters),
+        attendanceToday(companyId, filters),
+        presentOn(companyId, yesterday, filters),
         companyId
           ? User.countDocuments({
               company: companyId,
               companyStatus: "approved",
               companyJoined: { $gte: monthStart },
+              ...filters.byUser(),
             })
           : Promise.resolve(0),
       ]);
@@ -100,16 +126,22 @@ export async function buildKpis(ctx: CommandCenterContext): Promise<Kpi[]> {
     ];
 
     if (variant === "admin") {
-      const [boards, openTickets, openJobs, monthSpend, prevSpend] = await Promise.all([
-        companyId ? getCompanyBoardIds(companyId) : Promise.resolve([]),
+      // `ctx.boardIds` is already resolved by the orchestrator, so the second
+      // company->members->boards walk this used to do is gone.
+      const boards = ctx.boardIds ?? [];
+      const [openTickets, openJobs, monthSpend, prevSpend] = await Promise.all([
         companyId
-          ? ITTicket.countDocuments({ company: companyId, status: { $nin: ["RESOLVED", "CANCELLED"] } })
+          ? ITTicket.countDocuments({
+              company: companyId,
+              status: { $nin: ["RESOLVED", "CANCELLED"] },
+              ...filters.byMember("requester"),
+            })
           : Promise.resolve(0),
         companyId
-          ? ATSJob.countDocuments({ company: companyId, status: "open" })
+          ? ATSJob.countDocuments({ company: companyId, status: "open", ...filters.byRegionLabel() })
           : Promise.resolve(0),
-        companyId ? sumMonthSpend(companyId, monthStart, nextMonthPercent(now)) : Promise.resolve(0),
-        companyId ? sumMonthSpend(companyId, lastMonthStart(now), monthStart) : Promise.resolve(0),
+        companyId ? sumMonthSpend(companyId, monthStart, nextMonthPercent(now), filters) : Promise.resolve(0),
+        companyId ? sumMonthSpend(companyId, lastMonthStart(now), monthStart, filters) : Promise.resolve(0),
       ]);
       return [
         ...common,
@@ -149,12 +181,15 @@ export async function buildKpis(ctx: CommandCenterContext): Promise<Kpi[]> {
     }
 
     const [openPositions, contractsEnding, onLeaveToday] = await Promise.all([
-      companyId ? ATSJob.countDocuments({ company: companyId, status: "open" }) : Promise.resolve(0),
+      companyId
+        ? ATSJob.countDocuments({ company: companyId, status: "open", ...filters.byRegionLabel() })
+        : Promise.resolve(0),
       companyId
         ? User.countDocuments({
             company: companyId,
             companyStatus: "approved",
             employmentEndDate: { $gte: monthStart, $lte: addDays(now, 30) },
+            ...filters.byUser(),
           })
         : Promise.resolve(0),
       companyId
@@ -163,6 +198,7 @@ export async function buildKpis(ctx: CommandCenterContext): Promise<Kpi[]> {
             status: "approved",
             startDate: { $lte: today },
             endDate: { $gte: today },
+            ...filters.byMember("requester"),
           })
         : Promise.resolve(0),
     ]);
@@ -199,26 +235,36 @@ export async function buildKpis(ctx: CommandCenterContext): Promise<Kpi[]> {
   if (variant === "finance") {
     const [revenue, prevRevenue, expenses, payroll, receivables, payables, pendingSalary, pendingExpenses, pendingBills, pendingBudgets] =
       await Promise.all([
-        sumPaidInvoices(companyId, monthStart, nextMonthPercent(now)),
-        sumPaidInvoices(companyId, lastMonthStart(now), monthStart),
-        sumMonthExpensesPaid(companyId, monthStart, nextMonthPercent(now)),
-        sumPaidSalaries(companyId, monthStart, nextMonthPercent(now)),
-        sumPendingInvoices(companyId),
-        sumPendingPayables(companyId),
+        sumPaidInvoices(companyId, monthStart, nextMonthPercent(now), filters),
+        sumPaidInvoices(companyId, lastMonthStart(now), monthStart, filters),
+        sumMonthExpensesPaid(companyId, monthStart, nextMonthPercent(now), filters),
+        sumPaidSalaries(companyId, monthStart, nextMonthPercent(now), filters),
+        sumPendingInvoices(companyId, filters),
+        sumPendingPayables(companyId, filters),
         companyId
           ? FinanceSalary.countDocuments({
               company: companyId,
               status: { $in: ["pending", "approved"] },
+              ...filters.byMember("employee"),
             })
           : Promise.resolve(0),
         companyId
           ? ExpenseRequest.countDocuments({
               company: companyId,
               status: { $in: ["pending", "forwarded", "approved"] },
+              ...filters.byMember("requester"),
             })
           : Promise.resolve(0),
-        companyId ? ExpenseBill.countDocuments({ company: companyId, status: "pending" }) : Promise.resolve(0),
-        companyId ? ProjectBudget.countDocuments({ company: companyId, status: "pending" }) : Promise.resolve(0),
+        companyId
+          ? ExpenseBill.countDocuments({
+              company: companyId,
+              status: "pending",
+              ...(await filters.bill()),
+            })
+          : Promise.resolve(0),
+        companyId
+          ? ProjectBudget.countDocuments({ company: companyId, status: "pending", ...filters.byBoard() })
+          : Promise.resolve(0),
       ]);
     const pendingCount = Number(pendingSalary) + Number(pendingExpenses) + Number(pendingBills) + Number(pendingBudgets);
     return [
@@ -304,7 +350,7 @@ export async function buildKpis(ctx: CommandCenterContext): Promise<Kpi[]> {
           ])
         : Promise.resolve([]),
       companyId
-        ? ProjectBudget.countDocuments({ company: companyId, status: "pending" })
+        ? ProjectBudget.countDocuments({ company: companyId, status: "pending", ...filters.byBoard() })
         : Promise.resolve(0),
     ]);
     const stats = projectTasks[0] ?? { total: 0, done: 0, overdue: 0, blocked: 0 };
@@ -366,13 +412,18 @@ export async function buildKpis(ctx: CommandCenterContext): Promise<Kpi[]> {
     const [openTickets, criticalTickets, resolvedMonth, pendingProvisioning, activeCodes] =
       await Promise.all([
         companyId
-          ? ITTicket.countDocuments({ company: companyId, status: { $nin: ["RESOLVED", "CANCELLED"] } })
+          ? ITTicket.countDocuments({
+              company: companyId,
+              status: { $nin: ["RESOLVED", "CANCELLED"] },
+              ...filters.byMember("requester"),
+            })
           : Promise.resolve(0),
         companyId
           ? ITTicket.countDocuments({
               company: companyId,
               priority: { $in: ["HIGH", "URGENT"] },
               status: { $nin: ["RESOLVED", "CANCELLED"] },
+              ...filters.byMember("requester"),
             })
           : Promise.resolve(0),
         companyId
@@ -380,16 +431,22 @@ export async function buildKpis(ctx: CommandCenterContext): Promise<Kpi[]> {
               company: companyId,
               status: "RESOLVED",
               resolvedAt: { $gte: monthStart },
+              ...filters.byMember("requester"),
             })
           : Promise.resolve(0),
         companyId
           ? ITProvisioningRequest.countDocuments({
               company: companyId,
               status: { $in: ["PENDING", "UNDER_REVIEW", "APPROVED", "ACCOUNT_CREATED"] },
+              ...filters.byMember("employee"),
             })
           : Promise.resolve(0),
         companyId
-          ? ITJoiningCode.countDocuments({ company: companyId, status: "active" })
+          ? ITJoiningCode.countDocuments({
+              company: companyId,
+              status: "active",
+              ...filters.byMember("user"),
+            })
           : Promise.resolve(0),
       ]);
     return [
@@ -405,17 +462,19 @@ export async function buildKpis(ctx: CommandCenterContext): Promise<Kpi[]> {
     const cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const [activeUsers, pendingAccess, inactiveAccounts, pendingApprovals, openTickets] =
       await Promise.all([
-        countActiveMembers(companyId),
+        countActiveMembers(companyId, filters),
         companyId
           ? ITProvisioningRequest.countDocuments({
               company: companyId,
               status: { $in: ["PENDING", "UNDER_REVIEW"] },
+              ...filters.byMember("employee"),
             })
           : Promise.resolve(0),
         companyId
           ? User.countDocuments({
               company: companyId,
               companyStatus: "approved",
+              ...filters.byUser(),
               $or: [{ lastOnline: null }, { lastOnline: { $lt: cutoff } }],
             })
           : Promise.resolve(0),
@@ -424,6 +483,7 @@ export async function buildKpis(ctx: CommandCenterContext): Promise<Kpi[]> {
               company: companyId,
               status: { $in: PENDING_JOIN },
               kind: { $in: ["identity-code", "role-transfer", "region-address", "employment-type", "id-card", "document-letter"] },
+              ...filters.byMember("requester"),
             })
           : Promise.resolve(0),
         companyId
@@ -431,6 +491,7 @@ export async function buildKpis(ctx: CommandCenterContext): Promise<Kpi[]> {
               company: companyId,
               status: { $nin: ["RESOLVED", "CANCELLED"] },
               priority: { $in: ["HIGH", "URGENT"] },
+              ...filters.byMember("requester"),
             })
           : Promise.resolve(0),
       ]);
@@ -461,7 +522,16 @@ export async function buildKpis(ctx: CommandCenterContext): Promise<Kpi[]> {
         })
       : Promise.resolve(0),
     companyId
-      ? Attendance.countDocuments({ user: ctx.userId, date: today, status: "present" })
+      ? Attendance.countDocuments({
+          // `user` is enough on its own for a personal view, and spreading
+          // `byVisibleMember` over it would clobber this with `{ $in: [] }` —
+          // personal views carry no visible-member list, so the spread only
+          // applies once a region or company-wide scope is in play.
+          user: ctx.userId,
+          date: today,
+          status: "present",
+          ...(ctx.memberIds ? filters.byVisibleMember("user") : {}),
+        })
       : Promise.resolve(0),
     computeLeaveBalance(ctx),
   ]);
@@ -592,19 +662,30 @@ async function sumPaidInvoices(
   companyId: string | null,
   start: Date,
   end: Date,
+  filters: CommandCenterFilters,
 ): Promise<number> {
   if (!companyId) return 0;
   const rows = await ClientInvoice.aggregate([
-    { $match: { company: companyId, status: "paid", paidAt: { $gte: start, $lt: end } } },
+    {
+      $match: {
+        company: companyId,
+        status: "paid",
+        paidAt: { $gte: start, $lt: end },
+        ...filters.invoice(),
+      },
+    },
     { $group: { _id: null, total: { $sum: "$amount" } } },
   ]);
   return rows[0]?.total ?? 0;
 }
 
-async function sumPendingInvoices(companyId: string | null): Promise<number> {
+async function sumPendingInvoices(
+  companyId: string | null,
+  filters: CommandCenterFilters,
+): Promise<number> {
   if (!companyId) return 0;
   const rows = await ClientInvoice.aggregate([
-    { $match: { company: companyId, status: "pending" } },
+    { $match: { company: companyId, status: "pending", ...filters.invoice() } },
     { $group: { _id: null, total: { $sum: "$amount" } } },
   ]);
   return rows[0]?.total ?? 0;
@@ -614,10 +695,18 @@ async function sumPaidSalaries(
   companyId: string | null,
   start: Date,
   end: Date,
+  filters: CommandCenterFilters,
 ): Promise<number> {
   if (!companyId) return 0;
   const rows = await FinanceSalary.aggregate([
-    { $match: { company: companyId, status: "paid", paidAt: { $gte: start, $lt: end } } },
+    {
+      $match: {
+        company: companyId,
+        status: "paid",
+        paidAt: { $gte: start, $lt: end },
+        ...filters.byMember("employee"),
+      },
+    },
     { $group: { _id: null, total: { $sum: "$netSalary" } } },
   ]);
   return rows[0]?.total ?? 0;
@@ -627,6 +716,7 @@ async function sumMonthExpensesPaid(
   companyId: string | null,
   start: Date,
   end: Date,
+  filters: CommandCenterFilters,
 ): Promise<number> {
   if (!companyId) return 0;
   const [requests, bills] = await Promise.all([
@@ -636,35 +726,57 @@ async function sumMonthExpensesPaid(
           company: companyId,
           status: "disbursed",
           disbursedAt: { $gte: start, $lt: end },
+          ...filters.byMember("requester"),
         },
       },
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ]),
     ExpenseBill.aggregate([
-      { $match: { company: companyId, status: "paid", paidAt: { $gte: start, $lt: end } } },
+      {
+        $match: {
+          company: companyId,
+          status: "paid",
+          paidAt: { $gte: start, $lt: end },
+          ...(await filters.bill()),
+        },
+      },
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ]),
   ]);
   return (requests[0]?.total ?? 0) + (bills[0]?.total ?? 0);
 }
 
-async function sumMonthSpend(companyId: string, start: Date, end: Date): Promise<number> {
+async function sumMonthSpend(
+  companyId: string,
+  start: Date,
+  end: Date,
+  filters: CommandCenterFilters,
+): Promise<number> {
   const [expenses, payroll] = await Promise.all([
-    sumMonthExpensesPaid(companyId, start, end),
-    sumPaidSalaries(companyId, start, end),
+    sumMonthExpensesPaid(companyId, start, end, filters),
+    sumPaidSalaries(companyId, start, end, filters),
   ]);
   return expenses + payroll;
 }
 
-async function sumPendingPayables(companyId: string | null): Promise<number> {
+async function sumPendingPayables(
+  companyId: string | null,
+  filters: CommandCenterFilters,
+): Promise<number> {
   if (!companyId) return 0;
   const [expenses, bills] = await Promise.all([
     ExpenseRequest.aggregate([
-      { $match: { company: companyId, status: { $in: ["approved", "accepted"] } } },
+      {
+        $match: {
+          company: companyId,
+          status: { $in: ["approved", "accepted"] },
+          ...filters.byMember("requester"),
+        },
+      },
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ]),
     ExpenseBill.aggregate([
-      { $match: { company: companyId, status: "pending" } },
+      { $match: { company: companyId, status: "pending", ...(await filters.bill()) } },
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ]),
   ]);

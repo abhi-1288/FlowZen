@@ -24,23 +24,22 @@ export async function GET(_request: Request, { params }: Params) {
     throw error;
   }
 
-  const [user, ticket] = await Promise.all([
-    User.findById(userId).select("role company companyStatus name"),
-    ITTicket.findById(id)
-      .populate("requester", "name email role companyIdentityCode department customRole phone emergencyContact avatarUrl")
-      .populate("assignedTo", "name email")
-      .populate("assignedBy", "name email")
-      .populate("resolvedBy", "name email")
-      .populate("manager", "name email"),
-  ]);
+  const user = await User.findById(userId).select("role company companyStatus name");
   if (!user) return jsonError("User not found.", 404);
-  if (!ticket) return jsonError("Ticket not found.", 404);
   if (!user.company || user.companyStatus !== "approved") {
     return jsonError("You must be an approved company member to view IT tickets.", 403);
   }
 
   const companyId =
     typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
+  const ticket = await ITTicket.findOne({ _id: id, company: companyId })
+    .populate("requester", "name email role companyIdentityCode department customRole phone emergencyContact avatarUrl")
+    .populate("assignedTo", "name email")
+    .populate("assignedBy", "name email")
+    .populate("resolvedBy", "name email")
+    .populate("manager", "name email");
+  if (!ticket) return jsonError("Ticket not found.", 404);
+
   const allowed = await canViewTicket({ role: String(user.role), _id: user._id }, companyId, ticket);
   if (!allowed) return jsonError("You do not have permission to view this ticket.", 403);
 
@@ -65,18 +64,16 @@ export async function PATCH(request: Request, { params }: Params) {
     throw error;
   }
 
-  const [user, ticket] = await Promise.all([
-    User.findById(userId).select("role company companyStatus name"),
-    ITTicket.findById(id),
-  ]);
+  const user = await User.findById(userId).select("role company companyStatus name");
   if (!user) return jsonError("User not found.", 404);
-  if (!ticket) return jsonError("Ticket not found.", 404);
   if (!user.company || user.companyStatus !== "approved") {
     return jsonError("You must be an approved company member to modify IT tickets.", 403);
   }
 
   const companyId =
     typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
+  const ticket = await ITTicket.findOne({ _id: id, company: companyId });
+  if (!ticket) return jsonError("Ticket not found.", 404);
 
   // Priority change: IT_ADMIN only.
   if (body.priority !== undefined && body.priority !== null) {

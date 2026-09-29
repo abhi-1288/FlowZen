@@ -28,17 +28,15 @@ export async function POST(request: Request, { params }: Params) {
     throw error;
   }
 
-  const [user, ticket] = await Promise.all([
-    User.findById(userId).select("role company companyStatus name"),
-    ITTicket.findById(id),
-  ]);
+  const user = await User.findById(userId).select("role company companyStatus name");
   if (!user) return jsonError("User not found.", 404);
-  if (!ticket) return jsonError("Ticket not found.", 404);
   if (!user.company || user.companyStatus !== "approved") {
     return jsonError("You must be an approved company member to comment on IT tickets.", 403);
   }
   const companyId =
     typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
+  const ticket = await ITTicket.findOne({ _id: id, company: companyId });
+  if (!ticket) return jsonError("Ticket not found.", 404);
   const allowed = await canViewTicket({ role: String(user.role), _id: user._id }, companyId, ticket);
   if (!allowed) return jsonError("You do not have permission to comment on this ticket.", 403);
 
@@ -64,7 +62,7 @@ export async function POST(request: Request, { params }: Params) {
     emitNotification(target);
   }
 
-  const refreshed = await ITTicket.findById(id);
+  const refreshed = await ITTicket.findOne({ _id: id, company: companyId });
 
   // Return just the ticket so the client can re-render the comment list + activity.
   return NextResponse.json({ ticket: serializeDoc(refreshed) }, { status: 201 });
@@ -88,14 +86,12 @@ export async function DELETE(request: Request, { params }: Params) {
     throw error;
   }
 
-  const [user, ticket] = await Promise.all([
-    User.findById(userId).select("role company companyStatus name _id"),
-    ITTicket.findById(id),
-  ]);
+  const user = await User.findById(userId).select("role company companyStatus name _id");
   if (!user) return jsonError("User not found.", 404);
-  if (!ticket) return jsonError("Ticket not found.", 404);
   const companyId =
     typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
+  const ticket = await ITTicket.findOne({ _id: id, company: companyId });
+  if (!ticket) return jsonError("Ticket not found.", 404);
   const allowed = await canViewTicket({ role: String(user.role), _id: user._id }, companyId, ticket);
   if (!allowed) return jsonError("You do not have permission to remove comments from this ticket.", 403);
 
@@ -113,6 +109,6 @@ export async function DELETE(request: Request, { params }: Params) {
   pushItActivity(ticket, { _id: user._id }, "Comment removed", `Comment removed by ${user.name}`);
   await ticket.save();
 
-  const refreshed = await ITTicket.findById(id);
+  const refreshed = await ITTicket.findOne({ _id: id, company: companyId });
   return NextResponse.json({ ticket: serializeDoc(refreshed) });
 }

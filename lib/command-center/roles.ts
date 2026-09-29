@@ -10,6 +10,19 @@ export const VARIANT_LABELS: Record<Variant, string> = {
   personal: "My workspaces",
 };
 
+/**
+ * The badge above the dashboard.
+ *
+ * Every leader role is now regional, so a bare "Company-wide overview" would be
+ * a lie for everyone except the owner looking at the global rollup. The region
+ * is named instead when there is one; passing `null` keeps the static label.
+ */
+export function labelFor(variant: Variant, regionLabel?: string | null): string {
+  const region = String(regionLabel ?? "").trim();
+  if (!region) return VARIANT_LABELS[variant];
+  return `${region} overview`;
+}
+
 export function resolveVariant(role: string): Variant {
   switch (role) {
     case "admin":

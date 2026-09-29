@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowLeft, X } from "lucide-react";
+import { ArrowLeft, Plus, X } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
+import { DOCUMENT_LETTER_APPROVER_ROLES } from "@/lib/company-regions";
+import { MAX_LETTER_CO_APPROVERS } from "@/lib/document-letter-signatories";
 
 type Props = {
   mode: "request" | "send";
@@ -16,6 +18,7 @@ type ApproverUser = {
   _id: string;
   name: string;
   email: string;
+  regionLabel?: string;
 };
 
 const LETTER_TYPES = [
@@ -42,6 +45,13 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
   const [submitting, setSubmitting] = useState(false);
   const [approvers, setApprovers] = useState<ApproverUser[]>([]);
   const [selectedHrId, setSelectedHrId] = useState("");
+  const [coApprovers, setCoApprovers] = useState<ApproverUser[]>([]);
+  const [coApproverIds, setCoApproverIds] = useState<string[]>([]);
+  const [teamOwner, setTeamOwner] = useState<ApproverUser | null>(null);
+  const [teamOwnerId, setTeamOwnerId] = useState("");
+  const [teamOwnerBlockedReason, setTeamOwnerBlockedReason] = useState("");
+  const [approverRegion, setApproverRegion] = useState("");
+  const [regionFallback, setRegionFallback] = useState(false);
   const [internshipStart, setInternshipStart] = useState("");
   const [internshipEnd, setInternshipEnd] = useState("");
   const [projectTitle, setProjectTitle] = useState("");
@@ -52,6 +62,19 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
   const [companyJoined, setCompanyJoined] = useState("");
   const [letterContent, setLetterContent] = useState("");
   const [showPreview, setShowPreview] = useState(false);
+
+  const regionName = approverRegion.trim() ? `your region (${approverRegion.trim()})` : "your region";
+  const totalCoApprovers = coApproverIds.length + (teamOwnerId ? 1 : 0);
+  const atCoApproverCap = totalCoApprovers >= MAX_LETTER_CO_APPROVERS;
+  // The team-owner suggestion is one-click only — it is never added for you.
+  const canSuggestTeamOwner = Boolean(teamOwner) && !atCoApproverCap;
+  // A team owner outside your region cannot be nominated, so the server would
+  // drop it. Say so rather than offering a button that silently does nothing.
+  const teamOwnerOutOfRegion = !teamOwner && teamOwnerBlockedReason === "out-of-region";
+  // The approving HR already has a signature block, so they cannot also co-sign.
+  const coApproverOptions = coApprovers.filter(
+    (a) => a._id !== selectedHrId && a._id !== teamOwnerId,
+  );
 
   function handlePreview() {
     if (letterType === "id-card") {
@@ -95,17 +118,50 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
   }
 
   useEffect(() => {
-    const approverUrl = isJuniorSecurity
-      ? "/api/users?role=security&isSeniorSecurity=true"
-      : "/api/users?role=human-resource";
-    apiFetch<{ users: ApproverUser[] }>(approverUrl)
+    // The primary approver is always HR (or senior security for junior security).
+    const primaryUrl = isJuniorSecurity
+      ? `/api/users?role=security&isSeniorSecurity=true&region=mine`
+      : `/api/users?role=human-resource&region=mine`;
+    // The optional co-approver can be any of the wider approver roles.
+    // `regionFallback=main` keeps this picker on the same region rule the server
+    // validates nominations with, so it can never offer someone it then rejects.
+    const coUrl = `/api/users?role=${DOCUMENT_LETTER_APPROVER_ROLES.join(",")}&region=mine&regionFallback=main`;
+
+    apiFetch<{ users: ApproverUser[]; region?: string; regionFallback?: boolean }>(primaryUrl)
       .then((res) => {
         setApprovers(res.users ?? []);
+        setApproverRegion(res.region ?? "");
+        setRegionFallback(Boolean(res.regionFallback));
         if (res.users?.length === 1) {
           setSelectedHrId(res.users[0]._id);
         }
       })
       .catch(() => {});
+
+    if (!isJuniorSecurity) {
+      apiFetch<{ users: ApproverUser[] }>(coUrl)
+        .then((res) => setCoApprovers(res.users ?? []))
+        .catch(() => {});
+      apiFetch<{
+        teamOwner?: { user?: string; name?: string; role?: string } | null;
+        teamOwnerBlockedReason?: string;
+      }>("/api/hr/document-letter?plan=1")
+        .then((res) => {
+          if (res.teamOwner?.user) {
+            setTeamOwner({
+              _id: String(res.teamOwner.user),
+              name: String(res.teamOwner.name ?? ""),
+              email: "",
+            });
+            setTeamOwnerBlockedReason("");
+          } else {
+            setTeamOwner(null);
+            setTeamOwnerBlockedReason(String(res.teamOwnerBlockedReason ?? ""));
+          }
+        })
+        .catch(() => {});
+    }
+
     apiFetch<{ noticePeriodDays?: number; user?: { companyJoined?: string } }>("/api/profile")
       .then((res) => {
         if (res.noticePeriodDays) setNoticePeriodDays(res.noticePeriodDays);
@@ -188,6 +244,8 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
           purpose: purpose.trim(),
           customType: customType.trim(),
           approverId: selectedHrId || undefined,
+          coApproverIds,
+          teamOwnerId: teamOwnerId || undefined,
           internshipStart: letterType === "internship" ? internshipStart : undefined,
           internshipEnd: letterType === "internship" ? internshipEnd : undefined,
           projectTitle: letterType === "internship" ? projectTitle.trim() : undefined,
@@ -197,7 +255,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
           letterContent: letterContent.trim() ? letterContent.trim() : undefined,
         }),
       });
-      showToast(mode === "send" ? "Resignation letter sent to HR." : "Document letter request sent for approval.");
+      showToast(mode === "send" ? "Resignation letter sent for approval." : "Document letter request sent for approval.");
       onSuccess();
     } catch (err) {
       showToast(
@@ -234,7 +292,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
                 {showPreview ? "Edit Letter Content" : mode === "send" ? "Send Resignation Letter" : "Request Document Letter"}
               </h4>
               <p className="mt-0.5 text-sm text-slate-500">
-                {letterType === "id-card" ? "Request an ID card for approval." : showPreview ? "Customize the text before submitting." : mode === "send" ? `Submit your resignation letter to ${isJuniorSecurity ? "senior security" : "HR"}.` : `Submit a request to ${isJuniorSecurity ? "senior security" : "HR"} for a company document letter.`}
+                {letterType === "id-card" ? "Request an ID card for approval." : showPreview ? "Customize the text before submitting." : mode === "send" ? `Submit your resignation letter to ${isJuniorSecurity ? "senior security" : "your region's approver"}.` : `Submit a request to ${isJuniorSecurity ? "senior security" : "your region's approver"} for a company document letter.`}
               </p>
             </div>
           </div>
@@ -408,7 +466,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
 
           <div>
             <label className="text-xs font-semibold uppercase text-slate-500">
-              {isJuniorSecurity ? "Assign to Senior Security" : "Assign to HR"}
+              {isJuniorSecurity ? "Assign to Senior Security" : "Approving HR"}
             </label>
             <select
               className="mt-1 w-full rounded-lg neu-inset px-3 py-2 text-sm"
@@ -418,26 +476,141 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
               <option value="">Auto-assign</option>
               {approvers.map((a) => (
                 <option key={a._id} value={a._id}>
-                  {a.name} ({a.email})
+                  {a.name} ({a.email}){a?.regionLabel ? ` — ${a.regionLabel}` : "No-region"}
                 </option>
               ))}
             </select>
             <p className="mt-1 text-xs text-slate-400">
-              {isJuniorSecurity
-                ? approvers.length === 0
+              {approvers.length === 0
+                ? isJuniorSecurity
                   ? "No senior security members found. The request will be auto-assigned."
+                  : "No HR found. The request will be auto-assigned."
+                : regionFallback
+                  ? `No HR in ${regionName} — showing all company HR.`
                   : approvers.length > 1
-                    ? "Select a specific senior security member or leave as auto-assign."
-                    : ""
-                : letterType === "id-card"
-                  ? "Select the HR who will review and approve your ID card request."
-                  : approvers.length === 0
-                    ? "No HR members found. The request will be auto-assigned."
-                    : approvers.length > 1
-                      ? "Select a specific HR or leave as auto-assign."
-                      : ""}
+                    ? `Select a specific HR${regionName ? ` in ${regionName}` : ""} or leave as auto-assign.`
+                    : `Only one HR is available${regionName ? ` in ${regionName}` : ""}.`}
+              {!isJuniorSecurity ? " HR is always the required approver for a letter." : ""}
             </p>
+            {letterType === "id-card" ? (
+              <p className="mt-1 text-xs text-slate-400">
+                The selected approver will review and approve your ID card request.
+              </p>
+            ) : null}
           </div>
+
+          {letterType !== "id-card" && !isJuniorSecurity ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-xs font-semibold uppercase text-slate-500">
+                  Optional co-approvers
+                </label>
+                <span className="text-[11px] text-slate-400">
+                  {totalCoApprovers}/{MAX_LETTER_CO_APPROVERS}
+                </span>
+              </div>
+
+              {teamOwnerId ? (
+                <div className="mt-2 flex items-center justify-between gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-2">
+                  <p className="min-w-0 flex-1 truncate text-sm text-indigo-900">
+                    {teamOwner?.name ?? "Team owner"}
+                    <span className="ml-1 text-xs text-indigo-600">(Team Owner)</span>
+                  </p>
+                  <button
+                    type="button"
+                    aria-label="Remove team owner"
+                    onClick={() => setTeamOwnerId("")}
+                    className="rounded p-1 text-indigo-400 hover:bg-indigo-100 hover:text-indigo-700"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : null}
+
+              {coApproverIds.map((id) => {
+                return (
+                  <div key={id} className="mt-2 flex items-center gap-2">
+                    <select
+                      className="min-w-0 flex-1 rounded-lg neu-inset px-3 py-2 text-sm"
+                      value={id}
+                      onChange={(e) =>
+                        setCoApproverIds((current) =>
+                          current.map((existing) => (existing === id ? e.target.value : existing)),
+                        )
+                      }
+                    >
+                      {coApproverOptions
+                        .filter((a) => a._id === id || !coApproverIds.includes(a._id))
+                        .map((a) => (
+                          <option key={a._id} value={a._id}>
+                            {a.name} ({a.email}){a?.regionLabel ? ` — ${a.regionLabel}` : "No-region"}
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      type="button"
+                      aria-label="Remove co-approver"
+                      onClick={() =>
+                        setCoApproverIds((current) => current.filter((existing) => existing !== id))
+                      }
+                      className="rounded p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                );
+              })}
+
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={atCoApproverCap}
+                  onClick={() => {
+                    const next = coApproverOptions.find((a) => !coApproverIds.includes(a._id));
+                    if (next) setCoApproverIds((current) => [...current, next._id]);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Plus size={13} />
+                  {coApproverIds.length === 0 ? "Add a co-approver" : "Add another co-approver"}
+                </button>
+
+                {canSuggestTeamOwner && teamOwner ? (
+                  <button
+                    type="button"
+                    onClick={() => setTeamOwnerId(teamOwner._id)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+                  >
+                    <Plus size={13} />
+                    Add my team owner ({teamOwner.name})
+                  </button>
+                ) : null}
+
+                {teamOwnerOutOfRegion ? (
+                  <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-400">
+                    Team owner unavailable — not in {regionName}
+                  </span>
+                ) : null}
+              </div>
+
+              {atCoApproverCap ? (
+                <p className="mt-2 text-xs text-amber-600">
+                  You have reached the maximum of {MAX_LETTER_CO_APPROVERS} co-approvers.
+                </p>
+              ) : null}
+              {coApproverOptions.length === 0 && !teamOwnerId ? (
+                <p className="mt-2 text-xs text-slate-400">
+                  No eligible co-approvers found{regionName ? ` in ${regionName}` : ""}.
+                </p>
+              ) : null}
+
+              <p className="mt-2 text-xs text-slate-400">
+                Co-approvers are added only if you choose them. They can sign before or after HR
+                approves, and their signature is optional — it never holds up or cancels the
+                letter.
+              </p>
+            </div>
+          ) : null}
 
           {letterType !== "id-card" ? (
             <div className="pt-2">

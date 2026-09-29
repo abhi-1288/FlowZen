@@ -5,6 +5,7 @@ import { ATSTimeline } from "@/models/ATSTimeline";
 import { User } from "@/models/User";
 import { jsonError, requireUserId } from "@/lib/api";
 import { MAX_PROCTORING_LOG_ENTRIES, trimProctoringLog } from "@/lib/assessment-proctoring";
+import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
 
 /**
  * HR waiving proctoring for one candidate.
@@ -29,6 +30,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   await connectDb();
   const user = await User.findById(userId);
   if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  const hq = await requireRecruitmentHQ(user as any);
+  if (!hq.ok) return hq.response;
 
   const body = await request.json().catch(() => ({}));
   const exempt = body?.exempt === true;

@@ -5,6 +5,7 @@ import { User } from "@/models/User";
 import { jsonError, requireUserId } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
 import { CORE_STAGES, STAGES, STAGE_LABELS, TERMINAL_STAGES, type Stage } from "@/lib/recruitment-types";
+import { canRunRecruitmentPipeline, requireRecruitmentHQ } from "@/lib/recruitment-hq";
 
 const HR_ROLES = ["admin", "human-resource"];
 
@@ -29,7 +30,11 @@ export async function GET() {
       id: stage,
       label: STAGE_LABELS[stage as Stage],
     })),
-    canManage: HR_ROLES.includes(user.role),
+    // Stage order is company-wide: reordering it renames the pipeline every
+    // region's candidates sit in, so it follows the pipeline owner rather than
+    // the role string. Otherwise a region HR could restructure the main office's
+    // funnel from their own office.
+    canManage: canRunRecruitmentPipeline(company as any, user as any),
   });
 }
 
@@ -49,7 +54,8 @@ export async function PATCH(request: Request) {
   await connectDb();
   const user = await User.findById(userId);
   if (!user) return jsonError("Unauthorized", 401);
-  if (!HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  const hq = await requireRecruitmentHQ(user as any);
+  if (!hq.ok) return hq.response;
   if (!user.company) return jsonError("No company found.", 400);
 
   const stageOrder = [...(next as Stage[]), ...TERMINAL_STAGES];

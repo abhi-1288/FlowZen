@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { ATSJob } from "@/models/ATSJob";
 import { ATSCandidate } from "@/models/ATSCandidate";
+import { Company } from "@/models/Company";
 import { User } from "@/models/User";
+import { candidateRegionClause } from "@/lib/candidate-region-scope";
 import { isObjectId, jsonError, requireUserId, serializeDocs } from "@/lib/api";
 
 type Params = { params: Promise<{ id: string }> };
@@ -23,7 +25,17 @@ export async function GET(_request: Request, { params }: Params) {
   const job = await ATSJob.findOne({ _id: id, company: user.company });
   if (!job) return jsonError("Job not found.", 404);
 
-  const candidates = await ATSCandidate.find({ job: id, company: user.company })
+  // Region boundary. A recruiter who cannot see a region's candidates must not
+  // be able to reach them through this narrower, job-scoped list either.
+  const company = (await Company.findById(user.company)
+    .select("owner addresses address")
+    .lean()) as any;
+
+  const candidates = await ATSCandidate.find({
+    job: id,
+    company: user.company,
+    ...candidateRegionClause(company, user),
+  })
     .sort({ createdAt: -1 })
     .populate("assignedRecruiter", "name email")
     .populate("job", "title");

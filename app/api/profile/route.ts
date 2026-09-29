@@ -15,6 +15,9 @@ import { CompanyPolicy } from "@/models/CompanyPolicy";
 import { FinanceSalary } from "@/models/FinanceSalary";
 import { Attendance } from "@/models/Attendance";
 import { resolveEnrollingHr, resolveJoinedByInfo } from "@/lib/enrolling-hr";
+import { previousEmploymentForUser } from "@/lib/previous-employment";
+import { effectiveRegionApproverClause, effectiveRegionLabelOf, regionEntryForMember, type OfficeAddressLike } from "@/lib/company-regions";
+import { resolveRegionPolicy } from "@/lib/region-scope";
 import "@/models/Company";
 import "@/models/Team";
 
@@ -101,6 +104,44 @@ export async function GET() {
     status: "pending",
   }).select("_id");
   insights.pendingIdentityCodeRequest = !!pendingIdentityRequest;
+
+  // The viewer's own region heads, resolved for every role. `insights.hr` is
+  // only built for HR/finance/admin/security further down, so the profile org
+  // chart would otherwise have to fall back to a raw ObjectId for everyone
+  // else. Also tolerates a `regionLabel` left over from before the office was
+  // named — see `regionEntryForMember`.
+  if (user.company && user.companyStatus === "approved") {
+    const regionCompanyId =
+      typeof user.company === "object" && user.company
+        ? (user.company as any)._id
+        : user.company;
+    const regionCompany = (await Company.findById(regionCompanyId)
+      .select("addresses address")
+      .lean()) as { addresses?: OfficeAddressLike[] | null; address?: string | null } | null;
+    const regionEntry = regionEntryForMember(regionCompany, user);
+    const headIds = [regionEntry?.hrHead, regionEntry?.adminHead]
+      .map((id) => String(id ?? ""))
+      .filter(Boolean);
+    const headUsers = headIds.length
+      ? await User.find({ _id: { $in: headIds }, company: regionCompanyId })
+          .select("name role")
+          .lean()
+      : [];
+    const headById = new Map(headUsers.map((u: any) => [String(u._id), u]));
+    const namedHead = (id: unknown) => {
+      const key = String(id ?? "");
+      if (!key) return null;
+      const found = headById.get(key) as any;
+      return found
+        ? { id: key, name: String(found.name ?? ""), role: String(found.role ?? "") }
+        : null;
+    };
+    insights.regionHeads = {
+      region: regionEntry?.label ? String(regionEntry.label) : "",
+      hrHead: namedHead(regionEntry?.hrHead),
+      adminHead: namedHead(regionEntry?.adminHead),
+    };
+  }
   const pendingSalaryRequest = await JoinRequest.findOne({
     requester: userId,
     kind: "salary",
@@ -218,15 +259,45 @@ export async function GET() {
 
   if (["human-resource", "finance", "admin", "security"].includes(safeRole) && user.company && user.companyStatus === "approved") {
     const companyId = typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
-    const [members, teams, companyPolicy, companyDoc] = await Promise.all([
-      User.find({ company: companyId, companyStatus: "approved" })
+    const companyDoc = (await Company.findById(companyId)
+      .select("owner addresses address multiOffice")
+      .lean()) as {
+      owner?: unknown;
+      addresses?: OfficeAddressLike[] | null;
+      address?: string | null;
+      multiOffice?: boolean;
+    } | null;
+
+    // Regional admins only see members in their own region. The company owner,
+    // HR, finance and security keep the company-wide list. An admin whose
+    // region holds no members falls back to the whole company (same rule as
+    // the finance salary scope) rather than seeing an empty list.
+    const ownerId = companyDoc?.owner ?? null;
+    const isOwner = ownerId != null && String(ownerId) === String(user._id);
+    const adminRegion = effectiveRegionLabelOf(companyDoc, user);
+    let membersClause: Record<string, unknown> | null = null;
+    if (safeRole === "admin" && !isOwner && adminRegion) {
+      const clause = effectiveRegionApproverClause(companyDoc, adminRegion);
+      if (clause) {
+        const regionMemberCount = await User.countDocuments({
+          company: companyId,
+          companyStatus: "approved",
+          ...clause,
+        });
+        if (regionMemberCount > 0) membersClause = clause;
+      }
+    }
+
+    const [members, teams] = await Promise.all([
+      User.find({ company: companyId, companyStatus: "approved", ...(membersClause ?? {}) })
         .select("name email role customRole isSeniorSecurity team teamStatus activeTeams membershipHistory companyJoined employmentEndDate employmentType durationMonths durationDays durationHours durationYears salaryType baseSalary hourlyRate dailyRate salaryCurrency companyIdentityCode regionLabel phone dob address emergencyContact bloodGroup pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted")
         .populate("membershipHistory.inviter", "name role")
         .sort({ role: 1, name: 1 }),
       Team.find({ company: companyId }).select("name manager employees"),
-      CompanyPolicy.findOne({ company: companyId }).select("pfPercentage esicPercentage tdsPercentage"),
-      Company.findById(companyId).select("addresses multiOffice"),
     ]);
+    // The viewer's own region policy, so a regional admin sees their region's
+    // PF/ESIC/TDS percentages rather than a company-wide figure.
+    const companyPolicy = await resolveRegionPolicy(companyId, user.regionLabel);
     const companyPfPct = Number(companyPolicy?.pfPercentage ?? 12);
     const companyEsicPct = Number(companyPolicy?.esicPercentage ?? 0.75);
     const companyTdsPct = Number(companyPolicy?.tdsPercentage ?? 0);
@@ -471,6 +542,12 @@ export async function GET() {
 
   const serializedUser = serializeDoc(user);
   serializedUser.baseSalary = baseSalaryValue;
+  // Drives the Documents tab for members who have left the company: they keep
+  // read-only access to what they uploaded, but no company to browse.
+  serializedUser.documentCount = Array.isArray(user.documents) ? user.documents.length : 0;
+  // Real employment history, reconstructed once the disconnect has nulled out
+  // `company` / `companyJoined`. Null while the user is still a member.
+  serializedUser.previousEmployment = await previousEmploymentForUser(user);
 
   return NextResponse.json({ user: serializedUser, insights });
 }

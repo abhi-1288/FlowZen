@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { apiFetch } from "@/lib/client-utils";
+import { pendingSignatureSummary } from "@/lib/document-letter-signatories";
 import { ActionButton, AnyRecord, displayNested, EmptyState, SectionHeader } from "../shared";
 import { Modal } from "../modal";
 import dynamic from "next/dynamic";
@@ -9,6 +10,61 @@ const IdCardModal = dynamic(
   () => import("../id-card-modal").then((mod) => mod.IdCardModal),
   { ssr: false },
 );
+
+/** Mirrors the `kind` enum on the JoinRequest model. */
+type ApprovalKind =
+  | "company"
+  | "team"
+  | "identity-code"
+  | "salary"
+  | "salary-advance"
+  | "quit-company"
+  | "quit-team"
+  | "quit-company-board-transfer"
+  | "salary-increment"
+  | "role-transfer"
+  | "document-letter"
+  | "region-address"
+  | "id-card"
+  | "employment-type"
+  | "identity-code-range";
+
+type ApprovalGroup = "joining" | "resignation" | "documents" | "finance" | "hr-company";
+
+/**
+ * Exhaustive on purpose: adding a kind to the JoinRequest enum fails the build
+ * here until it is assigned a group, so a new request type can never end up
+ * visible only under "All".
+ */
+const KIND_TO_GROUP: Record<ApprovalKind, ApprovalGroup> = {
+  company: "joining",
+  team: "joining",
+  "quit-company": "resignation",
+  "quit-team": "resignation",
+  "quit-company-board-transfer": "resignation",
+  "role-transfer": "resignation",
+  "document-letter": "documents",
+  "id-card": "documents",
+  salary: "finance",
+  "salary-increment": "finance",
+  "salary-advance": "finance",
+  "identity-code": "hr-company",
+  "identity-code-range": "hr-company",
+  "region-address": "hr-company",
+  "employment-type": "hr-company",
+};
+
+const GROUPS: { id: ApprovalGroup; label: string; empty: string }[] = [
+  { id: "joining", label: "Joining", empty: "No pending joining requests." },
+  { id: "resignation", label: "Resignation", empty: "No pending resignation requests." },
+  { id: "documents", label: "Documents", empty: "No pending document requests." },
+  { id: "finance", label: "Finance", empty: "No pending salary requests." },
+  { id: "hr-company", label: "HR & Company", empty: "No pending HR or company requests." },
+];
+
+function groupOf(request: AnyRecord): ApprovalGroup | null {
+  return KIND_TO_GROUP[String(request.kind ?? "") as ApprovalKind] ?? null;
+}
 
 function requestIdOf(request: AnyRecord) {
   const value = request.id ?? request._id;
@@ -66,6 +122,10 @@ export function ApprovalsTab({
   const [rejectModalId, setRejectModalId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [idCardPreviewRequest, setIdCardPreviewRequest] = useState<AnyRecord | null>(null);
+  // Document letters preview in a modal. `draft` mirrors the page's `?draft=1`
+  // flag, needed for a letter HR has not approved yet, which the page refuses
+  // to render otherwise.
+  const [letterPreview, setLetterPreview] = useState<{ id: string; draft: boolean } | null>(null);
   const [detailRequestId, setDetailRequestId] = useState<string | null>(null);
   const [detailData, setDetailData] = useState<AnyRecord | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -146,9 +206,50 @@ export function ApprovalsTab({
     }
   }
 
+  async function coSign(id: string, sign: boolean) {
+    if (!id) return;
+    setDecidingIds((current) => ({ ...current, [id]: true }));
+    try {
+      await apiFetch(`/api/approvals/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ sign }),
+      });
+      setClearedIds((current) => ({ ...current, [id]: true }));
+      showToast(sign ? "Your signature has been added." : "Signature declined.");
+      await refresh(true);
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Could not record your signature.",
+        "error",
+      );
+    } finally {
+      setDecidingIds((current) => ({ ...current, [id]: false }));
+    }
+  }
+
   const visibleApprovals = approvals.filter(
     (request) => !clearedIds[requestIdOf(request)],
   );
+
+  const [activeGroup, setActiveGroup] = useState<"all" | ApprovalGroup>("all");
+
+  const countsByGroup = visibleApprovals.reduce<Record<string, number>>((acc, request) => {
+    const group = groupOf(request);
+    if (group) acc[group] = (acc[group] ?? 0) + 1;
+    return acc;
+  }, {});
+  const visibleGroups = GROUPS.filter((group) => (countsByGroup[group.id] ?? 0) > 0);
+
+  // Zero-count tabs are hidden, so deciding the last request in the active tab
+  // would otherwise strand the view on a tab that no longer exists. Derived
+  // rather than synced in an effect so the fallback applies in the same render.
+  const effectiveGroup: "all" | ApprovalGroup =
+    activeGroup !== "all" && (countsByGroup[activeGroup] ?? 0) === 0 ? "all" : activeGroup;
+
+  const groupedApprovals =
+    effectiveGroup === "all"
+      ? visibleApprovals
+      : visibleApprovals.filter((request) => groupOf(request) === effectiveGroup);
 
   async function openDetail(id: string) {
     if (!id) return;
@@ -181,14 +282,55 @@ export function ApprovalsTab({
   return (
     <section className="rounded-xl neu-card p-5">
       <SectionHeader title="Pending Approvals" description="Review and manage approval requests" accent="indigo" />
+      {visibleGroups.length > 1 ? (
+        <div className="sticky top-0 z-10 -mx-5 mt-5 bg-[var(--c-bg-card)] px-5 pb-2">
+          <div className="flex flex-wrap gap-2">
+            {([
+              { id: "all" as const, label: "All", count: visibleApprovals.length },
+              ...visibleGroups.map((group) => ({
+                id: group.id,
+                label: group.label,
+                count: countsByGroup[group.id] ?? 0,
+              })),
+            ]).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveGroup(tab.id)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  effectiveGroup === tab.id
+                    ? "bg-indigo-500 text-white"
+                    : "bg-[var(--c-bg-muted)] text-slate-600 hover:bg-[var(--c-bg-hover)]"
+                }`}
+              >
+                {tab.label} ({tab.count})
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div className="mt-5 divide-y divide-slate-200">
-        {visibleApprovals.map((request) => {
+        {groupedApprovals.map((request) => {
           const requestId = requestIdOf(request);
           const isDeciding = Boolean(decidingIds[requestId]);
           const metadata = (request.metadata ?? {}) as AnyRecord;
+          // A co-approver can sign before HR issues the letter, so this only
+          // decides whether the preview needs `?draft=1` to render at all.
+          const signatureReady = (request as AnyRecord).signatureReady !== false;
           return (
             <div className="flex flex-wrap items-center justify-between gap-4 py-4" key={requestId}>
               <div>
+                {(request as AnyRecord).signatoryView ? (
+                  <p
+                    className={`mb-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                      signatureReady
+                        ? "bg-indigo-100 text-indigo-700"
+                        : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {signatureReady ? "Your optional signature" : "Nominated to co-sign"}
+                  </p>
+                ) : null}
                 <p className="font-medium">
                   {displayNested(request.requester, "name", "User")},{" "}
                   {displayNested(request.requester, "role", "User")}
@@ -243,6 +385,17 @@ export function ApprovalsTab({
                         <p>Notice period: {String((request.metadata as AnyRecord)?.noticePeriodDays ?? "")} days</p>
                       </>
                     ) : null}
+                    {(request as AnyRecord).signatoryView && !signatureReady ? (
+                      <p className="text-slate-500">
+                        HR has not approved this letter yet. Your signature is optional and will be
+                        carried onto the letter when it is issued.
+                      </p>
+                    ) : null}
+                    {pendingSignatureSummary((request as AnyRecord).signatories) ? (
+                      <p className="font-medium text-indigo-600">
+                        Awaiting optional signature: {pendingSignatureSummary((request as AnyRecord).signatories)}
+                      </p>
+                    ) : null}
                   </div>
                 ) : String(request.kind).startsWith("quit-") ? (
                   <p className="mt-1 text-xs text-slate-500">
@@ -288,7 +441,7 @@ export function ApprovalsTab({
               <div className="flex gap-2">
                 {String(request.kind) === "document-letter" ? (
                   <ActionButton variant="secondary" className="px-3" disabled={isDeciding}
-                    onClick={() => window.open(`/letter/${requestId}?draft=1`, "_blank")}
+                    onClick={() => setLetterPreview({ id: requestId, draft: true })}
                   >
                     Preview
                   </ActionButton>
@@ -307,18 +460,38 @@ export function ApprovalsTab({
                     Detail
                   </ActionButton>
                 ) : null}
-                <ActionButton variant="danger" className="px-3" disabled={isDeciding}
-                  onClick={() => {
-                    if (String(request.kind ?? "") === "document-letter" || request.kind === "id-card") {
-                      setRejectModalId(requestId);
-                      setRejectionReason("");
-                    } else {
-                      decide(requestId, "rejected", false, String(request.kind ?? ""));
-                    }
-                  }}
-                >
-                  {isDeciding ? "Working..." : "Decline"}
-                </ActionButton>
+                {(request as AnyRecord).signatoryView ? (
+                  <>
+                    <ActionButton variant="secondary" className="px-3" disabled={isDeciding}
+                      onClick={() => setLetterPreview({ id: requestId, draft: !signatureReady })}
+                    >
+                      View letter
+                    </ActionButton>
+                    <ActionButton variant="primary" className="px-3" disabled={isDeciding}
+                      onClick={() => coSign(requestId, true)}
+                    >
+                      {isDeciding ? "Working..." : "Sign"}
+                    </ActionButton>
+                    <ActionButton variant="danger" className="px-3" disabled={isDeciding}
+                      onClick={() => coSign(requestId, false)}
+                    >
+                      Decline to sign
+                    </ActionButton>
+                  </>
+                ) : (
+                  <ActionButton variant="danger" className="px-3" disabled={isDeciding}
+                    onClick={() => {
+                      if (String(request.kind ?? "") === "document-letter" || request.kind === "id-card") {
+                        setRejectModalId(requestId);
+                        setRejectionReason("");
+                      } else {
+                        decide(requestId, "rejected", false, String(request.kind ?? ""));
+                      }
+                    }}
+                  >
+                    {isDeciding ? "Working..." : "Decline"}
+                  </ActionButton>
+                )}
                 {["company", "salary"].includes(String(request.kind ?? "")) ? (
                   <div className="flex items-center gap-2">
                     <select className="rounded-md neu-inset px-1.5 py-1.5 text-[11px]"
@@ -424,8 +597,12 @@ export function ApprovalsTab({
             </div>
           );
         })}
-        {visibleApprovals.length === 0 ? (
-          <EmptyState message="No pending approvals." />
+        {groupedApprovals.length === 0 ? (
+          <EmptyState
+            message={
+              GROUPS.find((group) => group.id === effectiveGroup)?.empty ?? "No pending approvals."
+            }
+          />
         ) : null}
       </div>
 
@@ -624,6 +801,45 @@ export function ApprovalsTab({
           signerName={session?.user?.name ?? ""}
           signerRole={session?.user?.role ?? ""}
         />
+      ) : null}
+
+      {letterPreview ? (
+        <Modal
+          open
+          onClose={() => {
+            setLetterPreview(null);
+            // The framed page can sign or approve the letter itself, so refresh
+            // to pick up whatever happened while it was open.
+            void refresh();
+          }}
+          title="Letter preview"
+          description="Read-only until you approve or sign below."
+          maxWidth="max-w-5xl"
+          footer={
+            <>
+              <a
+                href={`/letter/${letterPreview.id}${letterPreview.draft ? "?draft=1" : ""}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-[var(--c-bg-muted)]"
+              >
+                Open in new tab
+              </a>
+              <ActionButton variant="secondary" onClick={() => {
+                setLetterPreview(null);
+                void refresh();
+              }}>
+                Close
+              </ActionButton>
+            </>
+          }
+        >
+          <iframe
+            src={`/letter/${letterPreview.id}${letterPreview.draft ? "?draft=1" : ""}`}
+            title="Letter preview"
+            className="h-[68vh] w-full rounded-lg border border-slate-200"
+          />
+        </Modal>
       ) : null}
     </section>
   );

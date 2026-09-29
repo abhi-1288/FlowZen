@@ -1114,7 +1114,7 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-400 dark:text-zinc-500">
           <span>Passing threshold: {assessment.passScore}%</span>
           {assessment.negativeMarking > 0 && <span>Negative marking: -{negativeMarkingShort(assessment.negativeMarking, assessment.negativeMarkingLabel)} per wrong answer</span>}
-          {proctoring.active && <span>Proctored — camera on, no recording</span>}
+          {proctoring.active && <span>Proctored — camera on, Microphone on, Screen sharing</span>}
           <span>Answers save automatically</span>
           {isMock && <span className="font-semibold text-slate-500 dark:text-zinc-400">Practice run — does not affect your application</span>}
         </div>
@@ -1223,8 +1223,7 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
       )}
       {proctoringWanted && (
         <p className="mt-1.5 text-xs text-slate-400 dark:text-zinc-500">
-          Proctored: the camera and microphone stay on, and the exam opens fullscreen. Nothing is
-          recorded.
+          Proctored: the camera and microphone stay on, and the exam opens fullscreen, and the system checks for multiple faces, screen sharing, and background noise.
         </p>
       )}
 

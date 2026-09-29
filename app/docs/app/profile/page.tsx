@@ -59,6 +59,27 @@ export default function ProfileDocsPage() {
         </section>
 
         <section className="docs-section">
+          <h2>Roles and Access</h2>
+          <div className="docs-card">
+            <p>
+              <code>Company.owner</code> is the single global super-admin — the only role that can act
+              across every region and manage company-level settings.
+            </p>
+            <p>
+              The <code>admin</code> role is region-scoped (same rule as <code>finance</code>): an
+              admin&apos;s scope is the members whose effective region matches theirs, with the
+              main-office fallback when their <code>regionLabel</code> is unset. A regional admin can
+              see and manage members, attendance, documents, approvals and finance records for their
+              own region only — never another region&apos;s.
+            </p>
+            <p>
+              What stays company-level (owner-only): takedown, freeze/hold, brand theme, join codes,
+              and the region roster itself.
+            </p>
+          </div>
+        </section>
+
+        <section className="docs-section">
           <h2>Get Profile</h2>
           <div className="docs-card">
             <div className="docs-card-header">
@@ -67,7 +88,28 @@ export default function ProfileDocsPage() {
             </div>
             <p>Get current user&apos;s full profile.</p>
 
-            <div className="docs-code">{"{\n  \"user\": {\n    \"id\": \"...\",\n    \"name\": \"John Doe\",\n    \"email\": \"john@example.com\",\n    \"phone\": \"+1234567890\",\n    \"role\": \"employee\",\n    \"dob\": \"1990-05-15\",\n    \"address\": \"123 Main St\",\n    \"avatarUrl\": \"...\",\n    \"bloodGroup\": \"O+\",\n    \"emergencyContact\": {\n      \"name\": \"Jane Doe\",\n      \"phone\": \"+1234567891\",\n      \"relation\": \"Spouse\"\n    },\n    \"company\": \"companyId\",\n    \"team\": \"teamId\",\n    \"regionLabel\": \"US-East\"\n  }\n}"}</div>
+            <div className="docs-code">{"{\n  \"user\": {\n    \"id\": \"...\",\n    \"name\": \"John Doe\",\n    \"email\": \"john@example.com\",\n    \"phone\": \"+1234567890\",\n    \"role\": \"employee\",\n    \"dob\": \"1990-05-15\",\n    \"address\": \"123 Main St\",\n    \"avatarUrl\": \"...\",\n    \"bloodGroup\": \"O+\",\n    \"emergencyContact\": {\n      \"name\": \"Jane Doe\",\n      \"phone\": \"+1234567891\",\n      \"relation\": \"Spouse\"\n    },\n    \"company\": \"companyId\",\n    \"team\": \"teamId\",\n    \"regionLabel\": \"US-East\",\n    \"documentCount\": 3,\n    \"previousEmployment\": null\n  }\n}"}</div>
+
+            <p className="docs-note">
+              Two fields exist specifically for members who have been disconnected from their
+              company, where the profile would otherwise degrade into &ldquo;Not set&rdquo; /{" "}
+              &ldquo;none&rdquo;: <code>documentCount</code> drives the read-only Documents tab,
+              which is only shown to a disconnected member when it is greater than 0, and{" "}
+              <code>previousEmployment</code> summarises the employment they actually finished. It
+              is <code>null</code> while they are still an approved member.
+            </p>
+
+            <div className="docs-code">{"{\n  \"previousEmployment\": {\n    \"companyId\": \"...\",\n    \"companyName\": \"Acme Corp\",\n    \"region\": \"Pune\",\n    \"role\": \"qa-tester\",\n    \"employmentType\": \"full-time\",\n    \"joined\": \"2024-01-15T00:00:00.000Z\",\n    \"ended\": \"2025-06-30T00:00:00.000Z\"\n  }\n}"}</div>
+
+            <p className="docs-note">
+              The disconnect nulls out <code>company</code> and <code>companyJoined</code>, so{" "}
+              <code>joined</code> is reconstructed from the last <code>joined-company</code> entry in{" "}
+              <code>membershipHistory</code>, while <code>ended</code> comes from{" "}
+              <code>employmentEndDate</code> — the <code>contract-expired</code> history entry is
+              stamped with the cron run time, not the last working day.{" "}
+              <code>region</code> resolves the member&apos;s own <code>regionLabel</code>, falling
+              back to the main office.
+            </p>
           </div>
         </section>
 
@@ -206,7 +248,17 @@ export default function ProfileDocsPage() {
             </div>
             <p>Get user&apos;s uploaded documents.</p>
 
-            <div className="docs-code">{"{\n  \"documents\": [\n    {\n      \"id\": \"...\",\n      \"category\": \"identity\",\n      \"fileName\": \"passport.pdf\",\n      \"fileType\": \"application/pdf\",\n      \"fileUrl\": \"...\",\n      \"fieldValues\": {}\n    }\n  ]\n}"}</div>
+            <p className="docs-note">
+              A member who has been disconnected has no company left to read the required categories
+              from, but their own uploads are immutable history and the blob keys are not
+              company-scoped, so they stay downloadable. Such a request gets{" "}
+              <code>categories: []</code> and <code>readOnly: true</code> rather than the 403 an
+              approved company used to require. <code>readOnly</code> is the client&apos;s signal to
+              hide upload and delete controls; both mutations below still require an approved
+              company, so an ex-member can neither upload nor delete.
+            </p>
+
+            <div className="docs-code">{"{\n  \"categories\": [\n    { \"name\": \"identity\", \"mandatory\": true, \"fields\": [] }\n  ],\n  \"documents\": [\n    {\n      \"category\": \"identity\",\n      \"fileName\": \"passport.pdf\",\n      \"fileType\": \"application/pdf\",\n      \"fileUrl\": \"...\",\n      \"fieldValues\": []\n    }\n  ],\n  \"readOnly\": false\n}"}</div>
           </div>
         </section>
 
@@ -217,7 +269,62 @@ export default function ProfileDocsPage() {
               <span className="method-badge method-post">POST</span>
               <code className="endpoint-path">/api/profile/documents</code>
             </div>
-            <p>Add a new document to profile.</p>
+            <p>
+              Upload a document against a required category. Requires{" "}
+              <code>multipart/form-data</code> and an approved company.
+            </p>
+
+            <table className="docs-table">
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Type</th>
+                  <th>Required</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>file</code></td>
+                  <td>file</td>
+                  <td><span className="badge-required">Required</span></td>
+                  <td>The document. Max 20 MB</td>
+                </tr>
+                <tr>
+                  <td><code>category</code></td>
+                  <td>string</td>
+                  <td><span className="badge-required">Required</span></td>
+                  <td>Must match a category configured in the company&apos;s <code>requiredDocuments</code></td>
+                </tr>
+                <tr>
+                  <td><code>fieldValues</code></td>
+                  <td>string</td>
+                  <td><span className="badge-optional">Optional</span></td>
+                  <td>JSON-encoded array of <code>{"{ label, value }"}</code></td>
+                </tr>
+              </tbody>
+            </table>
+
+            <p className="docs-note">
+              The category decides which extensions are accepted via{" "}
+              <code>acceptedFileTypes</code>. Only one document per category is kept, so the
+              existing one must be deleted first. PDF uploads are parsed for a blood group, which
+              is written back to the profile if found, and <code>fieldValues</code> labelled
+              &ldquo;account number&rdquo; / &ldquo;ifsc&rdquo; are copied onto the profile too.
+            </p>
+
+            <div className="docs-code">{"{\n  \"ok\": true,\n  \"url\": \"...\",\n  \"fileName\": \"passport.pdf\",\n  \"fileType\": \"application/pdf\",\n  \"fileSize\": 245678,\n  \"category\": \"identity\",\n  \"fieldValues\": []\n}"}</div>
+          </div>
+        </section>
+
+        <section className="docs-section">
+          <h2>Delete Document</h2>
+          <div className="docs-card">
+            <div className="docs-card-header">
+              <span className="method-badge method-delete">DELETE</span>
+              <code className="endpoint-path">/api/profile/documents</code>
+            </div>
+            <p>Remove the document held against a category. Requires an approved company.</p>
 
             <table className="docs-table">
               <thead>
@@ -233,74 +340,12 @@ export default function ProfileDocsPage() {
                   <td><code>category</code></td>
                   <td>string</td>
                   <td><span className="badge-required">Required</span></td>
-                  <td>Document category</td>
-                </tr>
-                <tr>
-                  <td><code>fileName</code></td>
-                  <td>string</td>
-                  <td><span className="badge-required">Required</span></td>
-                  <td>Original filename</td>
-                </tr>
-                <tr>
-                  <td><code>fileType</code></td>
-                  <td>string</td>
-                  <td><span className="badge-required">Required</span></td>
-                  <td>MIME type</td>
-                </tr>
-                <tr>
-                  <td><code>fileSize</code></td>
-                  <td>number</td>
-                  <td><span className="badge-required">Required</span></td>
-                  <td>File size in bytes</td>
-                </tr>
-                <tr>
-                  <td><code>fileUrl</code></td>
-                  <td>string</td>
-                  <td><span className="badge-required">Required</span></td>
-                  <td>URL of uploaded file</td>
-                </tr>
-                <tr>
-                  <td><code>fieldValues</code></td>
-                  <td>object</td>
-                  <td><span className="badge-optional">Optional</span></td>
-                  <td>Additional metadata</td>
+                  <td>Category whose document should be deleted (query param)</td>
                 </tr>
               </tbody>
             </table>
 
-            <div className="docs-code">{"{\n  \"document\": { ... created document }\n}"}</div>
-          </div>
-        </section>
-
-        <section className="docs-section">
-          <h2>Delete Document</h2>
-          <div className="docs-card">
-            <div className="docs-card-header">
-              <span className="method-badge method-delete">DELETE</span>
-              <code className="endpoint-path">/api/profile/documents</code>
-            </div>
-            <p>Remove a document from profile.</p>
-
-            <table className="docs-table">
-              <thead>
-                <tr>
-                  <th>Field</th>
-                  <th>Type</th>
-                  <th>Required</th>
-                  <th>Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><code>documentId</code></td>
-                  <td>string</td>
-                  <td><span className="badge-required">Required</span></td>
-                  <td>Document ID to delete</td>
-                </tr>
-              </tbody>
-            </table>
-
-            <div className="docs-code">{"{\n  \"success\": true\n}"}</div>
+            <div className="docs-code">{"{\n  \"ok\": true\n}"}</div>
           </div>
         </section>
 

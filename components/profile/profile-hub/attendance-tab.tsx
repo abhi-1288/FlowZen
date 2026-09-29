@@ -60,6 +60,7 @@ export function AttendanceTab({
   currentMonthStart.setDate(1);
   const [exportFrom, setExportFrom] = useState(currentMonthStart.toISOString().slice(0, 10));
   const [exportTo, setExportTo] = useState(new Date().toISOString().slice(0, 10));
+  const [exporting, setExporting] = useState(false);
   const [leavePolicy, setLeavePolicy] = useState<AnyRecord | null>(null);
   const [wfhRequests, setWfhRequests] = useState<AnyRecord[]>([]);
   const [checkOutRequests, setCheckOutRequests] = useState<AnyRecord[]>([]);
@@ -130,12 +131,46 @@ export function AttendanceTab({
   };
   const isAttendanceEnabled = checkAttendanceEnabled(profile);
   const canExportAttendance = checkCanExport(profile);
-  const exportAttendance = () => {
+  const exportAttendance = async () => {
     if (!exportFrom || !exportTo) {
       showToast("Select a start and end date.", "error");
       return;
     }
-    window.location.href = `/api/attendance/export?from=${encodeURIComponent(exportFrom)}&to=${encodeURIComponent(exportTo)}`;
+    setExporting(true);
+    try {
+      const res = await fetch(
+        `/api/attendance/export?from=${encodeURIComponent(exportFrom)}&to=${encodeURIComponent(exportTo)}`,
+      );
+      if (!res.ok) {
+        // A plain navigation would dump this JSON in the browser.
+        let message = "Could not export attendance.";
+        try {
+          const data = await res.json();
+          if (data?.error) message = String(data.error);
+        } catch {
+          /* keep the default message */
+        }
+        showToast(message, "error");
+        return;
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const match = /filename="?([^"]+)"?/i.exec(disposition);
+      const filename = match?.[1] ?? `attendance-${exportFrom}-to-${exportTo}.csv`;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      showToast("Attendance CSV downloaded.", "success");
+    } catch {
+      showToast("Could not export attendance.", "error");
+    } finally {
+      setExporting(false);
+    }
   };
   useEffect(() => {
     if (!isAttendanceEnabled) return;
@@ -464,8 +499,9 @@ export function AttendanceTab({
                 className="px-3"
                 onClick={exportAttendance}
                 type="button"
+                disabled={exporting}
               >
-                Export Excel
+                {exporting ? "Exporting…" : "Export CSV"}
               </ActionButton>
             </div>
           ) : null}

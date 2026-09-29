@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import { connectDb } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { ATSCandidate } from "@/models/ATSCandidate";
-import { ATSJob } from "@/models/ATSJob";
 import { ATSOffer } from "@/models/ATSOffer";
 import { ATSTimeline } from "@/models/ATSTimeline";
 import { ATSAuditLog } from "@/models/ATSAuditLog";
@@ -11,7 +9,9 @@ import { Attendance } from "@/models/Attendance";
 import { JoinRequest } from "@/models/JoinRequest";
 import { Notification } from "@/models/Notification";
 import { Company } from "@/models/Company";
-import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
+import { withCandidateAccess } from "@/lib/recruitment-candidate-access";
+import { regionJoinApproverId } from "@/lib/join-approvers";
+import { jsonError } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
 import { sendMail } from "@/lib/mailer";
 import { employeeAccountContent } from "@/lib/email-templates";
@@ -19,7 +19,6 @@ import { buildOrigin } from "@/lib/candidate-portal";
 import { parseResumeFromUrl } from "@/lib/resume-parser";
 
 type Params = { params: Promise<{ id: string }> };
-const HR_ROLES = ["admin", "human-resource"];
 const ALLOWED_CONVERT_ROLES = ["employee", "project-manager", "qa-tester", "human-resource", "finance", "security", "others"];
 
 function parseDobString(value: string): Date | null {
@@ -33,17 +32,15 @@ function parseDobString(value: string): Date | null {
 
 export async function POST(request: Request, { params }: Params) {
   const { id } = await params;
-  const userId = await requireUserId();
-  if (!userId) return jsonError("Unauthorized", 401);
-  if (!isObjectId(id)) return jsonError("Invalid candidate id.");
+  const access = await withCandidateAccess(id, "write");
+  if (!access.ok) return access.response;
+  const { user: hrUser } = access;
+  const userId = String(hrUser._id);
+  const isSeniorSecurity = hrUser.role === "security" && Boolean((hrUser as any).isSeniorSecurity);
 
-  await connectDb();
-  const hrUser = await User.findById(userId);
-  const isSeniorSecurity = hrUser?.role === "security" && Boolean((hrUser as any).isSeniorSecurity);
-  if (!hrUser || (!HR_ROLES.includes(hrUser.role) && !isSeniorSecurity)) return jsonError("Forbidden", 403);
-  if (!hrUser.company) return jsonError("No company found.", 400);
-
-  const candidate = await ATSCandidate.findOne({ _id: id, company: hrUser.company }).select("+conversionOtpHash").populate("job", "title department employmentType durationMonths durationDays durationHours durationYears");
+  const candidate = await ATSCandidate.findById(access.candidate._id)
+    .select("+conversionOtpHash")
+    .populate("job", "title department employmentType durationMonths durationDays durationHours durationYears regionLabel");
   if (!candidate) return jsonError("Candidate not found.", 404);
   if (candidate.stage !== "joined") return jsonError("Candidate must be in 'Joined' stage to convert.", 400);
 
@@ -86,7 +83,6 @@ export async function POST(request: Request, { params }: Params) {
 
   const company = await Company.findById(hrUser.company);
   const companyName = company?.name || "Company";
-
   const passwordHash = await bcrypt.hash(password, 12);
 
   const job = candidate.job as any;
@@ -99,7 +95,7 @@ export async function POST(request: Request, { params }: Params) {
   const acceptedOffer = await ATSOffer.findOne({
     candidate: candidate._id,
     status: "accepted",
-  }).select("offeredCTC salaryType joiningDate");
+  }).select("offeredCTC salaryType joiningDate regionLabel");
 
   const offerJoiningDate = (acceptedOffer as any)?.joiningDate || null;
   const offerSalaryType = String((acceptedOffer as any)?.salaryType ?? "per-annum");
@@ -107,6 +103,35 @@ export async function POST(request: Request, { params }: Params) {
   const payBasis = ["per-annum", "per-month", "per-day", "per-hour"].includes(offerSalaryType)
     ? offerSalaryType
     : "per-annum";
+
+  // Which office this hire joins, and therefore which region's head approves it.
+  //
+  // Precedence mirrors `candidates/[id]/offer/route.ts`: the offer's stamped
+  // region is the authority because that is what the receiving region agreed to
+  // when it raised it. The candidate's transfer and the job's region are
+  // fallbacks for hires converted without an accepted offer on file.
+  const companyRegionLabels = company?.addresses?.length
+    ? (company.addresses as any[]).map((a) => String(a?.label ?? "").trim()).filter(Boolean)
+    : [];
+  const canonicalRegion = (value: unknown): string => {
+    const raw = String(value ?? "").trim();
+    if (!raw) return "";
+    return companyRegionLabels.find((l) => l.toLowerCase() === raw.toLowerCase()) ?? "";
+  };
+
+  const targetRegion =
+    canonicalRegion((acceptedOffer as any)?.regionLabel) ||
+    canonicalRegion(candidate.joiningRegionLabel) ||
+    canonicalRegion(job?.regionLabel) ||
+    canonicalRegion(hrUser.regionLabel);
+
+  // Falls back to the converting HR when the region has no head. See
+  // `regionJoinApproverId`: an unconfigured head must not block an onboarding.
+  const regionHeadId = targetRegion
+    ? await regionJoinApproverId(hrUser.company, targetRegion)
+    : "";
+  const joinApproverId = regionHeadId || userId;
+  const routedToRegionHead = Boolean(regionHeadId) && regionHeadId !== userId;
 
   const joiningDate = offerJoiningDate ? new Date(offerJoiningDate) : new Date();
   let employmentEndDate: Date | null = null;
@@ -228,7 +253,7 @@ export async function POST(request: Request, { params }: Params) {
 
   await JoinRequest.create({
     requester: employee._id,
-    approver: userId,
+    approver: joinApproverId,
     company: hrUser.company,
     kind: "company",
     status: "pending",
@@ -239,6 +264,17 @@ export async function POST(request: Request, { params }: Params) {
       offeredCTC: acceptedOffer?.offeredCTC || 0,
       salaryType: acceptedOffer?.salaryType || "per-annum",
       currency: acceptedOffer?.currency || "INR",
+      // The office the hire joins. `app/api/approvals/[id]/route.ts` reads this
+      // to stamp the new employee's `regionLabel` on approval; it used to copy
+      // the approver's region, which filed a Noida hire under whichever office
+      // the approver happened to sit in.
+      regionLabel: targetRegion,
+      joinRoutedTo: routedToRegionHead ? "region-head" : "converting-hr",
+      // Only recorded for an HR-role converter, because the approval flow
+      // filters the enrolled employee by `metadata.enrollingHrId` joined against
+      // the `human-resource` role. Storing it for an admin converter produced an
+      // id that the role filter could never match.
+      ...(hrUser.role === "human-resource" ? { enrollingHrId: userId } : {}),
     },
   });
 
@@ -274,6 +310,9 @@ export async function POST(request: Request, { params }: Params) {
       employeeId: String(employee._id),
       jobTitle: job?.title,
       accountEmail: finalEmail,
+      regionLabel: targetRegion,
+      joinApproverId,
+      joinRoutedTo: routedToRegionHead ? "region-head" : "converting-hr",
       ...(emailChanged ? { originalEmail } : {}),
     },
     company: hrUser.company,
@@ -290,6 +329,28 @@ export async function POST(request: Request, { params }: Params) {
     emitToUser(String(hr._id), "notification:new", {
       message: `${candidate.firstName} ${candidate.lastName} has been converted to employee.`,
     });
+  }
+
+  // The region head owns this approval now, so say so explicitly. They are very
+  // likely already in the loop above, but the generic "pending approval" line
+  // does not tell them this one is theirs to action or which office it lands in.
+  if (routedToRegionHead) {
+    const regionMessage = targetRegion
+      ? `${candidateFullName} joining ${targetRegion} is pending your approval.`
+      : `${candidateFullName} is pending your approval.`;
+    try {
+      await Notification.create({
+        user: joinApproverId,
+        company: hrUser.company,
+        type: "info",
+        title: "Join Approval Assigned to You",
+        message: regionMessage,
+          link: "/profile/approvals",
+      });
+      emitToUser(joinApproverId, "notification:new", { message: regionMessage });
+    } catch (notifyErr) {
+      console.error("Failed to notify region head of join approval:", notifyErr);
+    }
   }
 
   return NextResponse.json({ ok: true, employeeId: String(employee._id) });

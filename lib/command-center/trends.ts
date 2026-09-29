@@ -12,6 +12,7 @@ import { ProjectBudget } from "@/models/ProjectBudget";
 import { Task } from "@/models/Task";
 import { User } from "@/models/User";
 import { bucketIndex, buildBuckets } from "./dates";
+import { buildFilters, type CommandCenterFilters } from "./filters";
 import type { Bucket } from "./dates";
 import type { CommandCenterContext } from "./context";
 import type { ProjectHealth, TrendMetric, Variant } from "./types";
@@ -19,16 +20,38 @@ import type { ProjectHealth, TrendMetric, Variant } from "./types";
 export const DONE_RE = /done|complete|closed|finished|delivered/i;
 export const BLOCKED_RE = /block|wait|hold|stuck|defer|parked/i;
 
-export async function getCompanyBoardIds(companyId: string | null): Promise<string[]> {
+/**
+ * Boards in scope.
+ *
+ * With `memberIds` the viewer is regional, so a board belongs to them when they
+ * own it or are a member of it. That skips the company→members→boards walk
+ * entirely on the scoped path: the ids are already known to be members of this
+ * company, so any board matching them is this company's.
+ *
+ * Without `memberIds` there is no boundary and the original walk is kept, so
+ * companies with no region configured see exactly what they saw before.
+ */
+export async function getCompanyBoardIds(
+  companyId: string | null,
+  memberIds?: string[] | null,
+): Promise<string[]> {
   if (!companyId) return [];
+  if (memberIds) {
+    const scoped = await Board.find({
+      $or: [{ owner: { $in: memberIds } }, { "members.user": { $in: memberIds } }],
+    })
+      .select("_id")
+      .lean();
+    return scoped.map((b) => String(b._id));
+  }
   const members = await User.find({
     company: companyId,
     companyStatus: "approved",
   })
     .select("_id")
     .lean();
-  const memberIds = members.map((m) => m._id);
-  const boards = await Board.find({ owner: { $in: memberIds } })
+  const ownerIds = members.map((m) => m._id);
+  const boards = await Board.find({ owner: { $in: ownerIds } })
     .select("_id")
     .lean();
   return boards.map((b) => String(b._id));
@@ -69,11 +92,18 @@ async function attendanceSeries(
   companyId: string | null,
   activeMembers: number,
   buckets: Bucket[],
+  filters: CommandCenterFilters,
   userIdForPersonal?: string,
 ): Promise<TrendMetric> {
   const start = buckets[0].start;
   const end = buckets[buckets.length - 1].end;
-  const match: Record<string, unknown> = { date: { $gte: start, $lt: end } };
+  // `Attendance` has no `company` column, so the tenant boundary can only be
+  // expressed as a set of user ids. Without this the series counted every
+  // other tenant's present users.
+  const match: Record<string, unknown> = {
+    date: { $gte: start, $lt: end },
+    ...filters.byVisibleMember("user"),
+  };
   if (userIdForPersonal) match["user"] = userIdForPersonal;
   const rows = await Attendance.aggregate([
     { $match: match },
@@ -142,7 +172,11 @@ async function tasksSeries(
   };
 }
 
-async function expenseSeries(companyId: string | null, buckets: Bucket[]): Promise<TrendMetric> {
+async function expenseSeries(
+  companyId: string | null,
+  buckets: Bucket[],
+  filters: CommandCenterFilters,
+): Promise<TrendMetric> {
   if (!companyId) return emptySeries("expenses", "Expenses", "₹", buckets);
   const start = buckets[0].start;
   const end = buckets[buckets.length - 1].end;
@@ -151,10 +185,16 @@ async function expenseSeries(companyId: string | null, buckets: Bucket[]): Promi
       company: companyId,
       status: { $nin: ["rejected"] },
       createdAt: { $gte: start, $lt: end },
+      ...filters.byMember("requester"),
     })
       .select("amount createdAt")
       .lean(),
-    ExpenseBill.find({ company: companyId, status: "paid", paidAt: { $gte: start, $lt: end } })
+    ExpenseBill.find({
+      company: companyId,
+      status: "paid",
+      paidAt: { $gte: start, $lt: end },
+      ...(await filters.bill()),
+    })
       .select("amount paidAt")
       .lean(),
   ]);
@@ -173,7 +213,11 @@ async function expenseSeries(companyId: string | null, buckets: Bucket[]): Promi
   };
 }
 
-async function revenueSeries(companyId: string | null, buckets: Bucket[]): Promise<TrendMetric> {
+async function revenueSeries(
+  companyId: string | null,
+  buckets: Bucket[],
+  filters: CommandCenterFilters,
+): Promise<TrendMetric> {
   if (!companyId) return emptySeries("revenue", "Revenue", "₹", buckets);
   const start = buckets[0].start;
   const end = buckets[buckets.length - 1].end;
@@ -181,6 +225,7 @@ async function revenueSeries(companyId: string | null, buckets: Bucket[]): Promi
     company: companyId,
     status: "paid",
     paidAt: { $gte: start, $lt: end },
+    ...filters.invoice(),
   })
     .select("amount paidAt")
     .lean();
@@ -193,7 +238,11 @@ async function revenueSeries(companyId: string | null, buckets: Bucket[]): Promi
   };
 }
 
-async function payrollSeries(companyId: string | null, buckets: Bucket[]): Promise<TrendMetric> {
+async function payrollSeries(
+  companyId: string | null,
+  buckets: Bucket[],
+  filters: CommandCenterFilters,
+): Promise<TrendMetric> {
   if (!companyId) return emptySeries("payroll", "Payroll", "₹", buckets);
   const start = buckets[0].start;
   const end = buckets[buckets.length - 1].end;
@@ -201,6 +250,7 @@ async function payrollSeries(companyId: string | null, buckets: Bucket[]): Promi
     company: companyId,
     status: "paid",
     paidAt: { $gte: start, $lt: end },
+    ...filters.byMember("employee"),
   })
     .select("netSalary paidAt")
     .lean();
@@ -213,13 +263,22 @@ async function payrollSeries(companyId: string | null, buckets: Bucket[]): Promi
   };
 }
 
-async function candidateSeries(companyId: string | null, buckets: Bucket[]): Promise<TrendMetric> {
+async function candidateSeries(
+  companyId: string | null,
+  buckets: Bucket[],
+  filters: CommandCenterFilters,
+): Promise<TrendMetric> {
   if (!companyId) return emptySeries("candidates", "Candidates", "", buckets);
   const start = buckets[0].start;
   const end = buckets[buckets.length - 1].end;
   const candidates = await ATSCandidate.find({
     company: companyId,
     createdAt: { $gte: start, $lt: end },
+    // `joiningRegionLabel`, not `regionLabel`. The latter holds detected STATE
+    // names, so filtering it by office label silently dropped candidates for a
+    // regional viewer. The main-office branch of `byRegionLabel` already keeps
+    // the unassigned pool, which is what a company-wide candidate count needs.
+    ...filters.byRegionLabel("joiningRegionLabel"),
   })
     .select("createdAt")
     .lean();
@@ -232,13 +291,18 @@ async function candidateSeries(companyId: string | null, buckets: Bucket[]): Pro
   };
 }
 
-async function ticketSeries(companyId: string | null, buckets: Bucket[]): Promise<TrendMetric> {
+async function ticketSeries(
+  companyId: string | null,
+  buckets: Bucket[],
+  filters: CommandCenterFilters,
+): Promise<TrendMetric> {
   if (!companyId) return emptySeries("tickets", "Tickets created", "", buckets);
   const start = buckets[0].start;
   const end = buckets[buckets.length - 1].end;
   const tickets = await ITTicket.find({
     company: companyId,
     createdAt: { $gte: start, $lt: end },
+    ...filters.byMember("requester"),
   })
     .select("createdAt")
     .lean();
@@ -251,13 +315,18 @@ async function ticketSeries(companyId: string | null, buckets: Bucket[]): Promis
   };
 }
 
-async function ticketResolvedSeries(companyId: string | null, buckets: Bucket[]): Promise<TrendMetric> {
+async function ticketResolvedSeries(
+  companyId: string | null,
+  buckets: Bucket[],
+  filters: CommandCenterFilters,
+): Promise<TrendMetric> {
   if (!companyId) return emptySeries("tickets-resolved", "Tickets resolved", "", buckets);
   const start = buckets[0].start;
   const end = buckets[buckets.length - 1].end;
   const tickets = await ITTicket.find({
     company: companyId,
     resolvedAt: { $gte: start, $lt: end },
+    ...filters.byMember("requester"),
   })
     .select("resolvedAt")
     .lean();
@@ -270,13 +339,21 @@ async function ticketResolvedSeries(companyId: string | null, buckets: Bucket[])
   };
 }
 
-async function accessRequestSeries(companyId: string | null, buckets: Bucket[]): Promise<TrendMetric> {
+async function accessRequestSeries(
+  companyId: string | null,
+  buckets: Bucket[],
+  filters: CommandCenterFilters,
+): Promise<TrendMetric> {
   if (!companyId) return emptySeries("access-requests", "Access requests", "", buckets);
   const start = buckets[0].start;
   const end = buckets[buckets.length - 1].end;
   const requests = await ITProvisioningRequest.find({
     company: companyId,
     createdAt: { $gte: start, $lt: end },
+    // `employee` is the joiner being provisioned for and is null until the
+    // account exists, so regional IT leads see only requests naming someone in
+    // their region.
+    ...filters.byMember("employee"),
   })
     .select("createdAt")
     .lean();
@@ -289,7 +366,11 @@ async function accessRequestSeries(companyId: string | null, buckets: Bucket[]):
   };
 }
 
-async function joinerSeries(companyId: string | null, buckets: Bucket[]): Promise<TrendMetric> {
+async function joinerSeries(
+  companyId: string | null,
+  buckets: Bucket[],
+  userFilter: Record<string, unknown>,
+): Promise<TrendMetric> {
   if (!companyId) return emptySeries("joiners", "New joiners", "", buckets);
   const start = buckets[0].start;
   const end = buckets[buckets.length - 1].end;
@@ -297,6 +378,7 @@ async function joinerSeries(companyId: string | null, buckets: Bucket[]): Promis
     company: companyId,
     companyStatus: "approved",
     companyJoined: { $gte: start, $lt: end },
+    ...userFilter,
   })
     .select("companyJoined")
     .lean();
@@ -386,18 +468,26 @@ async function buildProjectHealth(
 export async function buildTrends(
   ctx: CommandCenterContext,
 ): Promise<{ trends: TrendMetric[]; projectHealth: ProjectHealth[] | null }> {
-  const { companyId, variant, period, userId, now } = ctx;
+  const { companyId, variant, period, userId, now, memberIds } = ctx;
+  const filters = buildFilters(ctx);
   const buckets = buildBuckets(period, now);
-  const activeMembers = companyId
-    ? await User.countDocuments({ company: companyId, companyStatus: "approved" })
-    : 0;
+  // Scoped to the members the viewer may count, so the attendance percentage's
+  // denominator matches its numerator.
+  const activeMembers =
+    companyId && variant !== "personal"
+      ? await User.countDocuments({
+          company: companyId,
+          companyStatus: "approved",
+          ...(memberIds ? { _id: { $in: memberIds } } : {}),
+        })
+      : 0;
 
   let projectHealth: ProjectHealth[] | null = null;
   let boardIds: string[] = [];
   let myBoardIds: string[] = [];
 
   if (variant === "admin" || variant === "projects") {
-    boardIds = await getCompanyBoardIds(companyId);
+    boardIds = ctx.boardIds ?? [];
     projectHealth = await buildProjectHealth(companyId, boardIds, now);
   }
   if (variant === "personal") {
@@ -407,38 +497,44 @@ export async function buildTrends(
   const producers: Record<Variant, () => Promise<TrendMetric[]>> = {
     admin: () =>
       Promise.all([
-        attendanceSeries(companyId, activeMembers, buckets),
+        attendanceSeries(companyId, activeMembers, buckets, filters),
         tasksSeries(boardIds, buckets),
-        expenseSeries(companyId, buckets),
-        revenueSeries(companyId, buckets),
+        expenseSeries(companyId, buckets, filters),
+        revenueSeries(companyId, buckets, filters),
       ]),
     hr: () =>
       Promise.all([
-        attendanceSeries(companyId, activeMembers, buckets),
-        candidateSeries(companyId, buckets),
+        attendanceSeries(companyId, activeMembers, buckets, filters),
+        candidateSeries(companyId, buckets, filters),
         tasksSeries(boardIds, buckets),
-        joinerSeries(companyId, buckets),
+        joinerSeries(companyId, buckets, filters.byUser()),
       ]),
     finance: () =>
       Promise.all([
-        revenueSeries(companyId, buckets),
-        expenseSeries(companyId, buckets),
-        payrollSeries(companyId, buckets),
-        attendanceSeries(companyId, activeMembers, buckets),
+        revenueSeries(companyId, buckets, filters),
+        expenseSeries(companyId, buckets, filters),
+        payrollSeries(companyId, buckets, filters),
+        attendanceSeries(companyId, activeMembers, buckets, filters),
       ]),
     projects: () =>
       Promise.all([
         tasksSeries(boardIds, buckets),
-        expenseSeries(companyId, buckets),
-        revenueSeries(companyId, buckets),
+        expenseSeries(companyId, buckets, filters),
+        revenueSeries(companyId, buckets, filters),
       ]),
     it: () =>
-      Promise.all([ticketSeries(companyId, buckets), ticketResolvedSeries(companyId, buckets)]),
+      Promise.all([
+        ticketSeries(companyId, buckets, filters),
+        ticketResolvedSeries(companyId, buckets, filters),
+      ]),
     security: () =>
-      Promise.all([accessRequestSeries(companyId, buckets), joinerSeries(companyId, buckets)]),
+      Promise.all([
+        accessRequestSeries(companyId, buckets, filters),
+        joinerSeries(companyId, buckets, filters.byUser()),
+      ]),
     personal: () =>
       Promise.all([
-        attendanceSeries(companyId, activeMembers, buckets, userId),
+        attendanceSeries(companyId, activeMembers, buckets, filters, userId),
         tasksSeries(myBoardIds, buckets, userId),
       ]),
   };

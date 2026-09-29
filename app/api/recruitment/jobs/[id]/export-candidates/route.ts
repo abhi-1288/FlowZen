@@ -5,8 +5,11 @@ import { ATSJob } from "@/models/ATSJob";
 import { ATSCandidate } from "@/models/ATSCandidate";
 import { ATSReferral } from "@/models/ATSReferral";
 import { User } from "@/models/User";
+import { Company } from "@/models/Company";
+import { candidateRegionClause } from "@/lib/candidate-region-scope";
 import { STAGE_LABELS, type Stage } from "@/lib/recruitment-types";
 import { parseResumeFromUrl } from "@/lib/resume-parser";
+import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
 
 const HR_ROLES = ["admin", "human-resource"];
 
@@ -53,13 +56,28 @@ export async function GET(_request: Request, { params }: Params) {
   await connectDb();
   const user = await User.findById(userId);
   if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  const hq = await requireRecruitmentHQ(user as any);
+  if (!hq.ok) return hq.response;
   if (!user.company) return jsonError("No company found.", 400);
 
   const job = await ATSJob.findOne({ _id: id, company: user.company }).select("title status");
   if (!job) return jsonError("Job not found.", 404);
   if (job.status !== "closed") return jsonError("Candidate export is available after the job is closed.", 400);
 
-  const candidates = await ATSCandidate.find({ job: id, company: user.company }).sort({ createdAt: 1 }).lean();
+  const companyScope = (await Company.findById(user.company)
+    .select("owner addresses address")
+    .lean()) as any;
+
+  // Scoped like the on-screen list. An export that ignores the region boundary
+  // would hand a regional recruiter a CSV of every other region's candidates —
+  // personal data, straight out of the door.
+  const candidates = await ATSCandidate.find({
+    job: id,
+    company: user.company,
+    ...candidateRegionClause(companyScope, user),
+  })
+    .sort({ createdAt: 1 })
+    .lean();
 
   const referralRecords = await ATSReferral.find({ job: id, company: user.company })
     .select("candidate referralId")
@@ -96,6 +114,7 @@ export async function GET(_request: Request, { params }: Params) {
     "ATS Status",
     "Assessment Score",
     "Assessment Status",
+    "Joining Region",
   ];
 
   const rows: string[] = [headings.map(csvCell).join(",")];
@@ -177,6 +196,8 @@ export async function GET(_request: Request, { params }: Params) {
         c.atsStatus ?? "",
         c.assessmentScore ?? "",
         c.assessmentStatus ?? "",
+        // The office this candidate was transferred to, not the detected state.
+        c.joiningRegionLabel || "",
       ]
         .map(csvCell)
         .join(",")

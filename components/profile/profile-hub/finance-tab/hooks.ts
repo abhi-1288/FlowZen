@@ -62,23 +62,29 @@ export function useLeaveImpacts(data: FinanceData | null, month: string) {
 export function usePolicyData(data: FinanceData | null) {
   const [policyData, setPolicyData] = useState<PolicyData | null>(null);
 
+  const loadPolicy = useCallback(async (region?: string) => {
+    const query = region ? `?region=${encodeURIComponent(region)}` : "";
+    const res = await apiFetch<PolicyApiResponse>(`/api/finance/policy${query}`);
+    setPolicyData({
+      foodAmount: res.foodAmount,
+      travelAccommodationAmount: res.travelAccommodationAmount,
+      foodOptedOutMembers: res.foodOptedOutMembers ?? [],
+      travelOptedOutMembers: res.travelOptedOutMembers ?? [],
+      advanceSalaryEnabled: res.advanceSalaryEnabled ?? false,
+      pfPercentage: res.pfPercentage ?? 12,
+      esicPercentage: res.esicPercentage ?? 0.75,
+      tdsPercentage: res.tdsPercentage ?? 0,
+    });
+  }, []);
+
   useEffect(() => {
     if (!data) return;
-    apiFetch<PolicyApiResponse>("/api/finance/policy")
-      .then((res) => setPolicyData({
-        foodAmount: res.foodAmount,
-        travelAccommodationAmount: res.travelAccommodationAmount,
-        foodOptedOutMembers: res.foodOptedOutMembers ?? [],
-        travelOptedOutMembers: res.travelOptedOutMembers ?? [],
-        advanceSalaryEnabled: res.advanceSalaryEnabled ?? false,
-        pfPercentage: res.pfPercentage ?? 12,
-        esicPercentage: res.esicPercentage ?? 0.75,
-        tdsPercentage: res.tdsPercentage ?? 0,
-      }))
-      .catch(() => { });
-  }, [data]);
+    loadPolicy().catch(() => { });
+  }, [data, loadPolicy]);
 
-  return { policyData, setPolicyData };
+  const refreshPolicy = useCallback((region?: string) => loadPolicy(region), [loadPolicy]);
+
+  return { policyData, setPolicyData, refreshPolicy };
 }
 
 export function useMySalarySlips(month: string) {
@@ -99,9 +105,10 @@ export function useMySalarySlips(month: string) {
 export function useSalaryCycle(data: FinanceData | null) {
   const [salaryCycle, setSalaryCycle] = useState<SalaryCycleData | null>(null);
 
-  const refreshSalaryCycle = useCallback(async () => {
+  const refreshSalaryCycle = useCallback(async (region?: string) => {
     try {
-      const result = await apiFetch<SalaryCycleData>("/api/finance/salary-cycle");
+      const query = region ? `?region=${encodeURIComponent(region)}` : "";
+      const result = await apiFetch<SalaryCycleData>(`/api/finance/salary-cycle${query}`);
       setSalaryCycle(result);
     } catch {
       // ignore

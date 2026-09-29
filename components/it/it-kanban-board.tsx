@@ -5,11 +5,19 @@ import { Info, X } from "lucide-react";
 import {
   type ItTicket,
   type ItTicketStatus,
+  type ProcurementRequest,
+  type ProcurementStatus,
   IT_STATUS_LABELS,
   IT_STATUS_COLORS,
   IT_PRIORITY_LABELS,
   IT_PRIORITY_COLORS,
+  PROCUREMENT_STATUS_LABELS,
+  PROCUREMENT_CATEGORY_LABELS,
 } from "./it-types";
+
+function formatMoney(value: number, currency: string) {
+  return `${(Number(value) || 0).toLocaleString("en-US", { maximumFractionDigits: 2 })} ${currency || "INR"}`;
+}
 
 const WORKFLOW_GUIDE: {
   status: ItTicketStatus;
@@ -269,6 +277,114 @@ export function ItKanbanBoard({
           </section>
         );
       })}
+      </div>
+    </div>
+  );
+}
+
+const PROCUREMENT_COLUMN_ORDER: ProcurementStatus[] = [
+  "PENDING_IT",
+  "ASSIGNED_IT",
+  "IT_APPROVED",
+  "ACCEPTED_FIN",
+  "DISBURSED",
+  "REJECTED_IT",
+  "REJECTED_FIN",
+  "CANCELLED",
+];
+
+/**
+ * The purchase half of the IT board. Same column layout as the ticket board,
+ * but the stages are the IT→finance hand-off rather than a support workflow.
+ */
+export function ProcurementBoard({
+  requests,
+  onSelect,
+}: {
+  requests: ProcurementRequest[];
+  onSelect: (r: ProcurementRequest) => void;
+}) {
+  const grouped = useMemo(() => {
+    const map: Record<ProcurementStatus, ProcurementRequest[]> = {
+      PENDING_IT: [],
+      ASSIGNED_IT: [],
+      IT_APPROVED: [],
+      ACCEPTED_FIN: [],
+      DISBURSED: [],
+      REJECTED_IT: [],
+      REJECTED_FIN: [],
+      CANCELLED: [],
+    };
+    for (const r of requests) {
+      if (map[r.status]) map[r.status].push(r);
+    }
+    return map;
+  }, [requests]);
+
+  return (
+    <div className="task-scrollbar flex flex-1 flex-col overflow-x-auto p-4 sm:p-6">
+      <p className="mb-4 text-xs text-slate-500 dark:text-zinc-400">
+        {requests.length} purchase request{requests.length !== 1 ? "s" : ""} across{" "}
+        {PROCUREMENT_COLUMN_ORDER.length} stages
+      </p>
+      <div className="flex flex-1 gap-4">
+        {PROCUREMENT_COLUMN_ORDER.map((status) => {
+          const col = grouped[status];
+          return (
+            <section
+              key={status}
+              className="flex max-h-full w-72 shrink-0 flex-col rounded-lg border border-slate-200 bg-slate-100/80 dark:border-zinc-800 dark:bg-[#000000]"
+            >
+              <header className="flex items-center justify-between gap-2 px-3 py-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <h3 className="truncate text-sm font-semibold text-slate-800 dark:text-zinc-200">
+                    {PROCUREMENT_STATUS_LABELS[status]}
+                  </h3>
+                  <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-zinc-700 dark:text-zinc-300">
+                    {col.length}
+                  </span>
+                </div>
+              </header>
+
+              <div className="task-scrollbar min-h-24 flex-1 space-y-3 overflow-y-auto px-3 pb-3">
+                {col.map((req) => (
+                  <button
+                    key={req.id}
+                    className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:shadow-md dark:border-zinc-800 dark:bg-[#000000]"
+                    onClick={() => onSelect(req)}
+                    type="button"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="min-w-0 flex-1 break-words text-sm font-semibold leading-5 text-slate-900 dark:text-zinc-100">
+                        {req.title}
+                      </h4>
+                      <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono font-medium text-slate-500 dark:bg-zinc-700 dark:text-zinc-400">
+                        {req.requestNumber}
+                      </span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                      {req.reason || PROCUREMENT_CATEGORY_LABELS[req.category]}
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                        {PROCUREMENT_CATEGORY_LABELS[req.category]}
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-zinc-700 dark:text-zinc-400">
+                        {formatMoney(req.amount, req.currency)}
+                        {req.quantity > 1 ? ` × ${req.quantity}` : ""}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+                {col.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-4 text-center text-sm text-slate-500 dark:border-zinc-700 dark:bg-zinc-700/70 dark:text-zinc-400">
+                    None
+                  </div>
+                ) : null}
+              </div>
+            </section>
+          );
+        })}
       </div>
     </div>
   );

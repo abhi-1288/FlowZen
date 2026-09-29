@@ -9,6 +9,7 @@ import DiscordProvider from "next-auth/providers/discord";
 import bcrypt from "bcryptjs";
 import { createHash } from "crypto";
 import { connectDb } from "@/lib/db";
+import { canRunRecruitmentPipeline } from "@/lib/recruitment-hq";
 import { User } from "@/models/User";
 import { Team } from "@/models/Team";
 import { rateLimitLogin } from "@/lib/rate-limit";
@@ -228,13 +229,38 @@ export const authOptions: NextAuthOptions = {
           try {
             await connectDb();
             const userDoc = await User.findById(token.sub)
-              .populate("company", "name primaryColor slug")
+              .populate("company", "name primaryColor slug owner addresses address")
               .populate("team", "name");
             if (!userDoc) return null!;
             (token as any).role = userDoc.role;
             (token as any).isSeniorSecurity = Boolean((userDoc as any).isSeniorSecurity);
             const team = userDoc.team as any;
             const companyDoc = userDoc.company as any;
+            // Company owners get a few powers their role string does not imply
+            // (e.g. routing candidates between regions) because the owner's
+            // role can be anything. Cached on the same 15-min cycle as the rest.
+            (token as any).isCompanyOwner = Boolean(
+              companyDoc?.owner && String(companyDoc.owner) === String(userDoc._id),
+            );
+            // Whether this user runs the recruitment pipeline: raises requisitions
+            // for any location and runs ATS / assessment / interviews company-wide.
+            // Held on the token so the client can hide controls it cannot use,
+            // rather than rendering a button that 403s on submit. The same decision
+            // is re-derived from the database on every server route that enforces
+            // it, so a stale token can only cause a wrong button, never a bypass.
+            (token as any).isRecruitmentHQ = canRunRecruitmentPipeline(
+              {
+                owner: companyDoc?.owner,
+                addresses: companyDoc?.addresses,
+                address: companyDoc?.address,
+              } as any,
+              {
+                _id: userDoc._id,
+                role: userDoc.role,
+                regionLabel: (userDoc as any).regionLabel,
+                company: userDoc.company,
+              } as any,
+            );
             (token as any).company = companyDoc?.name || null;
             (token as any).companyColor = companyDoc?.primaryColor || "#2563eb";
             (token as any).team = team?.name || null;
@@ -267,6 +293,8 @@ export const authOptions: NextAuthOptions = {
         session.user.teamId = (token as any).teamId || null;
         session.user.managedTeamCount = (token as any).managedTeamCount || 0;
         session.user.isSeniorSecurity = Boolean((token as any).isSeniorSecurity);
+        session.user.isCompanyOwner = Boolean((token as any).isCompanyOwner);
+        session.user.isRecruitmentHQ = Boolean((token as any).isRecruitmentHQ);
       }
       return session;
     }

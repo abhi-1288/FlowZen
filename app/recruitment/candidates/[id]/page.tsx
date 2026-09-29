@@ -22,6 +22,7 @@ import {
   Cog,
   ExternalLink,
   Link2,
+  Building2,
 } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
@@ -55,6 +56,11 @@ export default function CandidateProfilePage() {
   const { data: session } = useSession();
   const role = session?.user?.role;
   const isHr = role === "admin" || role === "human-resource";
+  // Interview panels, proctoring, test links and stage moves are the requisition
+  // owner's work. A region HR keeps `isHr` for the one thing only they can see —
+  // their own round and the prompt to complete it — which is why both flags exist
+  // rather than one replacing the other.
+  const canRunPipeline = Boolean(session?.user?.isRecruitmentHQ);
   const isSeniorSecurity = role === "security" && Boolean((session?.user as any)?.isSeniorSecurity);
   const mountedRef = useRef(true);
 
@@ -215,6 +221,7 @@ export default function CandidateProfilePage() {
     "offer-accepted": "Offer Accepted",
     "offer-rejected": "Offer Rejected",
     "stage-changed": "Stage Updated",
+    "region-assigned": "Sent to Region",
     joined: "Joined",
     rejected: "Not Selected",
     "note-added": "Note Added",
@@ -232,6 +239,7 @@ export default function CandidateProfilePage() {
     "offer-accepted": CheckCircle,
     "offer-rejected": XCircle,
     "stage-changed": Send,
+    "region-assigned": Building2,
     joined: Briefcase,
     rejected: XCircle,
     "note-added": MessageSquare,
@@ -542,7 +550,7 @@ export default function CandidateProfilePage() {
                       </span>
                     )}
                   </div>
-                  {isHr && (
+                  {canRunPipeline && (
                     <button
                       onClick={() => handleRemoveAssignment(a.role)}
                       className="text-rose-400 hover:text-rose-600"
@@ -568,7 +576,26 @@ export default function CandidateProfilePage() {
               {STAGE_LABELS[activeCandidate.stage]}
             </span>
           </div>
-          {isHr && (
+          {/* The office this candidate was transferred to. The offer inherits it
+              and the join approval is routed to that region's head, so it is
+              load-bearing context rather than a detail — shown only once set, to
+              keep the unassigned majority of the list uncluttered. */}
+          {activeCandidate.joiningRegionLabel && (
+            <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-indigo-50 px-3 py-2 dark:bg-indigo-950/40">
+              <span className="flex items-center gap-1.5 text-xs font-medium text-indigo-700 dark:text-indigo-300">
+                <Building2 size={12} /> Joining region
+              </span>
+              <span className="text-xs font-semibold text-indigo-800 dark:text-indigo-200">
+                {activeCandidate.joiningRegionLabel}
+              </span>
+            </div>
+          )}
+          {activeCandidate.joiningRegionLabel && activeCandidate.previousJoiningRegionLabel && (
+            <p className="mt-1 text-[11px] text-slate-500">
+              Reassigned from {activeCandidate.previousJoiningRegionLabel}.
+            </p>
+          )}
+          {canRunPipeline && (
             <div className="mt-2 flex items-center gap-1">
               {STAGES.map((stage, idx) => (
                 <div key={stage} className="flex items-center flex-1">
@@ -629,7 +656,7 @@ export default function CandidateProfilePage() {
             {(activeCandidate as any).assessmentRejectionNote && (
               <p className="mt-1 text-xs text-rose-600 font-medium">Rejection: {(activeCandidate as any).assessmentRejectionNote}</p>
             )}
-            {isHr && (
+            {canRunPipeline && (
               <ProctoringPanel
                 candidateId={activeCandidate.id}
                 proctoring={(activeCandidate as any).assessmentProctoring ?? null}
@@ -641,7 +668,7 @@ export default function CandidateProfilePage() {
                 onChanged={() => void fetchCandidate(activeCandidate.id)}
               />
             )}
-            {isHr && activeCandidate.stage === "screening" && (
+            {canRunPipeline && activeCandidate.stage === "screening" && (
               <div className="mt-3 border-t border-[var(--c-border-light)] pt-3">
                 <p className="text-xs text-slate-500 mb-2">
                   Candidate is eligible for the online assessment. Generate the test link and share it with the candidate.
@@ -679,7 +706,7 @@ export default function CandidateProfilePage() {
                 {testLinkError && <p className="mt-1.5 text-xs text-rose-600">{testLinkError}</p>}
               </div>
             )}
-            {activeCandidate.stage === "assessment" && !(activeCandidate as any).assessmentSubmittedAt && isHr && (
+            {activeCandidate.stage === "assessment" && !(activeCandidate as any).assessmentSubmittedAt && canRunPipeline && (
               <div className="mt-3 border-t border-[var(--c-border-light)] pt-3">
                 <button
                   onClick={() => void getTestLink()}
@@ -719,7 +746,7 @@ export default function CandidateProfilePage() {
 
         {/* Actions */}
         <div className="mt-4 flex flex-wrap gap-2">
-          {isHr && (
+          {canRunPipeline && (
             <>
               <button
                 onClick={() =>
@@ -738,7 +765,7 @@ export default function CandidateProfilePage() {
                 <FileText size={14} /> Generate Offer
               </button>
 
-              {isHr && activeCandidate.stage === "screening" && (
+              {canRunPipeline && activeCandidate.stage === "screening" && (
                 <button
                   onClick={() => { if (confirm("Move this candidate to the Assessment stage?")) void handleStageChange("assessment"); }}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 px-3 py-2 text-sm font-medium text-teal-600 hover:bg-teal-50"

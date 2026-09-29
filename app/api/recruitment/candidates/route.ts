@@ -10,12 +10,14 @@ import { Company } from "@/models/Company";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { companyCodePrefix } from "@/lib/company-identity";
+import { candidateRegionClause } from "@/lib/candidate-region-scope";
 import { isObjectId, jsonError, requireUserId, serializeDoc, serializeDocs } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
 import { createMagicLinkToken } from "@/lib/codes";
 import { buildOrigin } from "@/lib/candidate-portal";
 import { applicationReceivedContent } from "@/lib/email-templates";
 import { sendMail } from "@/lib/mailer";
+import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
 
 
 const HR_ROLES = ["admin", "human-resource"];
@@ -37,6 +39,10 @@ export async function GET(request: Request) {
   const isSeniorSecurity = user?.role === "security" && Boolean((user as any).isSeniorSecurity);
   if (!user || (!ALL_ROLES.includes(user.role) && !isSeniorSecurity)) return jsonError("Forbidden", 403);
   if (!user.company) return jsonError("No company found.", 400);
+
+  const company = (await Company.findById(user.company)
+    .select("owner addresses address")
+    .lean()) as any;
 
   const { searchParams } = new URL(request.url);
   const stage = searchParams.get("stage");
@@ -65,6 +71,15 @@ export async function GET(request: Request) {
   }
   if (!HR_ROLES.includes(user.role)) {
     filter["assignedTeam.user"] = userId;
+  }
+
+  // Region boundary. Spread into `$and` because `search` may already own `$or`,
+  // and two siblings of `$or` silently discard each other in Mongo.
+  const regionClause = candidateRegionClause(company, user);
+  if (Object.keys(regionClause).length > 0) {
+    const and: Record<string, unknown>[] = (filter.$and as Record<string, unknown>[]) ?? [];
+    and.push(regionClause);
+    filter.$and = and;
   }
 
   const [totalCount, candidates] = await Promise.all([
@@ -127,6 +142,8 @@ export async function POST(request: Request) {
   await connectDb();
   const user = await User.findById(userId);
   if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  const hq = await requireRecruitmentHQ(user as any);
+  if (!hq.ok) return hq.response;
   if (!user.company) return jsonError("No company found.", 400);
 
   const job = await ATSJob.findOne({ _id: body.job, company: user.company });

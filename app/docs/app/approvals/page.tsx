@@ -67,6 +67,29 @@ export default function ApprovalsDocsPage() {
             </div>
             <p>Get all pending approval requests for the current user.</p>
 
+            <p className="docs-note">
+              Requests where you are the assigned approver are always yours. As an HR or admin you
+              additionally see company-wide requests raised by non-HR members —{" "}
+              <strong>except</strong> <code>document-letter</code>, which is{" "}
+              <strong>region-scoped</strong>: you only see letters from your own region, with a user
+              who has no <code>regionLabel</code> resolving to the main office. If your region has
+              nobody holding an approver role, the company-wide list is returned instead rather
+              than leaving you with an empty inbox. <code>quit-company</code> requests are never
+              region-scoped.
+            </p>
+
+            <p className="docs-note">
+              As a <strong>nominated co-approver</strong> you get a separate inbox entry for every
+              document letter whose <code>signatories[]</code> still has a{" "}
+              <code>pending</code> row for you. The letter is listed from the moment it is created,
+              not only once HR issues it, so the &ldquo;you may sign later&rdquo; notification always
+              links to something. Two fields decorate those entries:{" "}
+              <code>signatoryView</code> is always <code>true</code> and tells the client to render
+              signature actions instead of approve/reject, and <code>signatureReady</code> says
+              whether <code>/letter/[id]</code> already renders without <code>?draft=1</code>. It is
+              not an access gate — signing is open before issuance.
+            </p>
+
             <div className="docs-code">{"{\n  \"requests\": [\n    {\n      \"id\": \"...\",\n      \"requester\": { \"id\": \"...\", \"name\": \"John\" },\n      \"kind\": \"company\",\n      \"status\": \"pending\",\n      \"createdAt\": \"2024-01-15T10:30:00Z\"\n    }\n  ]\n}"}</div>
           </div>
         </section>
@@ -78,7 +101,15 @@ export default function ApprovalsDocsPage() {
               <span className="method-badge method-patch">PATCH</span>
               <code className="endpoint-path">/api/approvals/[id]</code>
             </div>
-            <p>Approve or reject an approval request.</p>
+            <p>Approve or reject an approval request, or record an optional co-signature.</p>
+
+            <p className="docs-note">
+              <code>status</code> and <code>sign</code> are mutually exclusive. Sending{" "}
+              <code>sign</code> takes an early return{" "}
+              <strong>before any status transition</strong>, so a co-approver can never approve,
+              reject or otherwise advance a request — see{" "}
+              <Link href="/docs/app/documents">Documents</Link> for the full co-signing flow.
+            </p>
 
             <table className="docs-table">
               <thead>
@@ -138,8 +169,31 @@ export default function ApprovalsDocsPage() {
                   <td><span className="badge-optional">Optional</span></td>
                   <td>Mark as signed</td>
                 </tr>
+                <tr>
+                  <td><code>sign</code></td>
+                  <td>boolean</td>
+                  <td><span className="badge-optional">Optional</span></td>
+                  <td>
+                    Record an advisory co-signature on a document letter.{" "}
+                    <code>true</code> signs, <code>false</code> declines
+                  </td>
+                </tr>
               </tbody>
             </table>
+
+            <p className="docs-note">
+              The <code>sign</code> branch is only valid for{" "}
+              <code>kind: &quot;document-letter&quot;</code> (400 otherwise) and requires the caller
+              to hold a <code>pending</code> <code>signatories</code> row on the request, otherwise
+              403. Signing is open while the letter is <code>pending</code>,{" "}
+              <code>hr-approved</code> or <code>approved</code>; any other status is 409, since a
+              rejected letter will never be issued. A signature given before HR approves is retained
+              and appears on the letter once it is issued, and the requester is notified either way
+              — with an extra &ldquo;All signatures complete&rdquo; notification when the last
+              outstanding signature resolves. A decline counts as resolved, so a declined
+              co-approver never leaves the letter reading as still waiting. Co-signatures never
+              block, delay or revert issuance: HR is the only gate.
+            </p>
 
             <div className="docs-code">{"{\n  \"request\": {\n    \"id\": \"...\",\n    \"status\": \"approved\"\n  }\n}"}</div>
           </div>

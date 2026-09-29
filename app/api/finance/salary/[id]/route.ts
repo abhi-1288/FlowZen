@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { jsonError, requireUserId } from "@/lib/api";
+import { Company } from "@/models/Company";
 import { CompanyPolicy } from "@/models/CompanyPolicy";
 import { FinanceSalary } from "@/models/FinanceSalary";
 import { User } from "@/models/User";
-import { computeSalaryBreakdown, getSalaryPeriod } from "../../helpers";
+import { assertSalaryTargetInFinanceScope, canAccessFinanceRecord, canManageFinance, computeSalaryBreakdown, getSalaryPeriod } from "../../helpers";
+import { isCompanyOwner } from "@/lib/admin-region-scope";
+import { resolveRegionPolicy } from "@/lib/region-scope";
 
 export async function GET(
   _request: Request,
@@ -16,7 +19,7 @@ export async function GET(
   await connectDb();
 
   const actor = await User.findById(userId).select(
-    "name role company companyStatus",
+    "name role company companyStatus regionLabel",
   );
   if (!actor) return jsonError("User not found.", 404);
   if (!actor.company || actor.companyStatus !== "approved")
@@ -27,11 +30,32 @@ export async function GET(
   const salary = await FinanceSalary.findOne({
     _id: id,
     company: actor.company,
-  }).populate("employee", "name email role customRole companyIdentityCode baseSalary");
+  }).populate("employee", "name email role customRole companyIdentityCode baseSalary regionLabel");
   if (!salary) return jsonError("Salary record not found.", 404);
 
+  const employeeId = String(salary.employee._id ?? salary.employee);
+
+  // Own record, or a finance/admin acting inside their own region.
+  if (!(await canAccessFinanceRecord(actor, employeeId))) {
+    return jsonError("This salary record is outside your region.", 403);
+  }
+
+  // canAccessFinanceRecord returns true for any non-manager role, so a regular
+  // employee could otherwise read any salary by id. Non-own reads are limited
+  // to finance/admin and the company owner.
+  if (employeeId !== String(actor._id)) {
+    const company = (await Company.findById(actor.company).select("owner").lean()) as {
+      owner?: unknown;
+    } | null;
+    if (!isCompanyOwner(company, actor) && !canManageFinance(String(actor.role ?? ""))) {
+      return jsonError("You can only view your own salary record.", 403);
+    }
+  }
+
   const month = salary.month;
-  const policy = await CompanyPolicy.findOne({ company: actor.company }).select("salaryCycleDay salaryCycleStartDay salaryCycleEndDay");
+  // The employee's own region policy, not the actor's.
+  const employeeRegionLabel = String(salary.employee?.regionLabel ?? "");
+  const policy = await resolveRegionPolicy(salary.company, employeeRegionLabel);
 
   let periodStart: string;
   let periodEnd: string;
@@ -46,7 +70,7 @@ export async function GET(
 
   const computed = await computeSalaryBreakdown({
     actorCompany: actor.company,
-    employeeId: String(salary.employee._id ?? salary.employee),
+    employeeId,
     periodStart,
     periodEnd,
     allowances: Number(salary.allowances ?? 0),
@@ -102,7 +126,7 @@ export async function DELETE(
   await connectDb();
 
   const actor = await User.findById(userId).select(
-    "name role company companyStatus",
+    "name role company companyStatus regionLabel",
   );
   if (!actor) return jsonError("User not found.", 404);
   if (!actor.company || actor.companyStatus !== "approved")
@@ -115,8 +139,10 @@ export async function DELETE(
   const salary = await FinanceSalary.findOne({
     _id: id,
     company: actor.company,
-  }).select("status");
+  }).select("status employee");
   if (!salary) return jsonError("Salary record not found.", 404);
+  const outOfRegion = await assertSalaryTargetInFinanceScope(actor, String(salary.employee));
+  if (outOfRegion) return jsonError(outOfRegion, 403);
   if (salary.status !== "pending")
     return jsonError("Only pending salary records can be deleted.", 400);
 

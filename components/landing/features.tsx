@@ -12,6 +12,8 @@ import {
   MessageCircle,
   Shield,
   Wrench,
+  FileSignature,
+  MapPin,
 } from "lucide-react";
 
 const features = [
@@ -48,8 +50,20 @@ const features = [
   {
     icon: Building2,
     title: "Company & HR Tools",
-    desc: "Role-based onboarding, team invite codes, HR broadcasts, meeting invites, policy management, and more.",
+    desc: "Role-based onboarding, team invite codes, HR broadcasts, meeting invites, policy management, and approvers resolved per region.",
     color: "rose",
+  },
+  {
+    icon: FileSignature,
+    title: "Document Letters & Co-signatures",
+    desc: "Experience, salary and resignation letters approved by your regional HR, with up to three optional co-approvers who can sign before or after — without ever holding up the letter.",
+    color: "sky",
+  },
+  {
+    icon: MapPin,
+    title: "Multi-region & Offboarding",
+    desc: "Route every request to the right office automatically, run contract-end settlement on a schedule, and keep a former member's history and documents read-only.",
+    color: "fuchsia",
   },
   {
     icon: Lock,
@@ -88,6 +102,8 @@ const featureStyles = {
   teal: { icon: "bg-teal-50 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400", border: "hover:border-teal-300 dark:hover:border-teal-700" },
   orange: { icon: "bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400", border: "hover:border-orange-300 dark:hover:border-orange-700" },
   lime: { icon: "bg-lime-50 dark:bg-lime-950/30 text-lime-600 dark:text-lime-400", border: "hover:border-lime-300 dark:hover:border-lime-700" },
+  sky: { icon: "bg-sky-50 dark:bg-sky-950/30 text-sky-600 dark:text-sky-400", border: "hover:border-sky-300 dark:hover:border-sky-700" },
+  fuchsia: { icon: "bg-fuchsia-50 dark:bg-fuchsia-950/30 text-fuchsia-600 dark:text-fuchsia-400", border: "hover:border-fuchsia-300 dark:hover:border-fuchsia-700" },
 } as const;
 
 export function Features() {

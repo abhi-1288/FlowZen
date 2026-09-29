@@ -37,7 +37,7 @@ export function Hero({ isLoaded }: HeroProps) {
                 <Zap className="w-3 h-3 sm:w-4 sm:h-4 text-indigo-500 dark:text-indigo-400 shrink-0" />
                 <span className="truncate">
                   Kanban &middot; Attendance &middot; Finance &middot; HR
-                  &middot; Recruitment &middot; IT Support &middot; Chat
+                  &middot; Letters &middot; Recruitment &middot; IT Support
                 </span>
               </div>
             </motion.div>
@@ -55,8 +55,9 @@ export function Hero({ isLoaded }: HeroProps) {
               className="text-base sm:text-xl md:text-2xl text-gray-500 dark:text-gray-400 mb-8 sm:mb-12 max-w-3xl mx-auto leading-relaxed px-2 sm:px-0"
             >
               FlowZen is the all-in-one workflow platform where teams
-              manage kanban boards, attendance, finance, HR, recruitment, IT support,
-              chat, approvals, and roles in one workspace.
+              manage kanban boards, attendance, finance, HR, document letters,
+              recruitment, IT support, chat, approvals, and roles in one
+              workspace.
             </motion.p>
 
             <motion.div

@@ -6,6 +6,8 @@ import { ATSAuditLog } from "@/models/ATSAuditLog";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { isObjectId, jsonError, requireUserId, serializeDoc, serializeDocs } from "@/lib/api";
+import { effectiveRegionOf } from "@/lib/region-scope";
+import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
 import { emitToUser } from "@/lib/socket-emit";
 import { autoCloseOverdueJobs } from "@/lib/recruitment-utils";
 
@@ -102,6 +104,15 @@ export async function POST(request: Request) {
   if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
   if (!user.company) return jsonError("No company found.", 400);
 
+  // Requisitions are raised centrally, whatever the job's location. A PAN or
+  // Remote opening has no office to belong to until a candidate is hired, and an
+  // opening for a specific office still runs through one pipeline before the
+  // candidate is handed to that region — so the region cannot be the gate. See
+  // `lib/recruitment-hq.ts` for who that is: main office, owner, or a region head
+  // the main office has delegated.
+  const hq = await requireRecruitmentHQ(user as any);
+  if (!hq.ok) return hq.response;
+
   // Validate assessment date > closing date
   if (body.assessment && body.assessmentDate && body.autoCloseDate) {
     if (new Date(body.assessmentDate) <= new Date(body.autoCloseDate)) {
@@ -135,6 +146,9 @@ export async function POST(request: Request) {
     status: body.status || "draft",
     createdBy: userId,
     company: user.company,
+    // Snapshot of the requisition's region, taken from the HR raising it. A job
+    // has no member link, so the command center has nothing else to scope on.
+    regionLabel: await effectiveRegionOf(user),
   });
 
   await ATSAuditLog.create({

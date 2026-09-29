@@ -1,13 +1,16 @@
 import { ATSInterview } from "@/models/ATSInterview";
 import { ATSOffer } from "@/models/ATSOffer";
-import { CompanyPolicy } from "@/models/CompanyPolicy";
 import { Holiday } from "@/models/Holiday";
 import { ITJoiningCode } from "@/models/ITJoiningCode";
 import { LeaveRequest } from "@/models/LeaveRequest";
 import { Meeting } from "@/models/Meeting";
 import { ProjectBudget } from "@/models/ProjectBudget";
 import { User } from "@/models/User";
+import { effectiveRegionLabelOf, type OfficeAddressLike } from "@/lib/company-regions";
+import { resolveRegionPolicy } from "@/lib/region-scope";
+import { Company } from "@/models/Company";
 import { addDays, dayLabel, sameDay, startOfDay, timeLabel } from "./dates";
+import { buildFilters } from "./filters";
 import type { CommandCenterContext } from "./context";
 import type { UpcomingCategory, UpcomingItem, UpcomingSection } from "./types";
 
@@ -21,11 +24,26 @@ interface RawUpcoming {
 
 const WINDOW_DAYS = 14;
 
+/**
+ * A region hint for the viewer's own region, used only to fall back when the
+ * company has no region config. A scheduled interview records the region it is
+ * being run for; an empty one means the main office.
+ */
+async function actorRegionHint(ctx: CommandCenterContext): Promise<string> {
+  if (ctx.region) return ctx.region;
+  if (!ctx.companyId) return "";
+  const company = (await Company.findById(ctx.companyId)
+    .select("addresses address")
+    .lean()) as { addresses?: OfficeAddressLike[] | null; address?: string | null } | null;
+  return effectiveRegionLabelOf(company, { regionLabel: ctx.region });
+}
+
 export async function buildUpcoming(ctx: CommandCenterContext): Promise<UpcomingSection[]> {
   const { companyId, variant, userId, now } = ctx;
   const windowStart = now;
   const windowEnd = addDays(now, WINDOW_DAYS);
   const raw: RawUpcoming[] = [];
+  const filters = buildFilters(ctx);
 
   const showPeople = variant === "admin" || variant === "hr";
   const showPersonal = variant === "personal";
@@ -46,18 +64,20 @@ export async function buildUpcoming(ctx: CommandCenterContext): Promise<Upcoming
             company: companyId,
             status: "scheduled",
             scheduledAt: { $gte: windowStart, $lt: windowEnd },
+            ...filters.globalOrRegion("region"),
           })
             .populate("candidate", "firstName lastName")
             .populate("job", "title")
             .select("scheduledAt")
             .lean(),
-          User.find({ company: companyId, companyStatus: "approved" })
+          User.find({ company: companyId, companyStatus: "approved", ...filters.byUser() })
             .select("name dob employmentEndDate")
             .lean(),
           LeaveRequest.find({
             company: companyId,
             status: "approved",
             startDate: { $gte: windowStart, $lt: windowEnd },
+            ...filters.byMember("requester"),
           })
             .select("startDate requester")
             .lean(),
@@ -65,20 +85,31 @@ export async function buildUpcoming(ctx: CommandCenterContext): Promise<Upcoming
             company: companyId,
             status: "accepted",
             joiningDate: { $gte: windowStart, $lt: windowEnd },
+            ...filters.byRegionLabel("regionLabel"),
           })
             .populate("candidate", "firstName lastName")
             .select("joiningDate")
             .lean(),
+          // A meeting is the only company-level record with usable member links
+          // (its participants, else its creator), so it needs no snapshot. A
+          // company-wide all-hands will surface in every region, which is the
+          // honest reading of who was invited.
           Meeting.find({
             company: companyId,
             status: "scheduled",
             date: { $gte: windowStart, $lt: windowEnd },
+            ...(ctx.memberIds
+              ? { $or: [{ participants: { $in: ctx.visibleMemberIds } }, { creator: { $in: ctx.visibleMemberIds } }] }
+              : {}),
           })
             .select("title date time")
             .lean(),
           Holiday.find({
             company: companyId,
             startDate: { $gte: windowStart, $lt: windowEnd },
+            // `Holiday.region` is `""` for a company-wide holiday and the office
+            // label otherwise. This used to read every region's holidays.
+            ...filters.globalOrRegion("region"),
           })
             .select("title startDate")
             .lean(),
@@ -98,21 +129,25 @@ export async function buildUpcoming(ctx: CommandCenterContext): Promise<Upcoming
           company: companyId,
           status: "approved",
           deadline: { $gte: windowStart, $lt: windowEnd },
+          ...filters.byBoard(),
         })
           .populate("board", "title")
           .select("deadline board")
           .lean()
       : Promise.resolve(null),
+    // Region-aware: the payroll run date comes from the policy of the region
+    // being viewed, falling back to the global policy. `findOne({ company })`
+    // ignored `region` entirely and so returned an arbitrary region's policy
+    // whenever a company had more than one.
     showPayroll
-      ? CompanyPolicy.findOne({ company: companyId })
-          .select("salaryCycleDay")
-          .lean()
+      ? resolveRegionPolicy(companyId, await actorRegionHint(ctx))
       : Promise.resolve(null),
     showCodes
       ? ITJoiningCode.find({
           company: companyId,
           status: "active",
           expiresAt: { $gte: windowStart, $lt: windowEnd },
+          ...filters.byMember("user"),
         })
           .select("code expiresAt")
           .lean()

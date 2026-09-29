@@ -6,12 +6,31 @@ const ExpenseRequestSchema = new Schema(
     requester: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     category: {
       type: String,
-      enum: ["software", "device", "travel", "office-resources"],
+      enum: [
+        "software",
+        "device",
+        "travel",
+        "office-resources",
+        "laptop",
+        "desktop",
+        "electronics",
+        "internet-service",
+        "email-service",
+      ],
       required: true,
     },
     title: { type: String, required: true, trim: true, maxlength: 160 },
     amount: { type: Number, default: 0 },
     quantity: { type: Number, default: 1, min: 1 },
+    currency: { type: String, default: "INR", trim: true, uppercase: true, maxlength: 8 },
+    /** Display snapshot of the requester's effective region, as with ProcurementRequest. */
+    regionLabel: { type: String, default: "", trim: true },
+    /**
+     * Set when this expense is the finance leg of an IT-approved purchase. The
+     * IT side lives in `ProcurementRequest`; this link is what the finance list
+     * and reports use to show that the spend already cleared IT review.
+     */
+    procurement: { type: Schema.Types.ObjectId, ref: "ProcurementRequest", default: null },
     reason: { type: String, default: "", maxlength: 1000 },
     status: { type: String, enum: ["pending", "forwarded", "approved", "rejected", "accepted", "disbursed"], default: "pending", index: true },
     decidedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
@@ -25,6 +44,8 @@ const ExpenseRequestSchema = new Schema(
   },
   { timestamps: true },
 );
+
+ExpenseRequestSchema.index({ company: 1, procurement: 1 });
 
 export type ExpenseRequestDocument = InferSchemaType<typeof ExpenseRequestSchema>;
 

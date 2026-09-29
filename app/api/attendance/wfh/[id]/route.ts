@@ -3,10 +3,12 @@ import { connectDb } from "@/lib/db";
 import { requireUserId, jsonError } from "@/lib/api";
 import { WfhRequest } from "@/models/WfhRequest";
 import { User } from "@/models/User";
+import { Company } from "@/models/Company";
 import { Notification } from "@/models/Notification";
 import { emitToUser } from "@/lib/socket-emit";
 import { resolveEnrollingHr } from "@/lib/enrolling-hr";
 import { findApprovedHrUserId } from "@/lib/join-approvers";
+import { effectiveRegionLabelOf, isUserInEffectiveRegion, type OfficeAddressLike } from "@/lib/company-regions";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -21,6 +23,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const approver = await User.findById(userId);
     const wfh = await WfhRequest.findById(id).populate("requester");
     if (!wfh) return jsonError("Request not found.");
+
+    // Cross-tenant guard: the actor must belong to the WFH request's company.
+    if (String(approver?.company ?? "") !== String(wfh.company)) {
+      return jsonError("Request not found.", 404);
+    }
 
     const approverRole = String(approver?.role ?? "");
     const requesterId =
@@ -140,6 +147,23 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       // Admin final approval
       if (approverRole !== "admin") {
         return jsonError("Only admins can give final approval.", 403);
+      }
+      // Regional admins may only approve WFH for requesters in their own
+      // region. The company owner may approve any.
+      const companyDoc = (await Company.findById(wfh.company)
+        .select("owner addresses address")
+        .lean()) as {
+        owner?: unknown;
+        addresses?: OfficeAddressLike[] | null;
+        address?: string | null;
+      } | null;
+      const ownerId = companyDoc?.owner ?? null;
+      const isOwner = ownerId != null && String(ownerId) === String(userId);
+      if (!isOwner) {
+        const adminRegion = effectiveRegionLabelOf(companyDoc, approver);
+        if (adminRegion && !isUserInEffectiveRegion(companyDoc, adminRegion, wfh.requester)) {
+          return jsonError(`This request is outside your region (${adminRegion}).`, 403);
+        }
       }
       wfh.status = "approved";
       wfh.adminApprover = approver?._id;

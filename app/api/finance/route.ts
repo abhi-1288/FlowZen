@@ -7,11 +7,27 @@ import { ExpenseRequest } from "@/models/ExpenseRequest";
 import { FinanceSalary } from "@/models/FinanceSalary";
 import { Notification } from "@/models/Notification";
 import { ProjectBudget } from "@/models/ProjectBudget";
+import { ProcurementRequest } from "@/models/ProcurementRequest";
 import { User } from "@/models/User";
+import { Company } from "@/models/Company";
 import { emitNotification } from "@/lib/realtime";
-import { monthKey, localMonthKey, actorWithCompany, autoGenerateSalariesForMonth, canManageFinance, computeSalaryBreakdown, getSalaryPeriod } from "./helpers";
+import { effectiveRegionLabelOf } from "@/lib/company-regions";
+import { resolveRegionPolicy } from "@/lib/region-scope";
+import { formatAmount } from "@/lib/procurement";
+import { monthKey, localMonthKey, actorWithCompany, autoGenerateSalariesForMonth, canManageFinance, computeSalaryBreakdown, getSalaryPeriod, financeMemberScope, financeMemberSalaryFilter, financeMemberUserFilter, assertSalaryTargetInFinanceScope } from "./helpers";
 import { handleStatusUpdates } from "./status-updates";
 import { CompanyPolicy } from "@/models/CompanyPolicy";
+
+/** Snapshot of the actor's effective region, with the main-office fallback. */
+async function effectiveRegionLabelOfFor(actor: {
+  company: any;
+  regionLabel?: string | null;
+}): Promise<string> {
+  const company = (await Company.findById(actor.company)
+    .select("addresses address")
+    .lean()) as any;
+  return effectiveRegionLabelOf(company, actor);
+}
 
 export async function GET(request: Request) {
   const userId = await requireUserId();
@@ -24,8 +40,22 @@ export async function GET(request: Request) {
   const canManage = canManageFinance(role);
   const url = new URL(request.url);
 
+  // One regional boundary for the whole request: finance and admins only see
+  // and act on their own region's members.
+  const scope = canManage
+    ? await financeMemberScope(actor)
+    : { region: "", memberIds: null };
+
+  // Expenses are scoped the same way salaries are: a finance/admin sees their own
+  // region's requests, and everyone else only their own. Filtered on `requester`
+  // rather than the stored `regionLabel` snapshot so reassigning a member
+  // between regions moves their requests with them.
+  const expenseScope =
+    scope.memberIds ? { requester: { $in: scope.memberIds } } : {};
+
   if (url.searchParams.get("counts") === "true") {
     const month = monthKey(url.searchParams.get("month"));
+    const salaryScope = financeMemberSalaryFilter(scope);
     const [
       pendingSalaryApproval,
       pendingSalaryPayment,
@@ -35,40 +65,54 @@ export async function GET(request: Request) {
       pendingAssignedExpenses,
       pendingBills,
       pendingBudgets,
+      pendingPurchases,
     ] = await Promise.all([
       FinanceSalary.countDocuments({
         company: actor.company,
         month,
         status: "pending",
+        ...salaryScope,
       }),
       FinanceSalary.countDocuments({
         company: actor.company,
         month,
         status: "approved",
+        ...salaryScope,
       }),
       ExpenseRequest.countDocuments({
         company: actor.company,
         status: "pending",
+        ...expenseScope,
       }),
       ExpenseRequest.countDocuments({
         company: actor.company,
         status: "forwarded",
+        ...expenseScope,
         ...(role === "admin" ? { adminApprover: userId } : {}),
       }),
       ExpenseRequest.countDocuments({
         company: actor.company,
         status: "approved",
+        ...expenseScope,
         $or: [{ assignedTo: null }, { assignedTo: userId }],
       }),
       ExpenseRequest.countDocuments({
         company: actor.company,
         status: "pending",
+        ...expenseScope,
         assignedTo: userId,
       }),
       ExpenseBill.countDocuments({ company: actor.company, status: "pending" }),
       ProjectBudget.countDocuments({
         company: actor.company,
         status: "pending",
+      }),
+      // Purchases sitting with IT, waiting on their region. Shown to finance so
+      // they can see why a spend they were expecting has not arrived yet.
+      ProcurementRequest.countDocuments({
+        company: actor.company,
+        ...(scope.memberIds ? { requester: { $in: scope.memberIds } } : {}),
+        status: { $in: ["PENDING_IT", "ASSIGNED_IT"] },
       }),
     ]);
     return NextResponse.json({
@@ -80,12 +124,13 @@ export async function GET(request: Request) {
       pendingAssignedExpenses,
       pendingBills,
       pendingBudgets,
+      pendingPurchases,
     });
   }
 
   const month = monthKey(url.searchParams.get("month"));
 
-  const policy = await CompanyPolicy.findOne({ company: actor.company }).select("salaryCycleDay salaryCycleStartDay salaryCycleEndDay");
+  const policy = await resolveRegionPolicy(actor.company, actor.regionLabel);
   const salaryCycleDay = policy?.salaryCycleDay ?? 29;
 
   const now = new Date();
@@ -111,13 +156,14 @@ export async function GET(request: Request) {
       actorName: actor.name ?? "Finance",
       month,
       policy: policy || {},
+      memberIds: scope.memberIds,
     });
   }
 
-  const [salaries, expenses, budgets, boards, members, financeMembers, bills] =
+  const [salaries, expenses, budgets, boards, members, financeMembers, bills, people] =
     await Promise.all([
       canManage
-        ? FinanceSalary.find({ company: actor.company, month })
+        ? FinanceSalary.find({ company: actor.company, month, ...financeMemberSalaryFilter(scope) })
             .populate(
               "employee",
               "name email role customRole companyIdentityCode",
@@ -134,12 +180,13 @@ export async function GET(request: Request) {
             )
             .sort({ updatedAt: -1 }),
       canManage
-        ? ExpenseRequest.find({ company: actor.company })
+        ? ExpenseRequest.find({ company: actor.company, ...expenseScope })
             .populate("requester", "name email role")
             .populate("assignedTo", "name email role")
             .populate("adminApprover", "name email role")
             .populate("forwardedBy", "name email role")
             .populate("acceptedBy", "name email role")
+            .populate("procurement", "requestNumber category status")
             .sort({ createdAt: -1 })
             .limit(50)
         : ExpenseRequest.find({ company: actor.company, requester: userId })
@@ -148,6 +195,7 @@ export async function GET(request: Request) {
             .populate("adminApprover", "name email role")
             .populate("forwardedBy", "name email role")
             .populate("acceptedBy", "name email role")
+            .populate("procurement", "requestNumber category status")
             .sort({ createdAt: -1 })
             .limit(50),
       canManage
@@ -177,14 +225,21 @@ export async function GET(request: Request) {
             .sort({ createdAt: -1 })
         : [],
       canManage
-        ? User.find({ company: actor.company, companyStatus: "approved" })
-            .select("name email role customRole companyIdentityCode baseSalary")
+        ? User.find({
+            company: actor.company,
+            companyStatus: "approved",
+            ...financeMemberUserFilter(scope),
+          })
+            .select("name email role customRole companyIdentityCode baseSalary regionLabel")
             .sort({ name: 1 })
         : [],
+      // Region-scoped so the travel assignee picker cannot offer someone the
+      // request-expense validation would then reject.
       User.find({
         company: actor.company,
         role: "finance",
         companyStatus: "approved",
+        ...financeMemberUserFilter(scope),
       })
         .select("name email role customRole companyIdentityCode baseSalary")
         .sort({ name: 1 }),
@@ -193,6 +248,18 @@ export async function GET(request: Request) {
             .populate("budget")
             .populate("generatedBy", "name")
             .sort({ createdAt: -1 })
+        : [],
+      // Company-wide approver/assignee identities. Deliberately NOT region
+      // scoped: expense forwarding, salary-cycle allocation and salary-advance
+      // approval stay company-wide, so they need every admin/HR/finance user.
+      canManage
+        ? User.find({
+            company: actor.company,
+            companyStatus: "approved",
+            role: { $in: ["admin", "human-resource", "finance"] },
+          })
+            .select("name email role customRole")
+            .sort({ name: 1 })
         : [],
     ]);
 
@@ -248,6 +315,8 @@ export async function GET(request: Request) {
     month,
     canManage,
     monthEndGenerated,
+    region: scope.region,
+    regionFallback: !scope.memberIds,
     dashboard: { totalPayroll, pendingSalaries, paidSalaries },
     salaries: serializeDocs(salaries as any),
     expenses: serializeDocs(expenses as any),
@@ -256,6 +325,7 @@ export async function GET(request: Request) {
     boards: serializedBoards,
     members: serializeDocs(members as any),
     financeMembers: serializeDocs(financeMembers as any),
+    people: serializeDocs(people as any),
   });
 }
 
@@ -271,17 +341,31 @@ export async function POST(request: Request) {
   const action = String(body.action ?? "");
 
   if (action === "request-expense") {
-    const category = String(body.category ?? "");
+    // Same regional boundary the rest of finance uses, so the assignee picker
+    // and the validation below can only ever offer in-region finance users.
+    const scope = await financeMemberScope(actor);
+
+    // Travel is the only expense a member can raise here. Every company
+    // purchase (laptop, software, electronics, internet, email, office
+    // resources) is a `ProcurementRequest` raised from /profile/it, so it is
+    // reviewed by IT before finance sees the money.
+    const category = String(body.category ?? "").trim();
     const title = String(body.title ?? "").trim();
     const amount = Number(body.amount ?? 0);
     const quantity = Math.max(1, Math.floor(Number(body.quantity ?? 1)));
     const reason = String(body.reason ?? "").trim();
     if (!title) return jsonError("Expense title is required.");
-    if (
-      !["software", "device", "travel", "office-resources"].includes(category)
-    ) {
-      return jsonError("Invalid expense category.");
+    if (category !== "travel") {
+      return jsonError(
+        "Purchases are requested from /profile/it — raise a New Ticket there and IT will forward it to finance.",
+      );
     }
+    const currency = String(body.currency ?? "INR").trim().toUpperCase().slice(0, 8) || "INR";
+    if (!Number.isFinite(amount) || amount < 0)
+      return jsonError("Enter a valid amount.");
+
+    // Travel always goes to a finance user, whoever is asking — including
+    // it-admin / it-administration.
     let assignedTo = null;
     if (role !== "finance") {
       assignedTo = String(body.assignedTo ?? "");
@@ -290,25 +374,42 @@ export async function POST(request: Request) {
           "Please assign a finance user to handle this request.",
           400,
         );
+      const financeUserFilter = financeMemberUserFilter(scope);
       const financeUser = await User.findOne({
         _id: assignedTo,
         company: actor.company,
         role: "finance",
         companyStatus: "approved",
+        ...financeUserFilter,
       }).select("_id");
-      if (!financeUser)
+      if (!financeUser) {
+        const exists = await User.findOne({
+          _id: assignedTo,
+          company: actor.company,
+          role: "finance",
+          companyStatus: "approved",
+        }).select("_id");
+        if (!exists)
+          return jsonError(
+            "Assigned finance user not found in this company.",
+            404,
+          );
         return jsonError(
-          "Assigned finance user not found in this company.",
-          404,
+          `That finance user is outside your region (${scope.region}). Pick one in your own region.`,
+          400,
         );
+      }
     }
+    const regionLabel = await effectiveRegionLabelOfFor(actor);
     const expense = await ExpenseRequest.create({
       company: actor.company,
       requester: userId,
       category,
       title,
-      amount: Number.isFinite(amount) ? amount : 0,
+      amount: Math.round(amount * 100) / 100,
       quantity: Number.isFinite(quantity) ? quantity : 1,
+      currency,
+      regionLabel,
       reason,
       ...(assignedTo ? { assignedTo } : {}),
     });
@@ -324,7 +425,7 @@ export async function POST(request: Request) {
         company: actor.company,
         type: "info",
         title: "Expense assigned to you",
-        message: `${actor.name ?? "A member"} assigned you an expense: ${title} for ₹${Number.isFinite(amount) ? amount : 0}.`,
+        message: `${actor.name ?? "A member"} assigned you an expense: ${title} for ${formatAmount(amount, currency)}.`,
       });
       notifyIds.push(assignedTo);
     }
@@ -334,7 +435,7 @@ export async function POST(request: Request) {
         company: actor.company,
         type: "approval",
         title: "Expense pending approval",
-        message: `${actor.name ?? "A member"} requested ${title} for ₹${Number.isFinite(amount) ? amount : 0}.`,
+        message: `${actor.name ?? "A member"} requested ${title} for ${formatAmount(amount, currency)}.`,
       })),
     );
     admins.forEach((u) => notifyIds.push(String(u._id)));
@@ -343,7 +444,7 @@ export async function POST(request: Request) {
   }
 
   if (!canManageFinance(role))
-    return jsonError("Only finance, HR, or admins can manage finance.", 403);
+    return jsonError("Only finance or admins can manage finance.", 403);
 
   if (action === "calculate-salary") {
     const employeeId = String(body.employeeId ?? "");
@@ -351,6 +452,8 @@ export async function POST(request: Request) {
     const periodEnd = String(body.periodEnd ?? "");
     if (!periodStart || !periodEnd)
       return jsonError("Salary period dates are required.");
+    const outOfRegion = await assertSalaryTargetInFinanceScope(actor, employeeId);
+    if (outOfRegion) return jsonError(outOfRegion, 403);
     const computed = await computeSalaryBreakdown({
       actorCompany: actor.company,
       employeeId,
@@ -396,6 +499,12 @@ export async function POST(request: Request) {
     const pfExempted = body.pfExempted === true;
     const esicExempted = body.esicExempted === true;
     const tdsExempted = body.tdsExempted === true;
+
+    // Guard before the PF/ESIC write below — a rejected out-of-region request
+    // must not have already mutated that member's profile.
+    const outOfRegion = await assertSalaryTargetInFinanceScope(actor, employeeId);
+    if (outOfRegion) return jsonError(outOfRegion, 403);
+
     if (pfNumber || esicNumber || pfExempted || esicExempted || tdsExempted) {
       const updateData: Record<string, string | number | boolean> = {};
       if (pfNumber) updateData.pfNumber = pfNumber;
@@ -483,6 +592,11 @@ export async function POST(request: Request) {
     }).populate("employee", "name");
     if (!salaryRecord)
       return jsonError("Salary record not found in this company.", 404);
+    const outOfRegion = await assertSalaryTargetInFinanceScope(
+      actor,
+      String(salaryRecord.employee._id ?? salaryRecord.employee),
+    );
+    if (outOfRegion) return jsonError(outOfRegion, 403);
     if (
       salaryRecord.status !== "pending" &&
       salaryRecord.status !== "rejected"
@@ -496,7 +610,7 @@ export async function POST(request: Request) {
     const manualDeductions = Math.max(0, Number(body.deductions ?? 0));
     const note = String(body.note ?? "").trim();
 
-    const policy = await CompanyPolicy.findOne({ company: actor.company }).select("salaryCycleDay salaryCycleStartDay salaryCycleEndDay");
+    const policy = await resolveRegionPolicy(actor.company, actor.regionLabel);
     const { periodStart, periodEnd } = getSalaryPeriod(
       String(salaryRecord.month),
       policy || {},

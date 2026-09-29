@@ -5,6 +5,7 @@ import { ATSJob } from "@/models/ATSJob";
 import { ATSCandidate } from "@/models/ATSCandidate";
 import { User } from "@/models/User";
 import { emitToUser } from "@/lib/socket-emit";
+import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
 
 const HR_ROLES = ["admin", "human-resource"];
 
@@ -27,6 +28,8 @@ export async function POST(request: Request, { params }: Params) {
   await connectDb();
   const user = await User.findById(userId);
   if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
+  const hq = await requireRecruitmentHQ(user as any);
+  if (!hq.ok) return hq.response;
   if (!user.company) return jsonError("No company found.", 400);
 
   const job = await ATSJob.findOne({ _id: id, company: user.company }).select("_id assessment");

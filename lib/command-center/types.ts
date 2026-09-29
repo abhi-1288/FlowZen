@@ -100,6 +100,23 @@ export interface CommandCenterResponse {
   companyColor: string;
   role: string;
   userName: string;
+  /**
+   * The region the payload is scoped to. `""` is the whole company. Always
+   * reports what was actually applied, so a viewer whose `?region=` was
+   * ignored can see the real scope rather than the one they asked for.
+   */
+  region: string;
+  regionLabel: string;
+  regionScope: "global" | "region" | "personal";
+  /** Their own region holds no members, so they are seeing the whole company. */
+  regionFallback: boolean;
+  /** A `?region=` was passed but ignored — the viewer is pinned to their own region. */
+  regionForced: boolean;
+  canSwitchRegion: boolean;
+  /** "Global" is selectable — the company owner only. */
+  allowGlobalRegion: boolean;
+  /** Regions the viewer may switch between; `value` is what to send back. */
+  regionOptions: { value: string; label: string }[];
   kpis: Kpi[];
   trends: TrendMetric[];
   projectHealth: ProjectHealth[] | null;

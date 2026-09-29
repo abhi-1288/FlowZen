@@ -8,6 +8,8 @@ import { CompanyPolicy } from "@/models/CompanyPolicy";
 import { Attendance } from "@/models/Attendance";
 import { LeaveRequest } from "@/models/LeaveRequest";
 import { Holiday } from "@/models/Holiday";
+import { canAccessFinanceRecord } from "../../helpers";
+import { resolveRegionPolicy } from "@/lib/region-scope";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -60,7 +62,7 @@ export async function GET(request: Request, { params }: Params) {
     const salary = await FinanceSalary.findById(id);
     if (!salary) return jsonError("Salary record not found.", 404);
 
-    const actor = await User.findById(userId).select("role company companyStatus");
+    const actor = await User.findById(userId).select("role company companyStatus regionLabel");
     if (!actor) return jsonError("User not found.", 404);
 
     const isOwner = String(salary.employee) === userId;
@@ -76,15 +78,23 @@ export async function GET(request: Request, { params }: Params) {
       return jsonError("Forbidden", 403);
     }
 
-    const [employee, companyDoc, policy] = await Promise.all([
-      User.findById(salary.employee).select("name email role companyIdentityCode baseSalary salaryType hourlyRate dailyRate companyJoined createdAt pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted bankAccountNumber ifscCode documents"),
+    // The slip carries bank details, so a finance/admin may only pull one for a
+    // member in their own region.
+    if (!(await canAccessFinanceRecord(actor, salary.employee))) {
+      return jsonError("This salary slip is outside your region.", 403);
+    }
+
+    const [employee, companyDoc] = await Promise.all([
+      User.findById(salary.employee).select("name email role companyIdentityCode baseSalary salaryType hourlyRate dailyRate companyJoined createdAt regionLabel pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted bankAccountNumber ifscCode documents"),
       Company.findById(salary.company).select("name icon"),
-      CompanyPolicy.findOne({ company: salary.company }),
     ]);
 
     if (!employee || !companyDoc) {
       return jsonError("Employee or company not found.", 404);
     }
+
+    // The employee's own region policy, not the actor's.
+    const policy = await resolveRegionPolicy(salary.company, employee.regionLabel);
 
     const monthStr = salary.month;
     const year = Number(monthStr.slice(0, 4));

@@ -24,11 +24,12 @@ export async function POST(request: Request, { params }: Params) {
     throw error;
   }
 
-  const [user, ticket] = await Promise.all([
-    User.findById(userId).select("role company companyStatus name"),
-    ITTicket.findById(id),
-  ]);
+  const user = await User.findById(userId).select("role company companyStatus name");
   if (!user) return jsonError("User not found.", 404);
+
+  const companyId =
+    typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
+  const ticket = await ITTicket.findOne({ _id: id, company: companyId });
   if (!ticket) return jsonError("Ticket not found.", 404);
 
   // Only the requester can confirm.
@@ -39,9 +40,6 @@ export async function POST(request: Request, { params }: Params) {
   if (ticket.status !== "AWAITING_CONFIRMATION") {
     return jsonError(`Cannot confirm a ticket in ${ticket.status} status.`, 400);
   }
-
-  const companyId =
-    typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
 
   if (confirmed) {
     ticket.status = "RESOLVED";
@@ -55,6 +53,6 @@ export async function POST(request: Request, { params }: Params) {
   }
   await ticket.save();
 
-  const refreshed = await ITTicket.findById(id);
+  const refreshed = await ITTicket.findOne({ _id: id, company: companyId });
   return NextResponse.json({ ticket: serializeDoc(refreshed) });
 }

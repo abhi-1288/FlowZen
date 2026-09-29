@@ -17,7 +17,8 @@ import { WfhRequest } from "@/models/WfhRequest";
 import { CheckOutRequest } from "@/models/CheckOutRequest";
 import { addDays, startOfDay } from "./dates";
 import { startOfUtcDayMs } from "@/lib/date-utils";
-import { getColumnSets, getCompanyBoardIds, getMyBoardIds } from "./trends";
+import { getColumnSets, getMyBoardIds } from "./trends";
+import { buildFilters, type CommandCenterFilters } from "./filters";
 import type { CommandCenterContext } from "./context";
 import type { AttentionItem } from "./types";
 
@@ -25,6 +26,9 @@ const PENDING_STATUSES = ["pending", "hr-approved", "manager-approved"];
 
 export async function buildAttention(ctx: CommandCenterContext): Promise<AttentionItem[]> {
   const producers: Array<() => Promise<AttentionItem[]>> = [];
+  // Built once so the memoised bill filter is shared rather than re-resolved per
+  // producer.
+  const filters = buildFilters(ctx);
 
   const push = (fn: () => Promise<AttentionItem[]>) => producers.push(fn);
 
@@ -42,13 +46,13 @@ export async function buildAttention(ctx: CommandCenterContext): Promise<Attenti
 
   // ── Pending approvals ────────────────────────────────────────────
   if (ctx.variant === "admin" || ctx.variant === "hr") {
-    push(() => pendingHrApprovals(ctx));
+    push(() => pendingHrApprovals(ctx, filters));
   }
   if (ctx.variant === "admin" || ctx.variant === "finance") {
-    push(() => pendingFinanceApprovals(ctx));
+    push(() => pendingFinanceApprovals(ctx, filters));
   }
   if (ctx.variant === "security") {
-    push(() => pendingIdentityApprovals(ctx));
+    push(() => pendingIdentityApprovals(ctx, filters));
   }
   if (ctx.variant === "personal") {
     push(() => pendingPersonalRequests(ctx));
@@ -56,27 +60,27 @@ export async function buildAttention(ctx: CommandCenterContext): Promise<Attenti
 
   // ── IT ───────────────────────────────────────────────────────────
   if (ctx.variant === "admin" || ctx.variant === "it") {
-    push(() => criticalTickets(ctx));
-    push(() => provisioningPending(ctx));
+    push(() => criticalTickets(ctx, filters));
+    push(() => provisioningPending(ctx, filters));
   }
 
   // ── HR ───────────────────────────────────────────────────────────
   if (ctx.variant === "admin" || ctx.variant === "hr") {
-    push(() => contractsEnding(ctx));
-    push(() => missingAttendance(ctx));
-    push(() => offersAwaiting(ctx));
-    push(() => jobsClosing(ctx));
+    push(() => contractsEnding(ctx, filters));
+    push(() => missingAttendance(ctx, filters));
+    push(() => offersAwaiting(ctx, filters));
+    push(() => jobsClosing(ctx, filters));
   }
 
   // ── Finance ──────────────────────────────────────────────────────
   if (ctx.variant === "admin" || ctx.variant === "finance") {
-    push(() => overdueInvoices(ctx));
-    push(() => budgetDeadlines(ctx));
+    push(() => overdueInvoices(ctx, filters));
+    push(() => budgetDeadlines(ctx, filters));
   }
 
   // ── Security ─────────────────────────────────────────────────────
   if (ctx.variant === "security") {
-    push(() => inactiveAccounts(ctx));
+    push(() => inactiveAccounts(ctx, filters));
   }
 
   // ── Personal ─────────────────────────────────────────────────────
@@ -100,7 +104,7 @@ async function boardTitleMap(boardIds: string[]): Promise<Map<string, string>> {
 }
 
 async function overdueTasksCompany(ctx: CommandCenterContext): Promise<AttentionItem[]> {
-  const boardIds = await getCompanyBoardIds(ctx.companyId);
+  const boardIds = ctx.boardIds ?? [];
   if (boardIds.length === 0) return [];
   const sets = await getColumnSets(boardIds);
   const tasks = await Task.find({
@@ -166,7 +170,7 @@ async function overdueTasksPersonal(ctx: CommandCenterContext): Promise<Attentio
 }
 
 async function blockedTasks(ctx: CommandCenterContext): Promise<AttentionItem[]> {
-  const boardIds = await getCompanyBoardIds(ctx.companyId);
+  const boardIds = ctx.boardIds ?? [];
   if (boardIds.length === 0) return [];
   const sets = await getColumnSets(boardIds);
   if (sets.blockedIds.length === 0) return [];
@@ -189,14 +193,18 @@ async function blockedTasks(ctx: CommandCenterContext): Promise<AttentionItem[]>
   ];
 }
 
-async function pendingHrApprovals(ctx: CommandCenterContext): Promise<AttentionItem[]> {
+async function pendingHrApprovals(
+  ctx: CommandCenterContext,
+  filters: CommandCenterFilters,
+): Promise<AttentionItem[]> {
   const companyId = ctx.companyId;
   if (!companyId) return [];
+  const byRequester = filters.byMember("requester");
   const [join, leaves, wfh, checkout] = await Promise.all([
-    JoinRequest.countDocuments({ company: companyId, status: { $in: ["pending", "hr-approved"] } }),
-    LeaveRequest.countDocuments({ company: companyId, status: { $in: PENDING_STATUSES } }),
-    WfhRequest.countDocuments({ company: companyId, status: { $in: PENDING_STATUSES } }),
-    CheckOutRequest.countDocuments({ company: companyId, status: "pending" }),
+    JoinRequest.countDocuments({ company: companyId, status: { $in: ["pending", "hr-approved"] }, ...byRequester }),
+    LeaveRequest.countDocuments({ company: companyId, status: { $in: PENDING_STATUSES }, ...byRequester }),
+    WfhRequest.countDocuments({ company: companyId, status: { $in: PENDING_STATUSES }, ...byRequester }),
+    CheckOutRequest.countDocuments({ company: companyId, status: "pending", ...byRequester }),
   ]);
   const total = join + leaves + wfh + checkout;
   if (total === 0) return [];
@@ -219,14 +227,25 @@ async function pendingHrApprovals(ctx: CommandCenterContext): Promise<AttentionI
   ];
 }
 
-async function pendingFinanceApprovals(ctx: CommandCenterContext): Promise<AttentionItem[]> {
+async function pendingFinanceApprovals(
+  ctx: CommandCenterContext,
+  filters: CommandCenterFilters,
+): Promise<AttentionItem[]> {
   const companyId = ctx.companyId;
   if (!companyId) return [];
   const [salaries, expenses, bills, budgets] = await Promise.all([
-    FinanceSalary.countDocuments({ company: companyId, status: { $in: ["pending", "approved"] } }),
-    ExpenseRequest.countDocuments({ company: companyId, status: { $in: ["pending", "forwarded", "approved"] } }),
-    ExpenseBill.countDocuments({ company: companyId, status: "pending" }),
-    ProjectBudget.countDocuments({ company: companyId, status: "pending" }),
+    FinanceSalary.countDocuments({
+      company: companyId,
+      status: { $in: ["pending", "approved"] },
+      ...filters.byMember("employee"),
+    }),
+    ExpenseRequest.countDocuments({
+      company: companyId,
+      status: { $in: ["pending", "forwarded", "approved"] },
+      ...filters.byMember("requester"),
+    }),
+    ExpenseBill.countDocuments({ company: companyId, status: "pending", ...(await filters.bill()) }),
+    ProjectBudget.countDocuments({ company: companyId, status: "pending", ...filters.byBoard() }),
   ]);
   const total = salaries + expenses + bills + budgets;
   if (total === 0) return [];
@@ -249,7 +268,10 @@ async function pendingFinanceApprovals(ctx: CommandCenterContext): Promise<Atten
   ];
 }
 
-async function pendingIdentityApprovals(ctx: CommandCenterContext): Promise<AttentionItem[]> {
+async function pendingIdentityApprovals(
+  ctx: CommandCenterContext,
+  filters: CommandCenterFilters,
+): Promise<AttentionItem[]> {
   const companyId = ctx.companyId;
   if (!companyId) return [];
   const count = await JoinRequest.countDocuments({
@@ -258,6 +280,7 @@ async function pendingIdentityApprovals(ctx: CommandCenterContext): Promise<Atte
     kind: {
       $in: ["identity-code", "role-transfer", "region-address", "employment-type", "id-card", "document-letter"],
     },
+    ...filters.byMember("requester"),
   });
   if (count === 0) return [];
   return [
@@ -299,13 +322,17 @@ async function pendingPersonalRequests(ctx: CommandCenterContext): Promise<Atten
   ];
 }
 
-async function criticalTickets(ctx: CommandCenterContext): Promise<AttentionItem[]> {
+async function criticalTickets(
+  ctx: CommandCenterContext,
+  filters: CommandCenterFilters,
+): Promise<AttentionItem[]> {
   const companyId = ctx.companyId;
   if (!companyId) return [];
   const count = await ITTicket.countDocuments({
     company: companyId,
     priority: { $in: ["HIGH", "URGENT"] },
     status: { $nin: ["RESOLVED", "CANCELLED"] },
+    ...filters.byMember("requester"),
   });
   if (count === 0) return [];
   return [
@@ -322,12 +349,16 @@ async function criticalTickets(ctx: CommandCenterContext): Promise<AttentionItem
   ];
 }
 
-async function provisioningPending(ctx: CommandCenterContext): Promise<AttentionItem[]> {
+async function provisioningPending(
+  ctx: CommandCenterContext,
+  filters: CommandCenterFilters,
+): Promise<AttentionItem[]> {
   const companyId = ctx.companyId;
   if (!companyId) return [];
   const count = await ITProvisioningRequest.countDocuments({
     company: companyId,
     status: { $in: ["PENDING", "UNDER_REVIEW", "APPROVED", "ACCOUNT_CREATED"] },
+    ...filters.byMember("employee"),
   });
   if (count === 0) return [];
   return [
@@ -344,7 +375,10 @@ async function provisioningPending(ctx: CommandCenterContext): Promise<Attention
   ];
 }
 
-async function contractsEnding(ctx: CommandCenterContext): Promise<AttentionItem[]> {
+async function contractsEnding(
+  ctx: CommandCenterContext,
+  filters: CommandCenterFilters,
+): Promise<AttentionItem[]> {
   const companyId = ctx.companyId;
   if (!companyId) return [];
   const end = addDays(ctx.now, 30);
@@ -352,6 +386,7 @@ async function contractsEnding(ctx: CommandCenterContext): Promise<AttentionItem
     company: companyId,
     companyStatus: "approved",
     employmentEndDate: { $gte: startOfDay(ctx.now), $lte: end },
+    ...filters.byUser(),
   })
     .select("name employmentEndDate")
     .lean();
@@ -380,18 +415,28 @@ async function contractsEnding(ctx: CommandCenterContext): Promise<AttentionItem
   ];
 }
 
-async function missingAttendance(ctx: CommandCenterContext): Promise<AttentionItem[]> {
+async function missingAttendance(
+  ctx: CommandCenterContext,
+  filters: CommandCenterFilters,
+): Promise<AttentionItem[]> {
   const companyId = ctx.companyId;
   if (!companyId) return [];
   const today = startOfDay(ctx.now);
   const [members, presentMembers, onLeave] = await Promise.all([
-    User.find({ company: companyId, companyStatus: "approved" }).select("_id").lean(),
-    Attendance.distinct("user", { date: today, status: "present" }),
+    User.find({ company: companyId, companyStatus: "approved", ...filters.byUser() })
+      .select("_id")
+      .lean(),
+    Attendance.distinct("user", {
+      date: today,
+      status: "present",
+      ...filters.byVisibleMember("user"),
+    }),
     LeaveRequest.find({
       company: companyId,
       status: "approved",
       startDate: { $lte: today },
       endDate: { $gte: today },
+      ...filters.byMember("requester"),
     })
       .distinct("requester"),
   ]);
@@ -416,12 +461,16 @@ async function missingAttendance(ctx: CommandCenterContext): Promise<AttentionIt
   ];
 }
 
-async function offersAwaiting(ctx: CommandCenterContext): Promise<AttentionItem[]> {
+async function offersAwaiting(
+  ctx: CommandCenterContext,
+  filters: CommandCenterFilters,
+): Promise<AttentionItem[]> {
   const companyId = ctx.companyId;
   if (!companyId) return [];
   const count = await ATSOffer.countDocuments({
     company: companyId,
     status: { $in: ["draft", "sent"] },
+    ...filters.byRegionLabel("regionLabel"),
   });
   if (count === 0) return [];
   return [
@@ -438,7 +487,10 @@ async function offersAwaiting(ctx: CommandCenterContext): Promise<AttentionItem[
   ];
 }
 
-async function jobsClosing(ctx: CommandCenterContext): Promise<AttentionItem[]> {
+async function jobsClosing(
+  ctx: CommandCenterContext,
+  filters: CommandCenterFilters,
+): Promise<AttentionItem[]> {
   const companyId = ctx.companyId;
   if (!companyId) return [];
   // `autoCloseDate` is a wall clock, and the shared startOfDay/addDays helpers
@@ -450,6 +502,7 @@ async function jobsClosing(ctx: CommandCenterContext): Promise<AttentionItem[]> 
     company: companyId,
     status: "open",
     autoCloseDate: { $gte: new Date(dayStart), $lte: new Date(end) },
+    ...filters.byRegionLabel("regionLabel"),
   });
   if (count === 0) return [];
   return [
@@ -466,7 +519,10 @@ async function jobsClosing(ctx: CommandCenterContext): Promise<AttentionItem[]> 
   ];
 }
 
-async function overdueInvoices(ctx: CommandCenterContext): Promise<AttentionItem[]> {
+async function overdueInvoices(
+  ctx: CommandCenterContext,
+  filters: CommandCenterFilters,
+): Promise<AttentionItem[]> {
   const companyId = ctx.companyId;
   if (!companyId) return [];
   const cutoff = new Date(ctx.now.getTime() - 15 * 24 * 60 * 60 * 1000);
@@ -476,6 +532,7 @@ async function overdueInvoices(ctx: CommandCenterContext): Promise<AttentionItem
         company: companyId,
         status: "pending",
         createdAt: { $lt: cutoff },
+        ...filters.invoice(),
       },
     },
     { $group: { _id: null, count: { $sum: 1 }, total: { $sum: "$amount" } } },
@@ -496,7 +553,10 @@ async function overdueInvoices(ctx: CommandCenterContext): Promise<AttentionItem
   ];
 }
 
-async function budgetDeadlines(ctx: CommandCenterContext): Promise<AttentionItem[]> {
+async function budgetDeadlines(
+  ctx: CommandCenterContext,
+  filters: CommandCenterFilters,
+): Promise<AttentionItem[]> {
   const companyId = ctx.companyId;
   if (!companyId) return [];
   const end = addDays(ctx.now, 14);
@@ -504,6 +564,7 @@ async function budgetDeadlines(ctx: CommandCenterContext): Promise<AttentionItem
     company: companyId,
     status: "approved",
     deadline: { $gte: startOfDay(ctx.now), $lte: end },
+    ...filters.byBoard(),
   });
   if (count === 0) return [];
   return [
@@ -520,13 +581,17 @@ async function budgetDeadlines(ctx: CommandCenterContext): Promise<AttentionItem
   ];
 }
 
-async function inactiveAccounts(ctx: CommandCenterContext): Promise<AttentionItem[]> {
+async function inactiveAccounts(
+  ctx: CommandCenterContext,
+  filters: CommandCenterFilters,
+): Promise<AttentionItem[]> {
   const companyId = ctx.companyId;
   if (!companyId) return [];
   const cutoff = new Date(ctx.now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const count = await User.countDocuments({
     company: companyId,
     companyStatus: "approved",
+    ...filters.byUser(),
     $or: [{ lastOnline: null }, { lastOnline: { $lt: cutoff } }],
   });
   if (count === 0) return [];

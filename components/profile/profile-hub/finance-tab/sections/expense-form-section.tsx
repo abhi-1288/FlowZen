@@ -18,18 +18,12 @@ export function ExpenseFormSection({
 }) {
   return (
     <Card>
-      <SectionHeader title="Expense Request" description="Submit a new expense for approval" accent="rose" />
+      <SectionHeader
+        title="Travel Expense Request"
+        description="Submit a travel expense for approval. Equipment and software are requested from /profile/it."
+        accent="rose"
+      />
       <form className="mt-4 grid gap-3 md:grid-cols-4" onSubmit={onSubmit}>
-        <select
-          className="rounded-lg border border-[var(--c-border-light)] px-3 py-2"
-          value={expenseForm.category}
-          onChange={(e) => onFormChange({ ...expenseForm, category: e.target.value })}
-        >
-          <option value="software">Software purchase</option>
-          <option value="device">Laptop/device</option>
-          <option value="travel">Travel expense</option>
-          <option value="office-resources">Office resources</option>
-        </select>
         <input
           className="rounded-lg border border-[var(--c-border-light)] px-3 py-2"
           required

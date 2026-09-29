@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Download, Hash } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -17,29 +17,105 @@ import { DocumentsModal } from "./modals/documents-modal";
 import { MemberListModal } from "./modals/member-list-modal";
 import { currencySymbol } from "./helpers";
 
+/** The members page's own scoped payload, from `GET /api/hr/members`. */
+interface MembersPayload {
+  members: AnyRecord[];
+  totalMembers: number;
+  roleCounts: Record<string, number>;
+  companyPfPct: number;
+  companyEsicPct: number;
+  companyTdsPct: number;
+  joinedThisMonth: number;
+  leftThisMonth: number;
+  region: string;
+  regionLabel: string;
+  regionScope: "global" | "region";
+  regionFallback: boolean;
+  regionForced: boolean;
+  canSwitchRegion: boolean;
+  allowGlobalRegion: boolean;
+  regionOptions: { value: string; label: string }[];
+  allRegions: string[];
+}
+
+
 export function MembersTab({
-  insights,
   actorRole,
   company,
   showToast,
   refresh,
   regionOptions = [],
 }: {
-  insights: AnyRecord | null;
   actorRole: string;
   company: AnyRecord | null;
   showToast: (text: string, type?: "success" | "error") => void;
   refresh: (silent?: boolean) => Promise<void>;
+  /** Only a pre-load fallback; the endpoint returns the authoritative list. */
   regionOptions?: string[];
 }) {
   const { data: session } = useSession();
   const selfId = session?.user?.id ?? "";
-  const hr = (insights?.hr as AnyRecord | undefined) ?? null;
-  const members = Array.isArray(hr?.members) ? (hr.members as AnyRecord[]) : [];
-  const companyPfPct = Number(hr?.companyPfPct ?? 12);
-  const companyEsicPct = Number(hr?.companyEsicPct ?? 0.75);
-  const companyTdsPct = Number(hr?.companyTdsPct ?? 0);
-  const roleCounts = (hr?.roleCounts as AnyRecord | undefined) ?? {};
+
+  // The members list is region-scoped, so it comes from its own endpoint rather
+  // than from `insights.hr` — that payload is shared with the dashboard, policy
+  // tab and team section, and narrowing it there would shrink all of them.
+  const [region, setRegion] = useState("");
+  const [payload, setPayload] = useState<MembersPayload | null>(null);
+  const [membersLoading, setMembersLoading] = useState(true);
+
+  const members = useMemo(() => payload?.members ?? [], [payload]);
+  const companyPfPct = Number(payload?.companyPfPct ?? 12);
+  const companyEsicPct = Number(payload?.companyEsicPct ?? 0.75);
+  const companyTdsPct = Number(payload?.companyTdsPct ?? 0);
+  const roleCounts = useMemo(() => payload?.roleCounts ?? {}, [payload]);
+
+  // The assign-region picker must offer every office, not just the ones this
+  // viewer can switch between, or a head could never move a member into an
+  // office they are not currently looking at.
+  const allRegions = payload?.allRegions ?? regionOptions;
+  const switchableRegions = payload?.regionOptions ?? [];
+
+  const scopedToRegion = payload?.regionScope === "region";
+
+  // Pure fetcher: no state writes, so both the effect below and the post-mutation
+  // refresh can call it without one shadowing the other's loading handling.
+  const fetchMembers = useCallback(async (target: string) => {
+    const query = target ? `?region=${encodeURIComponent(target)}` : "";
+    return apiFetch<MembersPayload>(`/api/hr/members${query}`, undefined, { toast: false });
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchMembers(region)
+      .then((data) => {
+        if (cancelled) return;
+        setPayload(data);
+        setMembersLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) setMembersLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchMembers, region]);
+
+  const changeRegion = useCallback((next: string) => {
+    setMembersLoading(true);
+    setRegion(next);
+  }, []);
+
+  /**
+   * Re-read the members list and the rest of the profile together.
+   *
+   * A write here can move a member between regions, which changes both this
+   * list and the dashboard's headcount, so both are refreshed. `refresh` alone
+   * would leave the list stale because it no longer reads `insights.hr`.
+   */
+  const afterMutation = useCallback(async () => {
+    await Promise.all([refresh(true), fetchMembers(region).then(setPayload)]);
+  }, [fetchMembers, refresh, region]);
+
   const [modalRole, setModalRole] = useState<string | null>(null);
   const [firingFor, setFiringFor] = useState<string | null>(null);
   const [fireConfirmMember, setFireConfirmMember] = useState<AnyRecord | null>(null);
@@ -187,7 +263,7 @@ export function MembersTab({
       });
       showToast("Region updated.");
       setRegionModalMember(null);
-      await refresh(true);
+      await afterMutation();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Unable to update region.", "error");
     } finally {
@@ -216,7 +292,7 @@ export function MembersTab({
       });
       showToast("Employment details updated.");
       setEmploymentModalMember(null);
-      await refresh(true);
+      await afterMutation();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Unable to update employment details.", "error");
     } finally {
@@ -248,7 +324,7 @@ export function MembersTab({
       });
       showToast("Salary saved.");
       setSalaryModalMember(null);
-      await refresh(true);
+      await afterMutation();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Unable to save salary.", "error");
     } finally {
@@ -272,7 +348,7 @@ export function MembersTab({
       });
       showToast("Role updated.");
       setRoleModalMember(null);
-      await refresh(true);
+      await afterMutation();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Unable to update role.", "error");
     } finally {
@@ -292,7 +368,7 @@ export function MembersTab({
       });
       showToast("Custom role label updated.");
       setCustomRoleModalMember(null);
-      await refresh(true);
+      await afterMutation();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Unable to update custom role.", "error");
     } finally {
@@ -321,7 +397,7 @@ export function MembersTab({
       });
       showToast("PF, ESIC & TDS details saved.");
       setPfEsicModalMember(null);
-      await refresh(true);
+      await afterMutation();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Unable to save PF/ESIC details.", "error");
     } finally {
@@ -329,6 +405,15 @@ export function MembersTab({
     }
   }
 
+  /**
+   * Members grouped into one section per office.
+   *
+   * Ordered by the company's own `addresses[]` order, with unassigned members
+   * last. A member with no `regionLabel` is reported honestly as "Unassigned"
+   * rather than folded into the first office, which is what `/api/profile` does
+   * — silently filing someone under an office they do not belong to would make
+   * every per-office headcount here a quiet lie.
+   */
   const otherRoleOptions = useMemo(() => {
     const labels = new Set<string>();
     members.forEach((member) => {
@@ -428,7 +513,7 @@ export function MembersTab({
       showToast("Member removed.");
       setFireConfirmMember(null);
       setModalRole(null);
-      await refresh(true);
+      await afterMutation();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Could not remove member.", "error");
     } finally {
@@ -443,10 +528,61 @@ export function MembersTab({
   return (
     <section className="rounded-xl neu-card p-5">
       <SectionHeader title="Company Members" description="Manage roles, salaries, and memberships." accent="indigo" />
+      {allRegions.length > 0 ? (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <label className="text-xs font-medium text-slate-500" htmlFor="members-region-filter">Region</label>
+          {payload?.canSwitchRegion && switchableRegions.length > 0 ? (
+            <>
+              <select
+                id="members-region-filter"
+                className="rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-sm"
+                // With no explicit pick the server resolves to the viewer's own
+                // region; the owner resolves to the company-wide view, which is
+                // why "All offices" is the "" option for them and absent here.
+                value={region || (payload?.allowGlobalRegion ? "" : payload?.region)}
+                onChange={(e) => changeRegion(e.target.value)}
+                disabled={membersLoading}
+              >
+                {payload?.allowGlobalRegion ? <option value="">All offices</option> : null}
+                {switchableRegions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              {scopedToRegion ? (
+                <span className="text-xs text-slate-400">
+                  Showing {payload?.regionLabel}
+                </span>
+              ) : null}
+            </>
+          ) : (
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-zinc-800 dark:text-zinc-300">
+              {scopedToRegion ? payload?.regionLabel : "All offices"}
+            </span>
+          )}
+        </div>
+      ) : null}
+
+      {payload?.regionFallback ? (
+        <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          No members in {payload?.regionLabel}, so this list covers the whole company.
+        </p>
+      ) : null}
+
+      {payload?.regionForced && scopedToRegion ? (
+        <p className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-400">
+          This list is limited to {payload?.regionLabel}.
+        </p>
+      ) : null}
       <div className="mb-5 flex items-center gap-2">
         <div className="rounded-xl bg-[var(--c-bg-muted)] px-5 py-3 ring-1 ring-slate-100">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Total members</p>
-          <p className="mt-0.5 text-2xl font-bold text-slate-900">{Number(hr?.totalMembers ?? members.length)}</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            {scopedToRegion ? "Members in region" : "Total members"}
+          </p>
+          {/* The scoped list length, not a company-wide total, so the number
+              matches what is actually listed below it. */}
+          <p className="mt-0.5 text-2xl font-bold text-slate-900">
+            {membersLoading && !payload ? "—" : members.length}
+          </p>
         </div>
         {members.length > 0 ? (
           <button
@@ -471,6 +607,20 @@ export function MembersTab({
       </div>
 
       <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        {/* Senior security has no per-role tabs — they are scoped out of the role
+            grid above — so they get one unfiltered tab instead. Without it, hiding
+            the outer list would leave them with no way to reach any member at all,
+            which is a regression rather than a simplification. */}
+        {actorIsSeniorSecurity ? (
+          <button className="rounded-lg border border-transparent bg-[var(--c-bg-muted)] px-3 py-2 text-left transition hover:border-[var(--c-border-light)] focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            type="button"
+            onClick={() => { setModalRole("all"); setModalSearchQuery(""); setModalSearchInput(""); }}
+          >
+            <p className="text-xs font-medium text-slate-500">All members</p>
+            <p className="text-lg font-semibold">{members.length}</p>
+            <p className="mt-0.5 text-[11px] text-slate-400">View</p>
+          </button>
+        ) : null}
         {actorIsSeniorSecurity ? null : HR_MEMBER_ROLE_KEYS.map((roleName) => {
           const count = Number(roleCounts[roleName] ?? 0);
           return (
@@ -506,8 +656,12 @@ export function MembersTab({
         )}
       </div>
 
-      {members.length === 0 ? (
-        <p className="mt-5 rounded-lg bg-[var(--c-bg-muted)] px-3 py-6 text-center text-sm text-slate-500">No approved company members yet.</p>
+      {members.length === 0 && !membersLoading ? (
+        <p className="mt-5 rounded-lg bg-[var(--c-bg-muted)] px-3 py-6 text-center text-sm text-slate-500">
+          {scopedToRegion
+            ? `No members in ${payload?.regionLabel}.`
+            : "No approved company members yet."}
+        </p>
       ) : null}
 
       <MemberListModal
@@ -532,8 +686,8 @@ export function MembersTab({
         onSearch={() => setModalSearchQuery(modalSearchInput.trim())}
         onSelectedOtherRoleChange={setSelectedOtherRole}
         showToast={showToast}
-        onRefresh={refresh}
-        regionOptions={regionOptions}
+        onRefresh={afterMutation}
+        regionOptions={allRegions}
         onOpenRegionModal={openRegionModal}
         onOpenEmploymentModal={openEmploymentModal}
       />
@@ -613,7 +767,7 @@ export function MembersTab({
               onChange={(e) => setRegionLabelValue(e.target.value)}
             >
               <option value="">— None —</option>
-              {regionOptions.map((opt) => (
+              {allRegions.map((opt) => (
                 <option key={opt} value={opt}>{withMainOfficeSuffix(company, opt)}</option>
               ))}
             </select>

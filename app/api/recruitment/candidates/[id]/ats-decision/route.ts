@@ -1,32 +1,31 @@
 import { NextResponse } from "next/server";
-import { connectDb } from "@/lib/db";
 import { ATSCandidate } from "@/models/ATSCandidate";
 import { ATSJob } from "@/models/ATSJob";
 import { ATSTimeline } from "@/models/ATSTimeline";
-import { User } from "@/models/User";
-import { isObjectId, jsonError, requireUserId, serializeDoc } from "@/lib/api";
+import { withCandidateAccess } from "@/lib/recruitment-candidate-access";
+import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
+import { jsonError, serializeDoc } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
 
 type Params = { params: Promise<{ id: string }> };
-const HR_ROLES = ["admin", "human-resource"];
 const VALID_DECISIONS = ["selected", "rejected"];
 
 export async function POST(request: Request, { params }: Params) {
   const { id } = await params;
-  const userId = await requireUserId();
-  if (!userId) return jsonError("Unauthorized", 401);
-  if (!isObjectId(id)) return jsonError("Invalid candidate id.");
-
   const body = await request.json().catch(() => ({}));
   const decision = String(body.decision ?? "");
   if (!VALID_DECISIONS.includes(decision)) return jsonError("Invalid decision.");
 
-  await connectDb();
-  const user = await User.findById(userId);
-  if (!user || !HR_ROLES.includes(user.role)) return jsonError("Forbidden", 403);
-  if (!user.company) return jsonError("No company found.", 400);
+  const access = await withCandidateAccess(id, "write");
+  if (!access.ok) return access.response;
+  const { user } = access;
+  const userId = String(user._id);
 
-  const candidate = await ATSCandidate.findOne({ _id: id, company: user.company })
+  // Overriding or confirming the ATS verdict is a pipeline decision.
+  const hq = await requireRecruitmentHQ(user as any);
+  if (!hq.ok) return hq.response;
+
+  const candidate = await ATSCandidate.findById(access.candidate._id)
     .populate("assignedRecruiter", "name email")
     .populate("job", "title");
   if (!candidate) return jsonError("Candidate not found.", 404);

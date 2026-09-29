@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
-import { X, Building2, Download } from "lucide-react";
+import { useMemo } from "react";
+import { X, Download } from "lucide-react";
 import * as XLSX from "xlsx";
-import { ActionButton, AnyRecord, formatRole, formatRoleWithCustom } from "../../shared";
+import { AnyRecord, ActionButton, formatRole, formatRoleWithCustom } from "../../shared";
 import { currencySymbol } from "../helpers";
-import { apiFetch } from "@/lib/client-utils";
 import { withMainOfficeSuffix } from "@/lib/company-regions";
+import { MemberCard } from "./member-card";
 
 export function MemberListModal({
   modalRole,
@@ -62,6 +62,10 @@ export function MemberListModal({
   const modalMembers = useMemo(() => {
     if (!modalRole) return [];
     return members.filter((m) => {
+      // "all" is the unfiltered tab senior security gets in place of the per-role
+      // grid. It has to be matched before the strict role equality below, or every
+      // member is filtered out and the tab opens empty.
+      if (modalRole === "all") return true;
       if (modalRole === "senior-security") {
         return String(m.role) === "security" && Boolean((m as any).isSeniorSecurity);
       }
@@ -75,24 +79,6 @@ export function MemberListModal({
       return true;
     });
   }, [modalRole, members, selectedOtherRole]);
-
-  const [revokingIdCardFor, setRevokingIdCardFor] = useState<string | null>(null);
-
-  async function revokeIdCard(memberId: string) {
-    setRevokingIdCardFor(memberId);
-    try {
-      await apiFetch("/api/hr/revoke-id-card", {
-        method: "POST",
-        body: JSON.stringify({ memberId }),
-      });
-      showToast("ID card revoked.");
-      if (onRefresh) await onRefresh(true);
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Could not revoke ID card.", "error");
-    } finally {
-      setRevokingIdCardFor(null);
-    }
-  }
 
   function exportToExcel() {
     const fmtDate = (val: unknown): string => {
@@ -154,7 +140,7 @@ export function MemberListModal({
       >
         <div className="flex items-start justify-between gap-4 border-b border-[var(--c-border-light)] px-6 py-4 dark:border-zinc-800">
           <div>
-            <h4 className="text-sm font-semibold text-slate-900 dark:text-zinc-100" id="members-modal-title">{modalRole === "senior-security" ? "Senior Security" : modalRole === "junior-security" ? "Junior Security" : formatRole(modalRole)}</h4>
+            <h4 className="text-sm font-semibold text-slate-900 dark:text-zinc-100" id="members-modal-title">{modalRole === "all" ? "All members" : modalRole === "senior-security" ? "Senior Security" : modalRole === "junior-security" ? "Junior Security" : formatRole(modalRole)}</h4>
             <p className="text-sm text-slate-500 dark:text-zinc-400">
               {modalMembers.length} member{modalMembers.length === 1 ? "" : "s"}
             </p>
@@ -228,76 +214,26 @@ export function MemberListModal({
             }
             return (
               <ul className="space-y-4">
-                {filtered.map((member) => {
-                  const memberId = String(member.id);
-                  const teams = Array.isArray(member.teams) ? member.teams.map(String) : [];
-                  const isSelf = selfId && memberId === selfId;
-                  const joinedBy = member.joinedBy && typeof member.joinedBy === "object" ? (member.joinedBy as AnyRecord) : null;
-                  return (
-                    <li className="rounded-xl neu-card p-4 dark:border-zinc-800 dark:bg-[#000000]" key={memberId}>
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="min-w-0">
-                          <p className="font-semibold text-slate-900 dark:text-zinc-100">{String(member.name ?? "Member")}</p>
-                          <p className="truncate text-sm text-slate-500 dark:text-zinc-400">{String(member.email ?? "")}</p>
-                          {joinedBy?.name ? (
-                            <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
-                              Joined by <span className="font-medium text-slate-700 dark:text-zinc-200">{String(joinedBy.name)}</span>
-                            </p>
-                          ) : null}
-                        </div>
-
-                        <div className="grid items-center gap-2">
-                          <span className="rounded-lg neu-inset px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-200">
-                            role: {formatRoleWithCustom(String(member.role ?? "employee"), member.customRole, Boolean((member as any).isSeniorSecurity))}
-                          </span>
-                          <span className="rounded-lg neu-inset px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-200">
-                            salary: {(() => {
-                              const cur = String(member.salaryCurrency ?? "INR");
-                              return Number(member.baseSalary ?? 0) > 0 ? `${currencySymbol(cur)} ${Number(member.baseSalary).toLocaleString("en-IN")}` : "not set";
-                            })()}
-                          </span>
-                          <span className="rounded-lg neu-inset px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-200" title={teams.length ? teams.join(", ") : "No team joined"}>
-                            team: {teams.length ? teams.join(", ") : "-"}
-                          </span>
-                          <span className="rounded-lg neu-inset px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-200">
-                            region: {withMainOfficeSuffix(company, String(member.regionLabel ?? "")) || "-"}
-                          </span>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2 sm:col-span-3">
-                          <ActionButton variant="primary" className="px-3" type="button" onClick={() => onOpenSalaryModal(member)}>Base Salary</ActionButton>
-                          <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenPfEsicModal(member)}>PF & ESIC</ActionButton>
-                          <ActionButton variant="secondary" className="px-3" type="button" onClick={() => void onOpenDocModal(member)}>Documents</ActionButton>
-                          {onOpenRegionModal ? (
-                            <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenRegionModal(member)}>
-                              <Building2 className="mr-1 inline-block h-3.5 w-3.5" />Region
-                            </ActionButton>
-                          ) : null}
-                          {onOpenEmploymentModal ? (
-                            <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenEmploymentModal(member)}>
-                              Employment Type
-                            </ActionButton>
-                          ) : null}
-                          <ActionButton variant="danger" className="px-3" type="button" disabled={revokingIdCardFor === memberId} onClick={() => revokeIdCard(memberId)}>
-                            {revokingIdCardFor === memberId ? "Revoking..." : "Revoke ID Card"}
-                          </ActionButton>
-                          {canEditOthersRole && !isSelf ? (
-                            <>
-                              <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenCustomRoleModal(member)}>Custom Role</ActionButton>
-                              <ActionButton variant="secondary" className="px-3" type="button" onClick={() => onOpenRoleModal(member)}>Change Role</ActionButton>
-                            </>
-                          ) : null}
-                        </div>
-
-                        <div className="flex shrink-0 flex-col gap-2 sm:items-end">
-                          <ActionButton variant="danger" className="px-3" disabled={!!isSelf || firingFor === memberId} type="button" onClick={() => onRequestFire(member)}>
-                            {firingFor === memberId ? "Removing..." : "Fire"}
-                          </ActionButton>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
+                {filtered.map((member) => (
+                  <MemberCard
+                    key={String(member.id)}
+                    member={member}
+                    company={company}
+                    selfId={selfId}
+                    canEditOthersRole={canEditOthersRole}
+                    firingFor={firingFor}
+                    onRequestFire={onRequestFire}
+                    onOpenSalaryModal={onOpenSalaryModal}
+                    onOpenPfEsicModal={onOpenPfEsicModal}
+                    onOpenDocModal={onOpenDocModal}
+                    onOpenRoleModal={onOpenRoleModal}
+                    onOpenCustomRoleModal={onOpenCustomRoleModal}
+                    onOpenRegionModal={onOpenRegionModal}
+                    onOpenEmploymentModal={onOpenEmploymentModal}
+                    showToast={showToast}
+                    onRefresh={onRefresh}
+                  />
+                ))}
               </ul>
             );
           })()}

@@ -36,10 +36,18 @@ export function FinanceTab({
   actorRole,
   profileId,
   showToast,
+  region,
+  regionOptions = [],
+  isOwner = false,
 }: {
   actorRole: string;
   profileId: string;
   showToast: (text: string, type?: "success" | "error") => void;
+  /** Actor's effective region; "" when the company has no region configured. */
+  region: string;
+  regionOptions?: string[];
+  /** True when the actor is the company owner (global super-admin). */
+  isOwner?: boolean;
 }) {
   const [month, setMonth] = useState(() => {
     const d = new Date();
@@ -62,7 +70,7 @@ export function FinanceTab({
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
   const [showExpiredBudgets, setShowExpiredBudgets] = useState(false);
-  const [expenseForm, setExpenseForm] = useState<ExpenseForm>({ category: "software", title: "", amount: "", quantity: "1", reason: "", assignedTo: "" });
+  const [expenseForm, setExpenseForm] = useState<ExpenseForm>({ category: "travel", title: "", amount: "", quantity: "1", reason: "", assignedTo: "" });
   const [forwardAdminByExpense, setForwardAdminByExpense] = useState<Record<string, string>>({});
   const [rejectTarget, setRejectTarget] = useState<RejectTarget | null>(null);
   const [rejectReason, setRejectReason] = useState("");
@@ -81,8 +89,9 @@ export function FinanceTab({
   const [salaryModalTab, setSalaryModalTab] = useState<SalaryModalTab>("unpaid");
   const [expandedRoles, setExpandedRoles] = useState<Set<string>>(new Set());
   const { mySlips, slipsLoading } = useMySalarySlips(month);
-  const { policyData, setPolicyData } = usePolicyData(data);
+  const { policyData, setPolicyData, refreshPolicy } = usePolicyData(data);
   const { salaryCycle, setSalaryCycle, refreshSalaryCycle } = useSalaryCycle(data);
+  const [policyRegion, setPolicyRegion] = useState("");
   const [financeSubTab, setFinanceSubTab] = useState<"my" | "ops" | "reports">("my");
   const [foodOptedIn, setFoodOptedIn] = useState(true);
   const [travelOptedIn, setTravelOptedIn] = useState(true);
@@ -110,9 +119,18 @@ export function FinanceTab({
     setTdsPctInput(String(policyData.tdsPercentage));
   }, [policyData, profileId]);
 
+  useEffect(() => {
+    if (policyRegion === "") {
+      setPolicyRegion(region);
+      return;
+    }
+    void refreshPolicy(policyRegion);
+    void refreshSalaryCycle(policyRegion);
+  }, [policyRegion, region, refreshPolicy, refreshSalaryCycle]);
+
   async function toggleOptInOut(type: "food" | "travel", optedIn: boolean) {
     try {
-      await apiFetch("/api/finance/policy", { method: "PATCH", body: JSON.stringify({ type, optedIn }) });
+      await apiFetch("/api/finance/policy", { method: "PATCH", body: JSON.stringify({ type, optedIn, region: policyRegion }) });
       if (type === "food") setFoodOptedIn(optedIn);
       else setTravelOptedIn(optedIn);
       showToast(`Successfully ${optedIn ? "opted in" : "opted out"} of ${type} policy.`, "success");
@@ -125,7 +143,7 @@ export function FinanceTab({
     try {
       const res = await apiFetch<{ advanceSalaryEnabled: boolean }>("/api/finance/policy", {
         method: "POST",
-        body: JSON.stringify({ advanceSalaryEnabled: enabled }),
+        body: JSON.stringify({ advanceSalaryEnabled: enabled, region: policyRegion }),
       });
       setPolicyData((prev) => prev ? { ...prev, advanceSalaryEnabled: res.advanceSalaryEnabled } : prev);
       showToast(`Advance salary ${enabled ? "enabled" : "disabled"}.`, "success");
@@ -136,14 +154,15 @@ export function FinanceTab({
 
   async function savePercentages() {
     try {
-      const res = await apiFetch<PolicyData>("/api/finance/policy", {
-        method: "POST",
-        body: JSON.stringify({
-          pfPercentage: Number(pfPctInput),
-          esicPercentage: Number(esicPctInput),
-          tdsPercentage: Number(tdsPctInput),
-        }),
-      });
+    const res = await apiFetch<PolicyData>("/api/finance/policy", {
+      method: "POST",
+      body: JSON.stringify({
+        pfPercentage: Number(pfPctInput),
+        esicPercentage: Number(esicPctInput),
+        tdsPercentage: Number(tdsPctInput),
+        region: policyRegion,
+      }),
+    });
       setPolicyData((prev) => prev ? { ...prev, pfPercentage: res.pfPercentage, esicPercentage: res.esicPercentage, tdsPercentage: res.tdsPercentage } : prev);
       showToast("Deduction percentages saved.", "success");
     } catch (err: unknown) {
@@ -254,7 +273,7 @@ export function FinanceTab({
   async function submitExpense(event: FormEvent) {
     event.preventDefault();
     await apiFetch("/api/finance", { method: "POST", body: JSON.stringify({ action: "request-expense", ...expenseForm }) });
-    setExpenseForm({ category: "software", title: "", amount: "", quantity: "1", reason: "", assignedTo: "" });
+    setExpenseForm({ category: "travel", title: "", amount: "", quantity: "1", reason: "", assignedTo: "" });
     showToast("Expense request submitted.", "success");
     await load();
   }
@@ -334,15 +353,11 @@ export function FinanceTab({
 
   const isFinanceOrAdmin = actorRole === "finance" || actorRole === "admin";
   const hasFinanceMember = (data.financeMembers ?? []).length > 0;
-  const adminOptions = data.members.filter((m) => String(m.role) === "admin");
-  const approvers = [
-    ...(data.financeMembers ?? []),
-    ...(data.members ?? []),
-  ].filter((m, i, arr) => {
-    const role = String(m.role);
-    return (role === "admin" || role === "human-resource" || role === "finance") &&
-      arr.findIndex((x) => String(x.id) === String(m.id)) === i;
-  }).map((m) => ({ id: String(m.id), name: String(m.name ?? m.email ?? "Unknown") }));
+  const adminOptions = (data.people ?? []).filter((m) => String(m.role) === "admin");
+  const approvers = (data.people ?? []).map((m) => ({
+    id: String(m.id),
+    name: String(m.name ?? m.email ?? "Unknown"),
+  }));
 
   if (!isFinanceOrAdmin) {
     return (
@@ -361,7 +376,7 @@ export function FinanceTab({
         </div>
 
         <div>
-          <h4 className="mb-3 text-sm font-semibold text-slate-800">Request Expense</h4>
+          <h4 className="mb-3 text-sm font-semibold text-slate-800">Travel Expense</h4>
           <div className="space-y-4">
             <ExpenseFormSection expenseForm={expenseForm} actorRole={actorRole} financeMembers={data.financeMembers} onSubmit={submitExpense} onFormChange={setExpenseForm} />
             <ExpenseListSection expenses={data.expenses} actorRole={actorRole} profileId={profileId} adminOptions={adminOptions} forwardAdminByExpense={forwardAdminByExpense} onForwardAdmin={(id, adminId) => setForwardAdminByExpense({ ...forwardAdminByExpense, [id]: adminId })} onReject={(id, type) => setRejectTarget({ id, type })} onStatusUpdate={updateStatus} />
@@ -402,6 +417,23 @@ export function FinanceTab({
 
       <FinanceSubTabs activeTab={financeSubTab} data={data} invoices={invoices} onTabChange={setFinanceSubTab} />
 
+      {isFinanceOrAdmin && regionOptions.length > 0 ? (
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-slate-500" htmlFor="finance-region-select">Region</label>
+          <select
+            id="finance-region-select"
+            className="rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-sm"
+            value={policyRegion}
+            onChange={(e) => setPolicyRegion(e.target.value)}
+          >
+            {isOwner ? <option value="">Global</option> : null}
+            {regionOptions.map((opt) => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        </div>
+      ) : null}
+
       {data.monthEndGenerated ? (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
           <p className="text-sm font-medium text-emerald-800">Salaries auto-generated for {data.month}</p>
@@ -426,7 +458,7 @@ export function FinanceTab({
       {financeSubTab === "ops" && data.canManage ? (
         <div className="space-y-5">
           <div className="grid gap-5 xl:grid-cols-2">
-            <SalaryWizardSection actorRole={actorRole} salaryStep={salaryStep} salaryPeriod={salaryPeriod} salaryEmployeeId={salaryEmployeeId} salaryAllowances={salaryAllowances} salaryDeductions={salaryDeductions} salaryBreakdown={salaryBreakdown} memberPfNumber={memberPfNumber} memberEsicNumber={memberEsicNumber} memberPfExempted={memberPfExempted} memberEsicExempted={memberEsicExempted} memberTdsExempted={memberTdsExempted} salaryGenerating={salaryGenerating} members={data.members} pfPercentage={policyData?.pfPercentage ?? 0} esicPercentage={policyData?.esicPercentage ?? 0} tdsPercentage={policyData?.tdsPercentage ?? 0} onStepChange={setSalaryStep} onPeriodChange={setSalaryPeriod} onEmployeeChange={setSalaryEmployeeId} onAllowancesChange={setSalaryAllowances} onDeductionsChange={setSalaryDeductions} onPfNumberChange={setMemberPfNumber} onEsicNumberChange={setMemberEsicNumber} onCalculate={calculateSalary} onSubmit={submitSalary} />
+            <SalaryWizardSection actorRole={actorRole} salaryStep={salaryStep} salaryPeriod={salaryPeriod} salaryEmployeeId={salaryEmployeeId} salaryAllowances={salaryAllowances} salaryDeductions={salaryDeductions} salaryBreakdown={salaryBreakdown} memberPfNumber={memberPfNumber} memberEsicNumber={memberEsicNumber} memberPfExempted={memberPfExempted} memberEsicExempted={memberEsicExempted} memberTdsExempted={memberTdsExempted} salaryGenerating={salaryGenerating} members={data.members} region={data.region} regionFallback={data.regionFallback} pfPercentage={policyData?.pfPercentage ?? 0} esicPercentage={policyData?.esicPercentage ?? 0} tdsPercentage={policyData?.tdsPercentage ?? 0} onStepChange={setSalaryStep} onPeriodChange={setSalaryPeriod} onEmployeeChange={setSalaryEmployeeId} onAllowancesChange={setSalaryAllowances} onDeductionsChange={setSalaryDeductions} onPfNumberChange={setMemberPfNumber} onEsicNumberChange={setMemberEsicNumber} onCalculate={calculateSalary} onSubmit={submitSalary} />
             <ExpenseAllocatorSection expenses={data.expenses} onStatusUpdate={updateStatus} />
           </div>
           <InvoicesSection invoices={invoices} isFinanceOrAdmin={isFinanceOrAdmin} onCreateInvoice={() => setShowInvoiceForm(true)} onMarkInvoice={markInvoice} />

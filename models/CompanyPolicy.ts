@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 
 const policySchema = new mongoose.Schema({
   company: { type: mongoose.Schema.Types.ObjectId, ref: "Company", required: true, index: true },
+  // "" = global policy (fallback for members with no regional policy); non-empty = that region.
+  region: { type: String, default: "", trim: true },
   foodAmount: { type: Number, default: 0 },
   travelAccommodationAmount: { type: Number, default: 0 },
   foodOptedOutMembers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
@@ -43,6 +45,9 @@ const policySchema = new mongoose.Schema({
     },
   },
 }, { timestamps: true });
+
+// One policy per (company, region). The global policy uses region "".
+policySchema.index({ company: 1, region: 1 }, { unique: true });
 
 if (process.env.NODE_ENV === "development") {
   delete mongoose.models.CompanyPolicy;

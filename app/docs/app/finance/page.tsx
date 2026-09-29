@@ -59,15 +59,69 @@ export default function FinanceDocsPage() {
         </section>
 
         <section className="docs-section">
+          <h2>Region Scope for Salary Management</h2>
+          <div className="docs-card">
+            <p>Salary management is region scoped. A <code>finance</code> or <code>admin</code> user only sees, creates, edits, approves, pays, rejects, deletes and auto-generates salaries for members in their own effective region.</p>
+
+            <p>The scope is resolved from the actor&apos;s <code>regionLabel</code>, falling back to the main office when unset. It applies to:</p>
+            <ul>
+              <li><code>GET /api/finance</code> — the <code>members</code> picker, the <code>salaries</code> list, the pending counts, and the cycle-day auto-generation all use the same scope.</li>
+              <li><code>POST /api/finance</code> — <code>calculate-salary</code>, <code>generate-salary</code> and <code>edit-salary</code>.</li>
+              <li><code>PATCH /api/finance</code> — the <code>salary</code> status updates.</li>
+              <li><code>/api/finance/salary/[id]</code>, <code>/api/finance/salary-slip/[id]</code>, <code>/api/finance/member-salary/[id]</code> and <code>/api/finance/member-attendance/[id]</code>, so the boundary cannot be bypassed by calling a detail endpoint with a guessed id.</li>
+            </ul>
+
+            <div className="docs-info">
+              <p><strong>No region configured?</strong> Companies with no <code>addresses[]</code> and no <code>address</code> are unaffected and stay company-wide. A company that has regions but whose requester&apos;s region holds no approved members also falls back to company-wide, matching <code>/api/users?region=mine</code>. Employees can always read their own records.</p>
+            </div>
+
+            <div className="docs-info">
+              <p><strong>Expenses are region scoped too.</strong> A finance or admin user only sees and acts on expense requests raised by members in their own effective region, and the travel assignee picker is filtered the same way. Budgets, bills, invoices and salary advances stay company-wide.</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="docs-section">
+          <h2>Region Scope for Policy and Salary Cycle</h2>
+          <div className="docs-card">
+            <p>Company policy and the salary cycle are per-region. A <code>finance</code> or <code>admin</code> user reads and updates the policy — PF/ESIC/TDS percentages, salary cycle, food and travel allowances — for their own effective region only, resolved from their <code>regionLabel</code> with the main-office fallback.</p>
+
+            <p>This applies to <code>GET</code>, <code>POST</code> and <code>PATCH /api/finance/policy</code> and to <code>GET</code> and <code>POST /api/finance/salary-cycle</code>. Companies with no region configured stay company-wide, as does a region that holds no approved members.</p>
+          </div>
+        </section>
+
+        <section className="docs-section">
+          <h2>Two Tracks: Travel vs Purchases</h2>
+          <div className="docs-card">
+            <p>Money leaves the company through two different desks, and which one handles it depends on <em>what</em> is being bought — never on who is asking.</p>
+
+            <h3>Travel — finance only</h3>
+            <p>Any approved member raises a travel expense from the Finance tab. The assignee must be a <code>finance</code> user in the requester&apos;s region, and the request follows the usual chain: <code>pending → forwarded → approved → accepted → disbursed</code>.</p>
+
+            <h3>Purchases — IT first, then finance</h3>
+            <p>Laptops, desktops, software, electronics, internet service, email service and office resources are raised from <strong>/profile/it → New Ticket → Purchase request</strong>. They are stored as <code>ProcurementRequest</code> records, not expenses.</p>
+            <ul>
+              <li><code>it-admin</code> / <code>it-administration</code> buy for the company themselves, so their purchases are routed straight to <strong>finance</strong> — they never see the IT queue.</li>
+              <li>Everyone else (project-manager, qa-tester, HR, admin, finance, employee, others, security) is reviewed by <strong>IT</strong> first.</li>
+              <li>When IT approves, the API mints a linked <code>ExpenseRequest</code> already at <code>approved</code> with no admin approver — the IT review <em>is</em> the approval. Finance then accepts and disburses it from the Finance tab, and the procurement record&apos;s status follows along.</li>
+            </ul>
+
+            <div className="docs-info">
+              <p><strong>Region scoping.</strong> The assignee picker, the request list and the IT board are all scoped to the requester&apos;s effective region, with the same main-office and empty-region fallbacks as salaries. A company with no <code>addresses[]</code> stays company-wide.</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="docs-section">
           <h2>Get All Salaries</h2>
           <div className="docs-card">
             <div className="docs-card-header">
               <span className="method-badge method-get">GET</span>
               <code className="endpoint-path">/api/finance</code>
             </div>
-            <p>Get all salary records for the company.</p>
+            <p>Get salary records for the month. Finance and admin users receive only their own region&apos;s records; everyone else receives their own.</p>
 
-            <div className="docs-code">{"{\n  \"salaries\": [\n    {\n      \"id\": \"...\",\n      \"employee\": { \"id\": \"...\", \"name\": \"John\" },\n      \"month\": \"2024-01\",\n      \"baseSalary\": 50000,\n      \"allowances\": 5000,\n      \"deductions\": 3000,\n      \"netSalary\": 52000,\n      \"status\": \"approved\"\n    }\n  ]\n}"}</div>
+            <div className="docs-code">{"{\n  \"region\": \"Pune\",\n  \"regionFallback\": false,\n  \"salaries\": [\n    {\n      \"id\": \"...\",\n      \"employee\": { \"id\": \"...\", \"name\": \"John\" },\n      \"month\": \"2024-01\",\n      \"baseSalary\": 50000,\n      \"allowances\": 5000,\n      \"deductions\": 3000,\n      \"netSalary\": 52000,\n      \"status\": \"approved\"\n    }\n  ]\n}"}</div>
           </div>
         </section>
 
