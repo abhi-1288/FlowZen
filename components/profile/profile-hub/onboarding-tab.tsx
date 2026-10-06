@@ -86,6 +86,10 @@ export function OnboardingTab({
   const [mainRegionHrId, setMainRegionHrId] = useState("");
   const [mainRegionHrOptions, setMainRegionHrOptions] = useState<{ id: string; name: string; email?: string }[]>([]);
 
+  const [mainRegionContacts, setMainRegionContacts] = useState<{ name: string; phone: string; email: string; isPrimary: boolean }[]>([
+    { name: "", phone: "", email: "", isPrimary: true }
+  ]);
+
   const [itCodes, setItCodes] = useState<AnyRecord[]>([]);
   const [itCodesLoading, setItCodesLoading] = useState(false);
   const [generatingItCode, setGeneratingItCode] = useState(false);
@@ -157,11 +161,25 @@ export function OnboardingTab({
       setAddrState(String(main.state ?? ""));
       setAddrZip(String(main.zip ?? ""));
       setAddrCountry(String(main.country ?? ""));
+      const contacts = Array.isArray(main.contacts) ? main.contacts : [];
+      if (contacts.length > 0) {
+        setMainRegionContacts(contacts.map((c: any) => ({
+          name: String(c.name ?? ""),
+          phone: String(c.phone ?? ""),
+          email: String(c.email ?? ""),
+          isPrimary: Boolean(c.isPrimary),
+        })));
+      } else {
+        setMainRegionContacts([{ name: "", phone: "", email: "", isPrimary: true }]);
+      }
     } else if (company?.address) {
       const legacy = String(company.address);
       const parts = legacy.split(",").map((s) => s.trim()).filter(Boolean);
       setAddrLabel(parts[0] ?? "");
       setAddrLine1(parts[1] ?? "");
+      setMainRegionContacts([{ name: "", phone: "", email: "", isPrimary: true }]);
+    } else {
+      setMainRegionContacts([{ name: "", phone: "", email: "", isPrimary: true }]);
     }
   }, [company?.addresses, company?.address]);
   const createdTeamsCount = Number(managerInsight?.createdTeamsCount ?? managerTeams.length);
@@ -262,6 +280,23 @@ export function OnboardingTab({
       setAddressSaving(true);
       const label = addrLabel.trim() || "Main Office";
       const line1 = addrLine1.trim();
+      
+      // Filter out empty contacts and ensure at least one
+      const validContacts = mainRegionContacts
+        .filter((c) => c.name.trim().length > 0)
+        .slice(0, 5);
+      
+      if (validContacts.length === 0) {
+        showToast("At least one contact is required.", "error");
+        return;
+      }
+      
+      const primaryCount = validContacts.filter((c) => c.isPrimary).length;
+      if (primaryCount > 1) {
+        showToast("Only one primary contact allowed.", "error");
+        return;
+      }
+
       await apiFetch("/api/company/address", {
         method: "PATCH",
         body: JSON.stringify({
@@ -274,6 +309,7 @@ export function OnboardingTab({
           country: addrCountry,
           hrIds: mainRegionHrId ? [mainRegionHrId] : [],
           hrHeadId: mainRegionHrId || undefined,
+          contacts: validContacts,
         }),
       });
       showToast(mainRegionHrId
@@ -452,6 +488,7 @@ export function OnboardingTab({
               onAddrLabelChange={setAddrLabel} onAddrLine1Change={setAddrLine1} onAddrCityChange={setAddrCity} onAddrStateChange={setAddrState} onAddrZipChange={setAddrZip} onAddrCountryChange={setAddrCountry}
               onAddressSave={saveCompanyAddress} addressSaving={addressSaving}
               hrOptions={mainRegionHrOptions} selectedMainHrId={mainRegionHrId} onMainHrIdChange={setMainRegionHrId}
+              contacts={mainRegionContacts} onContactsChange={setMainRegionContacts}
             />
           </>
         ) : (

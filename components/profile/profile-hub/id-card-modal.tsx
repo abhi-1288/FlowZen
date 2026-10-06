@@ -20,6 +20,8 @@ import {
   ImageDown,
   Building2,
   MapPin,
+  Columns,
+  Users,
 } from "lucide-react";
 import QRCode from "qrcode";
 import type { AnyRecord } from "./shared";
@@ -68,8 +70,7 @@ function maskPhoneNumber(phone: string): string {
   return prefix + last4;
 }
 
-/* ─── inline styles (not Tailwind) for the card internals so they render
-       identically in print / canvas capture ─── */
+/* ─── inline styles tokens ─── */
 
 const SLATE_50 = "#f8fafc";
 const SLATE_200 = "#e2e8f0";
@@ -112,7 +113,10 @@ export function IdCardModal({
   const [signing, setSigning] = useState(false);
   const [localSigned, setLocalSigned] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState("");
-  const cardRef = useRef<HTMLDivElement>(null);
+  const [viewMode, setViewMode] = useState<"side-by-side" | "flip">("side-by-side");
+  const [isFlipped, setIsFlipped] = useState(false);
+
+  const exportRef = useRef<HTMLDivElement>(null);
 
   const uniqueId = profile?.companyIdentityCode
     ? String(profile.companyIdentityCode)
@@ -136,16 +140,16 @@ export function IdCardModal({
       .catch(() => setQrDataUrl(""));
   }, [qrValue, open]);
 
-  /* ── download helpers ── */
+  /* ── download & print helpers ── */
 
   const displaySignature =
     signature ||
     (localSigned
       ? {
-          name: signerName ?? "",
-          role: signerRole ?? "",
-          signedAt: new Date().toISOString(),
-        }
+        name: signerName ?? "",
+        role: signerRole ?? "",
+        signedAt: new Date().toISOString(),
+      }
       : null);
 
   function handleESign() {
@@ -166,9 +170,9 @@ export function IdCardModal({
   const isHrPreview = !!onSign;
 
   const captureCard = useCallback(async () => {
-    if (!cardRef.current) return null;
+    if (!exportRef.current) return null;
     const html2canvas = (await import("html2canvas")).default;
-    return html2canvas(cardRef.current, {
+    return html2canvas(exportRef.current, {
       scale: 3,
       useCORS: true,
       backgroundColor: "#f1f5f9",
@@ -210,7 +214,6 @@ export function IdCardModal({
     const dataUrl = canvas.toDataURL("image/png");
 
     const printWindow = window.open("", "_blank");
-
     if (!printWindow) return;
 
     printWindow.document.write(`
@@ -233,8 +236,9 @@ export function IdCardModal({
           }
 
           @page{
-            size:A4 portrait;
-            margin:10mm;
+            size: A4 landscape;
+            margin:10px;
+            padding:10px;
           }
         </style>
       </head>
@@ -253,7 +257,7 @@ export function IdCardModal({
     };
   }, [captureCard]);
 
-  /* ── data computations (moved before early-return so callbacks can use them) ── */
+  /* ── data computations ── */
 
   const initials =
     displayName
@@ -279,16 +283,17 @@ export function IdCardModal({
       : "#2563eb";
     return { hex, dark: darken(hex, 14), light: lighten(hex, 95) };
   }, [company?.primaryColor, isVisitor]);
+
   const joinedEvent = Array.isArray(profile?.membershipHistory)
     ? (profile.membershipHistory as AnyRecord[]).find(
-        (m) =>
-          String((m as AnyRecord)?.action ?? "") === "joined-company",
-      )
+      (m) =>
+        String((m as AnyRecord)?.action ?? "") === "joined-company",
+    )
     : null;
   const joiningDate = formatDate(
     profile?.companyJoined ||
-      (joinedEvent as AnyRecord | null)?.at ||
-      profile?.createdAt,
+    (joinedEvent as AnyRecord | null)?.at ||
+    profile?.createdAt,
   );
   const issueDateStr = issueDate
     ? formatDate(issueDate)
@@ -298,6 +303,7 @@ export function IdCardModal({
     ? String(company.supportEmail)
     : "";
   const storedWebsite = company?.website ? String(company.website) : "";
+
   const supportEmail = storedSupportEmail || `support@${domain}.com`;
   const website = storedWebsite || `www.${domain}.com`;
   const bloodGroup = profile?.bloodGroup ? String(profile.bloodGroup) : "—";
@@ -312,10 +318,10 @@ export function IdCardModal({
     Array.isArray(company?.addresses) ? (company.addresses as AnyRecord[]) : [];
   const userAddr = userRegionLabel
     ? companyAddresses.find(
-        (a) =>
-          String(a.label ?? "").trim().toLowerCase() ===
-          userRegionLabel.toLowerCase(),
-      )
+      (a) =>
+        String(a.label ?? "").trim().toLowerCase() ===
+        userRegionLabel.toLowerCase(),
+    )
     : null;
   const mainAddr =
     userAddr ||
@@ -326,6 +332,7 @@ export function IdCardModal({
   let addrLine2 = "";
   let regionLabel = userRegionLabel;
   let regionAddrText = "";
+  let regionContact = { name: "", phone: "", email: "" };
 
   if (mainAddr) {
     const a = mainAddr as AnyRecord;
@@ -342,6 +349,17 @@ export function IdCardModal({
     regionAddrText = [line1, city, state, zip, country]
       .filter(Boolean)
       .join(", ");
+
+    // Get primary contact from address contacts
+    const contacts = Array.isArray(a.contacts) ? a.contacts : [];
+    const primaryContact = contacts.find((c: any) => c.isPrimary) || contacts[0];
+    if (primaryContact) {
+      regionContact = {
+        name: String(primaryContact.name ?? ""),
+        phone: String(primaryContact.phone ?? ""),
+        email: String(primaryContact.email ?? ""),
+      };
+    }
   } else {
     const addrParts = companyAddr
       .split(",")
@@ -353,21 +371,435 @@ export function IdCardModal({
     if (addrParts.length > 0) regionAddrText = addrParts.join(", ");
   }
 
-  if (!open) return null;
+  /* ── Card Face Renderers ── */
 
+  const renderFrontCardContent = () => (
+    <div className="idc-card border-2 border-gray-300 border-dashed">
+      <div>
+        {/* Blue header */}
+        <div className="idc-front-header">
+          <img src={companyIcon} alt={companyName} />
+          <p className="idc-front-company-name">{companyName}</p>
+          {isVisitor ? (
+            <span
+              className="idc-region-tag"
+              style={{ background: "#d97706", color: "#fff", border: "none" }}
+            >
+              VISITOR
+            </span>
+          ) : null}
+          {regionLabel ? (
+            <span className="idc-region-tag">
+              {withMainOfficeSuffix(company, regionLabel)}
+            </span>
+          ) : null}
+        </div>
+
+        {/* ID Card title */}
+        <div className="idc-eid-title">
+          <span className="idc-eid-line" />
+          <span className="idc-eid-text">
+            {isVisitor ? "Visitor ID Card" : "Employee ID Card"}
+          </span>
+          <span className="idc-eid-line" />
+        </div>
+
+        {/* Photo + details */}
+        <div className="idc-front-body">
+          <div className="idc-avatar-frame">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={displayName} />
+            ) : (
+              <div className="idc-avatar-initials">{initials}</div>
+            )}
+          </div>
+
+          <div className="idc-detail-rows">
+            <div className="idc-detail-row">
+              <div className="idc-detail-icon">
+                <IdCard size={14} />
+              </div>
+              <div className="idc-detail-content">
+                <p className="idc-detail-label">
+                  {isVisitor ? "Pass ID" : "Employee ID"}
+                </p>
+                <p className="idc-detail-value blue">{uniqueId}</p>
+              </div>
+            </div>
+
+            <div className="idc-detail-row">
+              <div className="idc-detail-icon">
+                <User size={14} />
+              </div>
+              <div className="idc-detail-content">
+                <p className="idc-detail-label">Name</p>
+                <p className="idc-detail-value">{displayName}</p>
+              </div>
+            </div>
+
+            <div className="idc-detail-row">
+              <div className="idc-detail-icon">
+                <Briefcase size={14} />
+              </div>
+              <div className="idc-detail-content">
+                <p className="idc-detail-label">
+                  {isVisitor ? "Type" : "Designation"}
+                </p>
+                <p className="idc-detail-value">
+                  {isVisitor ? "Visitor" : displayRole}
+                </p>
+              </div>
+            </div>
+
+            <div className="idc-detail-row">
+              <div className="idc-detail-icon">
+                <Phone size={14} />
+              </div>
+              <div className="idc-detail-content">
+                <p className="idc-detail-label">Phone</p>
+                <p className="idc-detail-value">{phone}</p>
+              </div>
+            </div>
+
+            <div className="idc-detail-row">
+              <div className="idc-detail-icon">
+                <Mail size={14} />
+              </div>
+              <div className="idc-detail-content">
+                <p className="idc-detail-label">Email</p>
+                <p className="idc-detail-value">{email}</p>
+              </div>
+            </div>
+
+            {(regionContact.name || regionContact.phone || regionContact.email) && !isVisitor && (
+              <>
+                <div className="idc-detail-row" style={{ borderTop: "1px dashed " + SLATE_200, paddingTop: 8, marginTop: 4 }}>
+                  <div className="idc-detail-icon" style={{ background: "#fef3c7" }}>
+                    <Users size={14} style={{ color: "#d97706" }} />
+                  </div>
+                  <div className="idc-detail-content">
+                    <p className="idc-detail-label" style={{ color: "#d97706" }}>Region Office Contact</p>
+                    <p className="idc-detail-value" style={{ color: SLATE_700 }}>{regionContact.name}</p>
+                  </div>
+                </div>
+                {regionContact.phone && (
+                  <div className="idc-detail-row">
+                    <div className="idc-detail-icon" style={{ background: "#fef3c7" }}>
+                      <Phone size={14} style={{ color: "#d97706" }} />
+                    </div>
+                    <div className="idc-detail-content">
+                      <p className="idc-detail-label" style={{ color: "#d97706" }}>Phone</p>
+                      <p className="idc-detail-value">{regionContact.phone}</p>
+                    </div>
+                  </div>
+                )}
+                {regionContact.email && (
+                  <div className="idc-detail-row">
+                    <div className="idc-detail-icon" style={{ background: "#fef3c7" }}>
+                      <Mail size={14} style={{ color: "#d97706" }} />
+                    </div>
+                    <div className="idc-detail-content">
+                      <p className="idc-detail-label" style={{ color: "#d97706" }}>Email</p>
+                      <p className="idc-detail-value">{regionContact.email}</p>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div>
+        {/* Issue / Valid footer */}
+        <div className="idc-front-footer">
+          <div className="idc-front-footer-item">
+            <CalendarDays size={14} className="idc-front-footer-icon" />
+            <div>
+              <p className="idc-front-footer-label">
+                {isVisitor ? "Valid From" : "Issue Date"}
+              </p>
+              <p className="idc-front-footer-val" style={{ color: SLATE_900 }}>
+                {isVisitor && profile?.validFrom
+                  ? formatDate(profile.validFrom)
+                  : issueDateStr}
+              </p>
+            </div>
+          </div>
+          <div className="idc-front-footer-item">
+            <CalendarDays size={14} className="idc-front-footer-icon" />
+            <div>
+              <p className="idc-front-footer-label">
+                {isVisitor
+                  ? "Valid Until"
+                  : profile?.employmentEndDate
+                    ? "Employment Period"
+                    : "Valid Till"}
+              </p>
+              <p
+                className="idc-front-footer-val"
+                style={{ color: PRIMARY.hex, fontWeight: 700 }}
+              >
+                {isVisitor && profile?.validUntil
+                  ? formatDate(profile.validUntil)
+                  : profile?.employmentEndDate
+                    ? `${formatDate(profile.companyJoined)} — ${formatDate(profile.employmentEndDate)}`
+                    : "Active Employee"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Signature */}
+        <div className="idc-signature-area">
+          {displaySignature ? (
+            <>
+              <p className="idc-signature-script">{displaySignature.name}</p>
+              <p className="idc-signature-label">{displaySignature.role}</p>
+              <p className="text-xs text-slate-400 mt-1">
+                Signed on{" "}
+                {new Date(displaySignature.signedAt).toLocaleDateString(
+                  "en-IN",
+                  {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  },
+                )}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="idc-signature-script">Authorised</p>
+              <p className="idc-signature-label">Authorised Signature</p>
+            </>
+          )}
+        </div>
+
+        {/* Blue bar */}
+        <div className="idc-blue-bar" />
+      </div>
+    </div>
+  );
+
+  const renderBackCardContent = () => (
+    <div className="idc-card border-2 border-gray-300 border-dashed">
+      <div>
+        <div className="pt-4"></div>
+        {isVisitor ? (
+          <>
+            <div className="idc-back-info-row">
+              <div className="idc-back-icon-circle">
+                <Briefcase size={16} />
+              </div>
+              <div>
+                <p className="idc-back-info-label">Purpose of Visit</p>
+                <p className="idc-back-info-value">
+                  {profile?.purpose ? String(profile.purpose) : "—"}
+                </p>
+              </div>
+            </div>
+            <div className="idc-back-info-row">
+              <div className="idc-back-icon-circle">
+                <User size={16} />
+              </div>
+              <div>
+                <p className="idc-back-info-label">Host</p>
+                <p className="idc-back-info-value">
+                  {profile?.hostName ? String(profile.hostName) : "—"}
+                </p>
+              </div>
+            </div>
+            <div className="idc-back-info-row">
+              <div className="idc-back-icon-circle">
+                <Building2 size={16} />
+              </div>
+              <div>
+                <p className="idc-back-info-label">Company</p>
+                <p className="idc-back-info-value">
+                  {profile?.visitorCompany
+                    ? String(profile.visitorCompany)
+                    : "—"}
+                </p>
+              </div>
+            </div>
+            <div className="idc-back-info-row">
+              <div className="idc-back-icon-circle">
+                <MapPin size={16} />
+              </div>
+              <div>
+                <p className="idc-back-info-label">Visiting Office</p>
+                <p className="idc-back-info-value">
+                  {profile?.region
+                    ? String(profile.region)
+                    : profile?.visitAddress
+                      ? String(profile.visitAddress)
+                      : "—"}
+                </p>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="idc-back-info-row">
+              <div className="idc-back-icon-circle">
+                <PhoneCall size={16} />
+              </div>
+              <div>
+                <p className="idc-back-info-label">Emergency Contact</p>
+                <p className="idc-back-info-value">{emergencyContact}</p>
+              </div>
+            </div>
+            <div className="idc-back-info-row">
+              <div className="idc-back-icon-circle">
+                <Droplets size={16} />
+              </div>
+              <div>
+                <p className="idc-back-info-label">Blood Group</p>
+                <p className="idc-back-info-value">{bloodGroup}</p>
+              </div>
+            </div>
+            <div className="idc-back-info-row">
+              <div className="idc-back-icon-circle">
+                <CalendarDays size={16} />
+              </div>
+              <div>
+                <p className="idc-back-info-label">Joining Date</p>
+                <p className="idc-back-info-value">{joiningDate}</p>
+              </div>
+            </div>
+            <div className="idc-back-info-row">
+              <div className="idc-back-icon-circle">
+                <MapPin size={16} />
+              </div>
+              <div>
+                <p className="idc-back-info-label">Region Address</p>
+                <p className="idc-back-info-value">{regionAddrText || "—"}</p>
+              </div>
+            </div>
+            {(regionContact.name || regionContact.phone || regionContact.email) && !isVisitor && (
+              <>
+                <div className="idc-back-info-row" style={{ borderTop: "1px dashed " + SLATE_200, paddingTop: 12, marginTop: 4 }}>
+                  <div className="idc-back-icon-circle" style={{ background: "#fef3c7" }}>
+                    <Users size={16} style={{ color: "#d97706" }} />
+                  </div>
+                  <div>
+                    <p className="idc-back-info-label" style={{ color: "#d97706" }}>Region Office Contact</p>
+                    <p className="idc-back-info-value">{regionContact.name}</p>
+                  </div>
+                </div>
+                {regionContact.phone && (
+                  <div className="idc-back-info-row">
+                    <div className="idc-back-icon-circle" style={{ background: "#fef3c7" }}>
+                      <Phone size={16} style={{ color: "#d97706" }} />
+                    </div>
+                    <div>
+                      <p className="idc-back-info-label" style={{ color: "#d97706" }}>Phone</p>
+                      <p className="idc-back-info-value">{regionContact.phone}</p>
+                    </div>
+                  </div>
+                )}
+                {regionContact.email && (
+                  <div className="idc-back-info-row">
+                    <div className="idc-back-icon-circle" style={{ background: "#fef3c7" }}>
+                      <Mail size={16} style={{ color: "#d97706" }} />
+                    </div>
+                    <div>
+                      <p className="idc-back-info-label" style={{ color: "#d97706" }}>Email</p>
+                      <p className="idc-back-info-value">{regionContact.email}</p>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        <div className="idc-back-divider" />
+
+        {/* QR Code */}
+        <div className="idc-qr-section">
+          <div className="idc-qr-frame">
+            {qrDataUrl ? (
+              <img src={qrDataUrl} alt="QR Code" />
+            ) : (
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: SLATE_400,
+                }}
+              >
+                QR
+              </span>
+            )}
+          </div>
+          <p className="idc-qr-label">Scan to Verify</p>
+          <p className="idc-qr-id">ID: {uniqueId}</p>
+        </div>
+      </div>
+
+      <div>
+        <div className="idc-back-divider" />
+
+        {!isVisitor ? (
+          <>
+            <div className="idc-return-section">
+              <p className="idc-return-text">If found please return to</p>
+              <p className="idc-return-company">{companyName}</p>
+              {(companyAddr || addrLine1) && (
+                <>
+                  <p className="idc-return-addr">
+                    {addrLine1}
+                    {addrLine2 ? (
+                      <>
+                        <br />
+                        {renderMultiline(addrLine2)}
+                      </>
+                    ) : null}
+                  </p>
+                  {(regionContact.name || regionContact.phone) && (
+                    <p className="idc-return-addr" style={{ marginTop: 8, fontSize: "10px", color: "#d97706" }}>
+                      {regionContact.name}
+                      {regionContact.phone && <span> | </span>}
+                      {regionContact.phone}
+                    </p>
+                  )}
+                  <p className="idc-return-link">{supportEmail}</p>
+                </>
+              )}
+            </div>
+            <div className="idc-blue-bar" />
+          </>
+        ) : (
+          <div className="idc-blue-bar" />
+        )}
+      </div>
+    </div>
+  );
+
+  if (!open) return null;
   if (typeof document === "undefined") return null;
 
   return createPortal(
     <>
       <style>{`
-        .idc-modal-overlay { position:fixed;inset:0;z-index:50;display:flex;align-items:flex-start;justify-content:center;background:rgba(0,0,0,.10);backdrop-filter:blur(4px);padding:32px 16px;overflow-y:auto; }
+        .idc-modal-overlay { position:fixed;inset:0;z-index:50;display:flex;align-items:flex-start;justify-content:center;background:rgba(0,0,0,.35);backdrop-filter:blur(4px);padding:32px 16px;overflow-y:auto; }
         .idc-modal-box { width:100%;max-width:940px;margin:auto;animation:idc-fadeIn .25s ease-out; }
         @keyframes idc-fadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
 
         /* ── Toolbar ── */
-        .idc-toolbar { display:flex;align-items:center;justify-content:space-between;padding:16px 24px;background:#fff;border:1px solid ${SLATE_200};border-radius:16px 16px 0 0; }
+        .idc-toolbar { display:flex;align-items:center;justify-space-between;padding:16px 24px;background:#fff;border:1px solid ${SLATE_200};border-radius:16px 16px 0 0; }
         .idc-toolbar h3 { font-size:18px;font-weight:700;color:${SLATE_900};margin:0; }
-        .idc-toolbar-actions { display:flex;align-items:center;gap:8px; }
+        .idc-toolbar-actions { display:flex;align-items:center;gap:12px; }
+
+        /* ── Toggle buttons ── */
+        .idc-view-toggle { display:flex;align-items:center;background:${SLATE_50};padding:3px;border-radius:10px;border:1px solid ${SLATE_200}; }
+        .idc-toggle-btn { display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:7px;border:none;background:transparent;color:${SLATE_500};font-size:12px;font-weight:600;cursor:pointer;transition:all .15s; }
+        .idc-toggle-btn.active { background:#fff;color:${SLATE_900};box-shadow:0 1px 3px rgba(0,0,0,.1); }
+
         .idc-btn-outline { display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1px solid ${SLATE_200};background:#fff;color:${SLATE_700};font-size:13px;font-weight:600;cursor:pointer;transition:all .15s; }
         .idc-btn-outline:hover { background:${SLATE_50};border-color:${SLATE_400}; }
         .idc-btn-fill { display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:10px;border:none;background:${PRIMARY.hex};color:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s; }
@@ -376,76 +808,82 @@ export function IdCardModal({
         .idc-btn-close:hover { background:${SLATE_50};color:${SLATE_700}; }
 
         /* ── Cards area ── */
-        .idc-cards-area { display:flex;gap:24px;padding:24px;background:${SLATE_50};border-left:1px solid ${SLATE_200};border-right:1px solid ${SLATE_200}; }
+        .idc-cards-area { display:flex;justify-content:center;gap:24px;padding:24px;background:${SLATE_50};border-left:1px solid ${SLATE_200};border-right:1px solid ${SLATE_200};min-height:560px; }
         @media(max-width:720px){ .idc-cards-area { flex-direction:column;align-items:center; } }
 
-        .idc-card-wrapper { flex:1;min-width:0;display:flex;flex-direction:column;align-items:center; }
+        .idc-card-wrapper { flex:1;max-width:420px;min-width:0;display:flex;flex-direction:column;align-items:center; }
         .idc-card-label { display:inline-block;padding:4px 16px;border-radius:6px;border:1px solid ${SLATE_200};background:#fff;font-size:12px;font-weight:600;color:${SLATE_700};letter-spacing:.5px;margin-bottom:8px; }
 
-        /* ── Single card face ── */
-        .idc-card { width:100%;max-width:420px;min-height:480px;border-radius:16px;overflow:hidden;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.08); }
+        /* ── Fixed dimensions for card face ── */
+        .idc-card { width:100%;max-width:420px;height:540px;border-radius:16px;overflow:hidden;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.08);display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box; }
 
-        /* ── Front card ── */
-        .idc-front-header { position:relative;padding:28px 24px 24px;text-align:center;background:linear-gradient(135deg,${PRIMARY.hex} 0%,${PRIMARY.dark} 100%);color:#fff;overflow:hidden; }
+        /* ── 3D Flip System ── */
+        .idc-flip-scene { perspective: 1200px; width: 420px; max-width: 100%; height: 540px; margin: 0 auto; }
+        .idc-flip-card-box { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
+        .idc-flip-card-box.is-flipped { transform: rotateY(180deg); }
+        .idc-flip-face { position: absolute; inset: 0; width: 100%; height: 100%; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 16px; }
+        .idc-flip-face-back { transform: rotateY(180deg); }
+
+        /* ── Front card styling ── */
+        .idc-front-header { position:relative;padding:24px 20px 20px;text-align:center;background:linear-gradient(135deg,${PRIMARY.hex} 0%,${PRIMARY.dark} 100%);color:#fff;overflow:hidden; }
         .idc-front-header::before { content:'';position:absolute;top:-40px;right:-40px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.08); }
         .idc-front-header::after { content:'';position:absolute;bottom:-20px;left:-30px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.05); }
-        .idc-front-header img { position:relative;display:block;margin: 0 auto 8px;z-index:1;width:48px;height:48px;border-radius:12px;border:2px solid rgba(255,255,255,.3);object-fit:cover;margin-bottom:8px; }
-        .idc-front-company-name { position:relative;z-index:1;font-size:20px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;margin:0 0 4px; }
-        .idc-region-tag { position:relative;z-index:1;display:inline-block;padding:2px 12px;border-radius:20px;background:rgba(255,255,255,.2);font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#fff;margin-bottom:6px;border:1px solid rgba(255,255,255,.3); }
-        .idc-front-company-addr { position:relative;z-index:1;font-size:11px;color:rgba(255,255,255,.85);margin:0;line-height:1.4; }
+        .idc-front-header img { position:relative;display:block;margin: 0 auto 8px;z-index:1;width:44px;height:44px;border-radius:12px;border:2px solid rgba(255,255,255,.3);object-fit:cover;margin-bottom:6px; }
+        .idc-front-company-name { position:relative;z-index:1;font-size:18px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin:0 0 4px; }
+        .idc-region-tag { position:relative;z-index:1;display:inline-block;padding:2px 10px;border-radius:20px;background:rgba(255,255,255,.2);font-size:9.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#fff;margin-bottom:4px;border:1px solid rgba(255,255,255,.3); }
 
-        .idc-eid-title { display:flex;align-items:center;justify-content:center;gap:12px;padding:14px 24px; }
+        .idc-eid-title { display:flex;align-items:center;justify-content:center;gap:12px;padding:10px 20px; }
         .idc-eid-line { flex:0 0 32px;height:2px;border-radius:1px;background:${PRIMARY.hex}; }
-        .idc-eid-text { font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${SLATE_900}; }
+        .idc-eid-text { font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:${SLATE_900}; }
 
-        .idc-front-body { display:flex;gap:16px;padding:0 24px 16px; }
-        .idc-avatar-frame { flex-shrink:0;width:120px;height:140px;border-radius:12px;border:2px solid ${SLATE_200};overflow:hidden;background:${SLATE_50}; }
+        .idc-front-body { display:flex;gap:14px;padding:0 20px 10px; }
+        .idc-avatar-frame { flex-shrink:0;width:110px;height:130px;border-radius:12px;border:2px solid ${SLATE_200};overflow:hidden;background:${SLATE_50}; }
         .idc-avatar-frame img { width:100%;height:100%;object-fit:cover; }
-        .idc-avatar-initials { width:100%;height:100%;display:grid;place-items:center;background:linear-gradient(135deg,${PRIMARY.hex},${PRIMARY.dark});font-size:32px;font-weight:700;color:#fff; }
+        .idc-avatar-initials { width:100%;height:100%;display:grid;place-items:center;background:linear-gradient(135deg,${PRIMARY.hex},${PRIMARY.dark});font-size:30px;font-weight:700;color:#fff; }
 
-        .idc-detail-rows { flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;padding-top:4px; }
-        .idc-detail-row { display:flex;align-items:flex-start;gap:10px; }
-        .idc-detail-icon { flex-shrink:0;width:28px;height:28px;border-radius:8px;background:${PRIMARY.light};display:grid;place-items:center;color:${PRIMARY.hex}; }
+        .idc-detail-rows { flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;padding-top:2px; }
+        .idc-detail-row { display:flex;align-items:flex-start;gap:8px; }
+        .idc-detail-icon { flex-shrink:0;width:24px;height:24px;border-radius:6px;background:${PRIMARY.light};display:grid;place-items:center;color:${PRIMARY.hex}; }
         .idc-detail-content { min-width:0; }
-        .idc-detail-label { font-size:10px;font-weight:600;color:${SLATE_500};letter-spacing:.3px;margin:0;line-height:1.2; }
-        .idc-detail-value { font-size:12px;font-weight:700;color:${SLATE_900};margin:0;word-break:break-all;line-height:1.4; }
+        .idc-detail-label { font-size:9.5px;font-weight:600;color:${SLATE_500};letter-spacing:.3px;margin:0;line-height:1.2; }
+        .idc-detail-value { font-size:11.5px;font-weight:700;color:${SLATE_900};margin:0;word-break:break-all;line-height:1.3; }
         .idc-detail-value.blue { color:${PRIMARY.hex}; }
 
-        .idc-front-footer { display:flex;border-top:1px solid ${SLATE_200};margin:0 24px; }
-        .idc-front-footer-item { flex:1;display:flex;align-items:center;gap:8px;padding:12px 0; }
-        .idc-front-footer-item + .idc-front-footer-item { border-left:1px solid ${SLATE_200};padding-left:16px; }
+        .idc-front-footer { display:flex;border-top:1px solid ${SLATE_200};margin:0 20px; }
+        .idc-front-footer-item { flex:1;display:flex;align-items:center;gap:8px;padding:10px 0; }
+        .idc-front-footer-item + .idc-front-footer-item { border-left:1px solid ${SLATE_200};padding-left:14px; }
         .idc-front-footer-icon { color:${PRIMARY.hex};flex-shrink:0; }
-        .idc-front-footer-label { font-size:10px;font-weight:600;color:${SLATE_500};margin:0; }
-        .idc-front-footer-val { font-size:12px;font-weight:700;margin:0; }
+        .idc-front-footer-label { font-size:9.5px;font-weight:600;color:${SLATE_500};margin:0; }
+        .idc-front-footer-val { font-size:11.5px;font-weight:700;margin:0; }
 
-        .idc-signature-area { padding:12px 24px 16px;text-align:center; }
-        .idc-signature-script { font-family:'Segoe Script','Dancing Script',cursive;font-size:20px;color:${SLATE_700};margin:0 0 2px; }
-        .idc-signature-label { font-size:10px;font-weight:600;color:${SLATE_500};letter-spacing:.5px; }
+        .idc-signature-area { padding:8px 20px 12px;text-align:center; }
+        .idc-signature-script { font-family:'Segoe Script','Dancing Script',cursive;font-size:18px;color:${SLATE_700};margin:0 0 1px; }
+        .idc-signature-label { font-size:9.5px;font-weight:600;color:${SLATE_500};letter-spacing:.5px; }
 
         .idc-blue-bar { height:10px;background:linear-gradient(90deg,${PRIMARY.hex},${PRIMARY.dark});border-radius:0 0 16px 16px; }
 
-        /* ---  center line --- */
-        .idc-divider {display:flex; justify-content:center; align-items:center; padding:0 20px;}
+        /* --- center line --- */
+        .idc-divider {display:flex; justify-content:center; align-items:center; padding:0 12px;}
         .idc-divider-line {width:0; height:100%; min-height:520px; border-left:2px dashed #cbd5e1;}
 
-        /* ── Back card ── */
-        .idc-back-info-row { display:flex;align-items:flex-start;gap:14px;padding:16px 24px; }
-        .idc-back-icon-circle { flex-shrink:0;width:36px;height:36px;border-radius:50%;background:${PRIMARY.light};display:grid;place-items:center;color:${PRIMARY.hex}; }
-        .idc-back-info-label { font-size:12px;font-weight:600;color:${SLATE_700};margin:0; }
-        .idc-back-info-value { font-size:12px;font-weight:400;color:${SLATE_500};margin:2px 0 0; }
-        .idc-back-divider { height:1px;background:${SLATE_200};margin:0 24px; }
+        /* ── Back card styling ── */
+        .idc-back-info-row { display:flex;align-items:flex-start;gap:12px;padding:12px 20px; }
+        .idc-back-icon-circle { flex-shrink:0;width:32px;height:32px;border-radius:50%;background:${PRIMARY.light};display:grid;place-items:center;color:${PRIMARY.hex}; }
+        .idc-back-info-label { font-size:11.5px;font-weight:600;color:${SLATE_700};margin:0; }
+        .idc-back-info-value { font-size:11.5px;font-weight:400;color:${SLATE_500};margin:1px 0 0; }
+        .idc-back-divider { height:1px;background:${SLATE_200};margin:0 20px; }
 
-        .idc-qr-section { display:flex;flex-direction:column;align-items:center;padding:20px 24px 16px; }
-        .idc-qr-frame { width:120px;height:120px;border:2px dashed ${PRIMARY.hex};border-radius:12px;padding:8px;display:grid;place-items:center; }
+        .idc-qr-section { display:flex;flex-direction:column;align-items:center;padding:14px 20px 12px; }
+        .idc-qr-frame { width:100px;height:100px;border:2px dashed ${PRIMARY.hex};border-radius:12px;padding:6px;display:grid;place-items:center; }
         .idc-qr-frame img { width:100%;height:100%; }
-        .idc-qr-label { font-size:12px;font-weight:700;color:${PRIMARY.hex};letter-spacing:.5px;margin:10px 0 2px;text-transform:uppercase; }
-        .idc-qr-id { font-size:11px;color:${SLATE_500};margin:0; }
+        .idc-qr-label { font-size:11px;font-weight:700;color:${PRIMARY.hex};letter-spacing:.5px;margin:8px 0 1px;text-transform:uppercase; }
+        .idc-qr-id { font-size:10px;color:${SLATE_500};margin:0; }
 
-        .idc-return-section { text-align:center;padding:8px 24px 20px; }
-        .idc-return-text { font-size:11px;color:${SLATE_500};margin:0 0 6px; }
-        .idc-return-company { font-size:14px;font-weight:700;color:${SLATE_900};margin:0 0 4px; }
-        .idc-return-addr { font-size:11px;color:${SLATE_700};margin:0;line-height:1.5; }
-        .idc-return-link { font-size:11px;color:${PRIMARY.hex};margin:2px 0 0;font-weight:500; }
+        .idc-return-section { text-align:center;padding:6px 20px 14px; }
+        .idc-return-text { font-size:10.5px;color:${SLATE_500};margin:0 0 4px; }
+        .idc-return-company { font-size:13px;font-weight:700;color:${SLATE_900};margin:0 0 2px; }
+        .idc-return-addr { font-size:10.5px;color:${SLATE_700};margin:0;line-height:1.4; }
+        .idc-return-link { font-size:10.5px;color:${PRIMARY.hex};margin:2px 0 0;font-weight:500; }
 
         /* ── Bottom action bar ── */
         .idc-actions-bar { display:flex;align-items:center;justify-content:center;gap:12px;padding:20px 24px;background:#fff;border:1px solid ${SLATE_200};border-top:none;border-radius:0 0 16px 16px; }
@@ -459,90 +897,47 @@ export function IdCardModal({
         .cut-line { margin-bottom:4px;display:flex;align-items:center;justify-content:center;gap:8px;padding:4px 0 0;}
         .cut-line span { font-size:10px;color:${SLATE_400};letter-spacing:.5px; }
         .cut-line-dash { flex:1;border-top:2px dashed ${SLATE_500}; }
-
-        /* ── Print styles ── */
-        @media print {
-
-  @page {
-    size: A4 portrait;
-    margin: 10mm;
-  }
-
-  html,
-  body {
-    width: 210mm;
-    height: 297mm;
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow: visible !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  body > *:not(.idc-modal-overlay) {
-    display: none !important;
-  }
-
-  .idc-modal-overlay {
-    position: static !important;
-    inset: auto !important;
-    display: block !important;
-    width: auto !important;
-    height: auto !important;
-    overflow: visible !important;
-    background: #fff !important;
-    backdrop-filter: none !important;
-    padding: 0 !important;
-  }
-
-  .idc-toolbar,
-  .idc-actions-bar,
-  .idc-card-label {
-    display: none !important;
-  }
-
-  .idc-modal-box {
-    width: fit-content !important;
-    max-width: none !important;
-    margin: 0 auto !important;
-    overflow: visible !important;
-  }
-
-  .idc-cards-area {
-    display: flex !important;
-    justify-content: center !important;
-    align-items: flex-start !important;
-    gap: 24px !important;
-
-    overflow: visible !important;   /* removes scrollbar */
-    background: #fff !important;
-    border: none !important;
-    padding: 0 !important;
-  }
-
-  .idc-card-wrapper {
-    flex: 0 0 auto !important;
-  }
-
-  .idc-card {
-    width: 420px !important;
-    max-width: 420px !important;
-    min-height: 480px !important;
-    box-shadow: none !important;
-    overflow: hidden !important;
-  }
-
-  .idc-divider {
-    padding: 0 16px !important;
-  }
-
-  img,
-  svg {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-}
       `}</style>
+
+      {/* Off-screen canvas export container (always side-by-side) */}
+      <div
+        ref={exportRef}
+        style={{
+          position: "fixed",
+          left: "-9999px",
+          top: 0,
+          width: "900px",
+          backgroundColor: "#f1f5f9",
+          padding: "24px",
+          display: "flex",
+          gap: "24px",
+          justifyContent: "center",
+          alignItems: "flex-start",
+          zIndex: -1,
+        }}
+      >
+        <div className="idc-card-wrapper" style={{ flex: "0 0 420px" }}>
+          <span className="idc-card-label">FRONT</span>
+          <div className="cut-line" style={{ width: "100%" }}>
+            <span className="cut-line-dash" />
+            <span>✂ CUT HERE ✂</span>
+            <span className="cut-line-dash" />
+          </div>
+          {renderFrontCardContent()}
+        </div>
+        <div className="idc-divider">
+          <div className="idc-divider-line"></div>
+        </div>
+        <div className="idc-card-wrapper" style={{ flex: "0 0 420px" }}>
+          <span className="idc-card-label">BACK</span>
+          <div className="cut-line" style={{ width: "100%" }}>
+            <span className="cut-line-dash" />
+            <span>✂ CUT HERE ✂</span>
+            <span className="cut-line-dash" />
+          </div>
+          {renderBackCardContent()}
+        </div>
+      </div>
 
       <div
         className="idc-modal-overlay"
@@ -552,9 +947,42 @@ export function IdCardModal({
       >
         <div className="idc-modal-box">
           {/* ── Toolbar ── */}
-          <div className="idc-toolbar py-10">
+          <div className="idc-toolbar">
             <h3>ID Card</h3>
             <div className="idc-toolbar-actions">
+              {/* Layout view mode toggle */}
+              <div className="idc-view-toggle">
+                <button
+                  className={`idc-toggle-btn ${viewMode === "side-by-side" ? "active" : ""
+                    }`}
+                  onClick={() => setViewMode("side-by-side")}
+                  title="Side by Side Layout"
+                >
+                  <Columns size={14} /> Side-by-Side
+                </button>
+                <button
+                  className={`idc-toggle-btn ${viewMode === "flip" ? "active" : ""
+                    }`}
+                  onClick={() => setViewMode("flip")}
+                  title="3D Flip Card Layout"
+                >
+                  <RotateCw size={14} /> 3D Flip View
+                </button>
+              </div>
+
+              {viewMode === "side-by-side" && (
+                <button
+                  className="idc-btn-outline"
+                  onClick={() => {
+                    setViewMode("flip");
+                    setIsFlipped((prev) => !prev);
+                  }}
+                  title="Rotate to 3D Flip Card"
+                >
+                  <RotateCw size={14} /> Rotate / Flip
+                </button>
+              )}
+
               <button
                 className="idc-btn-close"
                 onClick={onClose}
@@ -565,344 +993,72 @@ export function IdCardModal({
             </div>
           </div>
 
-          {/* ── Cards ── */}
-          <div className="idc-cards-area overflow-y-auto" ref={cardRef}>
-            {/* ═══ FRONT ═══ */}
-            <div className="idc-card-wrapper">
-              <span className="idc-card-label">FRONT</span>
-              <div className="cut-line">
-                <span className="cut-line-dash" />
-                <span>✂ CUT HERE ✂</span>
-                <span className="cut-line-dash" />
+          {/* ── Cards View ── */}
+          <div className="idc-cards-area">
+            {viewMode === "side-by-side" ? (
+              <>
+                {/* ═══ FRONT ═══ */}
+                <div className="idc-card-wrapper">
+                  <span className="idc-card-label">FRONT</span>
+                  <div className="cut-line" style={{ width: "100%" }}>
+                    <span className="cut-line-dash" />
+                    <span>✂ CUT HERE ✂</span>
+                    <span className="cut-line-dash" />
+                  </div>
+                  {renderFrontCardContent()}
+                </div>
+
+                <div className="idc-divider">
+                  <div className="idc-divider-line"></div>
+                </div>
+
+                {/* ═══ BACK ═══ */}
+                <div className="idc-card-wrapper">
+                  <span className="idc-card-label">BACK</span>
+                  <div className="cut-line" style={{ width: "100%" }}>
+                    <span className="cut-line-dash" />
+                    <span>✂ CUT HERE ✂</span>
+                    <span className="cut-line-dash" />
+                  </div>
+                  {renderBackCardContent()}
+                </div>
+              </>
+            ) : (
+              /* ═══ 3D FLIP VIEW ═══ */
+              <div className="flex flex-col items-center gap-4 w-full">
+                <div className="flex items-center gap-3">
+                  <button
+                    className="idc-btn-fill"
+                    onClick={() => setIsFlipped((prev) => !prev)}
+                  >
+                    <RotateCw
+                      size={15}
+                      className={`transition-transform duration-300 ${isFlipped ? "rotate-180" : ""
+                        }`}
+                    />
+                    Rotate Card ({isFlipped ? "Back Side" : "Front Side"})
+                  </button>
+                  <span className="text-xs text-slate-500 font-medium">
+                    (Click card to flip)
+                  </span>
+                </div>
+
+                <div className="idc-flip-scene">
+                  <div
+                    className={`idc-flip-card-box ${isFlipped ? "is-flipped" : ""
+                      }`}
+                    onClick={() => setIsFlipped((prev) => !prev)}
+                  >
+                    <div className="idc-flip-face">
+                      {renderFrontCardContent()}
+                    </div>
+                    <div className="idc-flip-face idc-flip-face-back">
+                      {renderBackCardContent()}
+                    </div>
+                  </div>
+                </div>
               </div>
-
-              <div className="idc-card border-2 border-gray-300 border-dashed">
-                {/* Blue header */}
-                <div className="idc-front-header">
-                  <img src={companyIcon} alt={companyName} />
-                  <p className="idc-front-company-name">{companyName}</p>
-                  {isVisitor ? (
-                    <span className="idc-region-tag" style={{ background: "#d97706", color: "#fff", border: "none" }}>VISITOR</span>
-                  ) : null}
-                  {regionLabel ? (
-                    <span className="idc-region-tag">
-                      {withMainOfficeSuffix(company, regionLabel)}
-                    </span>
-                  ) : null}
-                </div>
-
-                {/* ID Card title */}
-                <div className="idc-eid-title">
-                  <span className="idc-eid-line" />
-                  <span className="idc-eid-text">{isVisitor ? "Visitor ID Card" : "Employee ID Card"}</span>
-                  <span className="idc-eid-line" />
-                </div>
-
-                {/* Photo + details */}
-                <div className="idc-front-body">
-                  <div className="idc-avatar-frame">
-                    {avatarUrl ? (
-                      <img src={avatarUrl} alt={displayName} />
-                    ) : (
-                      <div className="idc-avatar-initials">{initials}</div>
-                    )}
-                  </div>
-
-                  <div className="idc-detail-rows">
-                    {/* ID / Pass ID */}
-                    {isVisitor ? (
-                      <div className="idc-detail-row">
-                        <div className="idc-detail-icon">
-                          <IdCard size={14} />
-                        </div>
-                        <div className="idc-detail-content">
-                          <p className="idc-detail-label">Pass ID</p>
-                          <p className="idc-detail-value blue">{uniqueId}</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="idc-detail-row">
-                        <div className="idc-detail-icon">
-                          <IdCard size={14} />
-                        </div>
-                        <div className="idc-detail-content">
-                          <p className="idc-detail-label">Employee ID</p>
-                          <p className="idc-detail-value blue">{uniqueId}</p>
-                        </div>
-                      </div>
-                    )}
-                    {/* Name */}
-                    <div className="idc-detail-row">
-                      <div className="idc-detail-icon">
-                        <User size={14} />
-                      </div>
-                      <div className="idc-detail-content">
-                        <p className="idc-detail-label">Name</p>
-                        <p className="idc-detail-value">{displayName}</p>
-                      </div>
-                    </div>
-                    {/* Designation / Role */}
-                    <div className="idc-detail-row">
-                      <div className="idc-detail-icon">
-                        <Briefcase size={14} />
-                      </div>
-                      <div className="idc-detail-content">
-                        <p className="idc-detail-label">{isVisitor ? "Type" : "Designation"}</p>
-                        <p className="idc-detail-value">{isVisitor ? "Visitor" : displayRole}</p>
-                      </div>
-                    </div>
-                    {/* Phone */}
-                    <div className="idc-detail-row">
-                      <div className="idc-detail-icon">
-                        <Phone size={14} />
-                      </div>
-                      <div className="idc-detail-content">
-                        <p className="idc-detail-label">Phone</p>
-                        <p className="idc-detail-value">{phone}</p>
-                      </div>
-                    </div>
-                    {/* Email */}
-                    <div className="idc-detail-row">
-                      <div className="idc-detail-icon">
-                        <Mail size={14} />
-                      </div>
-                      <div className="idc-detail-content">
-                        <p className="idc-detail-label">Email</p>
-                        <p className="idc-detail-value">{email}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Issue / Valid footer */}
-                <div className="idc-front-footer">
-                  <div className="idc-front-footer-item">
-                    <CalendarDays size={14} className="idc-front-footer-icon" />
-                    <div>
-                      <p className="idc-front-footer-label">{isVisitor ? "Valid From" : "Issue Date"}</p>
-                      <p
-                        className="idc-front-footer-val"
-                        style={{ color: SLATE_900 }}
-                      >
-                        {isVisitor && profile?.validFrom
-                          ? formatDate(profile.validFrom)
-                          : issueDateStr}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="idc-front-footer-item">
-                    <CalendarDays size={14} className="idc-front-footer-icon" />
-                    <div>
-                      <p className="idc-front-footer-label">
-                        {isVisitor ? "Valid Until" : profile?.employmentEndDate ? "Employment Period" : "Valid Till"}
-                      </p>
-                      <p
-                        className="idc-front-footer-val"
-                        style={{ color: PRIMARY.hex, fontWeight: 700 }}
-                      >
-                        {isVisitor && profile?.validUntil
-                          ? formatDate(profile.validUntil)
-                          : profile?.employmentEndDate
-                            ? `${formatDate(profile.companyJoined)} — ${formatDate(profile.employmentEndDate)}`
-                            : "Active Employee"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Signature */}
-                <div className="idc-signature-area">
-                  {displaySignature ? (
-                    <>
-                      <p className="idc-signature-script">
-                        {displaySignature.name}
-                      </p>
-                      <p className="idc-signature-label">
-                        {displaySignature.role}
-                      </p>
-                      <p className="text-xs text-slate-400 mt-1">
-                        Signed on{" "}
-                        {new Date(displaySignature.signedAt).toLocaleDateString(
-                          "en-IN",
-                          {
-                            day: "numeric",
-                            month: "long",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          },
-                        )}
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="idc-signature-script">Authorised</p>
-                      <p className="idc-signature-label">
-                        Authorised Signature
-                      </p>
-                    </>
-                  )}
-                </div>
-
-                {/* Blue bar */}
-                <div className="idc-blue-bar" />
-              </div>
-            </div>
-
-            <div className="idc-divider">
-              <div className="idc-divider-line"></div>
-            </div>
-
-            {/* ═══ BACK ═══ */}
-            <div className="idc-card-wrapper">
-              <span className="idc-card-label">BACK</span>
-              <div className="cut-line">
-                <span className="cut-line-dash" />
-                <span>✂ CUT HERE ✂</span>
-                <span className="cut-line-dash" />
-              </div>
-
-              <div className="idc-card border-2 border-gray-300 border-dashed">
-                <div className="pt-8"></div>
-                {isVisitor ? (
-                  <>
-                    {/* Purpose */}
-                    <div className="idc-back-info-row">
-                      <div className="idc-back-icon-circle">
-                        <Briefcase size={16} />
-                      </div>
-                      <div>
-                        <p className="idc-back-info-label">Purpose of Visit</p>
-                        <p className="idc-back-info-value">{profile?.purpose ? String(profile.purpose) : "—"}</p>
-                      </div>
-                    </div>
-                    {/* Host */}
-                    <div className="idc-back-info-row">
-                      <div className="idc-back-icon-circle">
-                        <User size={16} />
-                      </div>
-                      <div>
-                        <p className="idc-back-info-label">Host</p>
-                        <p className="idc-back-info-value">{profile?.hostName ? String(profile.hostName) : "—"}</p>
-                      </div>
-                    </div>
-                    {/* Company */}
-                    <div className="idc-back-info-row">
-                      <div className="idc-back-icon-circle">
-                        <Building2 size={16} />
-                      </div>
-                      <div>
-                        <p className="idc-back-info-label">Company</p>
-                        <p className="idc-back-info-value">{profile?.visitorCompany ? String(profile.visitorCompany) : "—"}</p>
-                      </div>
-                    </div>
-                    {/* Visiting Address */}
-                    <div className="idc-back-info-row">
-                      <div className="idc-back-icon-circle">
-                        <MapPin size={16} />
-                      </div>
-                      <div>
-                        <p className="idc-back-info-label">Visiting Office</p>
-                        <p className="idc-back-info-value">{profile?.region ? String(profile.region) : profile?.visitAddress ? String(profile.visitAddress) : "—"}</p>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    {/* Emergency Contact */}
-                    <div className="idc-back-info-row">
-                      <div className="idc-back-icon-circle">
-                        <PhoneCall size={16} />
-                      </div>
-                      <div>
-                        <p className="idc-back-info-label">Emergency Contact</p>
-                        <p className="idc-back-info-value">{emergencyContact}</p>
-                      </div>
-                    </div>
-                    {/* Blood Group */}
-                    <div className="idc-back-info-row">
-                      <div className="idc-back-icon-circle">
-                        <Droplets size={16} />
-                      </div>
-                      <div>
-                        <p className="idc-back-info-label">Blood Group</p>
-                        <p className="idc-back-info-value">{bloodGroup}</p>
-                      </div>
-                    </div>
-                    {/* Joining Date */}
-                    <div className="idc-back-info-row">
-                      <div className="idc-back-icon-circle">
-                        <CalendarDays size={16} />
-                      </div>
-                      <div>
-                        <p className="idc-back-info-label">Joining Date</p>
-                        <p className="idc-back-info-value">{joiningDate}</p>
-                      </div>
-                    </div>
-                    {/* Region Address */}
-                    <div className="idc-back-info-row">
-                      <div className="idc-back-icon-circle">
-                        <MapPin size={16} />
-                      </div>
-                      <div>
-                        <p className="idc-back-info-label">Region Address</p>
-                        <p className="idc-back-info-value">{regionAddrText || "—"}</p>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                <div className="idc-back-divider" />
-
-                {/* QR Code */}
-                <div className="idc-qr-section">
-                  <div className="idc-qr-frame">
-                    {qrDataUrl ? (
-                      <img src={qrDataUrl} alt="QR Code" />
-                    ) : (
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: SLATE_400,
-                        }}
-                      >
-                        QR
-                      </span>
-                    )}
-                  </div>
-                  <p className="idc-qr-label">Scan to Verify</p>
-                  <p className="idc-qr-id">ID: {uniqueId}</p>
-                </div>
-
-                <div className="idc-back-divider" />
-
-                {!isVisitor ? (
-                  <>
-                    {/* Return info */}
-                    <div className="idc-return-section">
-                      <p className="idc-return-text">If found please return to</p>
-                      <p className="idc-return-company">{companyName}</p>
-                      {(companyAddr || addrLine1) && (
-                        <p className="idc-return-addr">
-                          {addrLine1}
-                          {addrLine2 ? (
-                            <>
-                              <br />
-                              {renderMultiline(addrLine2)}
-                            </>
-                          ) : null}
-                        </p>
-                      )}
-                      <p className="idc-return-link">{supportEmail}</p>
-                    </div>
-                    <div className="idc-blue-bar" />
-                  </>
-                ) : (
-                  <div className="idc-blue-bar" />
-                )}
-              </div>
-            </div>
+            )}
           </div>
 
           {/* ── Bottom actions ── */}

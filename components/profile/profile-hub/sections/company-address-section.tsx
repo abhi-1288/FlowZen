@@ -1,10 +1,43 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { apiFetch } from "@/lib/client-utils";
-import { Send, Clock, CheckCircle, MapPin, ToggleLeft, ToggleRight, UserCheck, UserX, Users, Shield, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
+import {
+  Send,
+  Clock,
+  CheckCircle,
+  MapPin,
+  ToggleLeft,
+  ToggleRight,
+  UserCheck,
+  UserX,
+  Users,
+  Shield,
+  ChevronDown,
+  ChevronLeft,
+  AlertTriangle,
+  Building2,
+  SlidersHorizontal,
+  Info,
+  Trash2,
+} from "lucide-react";
 import type { AnyRecord } from "../shared";
 import { isMainOfficeRegion, mainOfficeLabelOf, regionManagerCaps } from "@/lib/company-regions";
+import {
+  Checkbox,
+  ContactEditor,
+  EmptyBlock,
+  ModalShell,
+  NumberField,
+  Panel,
+  SelectField,
+  StatPill,
+  StatusBadge,
+  TabBar,
+  TextField,
+  type ContactDraft,
+  type TabDef,
+} from "./company-address-parts";
 
 interface AdminOption {
   id: string;
@@ -16,6 +49,29 @@ interface HrOption {
   id: string;
   name: string;
   email: string;
+}
+
+type AddressTab = "offices" | "add" | "limits";
+
+function regionLabelOf(addr: AnyRecord): string {
+  return String(addr.label ?? "").trim() || "Main Office";
+}
+
+function canManageRegion(
+  addr: AnyRecord,
+  role: string,
+  mainLabel: string,
+  userId: string,
+): boolean {
+  const isMainOfficeHr =
+    role === "human-resource" &&
+    (!mainLabel || String(addr.label ?? "").trim().toLowerCase() === mainLabel.toLowerCase());
+  return (
+    role === "admin" ||
+    isMainOfficeHr ||
+    staffIdsOf(addr.hrs).includes(userId) ||
+    String(addr.hrHead ?? "") === userId
+  );
 }
 
 export function CompanyAddressSection({
@@ -112,6 +168,9 @@ function AddressModal({
   const [newAddrState, setNewAddrState] = useState("");
   const [newAddrZip, setNewAddrZip] = useState("");
   const [newAddrCountry, setNewAddrCountry] = useState("");
+  const [newAddrContacts, setNewAddrContacts] = useState<ContactDraft[]>([
+    { name: "", phone: "", email: "", isPrimary: true }
+  ]);
   const [submittingAddr, setSubmittingAddr] = useState(false);
   const [pendingAddresses, setPendingAddresses] = useState<AnyRecord[]>([]);
   const [toggling, setToggling] = useState(false);
@@ -139,6 +198,38 @@ function AddressModal({
       { regionLabel: userRegionLabel ?? "" },
     );
   const canEditCaps = isAdmin || isMainOfficeHr;
+
+  // Presentation-only state: which panel the modal is showing, and which region
+  // (if any) has been drilled into for staffing management.
+  const [tab, setTab] = useState<AddressTab>("offices");
+  const [openRegion, setOpenRegion] = useState<string | null>(null);
+
+  const drillAddress = openRegion
+    ? approvedAddresses.find((a) => regionLabelOf(a) === openRegion) ?? null
+    : null;
+
+  const tabs = useMemo<TabDef<AddressTab>[]>(() => {
+    const list: TabDef<AddressTab>[] = [
+      {
+        id: "offices",
+        label: multiOffice ? "Offices" : "Overview",
+        icon: Building2,
+        count: pendingAddresses.length,
+      },
+    ];
+    if (multiOffice && isAuthHr) {
+      list.push({ id: "add", label: "Add Office", icon: MapPin });
+    }
+    if (multiOffice && (canEditCaps || (isAdmin && hrs.length > 0))) {
+      list.push({ id: "limits", label: "Limits & Access", icon: SlidersHorizontal });
+    }
+    return list;
+  }, [multiOffice, isAuthHr, canEditCaps, isAdmin, hrs.length, pendingAddresses.length]);
+
+  // A tab can disappear when its precondition flips (mode turned off, access
+  // revoked) while it is selected — fall back to the overview rather than
+  // rendering nothing.
+  const activeTab: AddressTab = tabs.some((t) => t.id === tab) ? tab : "offices";
 
   useEffect(() => {
     if (!multiOffice) return;
@@ -208,6 +299,15 @@ function AddressModal({
     if (!newAddrLabel.trim()) { showToast("Region/office name is required.", "error"); return; }
     if (!newAddrLine1.trim()) { showToast("Address line 1 is required.", "error"); return; }
     if (!selectedAdminId) { showToast("Please select an admin to approve.", "error"); return; }
+
+    // Validate contacts
+    const validContacts = newAddrContacts
+      .filter((c) => c.name.trim().length > 0)
+      .slice(0, 5);
+    if (validContacts.length === 0) { showToast("At least one contact is required.", "error"); return; }
+    const primaryCount = validContacts.filter((c) => c.isPrimary).length;
+    if (primaryCount > 1) { showToast("Only one primary contact allowed.", "error"); return; }
+
     setSubmittingAddr(true);
     try {
       await apiFetch("/api/company/address", {
@@ -221,6 +321,7 @@ function AddressModal({
           state: newAddrState,
           zip: newAddrZip,
           country: newAddrCountry,
+          contacts: validContacts,
         }),
       });
       showToast("Address submitted for admin approval.", "success");
@@ -230,6 +331,7 @@ function AddressModal({
       setNewAddrState("");
       setNewAddrZip("");
       setNewAddrCountry("");
+      setNewAddrContacts([{ name: "", phone: "", email: "", isPrimary: true }]);
       const data = await apiFetch<{ requests: AnyRecord[] }>("/api/approvals");
       const regionReqs = (data.requests ?? []).filter(
         (r: AnyRecord) => String(r.kind ?? "") === "region-address" && String(r.status) === "pending",
@@ -242,300 +344,513 @@ function AddressModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4">
-      <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl dark:border dark:border-zinc-800 dark:bg-[#000000]">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Office Address Management</h3>
-            <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">Manage multi-office settings and submit new addresses.</p>
-          </div>
-          <button
-            className="shrink-0 rounded-lg border border-[var(--c-border-light)] px-2 py-1 text-sm text-slate-500 hover:bg-[var(--c-bg-muted)] dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800"
-            onClick={onClose}
-            type="button"
-          >
-            Close
-          </button>
-        </div>
+const removeAddress = async (index: number) => {
+    const next = approvedAddresses.filter((_, idx) => idx !== index);
+    try {
+      await apiFetch("/api/company/address", {
+        method: "PATCH",
+        body: JSON.stringify({ addresses: next }),
+      });
+      await refresh();
+      showToast("Office address removed.");
+    } catch {
+      showToast("Failed to remove address.", "error");
+    }
+  };
 
-        <div className="mt-5 space-y-5">
-        {/* Multi-office toggle (admin only) */}
-        {isAdmin && (
-          <div className="flex items-center justify-between rounded-lg border border-[var(--c-border-light)] p-3 dark:border-zinc-800 dark:bg-[#0b0b0b]">
-            <div className="flex items-center gap-2">
-              <MapPin size={16} className="text-slate-500 dark:text-zinc-400" />
-              <span className="text-sm font-medium text-slate-700 dark:text-zinc-200">Multiple offices in different regions</span>
-            </div>
+  const officeCards = approvedAddresses.map((addr, i) => {
+    const label = regionLabelOf(addr);
+    return (
+      <OfficeCard
+        key={`${label}-${i}`}
+        addr={addr}
+        canManage={canManageRegion(addr, role, mainLabel, userId)}
+        onManage={() => setOpenRegion(label)}
+        onDelete={isAdmin && approvedAddresses.length >= 2 ? () => removeAddress(i) : undefined}
+      >
+        <RegionStaffingBlock
+          addr={addr}
+          company={company}
+          mainLabel={mainLabel}
+          canEditCaps={canEditCaps}
+          hrOptions={hrs}
+          adminOptions={admins}
+          showToast={showToast}
+          refresh={refresh}
+          drilled={false}
+        />
+      </OfficeCard>
+    );
+  });
+
+  return (
+    <ModalShell
+      onClose={onClose}
+      title="Office Address Management"
+      description="Manage multi-office settings and submit new addresses."
+      icon={MapPin}
+      iconTone={multiOffice ? "indigo" : "amber"}
+      headerExtra={
+        isAdmin ? (
+          <div className="hidden shrink-0 items-center gap-2 rounded-xl border border-[var(--c-border-light)] bg-[var(--c-bg)] px-3 py-2 sm:flex dark:border-zinc-800 dark:bg-zinc-950/40">
+            <span className="text-xs font-medium text-muted">Multi-office</span>
             <button
               type="button"
               disabled={toggling}
               onClick={handleToggleMultiOffice}
-              className="text-slate-500 hover:text-slate-700 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-200"
+              title={
+                multiOffice
+                  ? "Disable multi-office mode"
+                  : "Enable multi-office mode"
+              }
+              aria-label={
+                multiOffice
+                  ? "Disable multi-office mode"
+                  : "Enable multi-office mode"
+              }
+              className="text-slate-400 transition-colors hover:text-slate-700 disabled:opacity-50 dark:text-zinc-500 dark:hover:text-zinc-100"
             >
-              {multiOffice ? <ToggleRight size={24} className="text-indigo-600" /> : <ToggleLeft size={24} />}
+              {multiOffice ? (
+                <ToggleRight
+                  size={26}
+                  className="text-indigo-600 dark:text-indigo-400"
+                />
+              ) : (
+                <ToggleLeft size={26} />
+              )}
             </button>
           </div>
-        )}
+        ) : undefined
+      }
+      footer={
+        <>
+          <p className="text-caption text-muted">
+            {multiOffice
+              ? `${approvedAddresses.length} approved office${approvedAddresses.length !== 1 ? "s" : ""}`
+              : "Single office mode"}
+            {pendingAddresses.length > 0
+              ? ` · ${pendingAddresses.length} awaiting approval`
+              : ""}
+          </p>
+          {activeTab === "add" ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setTab("offices")}
+                className="neu-btn rounded-xl px-4 py-2.5 text-sm font-medium text-slate-600 dark:text-zinc-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={submittingAddr}
+                onClick={handleSubmitAddress}
+                className="neu-btn neu-btn-primary inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold disabled:opacity-60"
+              >
+                <Send size={15} />{" "}
+                {submittingAddr ? "Submitting..." : "Submit for Approval"}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onClose}
+              className="neu-btn rounded-xl px-5 py-2.5 text-sm font-semibold text-slate-600 dark:text-zinc-300"
+            >
+              Done
+            </button>
+          )}
+        </>
+      }
+    >
+      <TabBar
+        tabs={tabs}
+        active={activeTab}
+        onChange={(id) => {
+          setTab(id);
+          if (id !== "offices") setOpenRegion(null);
+        }}
+      />
 
-        {/* HR info when multi-office is off */}
-        {!multiOffice && !isAdmin && (
-          <p className="text-sm text-slate-400 italic">Multi-office mode is currently disabled. Contact your admin to enable it.</p>
-        )}
+      {/* Offices / Overview */}
+      {activeTab === "offices" && (
+        <div className="space-y-5">
+          {drillAddress ? (
+            <OfficeCard
+              addr={drillAddress}
+              canManage={false}
+              onManage={() => setOpenRegion(regionLabelOf(drillAddress))}
+              onBack={() => setOpenRegion(null)}
+            >
+              <RegionStaffingBlock
+addr={drillAddress}
+                    company={company}
+                    mainLabel={mainLabel}
+                    canEditCaps={canEditCaps}
+                    hrOptions={hrs}
+                    adminOptions={admins}
+                    showToast={showToast}
+                    refresh={refresh}
+                    drilled
+                  />
+            </OfficeCard>
+          ) : (
+            <>
+              {!multiOffice && !isAdmin && (
+                <Panel
+                  icon={Info}
+                  tone="warning"
+                  title="Multi-office mode is disabled"
+                  description="Contact your admin to enable it before you can submit office addresses for other regions."
+                />
+              )}
 
-        {multiOffice && (
-          <>
-            {/* Admin: manage authorized HRs */}
-            {isAdmin && hrs.length > 0 && (
-              <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">Authorized HR Managers</span>
-                <p className="text-xs text-slate-400 mt-0.5 mb-2 dark:text-zinc-500">Select which HR members can submit office addresses.</p>
-                <div className="space-y-1.5">
-                  {hrs.map((hr) => {
-                    const isAuthorized = authorizedHrs.includes(hr.id);
-                    return (
-                      <div key={hr.id} className="flex items-center justify-between rounded-lg border border-[var(--c-border-light)] px-3 py-2 dark:border-zinc-800 dark:bg-[#0b0b0b]">
-                        <div className="flex items-center gap-2">
-                          {isAuthorized ? <UserCheck size={14} className="text-emerald-500" /> : <UserX size={14} className="text-slate-300 dark:text-zinc-600" />}
-                          <span className="text-sm text-slate-700 dark:text-zinc-200">{hr.name}</span>
-                          <span className="text-xs text-slate-400 dark:text-zinc-500">({hr.email})</span>
+              {!multiOffice && singleOfficeEntry && (
+                <Panel
+                  icon={MapPin}
+                  title={String(singleOfficeEntry.label ?? "").trim() || "Main Office"}
+                  description={
+                    [
+                      String(singleOfficeEntry.line1 ?? ""),
+                      String(singleOfficeEntry.city ?? ""),
+                      String(singleOfficeEntry.state ?? ""),
+                      String(singleOfficeEntry.country ?? ""),
+                    ]
+                      .filter(Boolean)
+                      .join(", ") || String(company?.address ?? "")
+                  }
+                />
+              )}
+
+              {!multiOffice && legacyAddress && (
+                <Panel
+                  icon={MapPin}
+                  title="Main Office"
+                  description={legacyAddress}
+                />
+              )}
+
+              {multiOffice &&
+                (approvedAddresses.length === 0 ? (
+                  <EmptyBlock
+                    icon={Building2}
+                    title="No approved offices yet"
+                    description="Submitted office addresses show up here once an admin approves them."
+                  />
+                ) : (
+                  officeCards
+                ))}
+
+              {multiOffice && pendingAddresses.length > 0 && (
+                <Panel
+                  icon={Clock}
+                  tone="warning"
+                  title={`Pending approval (${pendingAddresses.length})`}
+                  description="Waiting for an admin to review these submissions."
+                >
+                  <div className="space-y-2.5">
+                    {pendingAddresses.map((req) => {
+                      const meta = (req.metadata ?? {}) as AnyRecord;
+                      return (
+                        <div
+                          key={String(req._id ?? req.id)}
+                          className="flex items-start justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 dark:border-amber-900/70 dark:bg-amber-950/25"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-slate-800 dark:text-zinc-100">
+                              {String(meta.label ?? "")}
+                            </p>
+                            <p className="mt-0.5 text-caption text-slate-500 dark:text-zinc-400">
+                              {[String(meta.line1 ?? ""), String(meta.city ?? "")].filter(Boolean).join(", ")}
+                            </p>
+                            {meta.adminName ? (
+                              <p className="mt-1 text-caption text-slate-400 dark:text-zinc-500">
+                                Assigned to: {String(meta.adminName)}
+                              </p>
+                            ) : null}
+                          </div>
+                          <StatusBadge tone="warning" icon={Clock}>
+                            Pending
+                          </StatusBadge>
                         </div>
+                      );
+                    })}
+                  </div>
+                </Panel>
+              )}
+
+              {multiOffice && !isAdmin && role === "human-resource" && !isAuthHr && (
+                <Panel
+                  icon={Info}
+                  tone="subtle"
+                  title="You cannot submit office addresses"
+                  description="You are not authorized to submit office addresses. Contact your admin for access."
+                />
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Add Office */}
+      {activeTab === "add" && isAuthHr && (
+        <div className="space-y-5">
+          <Panel
+            icon={UserCheck}
+            title="Approval Routing"
+            description="Pick the admin who should review this request."
+          >
+            {admins.length > 0 ? (
+              <div className="max-w-md">
+                <SelectField
+                  id="office-admin"
+                  label="Assign to Admin"
+                  required
+                  hint="They will approve or reject the submitted address."
+                  value={selectedAdminId}
+                  onChange={setSelectedAdminId}
+                >
+                  <option value="">Select admin</option>
+                  {admins.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({a.email})
+                    </option>
+                  ))}
+                </SelectField>
+              </div>
+            ) : null}
+          </Panel>
+
+          <Panel
+            icon={MapPin}
+            title="Office Details"
+            description="Where this office is located. Region name and street address are required."
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <TextField
+                id="office-label"
+                label="Region / Office Name"
+                required
+                className="sm:col-span-2"
+                placeholder="e.g. Haldwani Office, North India Branch"
+                value={newAddrLabel}
+                onChange={setNewAddrLabel}
+              />
+              <TextField
+                id="office-line1"
+                label="Address Line 1"
+                required
+                className="sm:col-span-2"
+                placeholder="Street, building"
+                value={newAddrLine1}
+                onChange={setNewAddrLine1}
+              />
+              <TextField
+                id="office-city"
+                label="City"
+                placeholder="City"
+                value={newAddrCity}
+                onChange={setNewAddrCity}
+              />
+              <TextField
+                id="office-state"
+                label="State"
+                placeholder="State"
+                value={newAddrState}
+                onChange={setNewAddrState}
+              />
+              <TextField
+                id="office-zip"
+                label="ZIP / Postal Code"
+                placeholder="ZIP"
+                value={newAddrZip}
+                onChange={setNewAddrZip}
+              />
+              <TextField
+                id="office-country"
+                label="Country"
+                placeholder="Country"
+                value={newAddrCountry}
+                onChange={setNewAddrCountry}
+              />
+            </div>
+          </Panel>
+
+          <Panel
+            icon={Users}
+            title="Office Contacts"
+            description="Who should be contacted at this office."
+          >
+            <ContactEditor
+              idPrefix="new-office"
+              value={newAddrContacts}
+              onChange={setNewAddrContacts}
+            />
+          </Panel>
+        </div>
+      )}
+
+      {/* Limits & Access */}
+      {activeTab === "limits" && (
+        <div className="space-y-5">
+          {canEditCaps && (
+            <GlobalCapsEditor
+              company={company}
+              showToast={showToast}
+              refresh={refresh}
+            />
+          )}
+
+          {isAdmin && hrs.length > 0 && (
+            <Panel
+              icon={UserCheck}
+              title="Authorized HR Managers"
+              description="Select which HR members can submit office addresses."
+            >
+              <div className="space-y-2.5">
+                {hrs.map((hr) => {
+                  const isAuthorized = authorizedHrs.includes(hr.id);
+                  return (
+                    <div
+                      key={hr.id}
+                      className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[var(--c-border-light)] bg-[var(--c-bg)] px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/40"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-bold text-slate-600 dark:bg-zinc-800 dark:text-zinc-300">
+                          {initialsOf(hr.name)}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-medium text-ink">
+                            {hr.name}
+                          </span>
+                          <span className="block truncate text-caption text-muted">
+                            {hr.email}
+                          </span>
+                        </span>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <StatusBadge
+                          tone={isAuthorized ? "success" : "neutral"}
+                          icon={isAuthorized ? UserCheck : UserX}
+                        >
+                          {isAuthorized ? "Authorized" : "Not authorized"}
+                        </StatusBadge>
                         <button
                           type="button"
                           disabled={managingHr}
                           onClick={() => handleToggleHr(hr.id)}
-                          className={`text-xs font-medium px-2.5 py-1 rounded-md border transition-colors ${ isAuthorized ? "border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40" : "border-indigo-200 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-900 dark:text-indigo-300 dark:hover:bg-indigo-950/40" } disabled:opacity-50`}
+                          className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
+                            isAuthorized
+                              ? "border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950/40"
+                              : "neu-btn text-indigo-600 dark:text-indigo-300"
+                          }`}
                         >
                           {isAuthorized ? "Revoke" : "Authorize"}
                         </button>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Unauthorized HR message */}
-            {!isAdmin && role === "human-resource" && !isAuthHr && (
-              <p className="text-sm text-slate-400 italic dark:text-zinc-500">You are not authorized to submit office addresses. Contact your admin for access.</p>
-            )}
-
-            {/* Global staffing caps (main office only) */}
-            {canEditCaps && (
-              <GlobalCapsEditor
-                company={company}
-                showToast={showToast}
-                refresh={refresh}
-              />
-            )}
-
-            {/* Approved offices */}
-            {approvedAddresses.length > 0 && (
-              <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">Approved Offices</span>
-                <div className="mt-2 space-y-2">
-                  {approvedAddresses.map((addr, i) => (
-                    <div key={i} className="rounded-lg border border-[var(--c-border-light)] dark:border-zinc-800 dark:bg-[#0b0b0b]">
-                      <div className="flex items-center justify-between p-3">
-                        <div>
-                          <p className="text-sm font-medium text-slate-800 dark:text-zinc-200">{String(addr.label ?? "")}</p>
-                          <p className="text-xs text-slate-500 dark:text-zinc-400">
-                            {[String(addr.line1 ?? ""), String(addr.city ?? ""), String(addr.state ?? "")].filter(Boolean).join(", ")}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {approvedAddresses.length >= 2 && isAdmin ? (
-                            <button
-                              type="button"
-                              className="text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                              onClick={async () => {
-                                const next = approvedAddresses.filter((_, idx) => idx !== i);
-                                try {
-                                  await apiFetch("/api/company/address", {
-                                    method: "PATCH",
-                                    body: JSON.stringify({ addresses: next }),
-                                  });
-                                  await refresh();
-                                  showToast("Office address removed.");
-                                } catch {
-                                  showToast("Failed to remove address.", "error");
-                                }
-                              }}
-                            >
-                              Delete
-                            </button>
-                          ) : null}
-                          <CheckCircle size={16} className="shrink-0 text-emerald-500" />
-                        </div>
-                      </div>
-                      <RegionStaffingBlock
-                        addr={addr}
-                        company={company}
-                        role={role}
-                        userId={userId}
-                        mainLabel={mainLabel}
-                        canEditCaps={canEditCaps}
-                        hrOptions={hrs}
-                        adminOptions={admins}
-                        showToast={showToast}
-                        refresh={refresh}
-                      />
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
-            )}
+            </Panel>
+          )}
+        </div>
+      )}
+    </ModalShell>
+  );
+}
 
-            {/* Single office with a stored name/label */}
-            {!multiOffice && singleOfficeEntry ? (
-              <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">Office Address</span>
-                <div className="mt-2 rounded-lg neu-inset/50 p-3">
-                  <p className="text-sm font-medium text-slate-800 dark:text-zinc-200">{String(singleOfficeEntry.label ?? "").trim() || "Main Office"}</p>
-                  <p className="text-xs text-slate-500 dark:text-zinc-400">
-                    {[String(singleOfficeEntry.line1 ?? ""), String(singleOfficeEntry.city ?? ""), String(singleOfficeEntry.state ?? ""), String(singleOfficeEntry.country ?? "")].filter(Boolean).join(", ") || String(company?.address ?? "")}
-                  </p>
-                </div>
-              </div>
+function initialsOf(name: string): string {
+  return (
+    name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((word) => word[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  );
+}
+
+function OfficeCard({
+  addr,
+  canManage,
+  onManage,
+  onBack,
+  onDelete,
+  children,
+}: {
+  addr: AnyRecord;
+  canManage: boolean;
+  onManage: () => void;
+  onBack?: () => void;
+  onDelete?: () => void;
+  children: ReactNode;
+}) {
+  const label = regionLabelOf(addr);
+  const address = [
+    String(addr.line1 ?? ""),
+    String(addr.city ?? ""),
+    String(addr.state ?? ""),
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-[var(--c-border-light)] bg-[var(--c-bg-card)] dark:border-zinc-800">
+      {onBack ? (
+        <div className="border-b border-[var(--c-border-light)] bg-[var(--c-bg)] px-5 py-2.5 dark:border-zinc-800 dark:bg-zinc-950/40">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 transition-colors hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            <ChevronLeft size={14} /> All offices
+          </button>
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap items-start justify-between gap-4 p-5">
+        <div className="flex min-w-0 items-start gap-3.5">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-950/70 dark:text-emerald-300">
+            <Building2 size={19} />
+          </span>
+          <div className="min-w-0">
+            <h4 className="truncate text-base font-semibold text-ink">{label}</h4>
+            {address ? (
+              <p className="mt-0.5 text-caption text-muted">{address}</p>
             ) : null}
-
-            {/* Show legacy single address when multi-office is off */}
-            {!multiOffice && legacyAddress && (
-              <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">Office Address</span>
-                <div className="mt-2 rounded-lg neu-inset/50 p-3">
-                  <p className="text-sm font-medium text-slate-800 dark:text-zinc-200">Main Office</p>
-                  <p className="text-xs text-slate-500 dark:text-zinc-400">{legacyAddress}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Pending submissions */}
-            {pendingAddresses.length > 0 && (
-              <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">Pending Approval</span>
-                <div className="mt-2 space-y-2">
-                  {pendingAddresses.map((req) => {
-                    const meta = (req.metadata ?? {}) as AnyRecord;
-                    return (
-                      <div key={String(req._id ?? req.id)} className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/30">
-                        <div>
-                          <p className="text-sm font-medium text-slate-800 dark:text-zinc-100">{String(meta.label ?? "")}</p>
-                          <p className="text-xs text-slate-500 dark:text-zinc-400">
-                            {String(meta.line1 ?? "")}, {String(meta.city ?? "")}
-                          </p>
-                          {meta.adminName ? <p className="text-xs text-slate-400 mt-0.5 dark:text-zinc-500">Assigned to: {String(meta.adminName)}</p> : null}
-                        </div>
-                        <Clock size={16} className="shrink-0 text-amber-500 dark:text-amber-400" />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Submit form (only for authorized HR) */}
-            {isAuthHr && (
-              <div className="rounded-lg border border-dashed border-slate-300 p-4 space-y-3 dark:border-zinc-800 dark:bg-[#0b0b0b]">
-                <div className="flex items-center gap-2">
-                  <MapPin size={16} className="text-slate-500 dark:text-zinc-400" />
-                  <span className="text-sm font-semibold text-slate-700 dark:text-zinc-200">Submit New Office Address</span>
-                </div>
-
-                {admins.length > 0 && (
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-zinc-400">Assign to Admin *</label>
-                    <select
-                      className="neu-inset w-full rounded-lg px-3 py-2 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
-                      value={selectedAdminId}
-                      onChange={(e) => setSelectedAdminId(e.target.value)}
-                    >
-                      <option value="">Select admin</option>
-                      {admins.map((a) => (
-                        <option key={a.id} value={a.id}>{a.name} ({a.email})</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="col-span-2">
-                    <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-zinc-400">Region / Office Name *</label>
-                    <input
-                      type="text"
-                      className="neu-inset w-full rounded-lg px-3 py-2 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
-                      placeholder="e.g. Haldwani Office, North India Branch"
-                      value={newAddrLabel}
-                      onChange={(e) => setNewAddrLabel(e.target.value)}
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-zinc-400">Address Line 1 *</label>
-                    <input
-                      type="text"
-                      className="neu-inset w-full rounded-lg px-3 py-2 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
-                      placeholder="Street, building"
-                      value={newAddrLine1}
-                      onChange={(e) => setNewAddrLine1(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-zinc-400">City</label>
-                    <input
-                      type="text"
-                      className="neu-inset w-full rounded-lg px-3 py-2 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
-                      placeholder="City"
-                      value={newAddrCity}
-                      onChange={(e) => setNewAddrCity(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-zinc-400">State</label>
-                    <input
-                      type="text"
-                      className="neu-inset w-full rounded-lg px-3 py-2 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
-                      placeholder="State"
-                      value={newAddrState}
-                      onChange={(e) => setNewAddrState(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-zinc-400">ZIP / Postal Code</label>
-                    <input
-                      type="text"
-                      className="neu-inset w-full rounded-lg px-3 py-2 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
-                      placeholder="ZIP"
-                      value={newAddrZip}
-                      onChange={(e) => setNewAddrZip(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-zinc-400">Country</label>
-                    <input
-                      type="text"
-                      className="neu-inset w-full rounded-lg px-3 py-2 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
-                      placeholder="Country"
-                      value={newAddrCountry}
-                      onChange={(e) => setNewAddrCountry(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  disabled={submittingAddr}
-                  onClick={handleSubmitAddress}
-                  className="neu-btn neu-btn-primary inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-medium"
-                >
-                  <Send size={14} /> {submittingAddr ? "Submitting..." : "Submit for Approval"}
-                </button>
-              </div>
-            )}
-          </>
-        )}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {onDelete ? (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
+            >
+              <Trash2 size={13} /> Delete
+            </button>
+          ) : null}
+          <StatusBadge tone="success" icon={CheckCircle}>
+            Approved
+          </StatusBadge>
+        </div>
       </div>
-      </div>
-    </div>
+
+      <div className="px-5 pb-1">{children}</div>
+
+      {canManage ? (
+        <div className="mt-3 flex justify-end border-t border-[var(--c-border-light)] px-5 py-3 dark:border-zinc-800">
+          <button
+            type="button"
+            onClick={onManage}
+            className="neu-btn inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold text-indigo-600 dark:text-indigo-300"
+          >
+            <Users size={14} /> Manage Staff
+          </button>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -580,42 +895,38 @@ function GlobalCapsEditor({
   };
 
   return (
-    <div className="rounded-lg border border-[var(--c-border-light)] p-3 dark:border-zinc-800 dark:bg-[#0b0b0b]">
-      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">Region Staffing Limits (all regions)</span>
-      <p className="text-xs text-slate-400 mt-0.5 dark:text-zinc-500">
-        Across every region, the maximum number of HRs and admins a region may hold. The main office can override per-region.
-      </p>
-      <div className="mt-2 flex flex-wrap items-end gap-3">
-        <label className="block">
-          <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">Max HRs</span>
-          <input
-            type="number"
-            min={1}
-            className="mt-1 w-24 rounded-lg neu-inset px-2 py-1.5 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
-            value={maxHrsStr}
-            onChange={(e) => setMaxHrsStr(e.target.value)}
-          />
-        </label>
-        <label className="block">
-          <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">Max Admins</span>
-          <input
-            type="number"
-            min={1}
-            className="mt-1 w-24 rounded-lg neu-inset px-2 py-1.5 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
-            value={maxAdminsStr}
-            onChange={(e) => setMaxAdminsStr(e.target.value)}
-          />
-        </label>
+    <Panel
+      icon={SlidersHorizontal}
+      title="Region Staffing Limits (all regions)"
+      description="Across every region, the maximum number of HRs and admins a region may hold. The main office can override per-region."
+      action={
         <button
           type="button"
           disabled={saving}
           onClick={saveCaps}
-          className="rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
+          className="neu-btn neu-btn-primary rounded-xl px-4 py-2 text-xs font-semibold disabled:opacity-60"
         >
           {saving ? "Saving..." : "Save Global Caps"}
         </button>
+      }
+    >
+      <div className="grid gap-5 sm:grid-cols-2">
+        <NumberField
+          id="global-max-hrs"
+          label="Max HRs"
+          hint="Applies to every region without its own override."
+          value={maxHrsStr}
+          onChange={setMaxHrsStr}
+        />
+        <NumberField
+          id="global-max-admins"
+          label="Max Admins"
+          hint="Applies to every region without its own override."
+          value={maxAdminsStr}
+          onChange={setMaxAdminsStr}
+        />
       </div>
-    </div>
+    </Panel>
   );
 }
 
@@ -745,28 +1056,38 @@ function PipelineAccessRow({
 function RegionStaffingBlock({
   addr,
   company,
-  role,
-  userId,
   mainLabel,
   canEditCaps,
   hrOptions,
   adminOptions,
   showToast,
   refresh,
+  drilled = false,
 }: {
   addr: AnyRecord;
   company: AnyRecord | null;
-  role: string;
-  userId: string;
   mainLabel: string;
   canEditCaps: boolean;
   hrOptions: HrOption[];
   adminOptions: AdminOption[];
   showToast: (text: string, type?: "success" | "error") => void;
   refresh: () => Promise<void>;
+  drilled?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const [draft, setDraft] = useState<{ hrs: string[]; admins: string[]; hrHead: string; adminHead: string } | null>(null);
+  // The drill-in view mounts this block already opened, so the roster draft is
+  // seeded up front. In the list view it stays null until the region is opened,
+  // exactly as before.
+  const [expanded, setExpanded] = useState(drilled);
+  const [draft, setDraft] = useState<{ hrs: string[]; admins: string[]; hrHead: string; adminHead: string } | null>(() =>
+    drilled
+      ? {
+          hrs: staffIdsOf(addr.hrs),
+          admins: staffIdsOf(addr.admins),
+          hrHead: String(addr.hrHead ?? ""),
+          adminHead: String(addr.adminHead ?? ""),
+        }
+      : null,
+  );
   const [saving, setSaving] = useState(false);
 
   const [capHrsStr, setCapHrsStr] = useState(addr.maxHrs != null ? String(addr.maxHrs) : "");
@@ -794,6 +1115,18 @@ function RegionStaffingBlock({
   // lists answer different questions.
   const [pipelineDraft, setPipelineDraft] = useState<string[]>(staffIdsOf(addr.pipelineManagers));
   const [savingPipeline, setSavingPipeline] = useState(false);
+
+  // Contacts management
+  const currentContacts = Array.isArray(addr.contacts) ? addr.contacts : [];
+  const [contactsDraft, setContactsDraft] = useState<{ name: string; phone: string; email: string; isPrimary: boolean }[]>(
+    currentContacts.length > 0 ? currentContacts.map((c: any) => ({
+      name: String(c.name ?? ""),
+      phone: String(c.phone ?? ""),
+      email: String(c.email ?? ""),
+      isPrimary: Boolean(c.isPrimary),
+    })) : [{ name: "", phone: "", email: "", isPrimary: true }]
+  );
+  const [savingContacts, setSavingContacts] = useState(false);
 
   // Only this region's own staff can be delegated. A company-wide picker would
   // let a head be granted authority over a region they do not work in, and the
@@ -832,23 +1165,34 @@ function RegionStaffingBlock({
     }
   };
 
-  const isMainOfficeHr =
-    role === "human-resource" &&
-    (!mainLabel || String(addr.label ?? "").trim().toLowerCase() === mainLabel.toLowerCase());
-  const canManage =
-    role === "admin" || isMainOfficeHr || currentHrs.includes(userId) || currentHrHead === userId;
+  const saveContacts = async () => {
+    const validContacts = contactsDraft
+      .filter((c) => c.name.trim().length > 0)
+      .slice(0, 5);
+    if (validContacts.length === 0) { showToast("At least one contact is required.", "error"); return; }
+    const primaryCount = validContacts.filter((c) => c.isPrimary).length;
+    if (primaryCount > 1) { showToast("Only one primary contact allowed.", "error"); return; }
+
+    setSavingContacts(true);
+    try {
+      await apiFetch("/api/company/address", {
+        method: "PATCH",
+        body: JSON.stringify({
+          mode: "assign-region-managers",
+          label,
+          contacts: validContacts,
+        }),
+      });
+      await refresh();
+      showToast("Region contacts updated.", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to update contacts.", "error");
+    } finally {
+      setSavingContacts(false);
+    }
+  };
 
   const staffed = Boolean(currentHrHead && currentAdminHead);
-
-  const expand = () => {
-    setDraft({
-      hrs: currentHrs,
-      admins: currentAdmins,
-      hrHead: currentHrHead,
-      adminHead: currentAdminHead,
-    });
-    setExpanded(true);
-  };
 
   const toggleHr = (id: string) => {
     setDraft((d) => {
@@ -907,8 +1251,12 @@ function RegionStaffingBlock({
       });
       await refresh();
       showToast("Region staff updated.", "success");
-      setExpanded(false);
-      setDraft(null);
+      // In the drill-in view the panel is the page — collapsing it would leave
+      // nothing to come back to. In the list it folds away as before.
+      if (!drilled) {
+        setExpanded(false);
+        setDraft(null);
+      }
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Failed to update region staff.", "error");
     } finally {
@@ -938,26 +1286,37 @@ function RegionStaffingBlock({
     }
   };
 
-  return (
-    <div className="border-t border-[var(--c-border-light)] px-3 py-3 dark:border-zinc-800">
+return (
+    <div className="pb-4">
       {!staffed && (
-        <div className="mb-2 flex items-start gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
-          <AlertTriangle size={13} className="mt-0.5 shrink-0" />
-          <span>This region has no HR Head / Admin Head yet. Assign staff so it is fully operational.</span>
+        <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-caption text-amber-700 dark:border-amber-900/70 dark:bg-amber-950/25 dark:text-amber-300">
+          <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+          <span>
+            This region has no HR Head / Admin Head yet. Assign staff so it is
+            fully operational.
+          </span>
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-600 dark:text-zinc-300">
-        <span className="inline-flex items-center gap-1.5">
-          <Users size={13} className="text-indigo-500" />
-          HR Head: <span className="font-medium text-slate-800 dark:text-zinc-100">{nameOf(hrOptions, currentHrHead) || "—"}</span>
-          <span className="text-slate-400">({currentHrs.length}/{caps.maxHrs})</span>
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <Shield size={13} className="text-emerald-500" />
-          Admin Head: <span className="font-medium text-slate-800 dark:text-zinc-100">{nameOf(adminOptions, currentAdminHead) || "—"}</span>
-          <span className="text-slate-400">({currentAdmins.length}/{caps.maxAdmins})</span>
-        </span>
+      {/* Summary strip */}
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        <StatPill
+          icon={Users}
+          tone="indigo"
+          label="HR Head"
+          value={nameOf(hrOptions, currentHrHead) || "Not assigned"}
+          counter={`(${currentHrs.length}/${caps.maxHrs})`}
+        />
+        <StatPill
+          icon={Shield}
+          tone="emerald"
+          label="Admin Head"
+          value={nameOf(adminOptions, currentAdminHead) || "Not assigned"}
+          counter={`(${currentAdmins.length}/${caps.maxAdmins})`}
+        />
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-caption text-slate-600 dark:text-zinc-300">
         <PipelineAccessRow
           label={label}
           isMainOffice={label.toLowerCase() === mainLabel.toLowerCase()}
@@ -970,146 +1329,191 @@ function RegionStaffingBlock({
           onToggle={togglePipelineManager}
           onSave={savePipelineManagers}
         />
-        {canManage && (
-          <button
-            type="button"
-            onClick={() => (expanded ? setExpanded(false) : expand())}
-            className="inline-flex items-center gap-1 rounded-md border border-[var(--c-border-light)] px-2 py-1 font-medium text-indigo-600 transition-colors hover:bg-indigo-50 dark:border-zinc-700 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
-          >
-            {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-            {expanded ? "Close" : "Manage Staff"}
-          </button>
-        )}
       </div>
 
       {expanded && draft && (
-        <div className="mt-3 space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-[var(--c-border-light)] p-3 dark:border-zinc-800 dark:bg-[#0b0b0b]">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">HR Staff (max {caps.maxHrs})</span>
-              <div className="mt-2 space-y-1.5">
-                {hrOptions.length === 0 && <p className="text-xs text-slate-400 italic">No HRs found.</p>}
+        <div className="mt-5 space-y-5 border-t border-[var(--c-border-light)] pt-5 dark:border-zinc-800">
+          <div className="grid gap-5 lg:grid-cols-2">
+            <Panel
+              icon={Users}
+              title={`HR Staff (max ${caps.maxHrs})`}
+              description="Tick the HRs assigned to this region."
+            >
+              <div className="space-y-2">
+                {hrOptions.length === 0 && (
+                  <p className="text-caption italic text-muted">No HRs found.</p>
+                )}
                 {hrOptions.map((hr) => {
                   const checked = draft.hrs.includes(hr.id);
                   const disabled = !checked && draft.hrs.length >= caps.maxHrs;
                   return (
-                    <label key={hr.id} className={`flex items-center gap-2 text-sm cursor-pointer ${disabled ? "opacity-40" : ""}`}>
+                    <label
+                      key={hr.id}
+                      className={`flex cursor-pointer items-center gap-2.5 rounded-lg px-1 py-0.5 text-sm ${
+                        disabled ? "opacity-40" : ""
+                      }`}
+                    >
                       <input
                         type="checkbox"
                         checked={checked}
                         disabled={disabled}
                         onChange={() => toggleHr(hr.id)}
-                        className="accent-indigo-600"
+                        className="h-4 w-4 shrink-0 cursor-pointer accent-indigo-600"
                       />
-                      <span className="text-slate-700 dark:text-zinc-200">{hr.name}</span>
+                      <span className="text-slate-700 dark:text-zinc-200">
+                        {hr.name}
+                      </span>
                     </label>
                   );
                 })}
               </div>
-              <label className="mt-2 block">
-                <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">HR Head</span>
-                <select
-                  className="mt-1 w-full rounded-lg neu-inset px-2 py-1.5 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
+              <div className="mt-4">
+                <SelectField
+                  id={`${label}-hr-head`}
+                  label="HR Head"
                   value={draft.hrHead}
-                  onChange={(e) => setDraft((d) => (d ? { ...d, hrHead: e.target.value } : d))}
+                  onChange={(v) => setDraft((d) => (d ? { ...d, hrHead: v } : d))}
                 >
                   <option value="">Select...</option>
                   {draft.hrs.map((id) => (
-                    <option key={id} value={id}>{nameOf(hrOptions, id)}</option>
+                    <option key={id} value={id}>
+                      {nameOf(hrOptions, id)}
+                    </option>
                   ))}
-                </select>
-              </label>
-            </div>
+                </SelectField>
+              </div>
+            </Panel>
 
-            <div className="rounded-lg border border-[var(--c-border-light)] p-3 dark:border-zinc-800 dark:bg-[#0b0b0b]">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">Admin Staff (max {caps.maxAdmins})</span>
-              <div className="mt-2 space-y-1.5">
-                {adminOptions.length === 0 && <p className="text-xs text-slate-400 italic">No admins found.</p>}
+            <Panel
+              icon={Shield}
+              title={`Admin Staff (max ${caps.maxAdmins})`}
+              description="Tick the admins assigned to this region."
+            >
+              <div className="space-y-2">
+                {adminOptions.length === 0 && (
+                  <p className="text-caption italic text-muted">
+                    No admins found.
+                  </p>
+                )}
                 {adminOptions.map((adm) => {
                   const checked = draft.admins.includes(adm.id);
-                  const disabled = !checked && draft.admins.length >= caps.maxAdmins;
+                  const disabled =
+                    !checked && draft.admins.length >= caps.maxAdmins;
                   return (
-                    <label key={adm.id} className={`flex items-center gap-2 text-sm cursor-pointer ${disabled ? "opacity-40" : ""}`}>
+                    <label
+                      key={adm.id}
+                      className={`flex cursor-pointer items-center gap-2.5 rounded-lg px-1 py-0.5 text-sm ${
+                        disabled ? "opacity-40" : ""
+                      }`}
+                    >
                       <input
                         type="checkbox"
                         checked={checked}
                         disabled={disabled}
                         onChange={() => toggleAdmin(adm.id)}
-                        className="accent-emerald-600"
+                        className="h-4 w-4 shrink-0 cursor-pointer accent-emerald-600"
                       />
-                      <span className="text-slate-700 dark:text-zinc-200">{adm.name}</span>
+                      <span className="text-slate-700 dark:text-zinc-200">
+                        {adm.name}
+                      </span>
                     </label>
                   );
                 })}
               </div>
-              <label className="mt-2 block">
-                <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">Admin Head</span>
-                <select
-                  className="mt-1 w-full rounded-lg neu-inset px-2 py-1.5 text-sm dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
+              <div className="mt-4">
+                <SelectField
+                  id={`${label}-admin-head`}
+                  label="Admin Head"
                   value={draft.adminHead}
-                  onChange={(e) => setDraft((d) => (d ? { ...d, adminHead: e.target.value } : d))}
+                  onChange={(v) =>
+                    setDraft((d) => (d ? { ...d, adminHead: v } : d))
+                  }
                 >
                   <option value="">Select...</option>
                   {draft.admins.map((id) => (
-                    <option key={id} value={id}>{nameOf(adminOptions, id)}</option>
+                    <option key={id} value={id}>
+                      {nameOf(adminOptions, id)}
+                    </option>
                   ))}
-                </select>
-              </label>
-            </div>
+                </SelectField>
+              </div>
+            </Panel>
           </div>
 
-          <button
-            type="button"
-            disabled={saving}
-            onClick={saveStaffing}
-            className="neu-btn neu-btn-primary rounded-lg px-4 py-2 text-xs font-medium disabled:opacity-50"
+          <div className="flex flex-wrap justify-end gap-2.5">
+            <button
+              type="button"
+              disabled={savingContacts}
+              onClick={saveContacts}
+              className="neu-btn rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 disabled:opacity-50 dark:text-zinc-300"
+            >
+              {savingContacts ? "Saving..." : "Save Contacts"}
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={saveStaffing}
+              className="neu-btn neu-btn-primary rounded-xl px-5 py-2.5 text-sm font-semibold disabled:opacity-60"
+            >
+              {saving ? "Saving..." : "Save Staff"}
+            </button>
+          </div>
+
+          <Panel
+            icon={Users}
+            tone="subtle"
+            title="Office Contacts"
+            description="Contacts printed on ID cards for this office."
           >
-            {saving ? "Saving..." : "Save Staff"}
-          </button>
+            <ContactEditor
+              idPrefix={`region-${label}`}
+              value={contactsDraft}
+              onChange={setContactsDraft}
+            />
+          </Panel>
 
           {canEditCaps && (
-            <div className="rounded-lg border border-dashed border-slate-300 p-3 dark:border-zinc-800 dark:bg-[#0b0b0b]">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">Staffing Caps (main office)</span>
-              <p className="text-xs text-slate-400 mt-0.5 dark:text-zinc-500">
-                Company defaults: {Number(company?.regionMaxHrs ?? 5)} HRs / {Number(company?.regionMaxAdmins ?? 2)} admins per region. Override for this region only.
-              </p>
-              <div className="mt-2 flex flex-wrap items-end gap-3">
-                <label className="block">
-                  <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">Max HRs</span>
-                  <input
-                    type="number"
-                    min={1}
-                    disabled={usingDefaults}
-                    className="mt-1 w-24 rounded-lg neu-inset px-2 py-1.5 text-sm disabled:opacity-40 dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
-                    value={capHrsStr}
-                    onChange={(e) => setCapHrsStr(e.target.value)}
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">Max Admins</span>
-                  <input
-                    type="number"
-                    min={1}
-                    disabled={usingDefaults}
-                    className="mt-1 w-24 rounded-lg neu-inset px-2 py-1.5 text-sm disabled:opacity-40 dark:bg-[#000000] dark:text-zinc-100 dark:border-zinc-800"
-                    value={capAdminsStr}
-                    onChange={(e) => setCapAdminsStr(e.target.value)}
-                  />
-                </label>
-                <label className="flex items-center gap-1.5 pb-2 text-xs text-slate-600 dark:text-zinc-300">
-                  <input type="checkbox" checked={usingDefaults} onChange={(e) => setUsingDefaults(e.target.checked)} className="accent-indigo-600" />
-                  Use company defaults
-                </label>
+            <Panel
+              icon={SlidersHorizontal}
+              tone="subtle"
+              title="Staffing Caps (main office)"
+              description={`Company defaults: ${Number(company?.regionMaxHrs ?? 5)} HRs / ${Number(company?.regionMaxAdmins ?? 2)} admins per region. Override for this region only.`}
+              action={
                 <button
                   type="button"
                   disabled={savingCaps}
                   onClick={saveCaps}
-                  className="rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
+                  className="neu-btn rounded-xl px-4 py-2 text-xs font-semibold text-slate-600 disabled:opacity-50 dark:text-zinc-300"
                 >
                   {savingCaps ? "Saving..." : "Save Caps"}
                 </button>
+              }
+            >
+              <div className="grid gap-5 sm:grid-cols-2">
+                <NumberField
+                  id={`${label}-max-hrs`}
+                  label="Max HRs"
+                  disabled={usingDefaults}
+                  value={capHrsStr}
+                  onChange={setCapHrsStr}
+                />
+                <NumberField
+                  id={`${label}-max-admins`}
+                  label="Max Admins"
+                  disabled={usingDefaults}
+                  value={capAdminsStr}
+                  onChange={setCapAdminsStr}
+                />
               </div>
-            </div>
+              <div className="mt-4">
+                <Checkbox
+                  id={`${label}-use-defaults`}
+                  checked={usingDefaults}
+                  onChange={setUsingDefaults}
+                  label="Use company defaults"
+                />
+              </div>
+            </Panel>
           )}
         </div>
       )}

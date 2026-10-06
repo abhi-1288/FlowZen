@@ -1,4 +1,4 @@
-import { Building2, Camera, Clipboard, Trash2, Users, X } from "lucide-react";
+import { Building2, Camera, Clipboard, Trash2, Users, X, Phone, Mail, Plus, Trash } from "lucide-react";
 import { ImageCropModal } from "./image-crop-modal";
 import { AnyRecord, formatRole } from "./shared";
 
@@ -358,6 +358,8 @@ export function CompanyIconSection({
   hrOptions,
   selectedMainHrId,
   onMainHrIdChange,
+  contacts,
+  onContactsChange,
 }: {
   company: AnyRecord | null;
   uploading: boolean;
@@ -383,6 +385,8 @@ export function CompanyIconSection({
   hrOptions: { id: string; name: string; email?: string }[];
   selectedMainHrId: string;
   onMainHrIdChange: (v: string) => void;
+  contacts: { name: string; phone: string; email: string; isPrimary: boolean }[];
+  onContactsChange: (contacts: { name: string; phone: string; email: string; isPrimary: boolean }[]) => void;
 }) {
   return (
     <>
@@ -496,6 +500,104 @@ export function CompanyIconSection({
                   value="No HR has joined yet — you can assign an HR Head later from Office Address Management."
                 />
               )}
+            </div>
+            <div>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                  <Users size={13} /> Office Contacts (1-5)
+                </label>
+                <button
+                  type="button"
+                  disabled={contacts.length >= 5}
+                  onClick={() => onContactsChange([...contacts, { name: "", phone: "", email: "", isPrimary: contacts.length === 0 }])}
+                  className="inline-flex items-center gap-1 rounded-lg border border-[var(--c-border-light)] px-2 py-1 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Plus size={12} /> Add Contact
+                </button>
+              </div>
+              <div className="space-y-2">
+                {contacts.map((contact, index) => (
+                  <div key={index} className="rounded-lg border border-[var(--c-border-light)] p-3 space-y-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="col-span-2">
+                        <label className="mb-1 block text-xs font-medium text-slate-500">Contact Name *</label>
+                        <input
+                          type="text"
+                          className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
+                          placeholder="Contact person name"
+                          value={contact.name}
+                          onChange={(e) => {
+                            const next = [...contacts];
+                            next[index] = { ...next[index], name: e.target.value };
+                            onContactsChange(next);
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-500">Phone</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"><Phone size={14} /></span>
+                          <input
+                            type="tel"
+                            className="neu-inset w-full rounded-lg px-3 py-2 text-sm pl-8"
+                            placeholder="+91 98765 43210"
+                            value={contact.phone}
+                            onChange={(e) => {
+                              const next = [...contacts];
+                              next[index] = { ...next[index], phone: e.target.value };
+                              onContactsChange(next);
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-500">Email</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"><Mail size={14} /></span>
+                          <input
+                            type="email"
+                            className="neu-inset w-full rounded-lg px-3 py-2 text-sm pl-8"
+                            placeholder="contact@company.com"
+                            value={contact.email}
+                            onChange={(e) => {
+                              const next = [...contacts];
+                              next[index] = { ...next[index], email: e.target.value };
+                              onContactsChange(next);
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 text-xs text-slate-600">
+                        <input
+                          type="checkbox"
+                          checked={contact.isPrimary}
+                          onChange={(e) => {
+                            const next = contacts.map((c, i) => ({
+                              ...c,
+                              isPrimary: i === index ? e.target.checked : false,
+                            }));
+                            onContactsChange(next);
+                          }}
+                          className="accent-indigo-600"
+                        />
+                        <span>Primary contact</span>
+                      </label>
+                      {contacts.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => onContactsChange(contacts.filter((_, i) => i !== index))}
+                          className="text-xs text-rose-600 hover:text-rose-700"
+                        >
+                          <Trash size={12} /> Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-1 text-xs text-slate-400">Minimum 1, maximum 5 contacts. Primary contact will be shown on ID cards.</p>
             </div>
             <button
               className="neu-btn neu-btn-primary mt-1 inline-flex items-center gap-1.5 rounded-lg px-5 py-2 text-sm font-medium"

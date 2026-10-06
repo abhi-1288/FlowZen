@@ -1,5 +1,5 @@
 ﻿import { Copy, Users } from "lucide-react";
-import type { AnyRecord } from "../shared";
+import { EmptyState, SectionHeader, type AnyRecord } from "../shared";
 
 export function TeamOnboardingCodesSection({
   managerTeams,
@@ -9,13 +9,11 @@ export function TeamOnboardingCodesSection({
   showToast: (text: string, type?: "success" | "error") => void;
 }) {
   return (
-    <section className="rounded-xl border overflow-y-auto h-auto max-h-[500px] border-[var(--c-border-light)] bg-[var(--c-bg-card)] p-5 dark:border-zinc-800 dark:bg-[#000000]">
-      <div className="mb-5 border-l-4 border-cyan-500 pl-4">
-        <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">Team Onboarding Codes</h3>
-        <p className="mt-0.5 text-sm text-slate-500 dark:text-zinc-400">Share these codes with new team members</p>
-      </div>
+    <section className="rounded-xl neu-card p-5 dark:border-zinc-800 dark:bg-[#000000]">
+      <SectionHeader title="Team Onboarding Codes" description="Share these codes with new team members" accent="cyan" />
+      <div className="mt-4 max-h-[500px] overflow-y-auto pr-1">
       {managerTeams.length === 0 ? (
-        <p className="text-sm text-slate-500 dark:text-zinc-400">Create a team to generate employee onboarding codes.</p>
+        <EmptyState message="Create a team to generate employee onboarding codes." />
       ) : (
         <div className="space-y-3">
           {managerTeams.map((teamItem) => {
@@ -23,9 +21,9 @@ export function TeamOnboardingCodesSection({
             const otherCode = String(teamItem.otherJoinCode ?? "");
             const teamName = String(teamItem.name ?? "Team");
             return (
-              <div key={String(teamItem.id)} className="rounded-lg border border-[var(--c-border-light)] p-4 dark:border-zinc-800">
+              <div key={String(teamItem.id)} className="rounded-lg neu-card p-4">
                 <div className="mb-2 flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-slate-800">{teamName}</p>
+                  <p className="text-sm font-semibold text-slate-800 dark:text-zinc-100">{teamName}</p>
                   <span className="text-xs text-slate-500 dark:text-zinc-400">{Number(teamItem.employeeCount ?? 0)} employees</span>
                 </div>
                 {[
@@ -39,7 +37,7 @@ export function TeamOnboardingCodesSection({
                         <p className="min-w-0 truncate font-mono text-sm font-semibold text-indigo-700 dark:text-indigo-300">{item.code}</p>
                         <button
                           aria-label={`Copy ${teamName} ${item.label}`}
-                          className="grid h-9 w-9 place-items-center rounded-lg neu-card text-slate-700 hover:bg-[var(--c-bg-muted)] dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-700"
+                          className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--c-border-light)] bg-[var(--c-bg-muted)] text-slate-700 transition hover:bg-[var(--c-bg-hover)] dark:border-zinc-700 dark:bg-[#161616] dark:text-zinc-300 dark:hover:bg-zinc-700"
                           onClick={() => { navigator.clipboard.writeText(item.code); showToast(`${teamName} ${item.label.toLowerCase()} copied.`); }}
                           title="Copy code"
                           type="button"
@@ -63,6 +61,7 @@ export function TeamOnboardingCodesSection({
           })}
         </div>
       )}
+      </div>
     </section>
   );
 }

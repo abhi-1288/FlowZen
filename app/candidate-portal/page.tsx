@@ -30,6 +30,8 @@ import {
   Printer,
   Download,
   Pencil,
+  Phone,
+  Users,
 } from "lucide-react";
 import QRCode from "qrcode";
 import html2canvas from "html2canvas";
@@ -74,7 +76,7 @@ type CandidateData = {
     editApplicationsEnabled?: boolean;
     editApplicationsCloseAt?: string | null;
   };
-  company: { name: string; icon?: string; primaryColor?: string };
+  company: { name: string; icon?: string; primaryColor?: string; addresses?: any[] };
   createdAt: string;
 };
 
@@ -1250,6 +1252,29 @@ function IdCardModal({
   const passId = String((interview as any).passCode || `FLOWZ-${String(interview.id).replace(/[^a-zA-Z0-9]/g, "").slice(-6).toUpperCase() || "PASS"}`);
   const candidateName = `${candidate.firstName} ${candidate.lastName}`.trim();
 
+  // Find office contact from company addresses based on interview location
+  const companyAddresses = Array.isArray(candidate.company?.addresses) ? candidate.company.addresses : [];
+  const interviewLocation = interview.location?.toLowerCase() || "";
+  const matchedAddress = companyAddresses.find((a: any) => {
+    const label = String(a.label ?? "").toLowerCase();
+    const city = String(a.city ?? "").toLowerCase();
+    const state = String(a.state ?? "").toLowerCase();
+    return label.includes(interviewLocation) || city.includes(interviewLocation) || state.includes(interviewLocation);
+  }) || companyAddresses.find((a: any) => Boolean(a.isMain)) || companyAddresses[0];
+  
+  let officeContact = { name: "", phone: "", email: "" };
+  if (matchedAddress) {
+    const contacts = Array.isArray(matchedAddress.contacts) ? matchedAddress.contacts : [];
+    const primaryContact = contacts.find((c: any) => c.isPrimary) || contacts[0];
+    if (primaryContact) {
+      officeContact = {
+        name: String(primaryContact.name ?? ""),
+        phone: String(primaryContact.phone ?? ""),
+        email: String(primaryContact.email ?? ""),
+      };
+    }
+  }
+
   useEffect(() => {
     let active = true;
     QRCode.toDataURL(qrContent, { width: 220, margin: 1, errorCorrectionLevel: "M" })
@@ -1349,6 +1374,26 @@ function IdCardModal({
                 <div className="flex items-center gap-2">
                   <User size={14} style={{ color: accent }} />
                   <span className="text-slate-500">Contact: <span className="font-medium text-slate-700">{interviewerName}{interviewerIdentity ? ` · ${interviewerIdentity}` : ""}</span></span>
+                </div>
+              )}
+              {(officeContact.name || officeContact.phone || officeContact.email) && (
+                <div className="pt-2 border-t border-slate-200 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Users size={14} style={{ color: "#d97706" }} />
+                    <span className="text-slate-500">Office Contact: <span className="font-medium text-slate-700">{officeContact.name}</span></span>
+                  </div>
+                  {officeContact.phone && (
+                    <div className="flex items-center gap-2">
+                      <Phone size={14} style={{ color: "#d97706" }} />
+                      <span className="text-slate-500">Phone: <span className="font-medium text-slate-700">{officeContact.phone}</span></span>
+                    </div>
+                  )}
+                  {officeContact.email && (
+                    <div className="flex items-center gap-2">
+                      <Mail size={14} style={{ color: "#d97706" }} />
+                      <span className="text-slate-500">Email: <span className="font-medium text-slate-700">{officeContact.email}</span></span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

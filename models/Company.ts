@@ -68,7 +68,13 @@ const CompanySchema = new Schema(
       maxHrs: { type: Number, default: null },
       maxAdmins: { type: Number, default: null },
       pipelineManagers: [{ type: Schema.Types.ObjectId, ref: "User" }],
-      createdBy: { type: Schema.Types.ObjectId, ref: "User" }
+      createdBy: { type: Schema.Types.ObjectId, ref: "User" },
+      contacts: [{
+        name: { type: String, required: true, trim: true, maxlength: 100 },
+        phone: { type: String, trim: true, maxlength: 20 },
+        email: { type: String, trim: true, maxlength: 100 },
+        isPrimary: { type: Boolean, default: false }
+      }]
     }],
     startDate: { type: Date, default: null },
     requiredDocuments: [{

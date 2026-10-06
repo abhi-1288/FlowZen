@@ -12,6 +12,20 @@ import { isCompanyOwner } from "@/lib/admin-region-scope";
 const cleanIds = (value: unknown): string[] =>
   Array.isArray(value) ? value.map((v) => String(v ?? "").trim()).filter(Boolean) : [];
 
+const cleanContacts = (value: unknown): { name: string; phone: string; email: string; isPrimary: boolean }[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((c) => c && typeof c === "object")
+    .map((c) => ({
+      name: String(c.name ?? "").trim(),
+      phone: String(c.phone ?? "").trim(),
+      email: String(c.email ?? "").trim(),
+      isPrimary: Boolean(c.isPrimary),
+    }))
+    .filter((c) => c.name.length > 0)
+    .slice(0, 5);
+};
+
 const positiveNumberOrNull = (value: unknown): number | null => {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : null;
@@ -182,6 +196,12 @@ export async function PATCH(request: Request) {
     const maxHrs = positiveNumberOrNull(body.maxHrs);
     const maxAdmins = positiveNumberOrNull(body.maxAdmins);
 
+    const contacts = cleanContacts(body.contacts);
+    if (contacts.length === 0) return jsonError("At least one contact is required for the address.", 400);
+    if (contacts.length > 5) return jsonError("Maximum 5 contacts allowed per address.", 400);
+    const primaryCount = contacts.filter((c) => c.isPrimary).length;
+    if (primaryCount > 1) return jsonError("Only one primary contact allowed per address.", 400);
+
     // Update the existing main entry in place rather than replacing the array.
     //
     // This used to assign `company.addresses = [mainEntry]`, which destroyed every
@@ -220,6 +240,7 @@ export async function PATCH(request: Request) {
       maxAdmins: maxAdmins ?? prior?.maxAdmins ?? null,
       pipelineManagers: prior ? cleanIds(prior.pipelineManagers) : [],
       createdBy: prior?.createdBy || userId,
+      contacts,
     };
 
     if (existing.length === 0) {
@@ -298,10 +319,18 @@ export async function PATCH(request: Request) {
     if (adminHead && !resolved.admins.includes(adminHead)) adminHead = "";
     if (!adminHead) adminHead = resolved.admins.includes(oldAdminHead) ? oldAdminHead : resolved.admins[0] ?? "";
 
+    const contacts = cleanContacts(body.contacts);
+    if (contacts.length > 5) return jsonError("Maximum 5 contacts allowed per address.", 400);
+    const primaryCount = contacts.filter((c) => c.isPrimary).length;
+    if (primaryCount > 1) return jsonError("Only one primary contact allowed per address.", 400);
+
     (region as any).hrs = resolved.hrs;
     (region as any).admins = resolved.admins;
     (region as any).hrHead = hrHead || null;
     (region as any).adminHead = adminHead || null;
+    if (contacts.length > 0) {
+      (region as any).contacts = contacts;
+    }
     company.markModified("addresses");
   }
 
@@ -424,6 +453,7 @@ export async function PATCH(request: Request) {
         maxHrs: null,
         maxAdmins: null,
         createdBy: userId,
+        contacts: [],
       };
       company.addresses = [mainEntry];
     }
@@ -451,6 +481,13 @@ export async function PATCH(request: Request) {
     for (const a of body.addresses) {
       const resolved = await resolveManagerIds(companyId, cleanIds(a.hrs), cleanIds(a.admins));
 
+      const contacts = cleanContacts(a.contacts);
+      if (contacts.length > 0) {
+        if (contacts.length > 5) return jsonError(`Region "${String(a.label ?? "").trim()}" allows at most 5 contacts.`, 400);
+        const primaryCount = contacts.filter((c) => c.isPrimary).length;
+        if (primaryCount > 1) return jsonError(`Region "${String(a.label ?? "").trim()}" allows only one primary contact.`, 400);
+      }
+
       const entry: any = {
         label: String(a.label ?? "").trim(),
         line1: String(a.line1 ?? "").trim(),
@@ -466,6 +503,7 @@ export async function PATCH(request: Request) {
         maxHrs: positiveNumberOrNull(a.maxHrs),
         maxAdmins: positiveNumberOrNull(a.maxAdmins),
         createdBy: cleanIds([a.createdBy])[0] ?? null,
+        contacts,
       };
       if (entry.hrHead && !resolved.hrs.includes(entry.hrHead)) entry.hrHead = null;
       if (entry.adminHead && !resolved.admins.includes(entry.adminHead)) entry.adminHead = null;
