@@ -7,6 +7,7 @@ import { User } from "@/models/User";
 import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
 import { effectiveRegionLabelOf } from "@/lib/company-regions";
+import { recordAudit } from "@/lib/audit";
 
 const ALLOWED_NOTICE_PERIOD_DAYS = new Set([5, 15, 30, 45, 60, 90]);
 const ALLOWED_PAID_LEAVE_PERIODS = new Set(["monthly", "yearly"]);
@@ -159,6 +160,41 @@ export async function PATCH(request: Request) {
       { upsert: true },
     );
   }
+
+  const policyFrom: Record<string, unknown> = { region: targetRegion };
+  const policyTo: Record<string, unknown> = { region: targetRegion };
+  if (hasNoticePeriod) {
+    policyFrom.noticePeriodDays = company.noticePeriodDays;
+    policyTo.noticePeriodDays = noticePeriodDays;
+  }
+  if (hasPaidLeaveDays) {
+    policyFrom.paidLeaveDays = company.paidLeaveDays;
+    policyTo.paidLeaveDays = Math.floor(paidLeaveDays);
+  }
+  if (hasPaidLeavePeriod) {
+    policyFrom.paidLeavePeriod = company.paidLeavePeriod;
+    policyTo.paidLeavePeriod = paidLeavePeriod;
+  }
+  if (hasCarryForwardLeave) {
+    policyFrom.carryForwardLeaveDays = company.carryForwardLeaveDays;
+    policyTo.carryForwardLeaveDays = carryForwardLeaveDays;
+  }
+  if (hasMinWorkHours) {
+    policyFrom.minWorkHours = company.minWorkHours;
+    policyTo.minWorkHours = Math.floor(minWorkHours);
+  }
+  if (Object.keys(settlementFields).length > 0) policyTo.settlement = settlementFields;
+
+  await recordAudit({
+    action: "company.settings.change",
+    actionLabel: "HR policy updated",
+    company: hr.company ?? null,
+    actor: { id: hr._id, name: hr.name, role: hr.role },
+    from: policyFrom,
+    to: policyTo,
+    result: "success",
+    request,
+  });
 
   const resp = NextResponse.json({
     ok: true,

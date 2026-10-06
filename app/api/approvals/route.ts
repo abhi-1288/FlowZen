@@ -4,6 +4,7 @@ import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { Company } from "@/models/Company";
 import { JoinRequest } from "@/models/JoinRequest";
 import { Notification } from "@/models/Notification";
+import { StoreOrder } from "@/models/StoreOrder";
 import { Team } from "@/models/Team";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
@@ -289,7 +290,42 @@ export async function GET() {
       teams: new Map(teams.map((team) => [String(team._id), { ...team, id: String(team._id) }])),
     };
 
-    return NextResponse.json({ requests: requests.map((request) => serializeApproval(request, related)) });
+    // Store orders assigned to this approver also surface here with a
+    // `store-order` kind so the same Pending Approvals view covers them.
+    const storeOrders = await StoreOrder.find({ approver: userId, status: "pending" })
+      .sort({ createdAt: -1 })
+      .populate("requester", "name email role")
+      .populate("company", "name")
+      .lean();
+    const storeRequests = storeOrders.map((order) => ({
+      id: String(order._id),
+      kind: "store-order",
+      status: order.status,
+      company: order.company,
+      requester: order.requester,
+      createdAt: order.createdAt,
+      metadata: {
+        orderNumber: order.orderNumber,
+        lineCount: Array.isArray(order.items) ? order.items.length : 0,
+        itemCount: Array.isArray(order.items)
+          ? order.items.reduce((sum, item) => sum + Number(item.quantity ?? 0), 0)
+          : 0,
+        deliveryName: order.deliveryName ?? "",
+        department: order.department ?? "",
+        items: Array.isArray(order.items)
+          ? order.items.map((item) => ({
+              name: item.name,
+              quantity: item.quantity,
+              unit: item.unit,
+              price: item.price,
+            }))
+          : [],
+      },
+    }));
+
+    return NextResponse.json({
+      requests: [...requests.map((request) => serializeApproval(request, related)), ...storeRequests],
+    });
   } catch (error) {
     const dbError = databaseUnavailable(error);
     if (dbError) return dbError;

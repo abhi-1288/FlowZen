@@ -154,6 +154,7 @@ export function formatRole(role: string, isSeniorSecurity?: boolean) {
     security: "Security",
     "it-admin": "IT Admin",
     "it-administration": "IT Administration",
+    warehouse: "Warehouse",
     others: "Others",
   };
   if (role === "security") {

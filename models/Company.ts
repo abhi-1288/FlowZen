@@ -17,6 +17,7 @@ const CompanySchema = new Schema(
     securityJoinCode: { type: String, unique: true, sparse: true, index: true },
     juniorSecurityJoinCode: { type: String, unique: true, sparse: true, index: true },
     itAdminJoinCode: { type: String, unique: true, sparse: true, index: true },
+    warehouseJoinCode: { type: String, unique: true, sparse: true, index: true },
     noticePeriodDays: { type: Number, default: 30 },
     paidLeaveDays: { type: Number, default: 0 },
     paidLeavePeriod: { type: String, enum: ["monthly", "yearly"], default: "monthly" },

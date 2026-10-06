@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Types } from "mongoose";
 import { connectDb } from "@/lib/db";
 import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { Company } from "@/models/Company";
@@ -7,7 +8,9 @@ import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
 import { effectiveRegionLabelOf, isMainOfficeLabel, isMainOfficeRegion, regionManagerCaps } from "@/lib/company-regions";
+import { applyRegionLabelChanges } from "@/lib/region-rename";
 import { isCompanyOwner } from "@/lib/admin-region-scope";
+import { recordAudit } from "@/lib/audit";
 
 const cleanIds = (value: unknown): string[] =>
   Array.isArray(value) ? value.map((v) => String(v ?? "").trim()).filter(Boolean) : [];
@@ -118,6 +121,15 @@ export async function PATCH(request: Request) {
   const company = await Company.findById(companyId);
   if (!company) return jsonError("Company not found.", 404);
 
+  type AuditEvent = { action: string; actionLabel: string; from?: unknown; to?: unknown; metadata?: Record<string, unknown> };
+  let auditEvent: AuditEvent | null = null;
+
+  // Label is the identity of a region: members, policies and identity-code
+  // ranges all snapshot it. When a rename/removal is detected below we rewrite
+  // the copies via `applyRegionLabelChanges` before `company.save()`.
+  const renames: { from: string; to: string }[] = [];
+  const removals: string[] = [];
+
   // HR submitting a new address for admin approval
   if (body.mode === "submit-address" && user.role === "human-resource") {
     const label = String(body.label ?? "").trim();
@@ -167,6 +179,17 @@ export async function PATCH(request: Request) {
       message: `${user.name} (HR) has submitted a new office address "${label}" for approval.`,
     });
     emitNotification(String(admin._id));
+
+    await recordAudit({
+      action: "company.region.submit",
+      actionLabel: "Office address submitted for approval",
+      company: companyId,
+      actor: { id: user._id, name: user.name, role: user.role },
+      to: { label, line1, city, state, zip, country },
+      metadata: { adminId: String(admin._id) },
+      result: "success",
+      request,
+    });
 
     return NextResponse.json({ requestId: String(joinRequest._id), status: "submitted" });
   }
@@ -221,6 +244,7 @@ export async function PATCH(request: Request) {
     const mainIndex = existing.findIndex((a: any) => Boolean(a?.isMain));
     const fallbackIndex = mainIndex >= 0 ? mainIndex : existing.findIndex((a: any) => a);
     const prior: any = fallbackIndex >= 0 ? existing[fallbackIndex] : null;
+    const oldMainLabel = String(prior?.label ?? "").trim();
 
     const mainEntry: any = {
       ...(prior ?? {}),
@@ -258,12 +282,27 @@ export async function PATCH(request: Request) {
 
     const composed = [label, line1, city, state, zip, country].filter(Boolean).join(", ");
     company.address = composed;
+
+    if (oldMainLabel && oldMainLabel.toLowerCase() !== label.toLowerCase()) {
+      renames.push({ from: oldMainLabel, to: label });
+    }
+
+    auditEvent = {
+      action: "company.settings.change",
+      actionLabel: "Main office address updated",
+      to: { label, address: composed },
+    };
   }
 
   if (body.address !== undefined) {
     const address = String(body.address ?? "").trim();
     if (address.length > 500) return jsonError("Address must be 500 characters or less.");
     company.address = address;
+    auditEvent = {
+      action: "company.settings.change",
+      actionLabel: "Office address updated",
+      to: { address },
+    };
   }
 
   // Assign/replace an existing region's HR & Admin staff, respecting min/caps
@@ -332,6 +371,13 @@ export async function PATCH(request: Request) {
       (region as any).contacts = contacts;
     }
     company.markModified("addresses");
+
+    auditEvent = {
+      action: "company.permission.change",
+      actionLabel: `Region managers assigned (${label})`,
+      from: { hrs: currentHrs, admins: currentAdmins },
+      to: { hrs: resolved.hrs, admins: resolved.admins, hrHead: hrHead || null, adminHead: adminHead || null },
+    };
   }
 
   // Delegate a region's recruitment pipeline to that region's HR / Admin heads.
@@ -384,6 +430,13 @@ export async function PATCH(request: Request) {
       (region as any).pipelineManagers = [];
     }
     company.markModified("addresses");
+
+    auditEvent = {
+      action: "company.permission.change",
+      actionLabel: `Recruitment pipeline delegation updated (${label})`,
+      from: { pipelineManagers: cleanIds((region as any).pipelineManagers) },
+      to: { pipelineManagers: requested },
+    };
   }
 
   // Set region staffing caps: company-wide defaults, or per-region override on the main office
@@ -421,6 +474,18 @@ export async function PATCH(request: Request) {
         }
       }
       company.markModified("addresses");
+
+      auditEvent = {
+        action: "company.permission.change",
+        actionLabel: `Region staffing caps updated (${label})`,
+        from: {
+          maxHrs: (region as any).maxHrs ?? company.regionMaxHrs ?? null,
+          maxAdmins: (region as any).maxAdmins ?? company.regionMaxAdmins ?? null,
+        },
+        to: body.useDefaults === true
+          ? { useDefaults: true }
+          : { maxHrs: rawMaxHrs, maxAdmins: rawMaxAdmins },
+      };
     } else {
       if (rawMaxHrs != null) {
         if (!Number.isFinite(rawMaxHrs) || rawMaxHrs < 1) return jsonError("Max HRs must be at least 1.", 400);
@@ -430,11 +495,27 @@ export async function PATCH(request: Request) {
         if (!Number.isFinite(rawMaxAdmins) || rawMaxAdmins < 1) return jsonError("Max admins must be at least 1.", 400);
         company.regionMaxAdmins = rawMaxAdmins;
       }
+
+      auditEvent = {
+        action: "company.permission.change",
+        actionLabel: "Region staffing caps updated",
+        from: {
+          maxHrs: company.regionMaxHrs ?? null,
+          maxAdmins: company.regionMaxAdmins ?? null,
+        },
+        to: { maxHrs: rawMaxHrs, maxAdmins: rawMaxAdmins },
+      };
     }
   }
 
   if (body.multiOffice !== undefined) {
     company.multiOffice = Boolean(body.multiOffice);
+
+    auditEvent = {
+      action: "company.settings.change",
+      actionLabel: "Multi-office mode updated",
+      to: { multiOffice: company.multiOffice },
+    };
 
     // When enabling multi-office, migrate old single address into addresses as "Main Office"
     if (company.multiOffice && company.address && (!company.addresses || company.addresses.length === 0)) {
@@ -462,6 +543,12 @@ export async function PATCH(request: Request) {
   if (body.addressManagers !== undefined) {
     if (!Array.isArray(body.addressManagers)) return jsonError("addressManagers must be an array.");
     company.addressManagers = body.addressManagers.map((id: any) => String(id));
+
+    auditEvent = {
+      action: "company.permission.change",
+      actionLabel: "Address managers updated",
+      to: { addressManagers: company.addressManagers },
+    };
   }
 
   if (body.addresses !== undefined) {
@@ -505,6 +592,15 @@ export async function PATCH(request: Request) {
         createdBy: cleanIds([a.createdBy])[0] ?? null,
         contacts,
       };
+      // Keep the subdocument id so a bulk replace preserves each office's
+      // identity — that is what lets renames be mapped to their members below.
+      if ((a as any)?._id) {
+        try {
+          entry._id = new Types.ObjectId(String((a as any)._id));
+        } catch {
+          // Malformed id from the client: let Mongoose mint a fresh one.
+        }
+      }
       if (entry.hrHead && !resolved.hrs.includes(entry.hrHead)) entry.hrHead = null;
       if (entry.adminHead && !resolved.admins.includes(entry.adminHead)) entry.adminHead = null;
 
@@ -518,7 +614,78 @@ export async function PATCH(request: Request) {
 
       resolvedEntries.push(entry);
     }
+
+    const priorEntries = (Array.isArray(company.addresses) ? company.addresses : []).slice();
     company.addresses = resolvedEntries;
+
+    // Diff the old roster against the new one so a label change is propagated
+    // to the members / policies / identity-code ranges that snapshot it.
+    const normLabel = (value: unknown) => String(value ?? "").trim().toLowerCase();
+    const priorById = new Map<string, any>();
+    for (const e of priorEntries) {
+      if ((e as any)?._id) priorById.set(String((e as any)._id), e);
+    }
+    const newLabels = new Set(resolvedEntries.map((e) => normLabel(e.label)));
+    const oldLabelByNorm = new Map<string, string>();
+    const newLabelByNorm = new Map<string, string>();
+    for (const e of priorEntries) oldLabelByNorm.set(normLabel(e.label), String(e.label ?? "").trim());
+    for (const e of resolvedEntries) newLabelByNorm.set(normLabel(e.label), String(e.label ?? "").trim());
+
+    // Primary mapping: subdocument ids matched across the replace.
+    for (const ne of resolvedEntries) {
+      const oe = (ne as any)?._id ? priorById.get(String((ne as any)._id)) : undefined;
+      if (!oe) continue;
+      const oldNorm = normLabel(oe.label);
+      const newNorm = normLabel(ne.label);
+      if (oldNorm && oldNorm !== newNorm) {
+        renames.push({ from: String(oe.label ?? "").trim(), to: String(ne.label ?? "").trim() });
+      }
+    }
+
+    // Fallback for entries whose id was not preserved (e.g. a client that never
+    // sent one): with no id-based rename to lean on, exactly one old label
+    // missing and one new label appearing is read as a rename; anything else
+    // left over counts as removals. Ambiguity between "rename" and
+    // "delete this + add that" is inherent without an identity to match on.
+    const renamedFrom = new Set(renames.map((r) => normLabel(r.from)));
+    const removedNorms = [...oldLabelByNorm.keys()].filter(
+      (n) => !newLabels.has(n) && !renamedFrom.has(n),
+    );
+    const addedNorms = [...newLabelByNorm.keys()].filter((n) => !oldLabelByNorm.has(n));
+    if (renames.length === 0 && removedNorms.length === 1 && addedNorms.length === 1) {
+      renames.push({ from: oldLabelByNorm.get(removedNorms[0]) ?? "", to: newLabelByNorm.get(addedNorms[0]) ?? "" });
+    } else {
+      for (const n of removedNorms) removals.push(oldLabelByNorm.get(n) ?? "");
+    }
+
+    auditEvent = {
+      action: "company.settings.change",
+      actionLabel: "Region list replaced",
+      from: { count: Array.isArray(company.addresses) ? company.addresses.length : 0 },
+      to: { count: resolvedEntries.length },
+    };
+  }
+
+  // Propagate region label changes to every snapshot of the name (resolved
+  // `User.regionLabel` first among them) before saving, so a failure aborts the
+  // save and company + members stay on the old name together.
+  if (renames.length > 0 || removals.length > 0) {
+    try {
+      await applyRegionLabelChanges({ company, companyId, renames, removals });
+    } catch (error) {
+      console.error("region label propagation failed:", error);
+      return jsonError("Something went wrong applying this change. Nothing was saved; please try again.", 500);
+    }
+  }
+
+  if (auditEvent) {
+    await recordAudit({
+      ...auditEvent,
+      company: companyId,
+      actor: { id: user._id, name: user.name, role: user.role },
+      result: "success",
+      request,
+    });
   }
 
   await company.save();

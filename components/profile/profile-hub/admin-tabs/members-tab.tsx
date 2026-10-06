@@ -3,7 +3,7 @@ import { useSession } from "next-auth/react";
 import { Download, Hash } from "lucide-react";
 import * as XLSX from "xlsx";
 import { apiFetch } from "@/lib/client-utils";
-import { withMainOfficeSuffix } from "@/lib/company-regions";
+import { effectiveRegionLabelOf, withMainOfficeSuffix } from "@/lib/company-regions";
 import { AnyRecord, formatRole, formatRoleWithCustom, SectionHeader, ActionButton } from "../shared";
 import { FinanceMembersView } from "../finance-members-tab";
 import { HR_MEMBER_ROLE_KEYS } from "./types";
@@ -476,7 +476,7 @@ export function MembersTab({
         String(m.email ?? ""),
         formatRoleWithCustom(String(m.role ?? "employee"), m.customRole, Boolean(m.isSeniorSecurity)),
         String(m.companyIdentityCode ?? ""),
-        withMainOfficeSuffix(company, String(m.regionLabel ?? "")),
+        withMainOfficeSuffix(company, effectiveRegionLabelOf(company, m)),
         teams,
         salaryDisplay,
         fmtDate(m.companyJoined),

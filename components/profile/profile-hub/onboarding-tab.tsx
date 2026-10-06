@@ -519,6 +519,7 @@ export function OnboardingTab({
                 company?.securityJoinCode ? { code: `${String(company.securityJoinCode)}${hrSuffix}`, label: "Senior Security code" } : null,
                 company?.otherJoinCode ? { code: `${String(company.otherJoinCode)}${hrSuffix}`, label: "Others code" } : null,
                 company?.itAdminJoinCode ? { code: `${String(company.itAdminJoinCode)}${hrSuffix}`, label: "IT Admin code" } : null,
+                company?.warehouseJoinCode ? { code: `${String(company.warehouseJoinCode)}${hrSuffix}`, label: "Warehouse code" } : null,
               ].filter(Boolean) as { code: string; label: string }[]}
               empty="Generating HR staff onboarding codes. Refresh once if they do not appear."
             />
@@ -868,7 +869,7 @@ export function OnboardingTab({
         onClose={() => { setDeleteTeamModal(null); setDeleteTeamConfirmText(""); }}
         onConfirm={() => void deleteTeamFn(deleteTeamModal!.teamId)} />
 
-      {["employee", "others"].includes(role) ? (
+      {["employee", "others", "warehouse"].includes(role) ? (
         companyJoinStatus === "approved" ? (
           <>
             <section className={sectionBase}>
@@ -906,7 +907,7 @@ export function OnboardingTab({
           <>
              <JoinPanel title="Join using code" placeholder="CO-... or TM-... code" value={teamCode} onChange={setTeamCode} onSubmit={joinTeam}
                loading={teamJoinLoading} status={pendingJoinStatus} onCancelRequest={() => setCancelJoinModal(true)} />
-            <HistoryCard title="Membership History" rows={toEmployeeHistoryRows(insights)} hint="Employee can join up to 2 teams." />
+            <HistoryCard title="Membership History" rows={toEmployeeHistoryRows(insights)} hint={role === "warehouse" ? "Company/team switches and removals." : "Employee can join up to 2 teams."} />
           </>
         )
       ) : null}

@@ -13,6 +13,7 @@ import { canRunRecruitmentPipeline } from "@/lib/recruitment-hq";
 import { User } from "@/models/User";
 import { Team } from "@/models/Team";
 import { rateLimitLogin } from "@/lib/rate-limit";
+import { recordAudit } from "@/lib/audit";
 
 const oauthProviders = [
   ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
@@ -90,9 +91,35 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials, req) {
         const email = credentials?.email?.trim().toLowerCase();
         const password = credentials?.password ?? "";
-        if (!email || !password) return null;
+        const headersRecord = (req as any)?.headers as Record<string, string | undefined> | undefined;
+        const auditRequest = { headers: headersRecord ?? {} } as unknown as Request;
+        const logLogin = (
+          result: "success" | "failed",
+          metadata: Record<string, unknown>,
+          user?: any,
+        ) =>
+          recordAudit({
+            action: result === "success" ? "auth.login" : "auth.login.failed",
+            actionLabel:
+              result === "success" ? "Member signed in" : "Sign-in attempt failed",
+            company: user?.company ?? null,
+            actor: user
+              ? { id: user._id, name: user.name, email: user.email, role: user.role }
+              : null,
+            result,
+            metadata,
+            request: auditRequest,
+          });
 
-        const headers = (req as any)?.headers as Record<string, string> | undefined;
+        if (!email || !password) {
+          await logLogin("failed", { email: email || "", reason: "missing_credentials" });
+          return null;
+        }
+
+        const headers =
+          typeof headersRecord === "object" && headersRecord
+            ? headersRecord
+            : undefined;
         const ip =
           headers?.["x-forwarded-for"]?.split(",")[0]?.trim() ||
           headers?.["x-real-ip"]?.trim() ||
@@ -100,19 +127,32 @@ export const authOptions: NextAuthOptions = {
 
         const loginCheck = rateLimitLogin(ip, email);
         if (!loginCheck.success) {
+          await logLogin("failed", { email, reason: "rate_limited" });
           throw new Error("Too many login attempts. Please try again later.");
         }
 
         await connectDb();
         const user = await User.findOne({ email }).select("+passwordHash");
-        if (!user) return null;
-        if (!user.passwordHash) return null;
+        if (!user) {
+          await logLogin("failed", { email, reason: "unknown_email" });
+          return null;
+        }
+        if (!user.passwordHash) {
+          await logLogin("failed", { email, reason: "no_local_password" }, user);
+          return null;
+        }
 
         const valid = await bcrypt.compare(password, user.passwordHash);
-        if (!valid) return null;
+        if (!valid) {
+          await logLogin("failed", { email, reason: "invalid_password" }, user);
+          return null;
+        }
         if (!user.emailVerified) {
+          await logLogin("failed", { email, reason: "unverified_email" }, user);
           throw new Error("Please verify your email with the OTP sent during signup before logging in.");
         }
+
+        await logLogin("success", { email }, user);
 
         return {
           id: user._id.toString(),
@@ -148,6 +188,14 @@ export const authOptions: NextAuthOptions = {
         user.passwordResetRequired = true;
         user.emailVerified = true;
         await user.save();
+
+        await recordAudit({
+          action: "auth.password.reset",
+          actionLabel: "Password reset link used",
+          company: user.company ?? null,
+          actor: { id: user._id, name: user.name, email: user.email, role: user.role },
+          result: "success",
+        });
 
         return {
           id: user._id.toString(),
@@ -211,6 +259,19 @@ export const authOptions: NextAuthOptions = {
       if (!savedUser) return false;
       user.id = savedUser._id.toString();
       user.role = savedUser.role;
+      await recordAudit({
+        action: "auth.login",
+        actionLabel: "Member signed in",
+        company: (savedUser as any).company ?? null,
+        actor: {
+          id: savedUser._id,
+          name: savedUser.name,
+          email: savedUser.email,
+          role: savedUser.role,
+        },
+        result: "success",
+        metadata: { provider: account.provider === "azure-ad" ? "microsoft" : account.provider },
+      });
       return true;
     },
     async jwt({ token, user }) {

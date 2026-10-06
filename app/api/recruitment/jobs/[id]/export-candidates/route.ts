@@ -10,6 +10,7 @@ import { candidateRegionClause } from "@/lib/candidate-region-scope";
 import { STAGE_LABELS, type Stage } from "@/lib/recruitment-types";
 import { parseResumeFromUrl } from "@/lib/resume-parser";
 import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
+import { recordAudit } from "@/lib/audit";
 
 const HR_ROLES = ["admin", "human-resource"];
 
@@ -208,6 +209,16 @@ export async function GET(_request: Request, { params }: Params) {
   const csv = "\uFEFF" + rows.join("\r\n");
   const date = new Date().toISOString().slice(0, 10);
   const filename = `candidates-${safeFilenamePart(job.title)}-${date}.csv`;
+
+  await recordAudit({
+    action: "data.export",
+    actionLabel: "Candidates exported",
+    company: user.company ?? null,
+    actor: { id: user._id, name: user.name, role: user.role },
+    to: { jobId: String(job._id), jobTitle: String(job.title ?? ""), exportedRows: candidates.length },
+    result: "success",
+    request: _request,
+  });
 
   return new NextResponse(csv, {
     headers: {

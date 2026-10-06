@@ -5,13 +5,16 @@ import { signOut, useSession } from "next-auth/react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import {
   Bell,
+  Boxes,
   Briefcase,
   Building2,
   Calendar,
   CalendarCheck,
   CheckSquare,
+  ChevronDown,
   ChevronRight,
   ClipboardList,
   Clock,
@@ -21,7 +24,10 @@ import {
   LayoutDashboard,
   LogOut,
   MessageSquare,
+  Package,
   ShieldCheck,
+  ShoppingCart,
+  Store as StoreIcon,
   User,
   Users,
   Wallet,
@@ -37,6 +43,7 @@ import { ApprovalsTab, MembersTab, MessagesTab, NotificationsTab, SecurityTab, V
 import { FinanceTab } from "./profile-hub/finance-tab";
 import { ProfileTab } from "./profile-hub/profile-tabs";
 import { TimelineTab } from "./profile-hub/timeline-tab";
+import { AuditTab } from "./profile-hub/audit-tab";
 import { OnboardingTab } from "./profile-hub/onboarding-tab";
 import { DocumentsTab } from "./profile-hub/documents-tab";
 import { MyLetters } from "./profile-hub/my-letters";
@@ -48,6 +55,21 @@ import { HrPolicyTab } from "./profile-hub/hr-policy-tab";
 import { ItTicketsView } from "@/components/it/it-tickets-view";
 import { CommandCenterHub } from "@/components/command-center/command-center-hub";
 import { AnyRecord, AvatarBadge, formatRoleWithCustom } from "./profile-hub/shared";
+import { useStoreCart } from "@/components/store/cart-context";
+import {
+  StoreNavContext,
+  isStoreView,
+  storePath,
+  type StoreView,
+} from "@/components/store/store-nav";
+
+// The store is a sub-view of the profile hub, not a route of its own, so its
+// screens stay out of the hub chunk until someone actually opens the Store.
+const StoreCatalog = dynamic(() => import("@/components/store/store-catalog").then((m) => m.StoreCatalog), { ssr: false });
+const StoreCartView = dynamic(() => import("@/components/store/store-cart").then((m) => m.StoreCart), { ssr: false });
+const StoreOrdersView = dynamic(() => import("@/components/store/store-orders").then((m) => m.StoreOrders), { ssr: false });
+const StoreApprovalsView = dynamic(() => import("@/components/store/store-approvals").then((m) => m.StoreApprovals), { ssr: false });
+const StoreManageView = dynamic(() => import("@/components/store/store-manage").then((m) => m.StoreManage), { ssr: false });
 
 type ProfileHubCache = {
   userId: string;
@@ -65,6 +87,7 @@ type ProfileHubCache = {
   visitorPendingCount: number;
   lostCardReportedCount: number;
   messagesCount: number;
+  auditCount: number;
   fetchedAt: number;
 };
 
@@ -91,9 +114,10 @@ export type Tab =
   | "games"
   | "finance-policy"
   | "hr-policy"
-  | "it";
+  | "it"
+  | "store";
 
-const VALID_TABS = new Set<string>(["dashboard", "command-center", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers", "calendar", "visitors", "security", "games", "finance-policy", "hr-policy", "it"]);
+const VALID_TABS = new Set<string>(["dashboard", "command-center", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers", "calendar", "visitors", "security", "games", "finance-policy", "hr-policy", "it", "store"]);
 
 const LEADER_DASH_ROLES = new Set<string>([
   "admin",
@@ -154,25 +178,39 @@ export function ProfileHub() {
   }, [router]);
 
   // Parse tab from window location directly (reliable, not dependent on router)
-  const getTabFromPath = (): { tab: Tab | undefined; showInvalid: boolean } => {
+  const getTabFromPath = (): { tab: Tab | undefined; storeView: StoreView | undefined; showInvalid: boolean } => {
     const pathParts = window.location.pathname.replace(/\/profile\/?/, "").split("/").filter(Boolean);
     const raw = pathParts[0] ?? "";
-    if (!raw) return { tab: undefined, showInvalid: false };
-    if (VALID_TABS.has(raw)) return { tab: raw as Tab, showInvalid: false };
-    return { tab: undefined, showInvalid: true };
+    if (!raw) return { tab: undefined, storeView: undefined, showInvalid: false };
+    // /profile/store is one tab with six sub-views, so the second segment has
+    // to be resolved before the tab check or "store/cart" reads as invalid.
+    if (raw === "store") {
+      const sub = pathParts[1] ?? "";
+      if (!sub) return { tab: "store", storeView: "catalog", showInvalid: false };
+      if (isStoreView(sub)) return { tab: "store", storeView: sub, showInvalid: false };
+      return { tab: undefined, storeView: undefined, showInvalid: true };
+    }
+    if (VALID_TABS.has(raw)) return { tab: raw as Tab, storeView: undefined, showInvalid: false };
+    return { tab: undefined, storeView: undefined, showInvalid: true };
   };
 
-  const initialRoute = typeof window !== "undefined" ? getTabFromPath() : { tab: undefined as Tab | undefined, showInvalid: false };
+  const initialRoute = typeof window !== "undefined"
+    ? getTabFromPath()
+    : { tab: undefined as Tab | undefined, storeView: undefined as StoreView | undefined, showInvalid: false };
   const [showInvalidRoute, setShowInvalidRoute] = useState(initialRoute.showInvalid);
 
   const [tab, setTabState] = useState<Tab>(initialRoute.tab || "dashboard");
+  const [storeView, setStoreViewState] = useState<StoreView>(initialRoute.storeView || "catalog");
+  const [storeOpen, setStoreOpen] = useState(initialRoute.tab === "store");
 
   // Sync tab from URL on popstate (browser back/forward)
   useEffect(() => {
     const onPop = () => {
-      const { tab: t, showInvalid } = getTabFromPath();
+      const { tab: t, storeView: sv, showInvalid } = getTabFromPath();
       setShowInvalidRoute(showInvalid);
       if (t) setTabState(t);
+      if (sv) setStoreViewState(sv);
+      if (t === "store") setStoreOpen(true);
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -180,15 +218,28 @@ export function ProfileHub() {
 
   // Sync tab when pathname changes (Link clicks, router.push, etc.)
   useEffect(() => {
-    const { tab: t, showInvalid } = getTabFromPath();
+    const { tab: t, storeView: sv, showInvalid } = getTabFromPath();
     setShowInvalidRoute(showInvalid);
     if (t) setTabState(t);
+    if (sv) setStoreViewState(sv);
+    if (t === "store") setStoreOpen(true);
   }, [pathname]);
 
   const setTab = (newTab: Tab) => {
     setTabState(newTab);
     setShowInvalidRoute(false);
-    window.history.pushState(null, "", `/profile/${newTab}`);
+    if (newTab === "store") setStoreViewState("catalog");
+    window.history.pushState(null, "", newTab === "store" ? "/profile/store" : `/profile/${newTab}`);
+  };
+
+  // Store sub-views navigate the same way every other hub tab does: state plus
+  // pushState, so the shell never remounts behind an in-hub link.
+  const setStoreView = (view: StoreView) => {
+    setTabState("store");
+    setStoreViewState(view);
+    setShowInvalidRoute(false);
+    setStoreOpen(true);
+    window.history.pushState(null, "", storePath(view));
   };
 
   const [profile, setProfile] = useState<AnyRecord | null>(null);
@@ -211,6 +262,7 @@ export function ProfileHub() {
   const [visitorPendingCount, setVisitorPendingCount] = useState(0);
   const [lostCardReportedCount, setLostCardReportedCount] = useState(0);
   const [messagesCount, setMessagesCount] = useState(0);
+  const [auditCount, setAuditCount] = useState(0);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
@@ -234,6 +286,7 @@ export function ProfileHub() {
     setVisitorPendingCount(profileHubCache.visitorPendingCount);
     setLostCardReportedCount(profileHubCache.lostCardReportedCount);
     setMessagesCount(profileHubCache.messagesCount ?? 0);
+    setAuditCount(profileHubCache.auditCount ?? 0);
     setLoading(false);
   }, [session?.user?.id]);
 
@@ -286,6 +339,10 @@ export function ProfileHub() {
   const canViewFinanceTab = hasCompany;
   const canViewSecurityTab = hasCompany && ["human-resource", "admin", "security"].includes(String(role));
   const canViewCompanyTabs = hasCompany;
+  const canViewAuditCenter =
+    hasCompany &&
+    (["admin", "human-resource", "it-admin", "it-administration"].includes(String(role)) ||
+      actorIsSeniorSecurity);
   const canViewGamesTab = hasCompany;
   // A member who has been disconnected loses every company tab, including
   // Documents. Their own uploads are immutable history, so give them back a
@@ -312,6 +369,36 @@ export function ProfileHub() {
     ...(canViewCompanyTabs ? (["calendar"] as Tab[]) : []),
     ...(canViewGamesTab ? (["games"] as Tab[]) : []),
     ...(canViewCompanyTabs ? (["it"] as Tab[]) : []),
+    ...(canViewCompanyTabs ? (["store"] as Tab[]) : []),
+  ];
+
+  // ── Store (a sub-view of this hub, navigated from its own accordion) ──
+  const { count: storeCartCount } = useStoreCart();
+  const [storeApprovalsCount, setStoreApprovalsCount] = useState(0);
+  const canManageStore = String(role) === "warehouse";
+
+  const refreshStoreApprovals = () => {
+    if (!canViewCompanyTabs) return;
+    apiFetch<{ count: number }>("/api/store/orders?scope=awaiting&count=1", undefined, {
+      toast: false,
+    })
+      .then((res) => setStoreApprovalsCount(res.count ?? 0))
+      .catch(() => setStoreApprovalsCount(0));
+  };
+
+  useEffect(() => {
+    refreshStoreApprovals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canViewCompanyTabs, tab, storeView]);
+
+  const storeNavItems = [
+    { view: "catalog" as StoreView, label: "Browse", icon: <StoreIcon size={14} /> },
+    { view: "cart" as StoreView, label: "Cart", icon: <ShoppingCart size={14} />, badge: storeCartCount },
+    { view: "orders" as StoreView, label: "My Orders", icon: <Package size={14} /> },
+    { view: "approvals" as StoreView, label: "Approvals", icon: <CheckSquare size={14} />, badge: storeApprovalsCount },
+    ...(canManageStore
+      ? [{ view: "manage" as StoreView, label: "Inventory", icon: <Boxes size={14} /> }]
+      : []),
   ];
 
   const { showNotificationToast, showSuccessToast, showErrorToast } = useNotificationToast();
@@ -350,6 +437,7 @@ export function ProfileHub() {
         setCheckOutRequestCount(cached.checkOutRequestCount);
         setJobsCount(cached.jobsCount);
         setMessagesCount(cached.messagesCount ?? 0);
+        setAuditCount(cached.auditCount ?? 0);
         setLoading(false);
         void load(true);
         return;
@@ -468,6 +556,19 @@ export function ProfileHub() {
         }
       }
 
+      let nextAuditCount = auditCount;
+      const canViewAudit =
+        ["admin", "human-resource", "it-admin", "it-administration"].includes(String(actualRole)) ||
+        (String(actualRole) === "security" &&
+          Boolean((nextProfile as any)?.isSeniorSecurity ?? (session?.user as any)?.isSeniorSecurity));
+      if (actualHasCompany && canViewAudit) {
+        const auditRes = await apiFetch<{ total: number }>("/api/profile/audit?page=1&limit=1").catch(() => null);
+        if (auditRes) {
+          nextAuditCount = Number(auditRes.total ?? 0);
+          setAuditCount(nextAuditCount);
+        }
+      }
+
       profileHubCache = {
         userId: String(session?.user?.id ?? ""),
         profile: nextProfile,
@@ -484,6 +585,7 @@ export function ProfileHub() {
         visitorPendingCount: nextVisitorPendingCount,
         lostCardReportedCount: nextLostCardReportedCount,
         messagesCount: nextMessagesCount,
+        auditCount: nextAuditCount,
         fetchedAt: Date.now(),
       };
     } finally {
@@ -773,6 +875,7 @@ export function ProfileHub() {
   }, [profile]);
 
   return (
+    <StoreNavContext.Provider value={setStoreView}>
     <main className="min-h-screen bg-[var(--c-bg)] text-[var(--c-text)] dark:bg-[#1a1a1a]">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-[var(--c-bg-card)] shadow-[10px_0_24px_-14px_rgba(151,163,184,0.65)] lg:flex dark:bg-[#000000] dark:border-r dark:border-zinc-800">
         <div className="shrink-0 p-4">
@@ -822,7 +925,7 @@ export function ProfileHub() {
           <NavButton
             active={tab === "timeline"}
             icon={<History size={16} />}
-            label="Timeline"
+            label={`Timeline${canViewAuditCenter && auditCount ? ` (${auditCount})` : ""}`}
             onClick={() => setTab("timeline")}
           />
           <NavButton
@@ -892,6 +995,62 @@ export function ProfileHub() {
               label={`Recruitment${recruitmentCount ? ` (${recruitmentCount})` : ""}`}
               onClick={() => router.push("/recruitment/candidates")}
             />
+          ) : null}
+          {canViewCompanyTabs ? (
+            <>
+              <NavButton
+                active={tab === "store"}
+                icon={<Package size={16} />}
+                label={`Store${storeApprovalsCount ? ` (${storeApprovalsCount})` : ""}`}
+                onClick={() => {
+                  if (tab === "store") {
+                    setStoreOpen((open) => !open);
+                    return;
+                  }
+                  setStoreView("catalog");
+                }}
+                after={
+                  <ChevronDown
+                    size={13}
+                    className={`shrink-0 text-slate-400 transition-transform duration-300 dark:text-zinc-500 ${
+                      storeOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                }
+              />
+              <div
+                className={`grid transition-all duration-300 ease-out ${
+                  storeOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                }`}
+              >
+                <div className="overflow-hidden">
+                  <div className="ml-4 space-y-0.5 border-l border-slate-200 pl-2.5 pt-0.5 dark:border-zinc-800">
+                    {storeNavItems.map((item) => (
+                      <button
+                        key={item.view}
+                        suppressHydrationWarning
+                        className={`group flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] font-medium transition-colors duration-150 ${
+                          tab === "store" && storeView === item.view
+                            ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300"
+                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
+                        }`}
+                        onClick={() => setStoreView(item.view)}
+                      >
+                        <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                          {item.icon}
+                        </span>
+                        <span className="truncate">{item.label}</span>
+                        {item.badge ? (
+                          <span className="ml-auto rounded-full bg-indigo-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white dark:bg-indigo-500">
+                            {item.badge}
+                          </span>
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
           ) : null}
           {canViewCompanyTabs ? (
             <NavButton
@@ -1115,6 +1274,26 @@ export function ProfileHub() {
               );
             })}
           </div>
+          {/* Store sub-views only have an accordion on the desktop sidebar, so
+              mobile gets its own animated strip when the Store tab is open. */}
+          {tab === "store" ? (
+            <div className="mt-2 flex gap-1 overflow-x-auto lg:hidden">
+              {storeNavItems.map((item) => (
+                <button
+                  key={item.view}
+                  className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors duration-100 ${
+                    storeView === item.view
+                      ? "neu-tab-pressed dark:bg-zinc-100 dark:text-zinc-900"
+                      : "bg-[var(--c-bg-muted)] text-slate-600 hover:bg-[var(--c-bg-hover)] dark:bg-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                  }`}
+                  onClick={() => setStoreView(item.view)}
+                >
+                  {item.label}
+                  {item.badge ? ` (${item.badge})` : ""}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div className="bg-[var(--c-bg)] p-5 sm:p-6 dark:bg-[#1a1a1a]">
@@ -1193,7 +1372,11 @@ export function ProfileHub() {
                 ) : null}
 
                 {tab === "timeline" ? (
-                  <TimelineTab items={timeline} role={role} />
+                  canViewAuditCenter ? (
+                    <AuditTab />
+                  ) : (
+                    <TimelineTab items={timeline} role={role} />
+                  )
                 ) : null}
 
                 {tab === "onboarding" ? (
@@ -1309,6 +1492,20 @@ export function ProfileHub() {
                   <VisitorsTab company={company} showToast={showToast} />
                 ) : null}
 
+                {tab === "store" && canViewCompanyTabs ? (
+                  storeView === "cart" ? (
+                    <StoreCartView />
+                  ) : storeView === "orders" ? (
+                    <StoreOrdersView />
+                  ) : storeView === "approvals" ? (
+                    <StoreApprovalsView onChanged={refreshStoreApprovals} />
+                  ) : storeView === "manage" ? (
+                    canManageStore ? <StoreManageView /> : null
+                  ) : (
+                    <StoreCatalog />
+                  )
+                ) : null}
+
                 {tab === "it" && canViewCompanyTabs ? (
                   <ItTicketsView />
                 ) : null}
@@ -1318,5 +1515,6 @@ export function ProfileHub() {
         </div>
       </section>
     </main>
+    </StoreNavContext.Provider>
   );
 }

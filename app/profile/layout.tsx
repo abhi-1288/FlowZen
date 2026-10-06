@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { StoreCartProvider } from "@/components/store/cart-context";
 
 export default async function ProfileLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/login");
-  return children;
+  return <StoreCartProvider>{children}</StoreCartProvider>;
 }

@@ -1,9 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import {
-  ArrowLeft,
   Plus,
   Search,
   Loader2,
@@ -15,6 +13,8 @@ import { useNotificationToast } from "@/lib/toast-context";
 import { ItKanbanBoard, ProcurementBoard } from "./it-kanban-board";
 import { ItTicketModal } from "./it-ticket-modal";
 import { NewTicketModal } from "./new-ticket-modal";
+import { RequestPurchaseModal } from "./request-purchase-modal";
+import { ItWarehouseTab } from "./it-warehouse-tab";
 import {
   type ItTicket,
   type ItTeamMember,
@@ -70,9 +70,10 @@ export function ItShell() {
   const [categoryFilter, setCategoryFilter] = useState<ItTicketCategory | "">("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [board, setBoard] = useState<"tickets" | "purchases">("tickets");
+  const [board, setBoard] = useState<"tickets" | "purchases" | "inventory">("tickets");
 
   const [showNewTicket, setShowNewTicket] = useState(false);
+  const [showNewPurchase, setShowNewPurchase] = useState(false);
 
   const fetchTickets = useCallback(async () => {
     try {
@@ -137,13 +138,6 @@ export function ItShell() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-3">
-              <Link
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-                href="/profile"
-              >
-                <ArrowLeft size={16} />
-                Profile
-              </Link>
               <h2 className="text-2xl font-semibold tracking-normal">
                 IT Support
               </h2>
@@ -160,7 +154,7 @@ export function ItShell() {
           </div>
           <div className="flex items-center gap-2">
             <div className="flex gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-zinc-700 dark:bg-zinc-800/60">
-              {(["tickets", "purchases"] as const).map((b) => (
+              {(["tickets", "purchases", "inventory"] as const).map((b) => (
                 <button
                   key={b}
                   className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
@@ -171,7 +165,7 @@ export function ItShell() {
                   onClick={() => setBoard(b)}
                   type="button"
                 >
-                  {b === "tickets" ? "Tickets" : "Purchases"}
+                  {b === "tickets" ? "Tickets" : b === "purchases" ? "Purchases" : "Inventory"}
                 </button>
               ))}
             </div>
@@ -182,6 +176,14 @@ export function ItShell() {
             >
               <Plus size={16} />
               New Ticket
+            </button>
+            <button
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+              onClick={() => setShowNewPurchase(true)}
+              type="button"
+            >
+              <Plus size={16} />
+              Request Purchase
             </button>
           </div>
         </div>
@@ -251,6 +253,8 @@ export function ItShell() {
               requests={purchases}
               onSelect={setSelectedPurchase}
             />
+          ) : board === "inventory" ? (
+            <ItWarehouseTab />
           ) : (
             <ItKanbanBoard
               tickets={filteredTickets}
@@ -283,6 +287,17 @@ export function ItShell() {
           onClose={() => setShowNewTicket(false)}
           onCreated={async () => {
             setShowNewTicket(false);
+            await fetchTickets();
+          }}
+        />
+      )}
+
+      {/* Request Purchase Modal */}
+      {showNewPurchase && (
+        <RequestPurchaseModal
+          onClose={() => setShowNewPurchase(false)}
+          onCreated={async () => {
+            setShowNewPurchase(false);
             await fetchTickets();
           }}
         />

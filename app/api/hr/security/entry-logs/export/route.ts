@@ -6,6 +6,7 @@ import { Company } from "@/models/Company";
 import { EntryLog } from "@/models/EntryLog";
 import { VisitorPass } from "@/models/VisitorPass";
 import * as XLSX from "xlsx";
+import { recordAudit } from "@/lib/audit";
 
 function startOfDay(value: string): Date | null {
   if (!value) return null;
@@ -208,6 +209,16 @@ export async function GET(request: Request) {
   const filename = `${safeCompany}-entry-exit-log-${fromStr}-to-${toStr}.xlsx`;
 
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+  await recordAudit({
+    action: "data.export",
+    actionLabel: "Entry-exit logs exported",
+    company: actor.company ?? null,
+    actor: { id: actor._id, name: actor.name, role: actor.role },
+    to: { from: isoDay(from), to: isoDay(to), logs: logs.length },
+    result: "success",
+    request,
+  });
 
   return new NextResponse(buf, {
     headers: {

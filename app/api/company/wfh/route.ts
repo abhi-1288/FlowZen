@@ -6,6 +6,7 @@ import { Company } from "@/models/Company";
 import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
 import { effectiveRegionLabelOf } from "@/lib/company-regions";
+import { recordAudit } from "@/lib/audit";
 
 const formatDate = (date: Date) => date.toLocaleDateString("en-GB");
 
@@ -80,6 +81,7 @@ export async function POST(request: Request) {
   }
 
   let quotaUpdated = false;
+  let datesAdded = 0;
 
   if (wfhDays !== undefined) {
     const days = Number(wfhDays);
@@ -136,6 +138,7 @@ export async function POST(request: Request) {
       current.setDate(current.getDate() + 1);
     }
     company.wfhDates.push(...dates);
+    datesAdded = dates.length;
 
     // Notify all company members
     const populatedCompany = await Company.findById(user.company).select("name owner members");
@@ -166,6 +169,23 @@ export async function POST(request: Request) {
   }
 
   await company.save();
+
+  await recordAudit({
+    action: "company.settings.change",
+    actionLabel: "WFH policy updated",
+    company: company._id,
+    actor: { id: user._id, name: user.name, role: user.role },
+    to: {
+      wfhDays: company.wfhDays,
+      wfhPeriod: company.wfhPeriod,
+      wfhCheckInMode: company.wfhCheckInMode,
+      carryForwardWfhDays: company.carryForwardWfhDays ?? false,
+      datesAdded,
+      region: dateRegion,
+    },
+    result: "success",
+    request,
+  });
 
   return NextResponse.json({
     wfhDays: company.wfhDays,
@@ -215,6 +235,16 @@ export async function DELETE(request: Request) {
 
   await company.save();
 
+  await recordAudit({
+    action: "company.settings.change",
+    actionLabel: "WFH date removed",
+    company: company._id,
+    actor: { id: user._id, name: user.name, role: user.role },
+    to: { date: targetDate.toISOString(), region: adminRegion },
+    result: "success",
+    request,
+  });
+
   return NextResponse.json({ wfhDates: company.wfhDates || [] });
 }
 
@@ -241,6 +271,17 @@ export async function PATCH(request: Request) {
 
   company.wfhCheckInMode = mode;
   await company.save();
+
+  await recordAudit({
+    action: "company.settings.change",
+    actionLabel: "WFH check-in mode updated",
+    company: company._id,
+    actor: { id: user._id, name: user.name, role: user.role },
+    from: { wfhCheckInMode: company.wfhCheckInMode },
+    to: { wfhCheckInMode: mode },
+    result: "success",
+    request,
+  });
 
   return NextResponse.json({ wfhCheckInMode: company.wfhCheckInMode });
 }

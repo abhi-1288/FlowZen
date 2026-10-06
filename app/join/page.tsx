@@ -134,7 +134,11 @@ function JoinPage() {
           </div>
           <div>
             <h1 className="text-2xl font-semibold text-slate-950">
-              {kind === "company" ? "Join Company" : kind === "team" ? "Join Team" : "Join IT Team"}
+              {kind === "company"
+                ? "Join Company"
+                : kind === "team"
+                  ? "Join Team"
+                  : "Join IT Team"}
             </h1>
             <p className="text-sm text-slate-500">Use invite code to request access.</p>
           </div>

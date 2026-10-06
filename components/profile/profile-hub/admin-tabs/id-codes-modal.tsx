@@ -246,7 +246,7 @@ export function IdCodesModal({
                               label: "Role",
                               value: formatRoleWithCustom(holder.role, holder.customRole, holder.isSeniorSecurity),
                             },
-                            { label: "Region/Office", value: withMainOfficeSuffixByLabel(data?.mainOfficeLabel, holder.regionLabel) || "—" },
+                            { label: "Region/Office", value: withMainOfficeSuffixByLabel(data?.mainOfficeLabel, String(holder.regionLabel ?? "").trim() || data?.mainOfficeLabel) || "—" },
                           ]);
                         } else if (isReleased) {
                           handleHover(e, [
@@ -269,7 +269,7 @@ export function IdCodesModal({
                               label: "Role",
                               value: formatRoleWithCustom(holder.role, holder.customRole, holder.isSeniorSecurity),
                             },
-                            { label: "Region/Office", value: withMainOfficeSuffixByLabel(data?.mainOfficeLabel, holder.regionLabel) || "—" },
+                            { label: "Region/Office", value: withMainOfficeSuffixByLabel(data?.mainOfficeLabel, String(holder.regionLabel ?? "").trim() || data?.mainOfficeLabel) || "—" },
                           ]);
                         }
                       }}

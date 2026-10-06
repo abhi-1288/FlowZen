@@ -6,6 +6,7 @@ import { User } from "@/models/User";
 import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
 import { effectiveRegionLabelOf } from "@/lib/company-regions";
+import { recordAudit } from "@/lib/audit";
 
 function normalizeDate(value: string) {
   const date = new Date(value);
@@ -84,6 +85,16 @@ export async function POST(request: Request) {
       await company.save();
     }
 
+    await recordAudit({
+      action: "company.settings.change",
+      actionLabel: "Weekend date added",
+      company: company._id,
+      actor: { id: userId, role: "admin" },
+      to: { date: target.toISOString(), region: dateRegion },
+      result: "success",
+      request,
+    });
+
     return NextResponse.json({ weekendDates: (company as any).weekendDates || [] });
   }
 
@@ -110,6 +121,16 @@ export async function POST(request: Request) {
 
   (company as any).weekendDates.push(...additions);
   await company.save();
+
+  await recordAudit({
+    action: "company.settings.change",
+    actionLabel: "Weekend dates assigned",
+    company: company._id,
+    actor: { id: userId, role: "admin" },
+    to: { month, added: additions.length, region: dateRegion },
+    result: "success",
+    request,
+  });
 
   if (additions.length > 0) {
     const populatedCompany = await Company.findById(company._id).select("members owner name");
@@ -163,5 +184,16 @@ export async function DELETE(request: Request) {
   });
 
   await company.save();
+
+  await recordAudit({
+    action: "company.settings.change",
+    actionLabel: "Weekend date removed",
+    company: company._id,
+    actor: { id: userId, role: "admin" },
+    to: { date: targetDate.toISOString(), region: adminRegion },
+    result: "success",
+    request,
+  });
+
   return NextResponse.json({ weekendDates: (company as any).weekendDates || [] });
 }

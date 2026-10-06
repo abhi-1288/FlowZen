@@ -45,6 +45,7 @@ export function RoleModal({
           <option value="admin">Admin</option>
           <option value="it-admin">IT Admin</option>
           <option value="it-administration">IT Administration</option>
+          <option value="warehouse">Warehouse</option>
           <option value="others">Others</option>
         </select>
         {newRoleValue === "security" && onIsSeniorSecurityChange ? (

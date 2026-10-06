@@ -20,6 +20,7 @@ const COMPANY_JOIN_ROLES_USING_HR = new Set([
   "others",
   "security",
   "it-admin",
+  "warehouse",
 ]);
 
 /**

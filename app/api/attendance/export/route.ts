@@ -9,6 +9,7 @@ import { Team } from "@/models/Team";
 import { User } from "@/models/User";
 import { WfhRequest } from "@/models/WfhRequest";
 import { financeMemberScope } from "@/app/api/finance/helpers";
+import { recordAudit } from "@/lib/audit";
 
 
 /** Parse a date string and return midnight local time (or null if invalid). */
@@ -259,6 +260,22 @@ export async function GET(request: Request) {
   const companyName = safeFilenamePart((company as any)?.name);
   const regionPart = regionFilter ? `-${safeFilenamePart(regionFilter)}` : "";
   const filename = `${companyName}${regionPart}-${isoDay(from)}-to-${isoDay(to)}.csv`;
+
+  await recordAudit({
+    action: "data.export",
+    actionLabel: "Attendance register exported",
+    company: actor.company ?? null,
+    actor: { id: actor._id, name: actor.name, role: actor.role },
+    to: {
+      from: isoDay(from),
+      to: isoDay(to),
+      days: dayCount,
+      members: memberIds.length,
+      region: regionFilter,
+    },
+    result: "success",
+    request,
+  });
   // UTF-8 BOM so Excel reads the rupee sign and accented names correctly;
   // CRLF because Excel expects it in a .csv.
   return new NextResponse(`\uFEFF${lines.join("\r\n")}`, {

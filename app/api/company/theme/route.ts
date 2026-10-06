@@ -4,6 +4,7 @@ import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 import { COMPANY_PALETTE } from "@/lib/theme";
+import { recordAudit } from "@/lib/audit";
 
 export async function PATCH(request: Request) {
   const userId = await requireUserId();
@@ -45,6 +46,20 @@ export async function PATCH(request: Request) {
   if (body.website !== undefined) {
     company.website = String(body.website ?? "").trim();
   }
+
+  await recordAudit({
+    action: "company.settings.change",
+    actionLabel: "Company theme updated",
+    company: companyId,
+    actor: { id: user._id, name: user.name, role: user.role },
+    to: {
+      primaryColor: body.primaryColor !== undefined ? String(body.primaryColor ?? "").trim() : company.primaryColor,
+      supportEmail: body.supportEmail !== undefined ? String(body.supportEmail ?? "").trim() : company.supportEmail,
+      website: body.website !== undefined ? String(body.website ?? "").trim() : company.website,
+    },
+    result: "success",
+    request,
+  });
 
   await company.save();
 

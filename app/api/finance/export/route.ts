@@ -3,6 +3,7 @@ import { connectDb } from "@/lib/db";
 import { jsonError, requireUserId } from "@/lib/api";
 import { FinanceSalary } from "@/models/FinanceSalary";
 import { User } from "@/models/User";
+import { recordAudit } from "@/lib/audit";
 
 function csvCell(value: unknown): string {
   const text = String(value ?? "");
@@ -111,6 +112,17 @@ export async function GET(request: Request) {
   }
 
   const filename = `salary-register-${month}${statusFilter ? `-${statusFilter}` : ""}.csv`;
+
+  await recordAudit({
+    action: "data.export",
+    actionLabel: "Salary register exported",
+    company: actor.company ?? null,
+    actor: { id: actor._id, name: actor.name, role: actor.role },
+    to: { month, status: statusFilter || null, exportedRows: salaries.length },
+    result: "success",
+    request,
+  });
+
   return new NextResponse(lines.join("\n"), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

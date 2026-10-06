@@ -7,6 +7,7 @@ import { emitNotification } from "@/lib/realtime";
 import { User } from "@/models/User";
 import { Company } from "@/models/Company";
 import { effectiveRegionLabelOf, isUserInEffectiveRegion, type OfficeAddressLike } from "@/lib/company-regions";
+import { recordAudit } from "@/lib/audit";
 
 /**
  * Resolve the policy region for an actor. Regional admins manage their own
@@ -138,6 +139,16 @@ export async function POST(request: Request) {
     { new: true, upsert: true },
   );
 
+  await recordAudit({
+    action: "company.settings.change",
+    actionLabel: "Finance policy updated",
+    company: actor.company ?? null,
+    actor: { id: actor._id, name: actor.name, role: actor.role },
+    to: { ...update, region: targetRegion },
+    result: "success",
+    request,
+  });
+
   const allMembers = await User.find({
     company: actor.company,
     companyStatus: "approved",
@@ -225,6 +236,18 @@ export async function PATCH(request: Request) {
   }
 
   await policy.save();
+
+  await recordAudit({
+    action: "company.settings.change",
+    actionLabel: "Finance deduction opt-out changed",
+    company: actor.company ?? null,
+    actor: { id: actor._id, name: actor.name, role: actor.role },
+    target: { id: member._id, name: String((member as any).name ?? "") },
+    from: { [type]: isOptedOut ? "opted-out" : "opted-in" },
+    to: { [type]: isOptedOut ? "opted-in" : "opted-out" },
+    result: "success",
+    request,
+  });
 
   // Notify all finance/admin users in the company
   const financeUsers = await User.find({

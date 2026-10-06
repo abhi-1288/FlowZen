@@ -5,6 +5,7 @@ import { resolveEnrollingHr } from "@/lib/enrolling-hr";
 import { User } from "@/models/User";
 import { Company } from "@/models/Company";
 import { effectiveRegionLabelOf, isUserInEffectiveRegion, type OfficeAddressLike } from "@/lib/company-regions";
+import { recordAudit } from "@/lib/audit";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -116,6 +117,19 @@ export async function POST(request: Request, { params }: Params) {
     type: rawAmount >= oldSalary ? "increment" : "decrement",
   });
   await member.save();
+
+  await recordAudit({
+    action: "member.salary.change",
+    actionLabel: "Salary changed",
+    company: member.company ?? null,
+    actor: { id: actor._id, name: actor.name, role: actor.role },
+    target: { id: member._id, name: member.name, role: member.role },
+    from: { amount: oldSalary, salaryType: member.salaryType ?? salaryType },
+    to: { amount: rawAmount, salaryType },
+    metadata: { currency },
+    result: "success",
+    request,
+  });
 
   return NextResponse.json({
     ok: true,

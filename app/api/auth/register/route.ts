@@ -23,6 +23,7 @@ export async function POST(request: Request) {
     "security",
     "it-admin",
     "it-administration",
+    "warehouse",
     "others",
   ].includes(String(body.role))
     ? String(body.role)

@@ -18,6 +18,7 @@ import { resolveEnrollingHr, resolveJoinedByInfo } from "@/lib/enrolling-hr";
 import { previousEmploymentForUser } from "@/lib/previous-employment";
 import { effectiveRegionApproverClause, effectiveRegionLabelOf, regionEntryForMember, type OfficeAddressLike } from "@/lib/company-regions";
 import { resolveRegionPolicy } from "@/lib/region-scope";
+import { recordAudit } from "@/lib/audit";
 import "@/models/Company";
 import "@/models/Team";
 
@@ -86,6 +87,9 @@ export async function GET() {
       }
       if (!company.itAdminJoinCode) {
         company.itAdminJoinCode = `${company.joinCode}-ITADMIN`;
+      }
+      if (!company.warehouseJoinCode) {
+        company.warehouseJoinCode = `${company.joinCode}-WAREHOUSE`;
       }
       await company.save();
       user.company = company;
@@ -598,6 +602,17 @@ export async function PATCH(request: Request) {
       user.passwordResetRequired = false;
     }
     await user.save();
+    await recordAudit({
+      action: "member.role.change",
+      actionLabel: "Role set during onboarding",
+      company: user.company ?? null,
+      actor: { id: user._id, name: user.name, email: user.email, role: user.role },
+      target: { id: user._id, name: user.name, role: user.role },
+      from: "others",
+      to: newRole,
+      result: "success",
+      request,
+    });
     return NextResponse.json({ ok: true, role: user.role });
   }
 
@@ -609,12 +624,33 @@ export async function PATCH(request: Request) {
 
   if (!user.passwordResetRequired) {
     const valid = await bcrypt.compare(currentPassword, user.passwordHash);
-    if (!valid) return jsonError("Current password is incorrect.", 401);
+    if (!valid) {
+      await recordAudit({
+        action: "auth.password.change.failed",
+        actionLabel: "Password change failed",
+        company: user.company ?? null,
+        actor: { id: user._id, name: user.name, email: user.email, role: user.role },
+        result: "failed",
+        metadata: { reason: "incorrect_current_password" },
+        request,
+      });
+      return jsonError("Current password is incorrect.", 401);
+    }
   }
 
   user.passwordHash = await bcrypt.hash(newPassword, 12);
   user.passwordResetRequired = false;
   await user.save();
+
+  await recordAudit({
+    action: "auth.password.change",
+    actionLabel: "Password changed",
+    company: user.company ?? null,
+    actor: { id: user._id, name: user.name, email: user.email, role: user.role },
+    target: { id: user._id, name: user.name, role: user.role },
+    result: "success",
+    request,
+  });
 
   return NextResponse.json({ ok: true });
 }

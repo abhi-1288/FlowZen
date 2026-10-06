@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { Html5Qrcode } from "html5-qrcode";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
-import { withMainOfficeSuffix } from "@/lib/company-regions";
+import { effectiveRegionLabelOf, withMainOfficeSuffix } from "@/lib/company-regions";
 import { ActionButton, AnyRecord, SectionHeader } from "../shared";
 
 type ActiveSection = "verify" | "scan" | "visitors" | "lost-cards" | "entry-logs" | "emergency";
@@ -1640,7 +1640,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                       <td className="px-3 py-2.5 text-xs text-slate-500">{c.emergencyContact || "-"}</td>
                       {isSenior ? <td className="px-3 py-2.5 text-xs text-slate-500">{c.phone || "-"}</td> : null}
                       <td className="px-3 py-2.5 text-xs text-slate-500">{c.bloodGroup || "-"}</td>
-                      <td className="px-3 py-2.5 text-xs text-slate-500">{withMainOfficeSuffix(company, c.regionLabel) || "-"}</td>
+                      <td className="px-3 py-2.5 text-xs text-slate-500">{withMainOfficeSuffix(company, effectiveRegionLabelOf(company, c)) || "-"}</td>
                     </tr>
                   ))}
                 </tbody>

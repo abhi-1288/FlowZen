@@ -13,7 +13,7 @@ const UserSchema = new Schema(
     passwordHash: { type: String, select: false },
     role: {
       type: String,
-      enum: ["employee", "project-manager", "qa-tester", "human-resource", "finance", "admin", "security", "it-admin", "it-administration", "others"],
+      enum: ["employee", "project-manager", "qa-tester", "human-resource", "finance", "admin", "security", "it-admin", "it-administration", "others", "warehouse"],
       default: "employee",
       index: true,
     },

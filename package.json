@@ -13,6 +13,8 @@
     "backfill:ats-region": "node scripts/backfill-ats-region.js",
     "backfill:candidate-joining-regions": "node scripts/backfill-candidate-joining-regions.js",
     "backfill:join-approval-regions": "node scripts/backfill-join-approval-regions.js",
+    "backfill:stale-region-labels": "node scripts/backfill-stale-region-labels.js",
+    "repoint:main-office-members": "node scripts/repoint-main-office-members.js",
     "doctor": "npx react-doctor@latest",
     "postinstall": "patch-package"
   },

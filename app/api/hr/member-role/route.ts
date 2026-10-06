@@ -6,8 +6,9 @@ import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
 import { effectiveRegionLabelOf, isUserInEffectiveRegion, type OfficeAddressLike } from "@/lib/company-regions";
+import { recordAudit } from "@/lib/audit";
 
-const VALID_ROLES = ["employee", "project-manager", "qa-tester", "human-resource", "finance", "admin", "security", "it-admin", "it-administration", "others"];
+const VALID_ROLES = ["employee", "project-manager", "qa-tester", "human-resource", "finance", "admin", "security", "it-admin", "it-administration", "others", "warehouse"];
 const ROLE_LABELS = [
   "Intern",
   "Trainee",
@@ -90,6 +91,17 @@ export async function PATCH(request: Request) {
     if (customRole.length > 80) return jsonError("Role name must be 80 characters or less.", 400);
     member.customRole = customRole;
     await member.save();
+    await recordAudit({
+      action: "member.role.change",
+      actionLabel: "Custom role updated",
+      company: member.company ?? null,
+      actor: { id: actor._id, name: actor.name, role: actor.role },
+      target: { id: member._id, name: member.name, role: member.role },
+      from: String(member.customRole ?? ""),
+      to: customRole,
+      result: "success",
+      request,
+    });
     return NextResponse.json({ ok: true, options: ROLE_LABELS, customRole });
   }
 
@@ -122,6 +134,19 @@ export async function PATCH(request: Request) {
       message: `Your role has been changed from ${oldRole} to ${newRole} by ${actor.name ?? "HR/Admin"}.`,
     });
     emitNotification(String(member._id));
+
+    await recordAudit({
+      action: "member.role.change",
+      actionLabel: "Role changed",
+      company: member.company ?? null,
+      actor: { id: actor._id, name: actor.name, role: actor.role },
+      target: { id: member._id, name: member.name, role: member.role },
+      from: oldRole,
+      to: newRole,
+      metadata: { isSeniorSecurity: Boolean(isSeniorSecurityChange) ? Boolean(newIsSeniorSecurity) : undefined },
+      result: "success",
+      request,
+    });
 
     return NextResponse.json({ ok: true, role: member.role });
   }

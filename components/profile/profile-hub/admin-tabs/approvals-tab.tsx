@@ -27,9 +27,10 @@ type ApprovalKind =
   | "region-address"
   | "id-card"
   | "employment-type"
-  | "identity-code-range";
+  | "identity-code-range"
+  | "store-order";
 
-type ApprovalGroup = "joining" | "resignation" | "documents" | "finance" | "hr-company";
+type ApprovalGroup = "joining" | "resignation" | "documents" | "finance" | "hr-company" | "store";
 
 /**
  * Exhaustive on purpose: adding a kind to the JoinRequest enum fails the build
@@ -52,6 +53,7 @@ const KIND_TO_GROUP: Record<ApprovalKind, ApprovalGroup> = {
   "identity-code-range": "hr-company",
   "region-address": "hr-company",
   "employment-type": "hr-company",
+  "store-order": "store",
 };
 
 const GROUPS: { id: ApprovalGroup; label: string; empty: string }[] = [
@@ -60,6 +62,7 @@ const GROUPS: { id: ApprovalGroup; label: string; empty: string }[] = [
   { id: "documents", label: "Documents", empty: "No pending document requests." },
   { id: "finance", label: "Finance", empty: "No pending salary requests." },
   { id: "hr-company", label: "HR & Company", empty: "No pending HR or company requests." },
+  { id: "store", label: "Store Orders", empty: "No pending store orders." },
 ];
 
 function groupOf(request: AnyRecord): ApprovalGroup | null {
@@ -161,6 +164,16 @@ export function ApprovalsTab({
       : undefined;
     setDecidingIds((current) => ({ ...current, [id]: true }));
     try {
+      if (requestKind === "store-order") {
+        await apiFetch(`/api/store/orders/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ status, reason }),
+        });
+        setClearedIds((current) => ({ ...current, [id]: true }));
+        showToast(`Order ${status}${force ? " (forced)" : ""}.`);
+        await refresh(true);
+        return;
+      }
       await apiFetch(`/api/approvals/${id}`, {
         method: "PATCH",
         body: JSON.stringify({
@@ -359,7 +372,9 @@ export function ApprovalsTab({
                                   ? "requested an ID card"
                                   : request.kind === "employment-type"
                                     ? "requested an employment type"
-                                    : "requested to join"}{" "}
+                                    : request.kind === "store-order"
+                                      ? `requested store order ${metadata.orderNumber ?? ""}`
+                                      : "requested to join"}{" "}
                   {String(request.kind) === "identity-code"
                     ? displayNested(request.company, "name", "company")
                     : String(request.kind) === "identity-code-range"
@@ -405,6 +420,27 @@ export function ApprovalsTab({
                       return `Notice period: ${info.noticeDays} days. Pending: ${info.elapsedDays} days. Remaining: ${info.remainingDays} days.`;
                     })()}
                   </p>
+                ) : null}
+                {request.kind === "store-order" ? (
+                  <div className="mt-1 space-y-0.5 text-xs text-slate-500">
+                    <p>
+                      Order {String(metadata.orderNumber ?? "")} · {String(metadata.lineCount ?? 0)} line(s) ·{" "}
+                      {String(metadata.itemCount ?? 0)} item(s)
+                    </p>
+                    {metadata.deliveryName ? (
+                      <p>
+                        Deliver to: {String(metadata.deliveryName)}
+                        {metadata.department ? ` · ${String(metadata.department)}` : ""}
+                      </p>
+                    ) : null}
+                    {Array.isArray(metadata.items) && metadata.items.length > 0 ? (
+                      <p>
+                        {metadata.items
+                          .map((item: AnyRecord) => `${String(item.name ?? "")} × ${String(item.quantity ?? "")}`)
+                          .join(", ")}
+                      </p>
+                    ) : null}
+                  </div>
                 ) : null}
                 {request.kind === "quit-company" && request.replacementHr ? (
                   <p className="mt-1 text-xs text-slate-500">
@@ -481,7 +517,7 @@ export function ApprovalsTab({
                 ) : (
                   <ActionButton variant="danger" className="px-3" disabled={isDeciding}
                     onClick={() => {
-                      if (String(request.kind ?? "") === "document-letter" || request.kind === "id-card") {
+                      if (String(request.kind ?? "") === "document-letter" || request.kind === "id-card" || request.kind === "store-order") {
                         setRejectModalId(requestId);
                         setRejectionReason("");
                       } else {
@@ -613,7 +649,8 @@ export function ApprovalsTab({
             <ActionButton variant="secondary" onClick={() => setRejectModalId(null)}>Cancel</ActionButton>
             <ActionButton variant="danger" disabled={!rejectionReason.trim()} onClick={() => {
               if (rejectModalId) {
-                decide(rejectModalId, "rejected", false, "document-letter", rejectionReason.trim());
+                const rejectRequest = approvals.find((r) => requestIdOf(r) === rejectModalId);
+                decide(rejectModalId, "rejected", false, String(rejectRequest?.kind ?? ""), rejectionReason.trim());
                 setRejectModalId(null);
               }
             }}>Reject</ActionButton>

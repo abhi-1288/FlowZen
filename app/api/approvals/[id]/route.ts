@@ -15,6 +15,7 @@ import { effectiveRegionLabelOf, isUserInEffectiveRegion, mainOfficeLabelOf, typ
 import { signatorySlotLabel, signatoryCompletion } from "@/lib/document-letter-signatories";
 import { generateFinalSettlement } from "@/app/api/finance/helpers";
 import { CompanyPolicy } from "@/models/CompanyPolicy";
+import { recordAudit } from "@/lib/audit";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -1088,6 +1089,28 @@ export async function PATCH(request: Request, { params }: Params) {
     }
     joinRequest.status = status;
     await joinRequest.save();
+
+    await recordAudit({
+      action: status === "rejected" ? "approval.reject" : "approval.approve",
+      actionLabel:
+        status === "hr-approved"
+          ? "Salary update moved to final approval"
+          : status === "rejected"
+            ? "Request declined"
+            : "Request approved",
+      company: joinRequest.company ?? null,
+      actor: { id: userId },
+      target: { id: joinRequest.requester },
+      from: joinRequest.status,
+      to: status,
+      metadata: {
+        kind: joinRequest.kind,
+        request: String(joinRequest._id),
+        rejectionReason: rejectionReason || undefined,
+      },
+      result: "success",
+      request,
+    });
     
     if (joinRequest.kind === "salary-increment" && status === "hr-approved") {
       return NextResponse.json({ request: serializeDoc(joinRequest) });

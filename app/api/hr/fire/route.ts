@@ -12,6 +12,7 @@ import { generateFinalSettlement } from "@/app/api/finance/helpers";
 import { CompanyPolicy } from "@/models/CompanyPolicy";
 import { recordIdentityCodeRelease } from "@/lib/company-identity";
 import { effectiveRegionLabelOf, isUserInEffectiveRegion } from "@/lib/company-regions";
+import { recordAudit } from "@/lib/audit";
 
 async function cleanupBoardsForUser(userId: any) {
   const boards = await Board.find({ "members.user": userId });
@@ -50,6 +51,9 @@ export async function POST(request: Request) {
   const [actor, member] = await Promise.all([User.findById(userId), User.findById(memberId)]);
   if (!actor) return jsonError("User not found.", 404);
   if (!member) return jsonError("Member not found.", 404);
+  const firedRole = String((member as any).role ?? "");
+  const firedSalary = Number((member as any).baseSalary ?? 0);
+  const firedRegion = String((member as any).regionLabel ?? "");
 
   const actorIsSeniorSecurity = String(actor.role) === "security" && Boolean((actor as any).isSeniorSecurity);
   if (!["human-resource", "admin"].includes(String(actor.role)) && !actorIsSeniorSecurity) {
@@ -154,6 +158,19 @@ export async function POST(request: Request) {
   await member.save();
 
   await Company.updateOne({ _id: company._id }, { $pull: { members: member._id } });
+
+  await recordAudit({
+    action: "member.terminated",
+    actionLabel: "Member terminated",
+    company: company._id,
+    actor: { id: actor._id, name: actor.name, role: actor.role },
+    target: { id: member._id, name: member.name, role: firedRole },
+    from: { role: firedRole, regionLabel: firedRegion, baseSalary: firedSalary },
+    to: "terminated",
+    metadata: { reason: `Fired by ${String(actor.name ?? "HR/Admin")}` },
+    result: "success",
+    request,
+  });
 
   const actorLabel = String(actor.role) === "admin" ? "admin" : actorIsSeniorSecurity ? "senior security" : "HR";
 

@@ -5,6 +5,7 @@ import { User } from "@/models/User";
 import { databaseUnavailable, jsonError } from "@/lib/api";
 import { signMobileToken } from "@/lib/mobile-auth";
 import { rateLimitLogin } from "@/lib/rate-limit";
+import { recordAudit } from "@/lib/audit";
 
 function getClientIp(request: Request) {
   const xff = request.headers.get("x-forwarded-for");
@@ -50,19 +51,54 @@ export async function POST(request: Request) {
 
   const user = await User.findOne({ email }).select("+passwordHash");
   if (!user) {
+    await recordAudit({
+      action: "auth.login.failed",
+      actionLabel: "Sign-in attempt failed",
+      company: null,
+      result: "failed",
+      metadata: { email, reason: "unknown_email" },
+      request,
+    });
     return jsonError("Invalid email or password.", 401);
   }
 
   if (!user.passwordHash) {
+    await recordAudit({
+      action: "auth.login.failed",
+      actionLabel: "Sign-in attempt failed",
+      company: user.company ?? null,
+      actor: { id: user._id, name: user.name, email: user.email, role: user.role },
+      result: "failed",
+      metadata: { email, reason: "no_local_password" },
+      request,
+    });
     return jsonError("This account uses social login. Please log in via the website.", 401);
   }
 
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) {
+    await recordAudit({
+      action: "auth.login.failed",
+      actionLabel: "Sign-in attempt failed",
+      company: user.company ?? null,
+      actor: { id: user._id, name: user.name, email: user.email, role: user.role },
+      result: "failed",
+      metadata: { email, reason: "invalid_password" },
+      request,
+    });
     return jsonError("Invalid email or password.", 401);
   }
 
   if (!user.emailVerified) {
+    await recordAudit({
+      action: "auth.login.failed",
+      actionLabel: "Sign-in attempt failed",
+      company: user.company ?? null,
+      actor: { id: user._id, name: user.name, email: user.email, role: user.role },
+      result: "failed",
+      metadata: { email, reason: "unverified_email" },
+      request,
+    });
     return jsonError("Please verify your email with the OTP sent during signup before logging in.", 403);
   }
 
@@ -78,6 +114,16 @@ export async function POST(request: Request) {
     email: user.email,
     role: user.role,
     name: user.name,
+  });
+
+  await recordAudit({
+    action: "auth.login",
+    actionLabel: "Member signed in",
+    company: user.company ?? null,
+    actor: { id: user._id, name: user.name, email: user.email, role: user.role },
+    result: "success",
+    metadata: { email: user.email, provider: "mobile" },
+    request,
   });
 
   return NextResponse.json({

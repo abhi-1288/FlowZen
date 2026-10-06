@@ -4,8 +4,9 @@ import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 import { isCompanyOwner } from "@/lib/admin-region-scope";
+import { recordAudit } from "@/lib/audit";
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
     const userId = await requireUserId();
     if (!userId) return jsonError("Unauthorized", 401);
@@ -31,6 +32,7 @@ export async function POST() {
       return jsonError("Company has already been taken down.", 400);
     }
 
+    const previousStatus = company.status;
     if (company.status === "active") {
       const approvedMembersBesidesAdmin = await User.countDocuments({
         _id: { $ne: actor._id },
@@ -46,6 +48,17 @@ export async function POST() {
     }
 
     await company.save();
+
+    await recordAudit({
+      action: "company.settings.change",
+      actionLabel: "Company freeze status changed",
+      company: company._id,
+      actor: { id: actor._id, name: actor.name, role: actor.role },
+      from: { status: previousStatus },
+      to: { status: company.status },
+      result: "success",
+      request,
+    });
 
     return NextResponse.json({ ok: true, status: company.status });
   } catch (error) {

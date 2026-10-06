@@ -5,6 +5,7 @@ import { User } from "@/models/User";
 import { JoinRequest } from "@/models/JoinRequest";
 import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
+import { recordAudit } from "@/lib/audit";
 
 export async function POST(request: Request) {
   const userId = await requireUserId();
@@ -61,6 +62,16 @@ export async function POST(request: Request) {
     message: `${actor.name} (${actor.role === "human-resource" ? "HR" : "Admin"}) has revoked your ID card.`,
   });
   emitNotification(targetUserId);
+
+  await recordAudit({
+    action: "data.document.revoke",
+    actionLabel: "ID card revoked",
+    company: actorCompanyId,
+    actor: { id: actor._id, name: actor.name, role: actor.role },
+    target: { id: targetUserId },
+    result: "success",
+    request,
+  });
 
   return NextResponse.json({ status: "revoked" });
 }

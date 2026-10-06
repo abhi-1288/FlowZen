@@ -3,7 +3,7 @@ import { Building2 } from "lucide-react";
 import { ActionButton, AnyRecord, formatRoleWithCustom } from "../../shared";
 import { currencySymbol } from "../helpers";
 import { apiFetch } from "@/lib/client-utils";
-import { withMainOfficeSuffix } from "@/lib/company-regions";
+import { effectiveRegionLabelOf, withMainOfficeSuffix } from "@/lib/company-regions";
 
 /**
  * One member row, with the full set of actions.
@@ -102,7 +102,7 @@ export function MemberCard({
             team: {teams.length ? teams.join(", ") : "-"}
           </span>
           <span className="rounded-lg neu-inset px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-200">
-            region: {withMainOfficeSuffix(company, String(member.regionLabel ?? "")) || "Unassigned"}
+            region: {withMainOfficeSuffix(company, effectiveRegionLabelOf(company, member)) || "Unassigned"}
           </span>
         </div>
 

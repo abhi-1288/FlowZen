@@ -22,6 +22,7 @@ function roleForCompanyCode(company: any, code: string, baseCode: string) {
   if (matches(company.employeeJoinCode)) return "employee";
   if (matches(company.securityJoinCode) || matches(company.juniorSecurityJoinCode)) return "security";
   if (matches(company.itAdminJoinCode)) return "it-admin";
+  if (matches(company.warehouseJoinCode)) return "warehouse";
   if (matches(company.otherJoinCode)) return "others";
   if (matches(company.hrJoinCode) || matches(company.joinCode)) return "human-resource";
   return null;
@@ -42,6 +43,7 @@ function joinTitleForRole(role: string) {
   if (role === "security") return "Security join request";
   if (role === "it-admin") return "IT Admin join request";
   if (role === "it-administration") return "IT Administration join request";
+  if (role === "warehouse") return "Warehouse join request";
   if (role === "employee") return "Employee join request";
   return "Others join request";
 }
@@ -80,6 +82,7 @@ export async function POST(request: Request) {
         { securityJoinCode: withoutHrSuffix },
         { juniorSecurityJoinCode: withoutHrSuffix },
         { itAdminJoinCode: withoutHrSuffix },
+        { warehouseJoinCode: withoutHrSuffix },
         { adminJoinCode: withoutHrSuffix },
       ]
     })
@@ -108,7 +111,7 @@ export async function POST(request: Request) {
     status: "pending"
   });
   const invitedHrId =
-    hrSuffix && ["project-manager", "qa-tester", "finance", "employee", "others"].includes(codeRole)
+    hrSuffix && ["project-manager", "qa-tester", "finance", "employee", "others", "warehouse"].includes(codeRole)
       ? await findApprovedHrUserIdByInviteSuffix(company._id, hrSuffix)
       : null;
   const approverId = invitedHrId ?? (await resolveCompanyJoinApproverId(company, codeRole));

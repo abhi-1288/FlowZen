@@ -15,6 +15,7 @@ const demoUsers = [
   { name: "FlowZen IT Admin", email: "it_admin@flowzen.com", role: "it-admin" },
   { name: "FlowZen IT Support", email: "it_support@flowzen.com", role: "it-administration" },
   { name: "FlowZen Other", email: "other@flowzen.com", role: "others" },
+  { name: "FlowZen Warehouse", email: "warehouse@flowzen.com", role: "warehouse" },
 ];
 
 export async function POST() {

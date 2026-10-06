@@ -3,7 +3,7 @@ import { X, Download } from "lucide-react";
 import * as XLSX from "xlsx";
 import { AnyRecord, ActionButton, formatRole, formatRoleWithCustom } from "../../shared";
 import { currencySymbol } from "../helpers";
-import { withMainOfficeSuffix } from "@/lib/company-regions";
+import { effectiveRegionLabelOf, withMainOfficeSuffix } from "@/lib/company-regions";
 import { MemberCard } from "./member-card";
 
 export function MemberListModal({
@@ -100,7 +100,7 @@ export function MemberListModal({
         String(m.email ?? ""),
         formatRoleWithCustom(String(m.role ?? "employee"), m.customRole, Boolean(m.isSeniorSecurity)),
         String(m.companyIdentityCode ?? ""),
-        withMainOfficeSuffix(company, String(m.regionLabel ?? "")),
+        withMainOfficeSuffix(company, effectiveRegionLabelOf(company, m)),
         teams,
         salaryDisplay,
         fmtDate(m.companyJoined),
