@@ -149,6 +149,10 @@ export async function POST(request: Request) {
   const job = await ATSJob.findOne({ _id: body.job, company: user.company });
   if (!job) return jsonError("Job not found.", 404);
 
+  const normalizedEmail = String(body.email).trim().toLowerCase();
+  const existing = await ATSCandidate.findOne({ email: normalizedEmail, job: job._id, company: user.company });
+  if (existing) return jsonError("A candidate with this email has already applied to this job.", 409);
+
   const referralId = String(body.referralId ?? "").trim();
   let referralEmployee: any = null;
   if (referralId) {
@@ -171,7 +175,7 @@ export async function POST(request: Request) {
   const candidate = await ATSCandidate.create({
     firstName: String(body.firstName).trim(),
     lastName: String(body.lastName ?? "").trim(),
-    email: String(body.email).trim().toLowerCase(),
+    email: normalizedEmail,
     phone: String(body.phone ?? "").trim(),
     currentCompany: String(body.currentCompany ?? "").trim(),
     experienceYears: Number(body.experienceYears) || 0,

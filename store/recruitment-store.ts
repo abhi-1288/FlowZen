@@ -618,7 +618,7 @@ export const useRecruitmentStore = create<RecruitmentStore>((set, get) => ({
         method: "POST",
         body: formData,
       });
-      const payload = await response.json();
+      const payload = await response.json().catch(() => ({} as any));
       if (!response.ok) throw new Error(payload.error ?? "Resume upload failed.");
       set((state) => ({
         activeCandidate: state.activeCandidate?.id === candidateId

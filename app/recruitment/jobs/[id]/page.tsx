@@ -24,6 +24,7 @@ import { AssessmentCandidatesModal } from "@/components/recruitment/assessment-c
 import { MockTestModal } from "@/components/recruitment/mock-test-modal";
 import { assessmentResultsUnlocked } from "@/lib/assessment";
 import { fmtJobDateTime as fmtDateTime, startOfUtcDayMs, utcWallClock, utcWallClockNow, dateInputValue, timeInputValue } from "@/lib/date-utils";
+import { useNotificationToast } from "@/lib/toast-context";
 import { MAX_EDIT_WINDOW_MS, isEditWindowOpen, validateEditWindowDeadline } from "@/lib/edit-window";
 import { JobModal } from "@/components/recruitment/job-modal";
 import {
@@ -107,7 +108,7 @@ export default function JobDetailPage() {
   const [copied, setCopied] = useState(false);
   const [atsLoading, setAtsLoading] = useState(false);
   const [atsWarn, setAtsWarn] = useState<{ open: boolean; missingDesc: boolean; missingSkills: boolean; missingThreshold: boolean; force: boolean }>({ open: false, missingDesc: false, missingSkills: false, missingThreshold: false, force: false });
-  const [atsResultData, setAtsResultData] = useState<{ scored: number; selected: number; rejected: number; errors: number; total: number } | null>(null);
+  const [atsResultData, setAtsResultData] = useState<{ scored: number; selected: number; rejected: number; errors: number; missingResume?: number; total: number } | null>(null);
   const [atsLastResult, setAtsLastResult] = useState<{ scored: number; selected: number; rejected: number; errors: number; total: number } | null>(null);
   const [atsDecisionPending, setAtsDecisionPending] = useState(false);
   const [atsAction, setAtsAction] = useState<"auto" | "manual">("auto");
@@ -1268,7 +1269,7 @@ function AtsResultModal({
   onMarkLater,
   onSubmit,
 }: {
-  result: { scored: number; selected: number; rejected: number; errors: number; total: number } | null;
+  result: { scored: number; selected: number; rejected: number; errors: number; missingResume?: number; total: number } | null;
   action: "auto" | "manual";
   onActionChange: (value: "auto" | "manual") => void;
   onMarkLater: () => void;
@@ -1296,7 +1297,10 @@ function AtsResultModal({
             </div>
           </div>
           {result.errors > 0 && (
-            <p className="mt-2 text-xs text-amber-600">{result.errors} candidate(s) could not be scored due to errors.</p>
+            <p className="mt-2 text-xs text-amber-600">
+              {result.errors} candidate(s) could not be scored due to errors.
+              {typeof result.missingResume === "number" && result.missingResume > 0 && ` ${result.missingResume} had no resume uploaded.`}
+            </p>
           )}
           <label className="mt-4 block text-sm font-medium text-slate-700">ATS timeline action</label>
           <select
@@ -1730,6 +1734,7 @@ function FieldInput({
 
 function CandidateModal({ jobId, employmentType }: { jobId: string; employmentType?: string }) {
   const { modal, setModal, createCandidate, uploadResume, saving } = useRecruitmentStore();
+  const { showSuccessToast, showErrorToast } = useNotificationToast();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -1815,6 +1820,10 @@ function CandidateModal({ jobId, employmentType }: { jobId: string; employmentTy
       setError("Resume / CV is required.");
       return;
     }
+    if (emailDuplicate) {
+      setError("A candidate with this email has already applied to this job.");
+      return;
+    }
     setError("");
     const isReferral = knowEmployee && referralStatus === "verified" && referralId.trim().length > 0;
     const data: Record<string, unknown> = {
@@ -1836,8 +1845,16 @@ function CandidateModal({ jobId, employmentType }: { jobId: string; employmentTy
     try {
       const created = await createCandidate(data);
       if (created?.id && resumeFile) {
-        await uploadResume(created.id, resumeFile);
+        try {
+          await uploadResume(created.id, resumeFile);
+        } catch (uploadErr) {
+          showSuccessToast("Candidate added.");
+          showErrorToast(uploadErr instanceof Error ? `Candidate added, but resume upload failed: ${uploadErr.message}` : "Candidate added, but resume upload failed.");
+          setModal(null);
+          return;
+        }
       }
+      showSuccessToast("Candidate added successfully.");
       setModal(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add candidate. Please try again.");
@@ -1862,7 +1879,7 @@ function CandidateModal({ jobId, employmentType }: { jobId: string; employmentTy
               {emailChecking && <p className="mt-1.5 text-xs text-slate-400 dark:text-zinc-500">Checking if you have already applied...</p>}
               {!emailChecking && emailDuplicate && (
                 <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">
-                  A candidate with this email already exists for this job{emailDuplicate.firstName ? ` (${emailDuplicate.firstName} ${emailDuplicate.lastName || ""})` : ""}. You can still add them if you want to.
+                  A candidate with this email has already applied to this job{emailDuplicate.firstName ? ` (${emailDuplicate.firstName} ${emailDuplicate.lastName || ""})` : ""}. They cannot be added again.
                 </p>
               )}
             </div>

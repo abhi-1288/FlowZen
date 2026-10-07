@@ -50,12 +50,14 @@ export async function POST(request: Request, { params }: Params) {
   let selected = 0;
   let rejected = 0;
   let errors = 0;
+  let missingResume = 0;
 
   for (const candidate of candidates) {
     try {
       const resumeUrl = (candidate as any).resumeUrl;
       if (!resumeUrl) {
         errors++;
+        missingResume++;
         continue;
       }
 
@@ -124,6 +126,7 @@ export async function POST(request: Request, { params }: Params) {
     selected,
     rejected,
     errors,
+    missingResume,
     threshold,
     total: candidates.length,
   });
