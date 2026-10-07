@@ -1,5 +1,3 @@
-import { utcWallClockNow } from "@/lib/date-utils";
-
 /**
  * The application-editing window rules.
  *
@@ -51,13 +49,13 @@ type EditWindowJob = {
  * button, and the sweep that flips the stored boolean all call this, so they
  * cannot drift into disagreeing about whether editing is allowed.
  *
- * `editApplicationsCloseAt` is a UTC wall clock (lib/date-utils), so it is
- * compared against `utcWallClockNow()` rather than the raw instant. Note that
- * `open` is computed here and not merely read from `editApplicationsEnabled`:
- * the effective window closes on time even if no cron has run to clear the flag,
- * so a missed sweep delays the notification but never the deadline.
+ * `editApplicationsCloseAt` is a real instant (lib/date-utils), so it is
+ * compared against `Date.now()`. Note that `open` is computed here and not
+ * merely read from `editApplicationsEnabled`: the effective window closes on
+ * time even if no cron has run to clear the flag, so a missed sweep delays the
+ * notification but never the deadline.
  */
-export function isEditWindowOpen(job: EditWindowJob, nowMs: number = utcWallClockNow()): EditWindowState {
+export function isEditWindowOpen(job: EditWindowJob, nowMs: number = Date.now()): EditWindowState {
   const enabled = job?.editApplicationsEnabled === true;
   const raw = job?.editApplicationsCloseAt;
   const closeAt = raw ? new Date(raw) : null;
@@ -91,7 +89,7 @@ export function isEditWindowOpen(job: EditWindowJob, nowMs: number = utcWallCloc
  */
 export function validateEditWindowDeadline(
   value: unknown,
-  nowMs: number = utcWallClockNow()
+  nowMs: number = Date.now()
 ): { ok: true; closeAt: Date } | { ok: false; error: string } {
   if (value === null || value === undefined || value === "") {
     return { ok: false, error: "Choose a date and time for the editing window to close." };

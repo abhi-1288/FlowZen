@@ -5,7 +5,7 @@ import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
 import type { EmploymentType, JobStatus, SalaryType } from "@/lib/recruitment-types";
 import { apiFetch } from "@/lib/client-utils";
-import { dateInputValue, timeInputValue, utcWallClock } from "@/lib/date-utils";
+import { dateInputValue, timeInputValue, wallClockToIso } from "@/lib/date-utils";
 import { MarkdownTextarea } from "@/components/recruitment/markdown-textarea";
 
 /**
@@ -114,7 +114,7 @@ export function JobModal() {
       salaryRangeMax: Number(form.get("salaryRangeMax") || 0),
       salaryType: String(form.get("salaryType") || "per-annum") as SalaryType,
       openings: Number(form.get("openings") || 1),
-      autoCloseDate: utcWallClock(
+      autoCloseDate: wallClockToIso(
         String(form.get("autoCloseDate") || ""),
         String(form.get("autoCloseTime") || ""),
         "23:59:59"
@@ -126,7 +126,7 @@ export function JobModal() {
         .filter(Boolean),
       assessment: Boolean(form.get("assessment")),
       assessmentDate: form.get("assessment")
-        ? utcWallClock(
+        ? wallClockToIso(
             String(form.get("assessmentDate") || ""),
             String(form.get("assessmentTime") || ""),
             "00:00:00"

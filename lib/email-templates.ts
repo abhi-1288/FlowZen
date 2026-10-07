@@ -348,7 +348,8 @@ export function assessmentInvitationEmail({
 export function mockTestInvitationEmail({
   candidateName,
   jobTitle,
-  windowLabel,
+  startLabel,
+  endLabel,
   durationMinutes,
   maxAttempts,
   attemptNote,
@@ -357,7 +358,8 @@ export function mockTestInvitationEmail({
 }: {
   candidateName: string;
   jobTitle: string;
-  windowLabel: string;
+  startLabel: string;
+  endLabel: string;
   durationMinutes?: number | null;
   maxAttempts?: number | null;
   attemptNote?: string;
@@ -380,8 +382,18 @@ export function mockTestInvitationEmail({
         <td style="padding:12px 0;border-bottom:1px solid #e2e8f0;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
             <tr>
-              <td style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;width:100px;">Available</td>
-              <td style="font-size:15px;font-weight:600;color:#1e293b;">${windowLabel}</td>
+              <td style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;width:140px;">Start date-time</td>
+              <td style="font-size:15px;font-weight:600;color:#1e293b;">${startLabel}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:12px 0;border-bottom:1px solid #e2e8f0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;width:140px;">End date-time</td>
+              <td style="font-size:15px;font-weight:600;color:#1e293b;">${endLabel}</td>
             </tr>
           </table>
         </td>
@@ -391,7 +403,7 @@ export function mockTestInvitationEmail({
         <td style="padding:12px 0;border-bottom:1px solid #e2e8f0;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
             <tr>
-              <td style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;width:100px;">Duration</td>
+              <td style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;width:140px;">Duration</td>
               <td style="font-size:15px;font-weight:600;color:#1e293b;">${durationMinutes} minutes</td>
             </tr>
           </table>
@@ -402,7 +414,7 @@ export function mockTestInvitationEmail({
         <td style="padding:12px 0;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
             <tr>
-              <td style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;width:100px;">Attempts</td>
+              <td style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;width:140px;">Attempts</td>
               <td style="font-size:15px;font-weight:600;color:#1e293b;">${maxAttempts}</td>
             </tr>
           </table>
@@ -418,7 +430,7 @@ export function mockTestInvitationEmail({
 
   return {
     subject: `Practice Mock Test Available for ${jobTitle}`,
-    text: `Dear ${candidateName},\n\nA practice mock test is now available for ${jobTitle}.\n\nThis is practice only: it is scored on a short paper from the same question bank and does not affect your application or your assessment result.\n\nAvailable: ${windowLabel}${durationMinutes ? `\nDuration: ${durationMinutes} minutes` : ""}${maxAttempts ? `\nAttempts: ${maxAttempts}` : ""}${portalLink ? `\n\nOpen Mock Test: ${portalLink}` : ""}`,
+    text: `Dear ${candidateName},\n\nA practice mock test is now available for ${jobTitle}.\n\nThis is practice only: it is scored on a short paper from the same question bank and does not affect your application or your assessment result.\n\nStart date-time: ${startLabel}\nEnd date-time: ${endLabel}${durationMinutes ? `\nDuration: ${durationMinutes} minutes` : ""}${maxAttempts ? `\nAttempts: ${maxAttempts}` : ""}${portalLink ? `\n\nOpen Mock Test: ${portalLink}` : ""}`,
     html,
   };
 }

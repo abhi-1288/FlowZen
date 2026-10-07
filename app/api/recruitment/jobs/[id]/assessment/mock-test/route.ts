@@ -13,6 +13,7 @@ import {
   type MockTestConfig,
 } from "@/lib/assessment-mock";
 import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
+import { MOCK_ELIGIBLE_STAGES } from "@/lib/assessment-mock-emails";
 
 /**
  * HR configuration for a job's mock test.
@@ -113,12 +114,12 @@ export async function GET(request: Request, { params }: Params) {
     ATSCandidate.countDocuments({
       job: ctx.jobId,
       company: ctx.company,
-      stage: { $in: ["screening", "assessment"] },
+      stage: { $in: MOCK_ELIGIBLE_STAGES },
     }),
     ATSCandidate.countDocuments({
       job: ctx.jobId,
       company: ctx.company,
-      stage: { $in: ["screening", "assessment"] },
+      stage: { $in: MOCK_ELIGIBLE_STAGES },
       "mockTest.inviteSentAt": { $ne: null },
     }),
     ATSCandidate.countDocuments({
@@ -245,6 +246,22 @@ export async function POST(request: Request, { params }: Params) {
   // lastInvitedAt is owned by the invite cron, not by HR, so it is carried over
   // rather than reset — otherwise saving the form would re-arm the blast.
   const previous = resolveMockTestConfig(assessment.mockTest);
+
+  // A moved window is a different invitation, so the per-candidate latch has to
+  // go with it: otherwise everybody emailed for the old dates would stay latched
+  // and never hear about the new ones. Cosmetic saves (duration, attempts,
+  // result release) deliberately do not re-arm anything.
+  const stamp = (d: Date | null) => (d ? d.getTime() : null);
+  const windowChanged =
+    stamp(previous.opensAt) !== stamp(config.opensAt) ||
+    stamp(previous.closesAt) !== stamp(config.closesAt);
+  if (windowChanged) {
+    await ATSCandidate.updateMany(
+      { job: ctx.jobId, company: ctx.company, stage: { $in: MOCK_ELIGIBLE_STAGES } },
+      { $set: { "mockTest.inviteSentAt": null } }
+    );
+  }
+
   await ATSAssessment.updateOne(
     { job: ctx.jobId, company: ctx.company },
     { $set: { mockTest: { ...config, lastInvitedAt: previous.lastInvitedAt } } }

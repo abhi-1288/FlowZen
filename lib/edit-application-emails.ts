@@ -49,11 +49,11 @@ export async function sendEditApplicationInvites(
     if (!isEditWindowOpen(job).open) continue;
 
     const closeAt = job.editApplicationsCloseAt ? new Date(job.editApplicationsCloseAt) : null;
-    // A UTC wall clock (lib/date-utils), so it is formatted in UTC to match the
-    // value the candidate typed into the HR form.
+    // A real instant entered as an IST wall clock (lib/date-utils), so it is
+    // formatted in IST to match the value the HR user typed into the form.
     const closesAtLabel = closeAt
       ? closeAt.toLocaleString("en-IN", {
-          timeZone: "UTC",
+          timeZone: "Asia/Kolkata",
           weekday: "short",
           day: "numeric",
           month: "short",

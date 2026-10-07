@@ -135,8 +135,11 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
 
   useEffect(() => {
     fetch(`/api/recruitment/jobs/${jobId}/assessment`)
-      .then((r) => r.json())
-      .then((data) => {
+      .then(async (r) => {
+        const data = await r.json().catch(() => null);
+        if (!r.ok || !data) {
+          throw new Error((data as { error?: string } | null)?.error || `Could not load the assessment (${r.status}).`);
+        }
         if (data.assessment) {
           setPassScore(data.assessment.passScore ?? 50);
           setNegativeMarkingText(
@@ -174,7 +177,10 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
         }
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : "Could not load the assessment.");
+        setLoading(false);
+      });
   }, [jobId]);
 
   function addQuestion(list: Question[], setList: (v: Question[]) => void) {
@@ -183,6 +189,26 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
 
   function removeQuestion(idx: number, list: Question[], setList: (v: Question[]) => void) {
     setList(list.filter((_, i) => i !== idx));
+  }
+
+  /** Fresh start: drops every saved/staged question locally. Persisted only on Save. */
+  function discardAllQuestions() {
+    if (totalCount === 0) return;
+    const ok = window.confirm(
+      `Remove all ${totalCount} question${totalCount === 1 ? "" : "s"} and start fresh? Nothing changes on the server until you press Save Assessment.`
+    );
+    if (!ok) return;
+    setGeneral([]);
+    setDomains([]);
+    setPdfQuestions([]);
+    setPdfWarnings([]);
+    setPdfTargets({});
+    setPdfPending(null);
+    setPdfBatchActive(false);
+    setAddingAnother(false);
+    setPdfDraft({ kind: "general", domainName: "", domainLimit: 0 });
+    setError("");
+    setSuccess("All questions removed. Add at least one question and press Save Assessment to apply.");
   }
 
   function updateQuestion(idx: number, patch: Partial<Question>, list: Question[], setList: (v: Question[]) => void) {
@@ -1195,10 +1221,18 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
               </div>
 
               {totalCount > 0 && (
-                <p className="text-xs text-slate-400">
-                  {totalCount} question{totalCount === 1 ? " is" : "s are"} currently saved
-                  {partsSummary()}.
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-slate-400">
+                    {totalCount} question{totalCount === 1 ? " is" : "s are"} currently saved
+                    {partsSummary()}.
+                  </p>
+                  <button
+                    onClick={discardAllQuestions}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:border-rose-900/60 dark:text-rose-400 dark:hover:bg-rose-500/10"
+                  >
+                    <Trash2 size={13} /> Discard all questions
+                  </button>
+                </div>
               )}
             </>
           )}
@@ -1206,6 +1240,34 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
           {step === "pdf-upload" && (
             <>
               {renderSettings()}
+
+              {totalCount > 0 && (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Previously saved questions</h3>
+                    <button
+                      onClick={discardAllQuestions}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:border-rose-900/60 dark:text-rose-400 dark:hover:bg-rose-500/10"
+                    >
+                      <Trash2 size={13} /> Discard all questions
+                    </button>
+                  </div>
+                  {renderSection(
+                    "General / Common questions",
+                    "Every candidate answers these, regardless of domain.",
+                    general,
+                    setGeneral
+                  )}
+                  {domains.map((d) =>
+                    renderSection(
+                      d.name.trim() || "Untitled domain",
+                      undefined,
+                      d.questions,
+                      (list) => updateDomain(d.id, { questions: list })
+                    )
+                  )}
+                </>
+              )}
 
               <p className="text-sm text-slate-600 dark:text-zinc-300">
                 Upload a PDF containing questions with options and their answers. Choose where it goes, then pick the file.
@@ -1447,6 +1509,17 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
           {step === "manual" && (
             <>
               {renderSettings()}
+
+              {totalCount > 0 && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={discardAllQuestions}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:border-rose-900/60 dark:text-rose-400 dark:hover:bg-rose-500/10"
+                  >
+                    <Trash2 size={13} /> Discard all questions
+                  </button>
+                </div>
+              )}
 
               {renderSection(
                 "General / Common questions",

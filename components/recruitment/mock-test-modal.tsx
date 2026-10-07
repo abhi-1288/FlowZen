@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { KOLKATA_OFFSET_MS } from "@/lib/date-utils";
 
 /**
  * HR configuration for a job's mock test.
@@ -90,18 +91,18 @@ type Form = {
   maxAttempts: string;
 };
 
-/** ISO -> the "YYYY-MM-DDTHH:mm" a datetime-local input expects, in UTC. */
+/** ISO -> the "YYYY-MM-DDTHH:mm" a datetime-local input expects, read as an IST wall clock. */
 function toLocalInput(iso: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toISOString().slice(0, 16);
+  return new Date(d.getTime() + KOLKATA_OFFSET_MS).toISOString().slice(0, 16);
 }
 
-/** The datetime-local value -> epoch ms, read as UTC to match the slot convention. */
+/** The datetime-local value -> epoch ms, read in IST to match the instant convention. */
 function toLocalMs(value: string): number | null {
   if (!value) return null;
-  const ms = new Date(`${value}:00.000Z`).getTime();
+  const ms = new Date(`${value}:00+05:30`).getTime();
   return Number.isFinite(ms) ? ms : null;
 }
 
@@ -151,6 +152,7 @@ export function MockTestModal({ jobId, onClose, totalQuestions }: Props) {
   const [notice, setNotice] = useState("");
   const [resetting, setResetting] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState<string | null>(null);
+  const [inviting, setInviting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -307,8 +309,49 @@ export function MockTestModal({ jobId, onClose, totalQuestions }: Props) {
     }
   }
 
+  /**
+   * Fire the invitation blast now instead of waiting for the daily cron. It
+   * works off the *saved* config, so anything typed but not saved yet is not
+   * what candidates receive.
+   */
+  async function sendInvites() {
+    setInviting(true);
+    setError("");
+    setNotice("");
+    try {
+      const res = await fetch(`/api/recruitment/jobs/${jobId}/assessment/mock-test/invite`, { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json.error || "Could not send the invitations.");
+        return;
+      }
+      const emailed: number = json.emailed ?? 0;
+      const eligible: number = json.eligible ?? 0;
+      const failed: number = json.candidatesSkipped ?? 0;
+      setNotice(
+        emailed > 0
+          ? `Invitation emailed to ${emailed} of ${eligible} candidate${eligible === 1 ? "" : "s"}.${
+              failed ? ` ${failed} could not be reached.` : ""
+            }`
+          : eligible === 0
+            ? "Every eligible candidate has already been invited."
+            : `No invitations went out${failed ? ` — ${failed} failed.` : "."}`
+      );
+      await load();
+    } catch {
+      setError("Could not send the invitations.");
+    } finally {
+      setInviting(false);
+    }
+  }
+
   const phaseInfo = PHASE_COPY[preview?.phase ?? "disabled"] ?? PHASE_COPY.disabled;
 
+  // Same gate the sender applies: only a saved, enabled window that is open (or
+  // not open yet) still has candidates who can be invited to it.
+  const canInvite =
+    Boolean(data?.mockTest.enabled) &&
+    (data?.window.phase === "open" || data?.window.phase === "scheduled");
   return (
     <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/35 px-4 py-8">
       <div className="w-full max-w-2xl rounded-lg bg-white shadow-soft dark:bg-[#000000]">
@@ -380,7 +423,7 @@ export function MockTestModal({ jobId, onClose, totalQuestions }: Props) {
                         onChange={(e) => set("opensAt", e.target.value)}
                         className={inputCls}
                       />
-                      <p className={hintCls}>Times are saved in UTC, as with the real assessment.</p>
+                      <p className={hintCls}>Times are saved in IST, as with the real assessment.</p>
                     </div>
                     <div>
                       <label className={labelCls} htmlFor="mock-closes">Closes at</label>
@@ -634,6 +677,16 @@ export function MockTestModal({ jobId, onClose, totalQuestions }: Props) {
         )}
 
         <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-4 dark:border-zinc-800">
+          {data?.mockTest.enabled && (
+            <button
+              onClick={() => void sendInvites()}
+              disabled={!canInvite || inviting}
+              title="Email every eligible candidate who has not been invited yet. Uses the saved window."
+              className="mr-auto rounded-md border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            >
+              {inviting ? "Sending…" : "Send invite emails now"}
+            </button>
+          )}
           <button
             onClick={onClose}
             className="rounded-md border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"

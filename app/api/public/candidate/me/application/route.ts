@@ -9,10 +9,10 @@ import { saveDocument, deleteFileByUrl } from "@/lib/storage";
 import { publicCandidateProjection } from "@/lib/candidate-visibility";
 import { isEditWindowOpen } from "@/lib/recruitment-utils";
 
-/** Deadline label for the "window closed" message, in UTC to match the stored wall clock. */
+/** Deadline label for the "window closed" message, in IST to match the value HR typed. */
 function fmtDeadline(closeAt: Date): string {
   return closeAt.toLocaleString("en-IN", {
-    timeZone: "UTC",
+    timeZone: "Asia/Kolkata",
     day: "numeric",
     month: "short",
     year: "numeric",

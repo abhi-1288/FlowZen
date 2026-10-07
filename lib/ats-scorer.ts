@@ -78,8 +78,8 @@ Return JSON: {"score":0-100,"reason":"brief","matchedSkills":[""],"missingSkills
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 1024,
+          maxOutputTokens: 2048,
+          thinkingConfig: { thinkingLevel: "low" },
           responseMimeType: "application/json",
           responseSchema: {
             type: "object",
@@ -106,7 +106,8 @@ Return JSON: {"score":0-100,"reason":"brief","matchedSkills":[""],"missingSkills
   };
 
   let response = await callGemini(GEMINI_MODEL);
-  if (!response.ok && GEMINI_FALLBACK_MODEL && GEMINI_FALLBACK_MODEL !== GEMINI_MODEL && (response.status === 503 || response.status === 429 || response.status === 500)) {
+  const fallbackStatuses = [503, 429, 500, 404, 400];
+  if (!response.ok && GEMINI_FALLBACK_MODEL && GEMINI_FALLBACK_MODEL !== GEMINI_MODEL && fallbackStatuses.includes(response.status)) {
     console.warn(`[ATS] Primary model ${GEMINI_MODEL} unavailable, falling back to ${GEMINI_FALLBACK_MODEL}`);
     response = await callGemini(GEMINI_FALLBACK_MODEL);
   }
@@ -126,7 +127,7 @@ Return JSON: {"score":0-100,"reason":"brief","matchedSkills":[""],"missingSkills
     parsed = JSON.parse(text) as AtsScoreResult;
   } catch (e) {
     console.error("[ATS] JSON parse error:", e, "raw:", text.substring(0, 500));
-    throw new Error("Failed to parse Gemini response as JSON.");
+    throw new Error(`Failed to parse Gemini response as JSON (finishReason: ${finishReason || "unknown"}).`);
   }
   const score = Math.max(0, Math.min(100, Math.round(Number(parsed.score) || 0)));
 

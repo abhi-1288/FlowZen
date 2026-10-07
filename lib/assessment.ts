@@ -5,6 +5,7 @@ import {
   type AssessmentTimeSlot,
   type AssessmentWindowMode,
 } from "@/lib/assessment-timing";
+import { startOfKolkataDayMs } from "@/lib/date-utils";
 
 // Build the flattened question list delivered to a candidate: general (non-domain)
 // questions first, then the questions of the candidate's chosen domain (if any).
@@ -85,7 +86,7 @@ export function assessmentIsOpen(
 }
 
 // Whether assessment results/apply are unlocked (the day after the assessment date).
-// Day boundaries are computed in UTC to match the slot arithmetic above.
+// Day boundaries are IST to match the slot arithmetic above.
 export function assessmentResultsUnlocked(
   opts: { assessment?: boolean; assessmentDate?: Date | string | null },
   now: Date = new Date()
@@ -93,9 +94,8 @@ export function assessmentResultsUnlocked(
   if (!opts?.assessment || !opts.assessmentDate) return false;
   const date = new Date(opts.assessmentDate);
   if (Number.isNaN(date.getTime())) return false;
-  const dayMs = 86_400_000;
-  const assessmentDay = Math.floor(date.getTime() / dayMs) * dayMs;
-  return now.getTime() >= assessmentDay + dayMs;
+  const assessmentDay = startOfKolkataDayMs(date);
+  return now.getTime() >= assessmentDay + 86_400_000;
 }
 
 // Grade answers against the question key with per-question marks and an optional

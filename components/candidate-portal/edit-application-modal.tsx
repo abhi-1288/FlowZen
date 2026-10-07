@@ -38,15 +38,15 @@ export default function EditApplicationModal({
   };
 
   // Shown so a candidate knows what they are editing against, and so the form is
-  // not the only place the deadline is discoverable. Formatted in UTC to match
-  // the stored wall clock (lib/date-utils).
+  // not the only place the deadline is discoverable. Formatted in IST to match
+  // the value HR typed (lib/date-utils).
   const closesAtLabel = (() => {
     const raw = candidate.job?.editApplicationsCloseAt;
     if (!raw) return "";
     const d = new Date(raw);
     if (Number.isNaN(d.getTime())) return "";
     return d.toLocaleString("en-IN", {
-      timeZone: "UTC",
+      timeZone: "Asia/Kolkata",
       day: "numeric",
       month: "short",
       hour: "2-digit",

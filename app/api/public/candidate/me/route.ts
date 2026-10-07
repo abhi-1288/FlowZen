@@ -306,7 +306,14 @@ export async function GET(request: Request) {
         passScore: (assessmentDoc as any).passScore ?? 50,
         negativeMarking: (assessmentDoc as any).negativeMarking ?? 0,
         negativeMarkingLabel: (assessmentDoc as any).negativeMarkingLabel || "",
-        domains: ((assessmentDoc as any).domains as any[]) || [],
+        // Mapped to the same shape the real assessment payload ships: counts
+        // only, never the question bodies or their answers — those are served
+        // exclusively by the start route once an attempt actually begins.
+        domains: (((assessmentDoc as any).domains as any[]) || []).map((d: any) => ({
+          name: d.name,
+          limit: d.limit ?? 0,
+          questionCount: Array.isArray(d.questions) ? d.questions.length : 0,
+        })),
         proctoring: { ...proctoring, active: proctoring.enabled && !exempt },
         domain: sitting.active?.domain || last?.domain || (candidate as any).assessmentDomain || "",
         stage: candidate.stage,

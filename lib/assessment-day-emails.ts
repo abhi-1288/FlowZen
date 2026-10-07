@@ -5,7 +5,6 @@ import { Company } from "@/models/Company";
 import { buildPortalLink, resolveCandidatePortalToken } from "@/lib/candidate-portal";
 import { assessmentInvitationEmail } from "@/lib/email-templates";
 import { sendMail } from "@/lib/mailer";
-import { utcWallClockNow } from "@/lib/date-utils";
 
 // The cron fires once per day on Vercel (free tier /api/cron/assessment-day)
 // and on demand in dev mode (/api/dev/assessment-day). Emails are sent to every
@@ -19,17 +18,17 @@ const LOOKAHEAD_MS = 24 * 60 * 60 * 1000;
  * Sends the "Online Assessment Available" email to candidates whose assessment
  * is today or within the next 24 hours.
  *
- * `assessmentDate` is a wall clock rather than a real instant (see
- * lib/date-utils), so this module compares it against the current wall clock and
- * formats it on UTC boundaries. An assessment scheduled for 09:00 is stored as
- * 09:00Z and stays 09:00 in the email and the portal.
+ * `assessmentDate` is a real instant entered as an IST wall clock (see
+ * lib/date-utils), so this module compares it against the current clock and
+ * formats it in IST. An assessment scheduled for 09:00 stays 09:00 in the email
+ * and the portal.
  */
 export async function sendAssessmentReminderEmails(): Promise<{ emailed: number; jobsChecked: number }> {
   await connectDb();
 
-  const wallClockNow = utcWallClockNow();
-  const windowStart = new Date(wallClockNow - GRACE_MS);
-  const windowEnd = new Date(wallClockNow + LOOKAHEAD_MS);
+  const nowMs = Date.now();
+  const windowStart = new Date(nowMs - GRACE_MS);
+  const windowEnd = new Date(nowMs + LOOKAHEAD_MS);
 
   const jobs = await ATSJob.find({
     assessment: true,
@@ -57,7 +56,7 @@ export async function sendAssessmentReminderEmails(): Promise<{ emailed: number;
         const portalLink = buildPortalLink(origin, token);
         const companyDoc = await Company.findById(job.company).select("name icon");
         const dateStr = new Date(job.assessmentDate!).toLocaleDateString("en-US", {
-          timeZone: "UTC",
+          timeZone: "Asia/Kolkata",
           weekday: "long",
           month: "long",
           day: "numeric",

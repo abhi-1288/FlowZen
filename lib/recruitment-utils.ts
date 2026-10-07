@@ -4,23 +4,21 @@ import { ATSCandidate } from "@/models/ATSCandidate";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitToUser } from "@/lib/socket-emit";
-import { utcWallClockNow } from "@/lib/date-utils";
+import { KOLKATA_OFFSET_MS } from "@/lib/date-utils";
 
 /**
  * Closes open jobs whose `autoCloseDate` has passed and notifies HR.
  *
- * `autoCloseDate` is a wall clock (see lib/date-utils), so it is compared against
- * the current wall clock rather than the raw instant — otherwise a job set to
- * close at 23:59 would trip five and a half hours early on an IST host.
+ * `autoCloseDate` is a real instant (see lib/date-utils), so this is plain
+ * elapsed-time comparison against the current clock.
  */
 export async function autoCloseOverdueJobs() {
   await connectDb();
   const now = new Date();
-  const wallClockNow = utcWallClockNow(now);
 
   const overdueJobs = await ATSJob.find({
     status: "open",
-    autoCloseDate: { $lt: new Date(wallClockNow) },
+    autoCloseDate: { $lt: now },
   });
 
   if (overdueJobs.length === 0) return 0;
@@ -31,9 +29,10 @@ export async function autoCloseOverdueJobs() {
     { $set: { status: "closed" } }
   );
 
-  // Read the UTC components so the date in the notification matches the wall
+  // Read the IST components so the date in the notification matches the wall
   // clock the job was scheduled against, not the host's local one.
-  const dateStr = `${now.getUTCDate()}/${now.getUTCMonth() + 1}/${now.getUTCFullYear()}`;
+  const kolkataNow = new Date(now.getTime() + KOLKATA_OFFSET_MS);
+  const dateStr = `${kolkataNow.getUTCDate()}/${kolkataNow.getUTCMonth() + 1}/${kolkataNow.getUTCFullYear()}`;
 
   for (const job of overdueJobs) {
     const companyId = job.company;
@@ -96,7 +95,7 @@ export async function closeExpiredEditWindows(): Promise<{ closed: number }> {
 
   const overdue = await ATSJob.find({
     editApplicationsEnabled: true,
-    editApplicationsCloseAt: { $ne: null, $lte: new Date(utcWallClockNow()) },
+    editApplicationsCloseAt: { $ne: null, $lte: new Date() },
   });
   if (overdue.length === 0) return { closed: 0 };
 
@@ -104,10 +103,10 @@ export async function closeExpiredEditWindows(): Promise<{ closed: number }> {
   await ATSJob.updateMany({ _id: { $in: ids } }, { $set: { editApplicationsEnabled: false } });
 
   for (const job of overdue) {
-    const when = new Date(job.editApplicationsCloseAt)
-      .toISOString()
-      .replace("T", " ")
-      .slice(0, 16);
+    const kolkataClose = new Date(new Date(job.editApplicationsCloseAt).getTime() + KOLKATA_OFFSET_MS);
+    const when = `${kolkataClose.getUTCFullYear()}-${String(kolkataClose.getUTCMonth() + 1).padStart(2, "0")}-${String(
+      kolkataClose.getUTCDate()
+    ).padStart(2, "0")} ${String(kolkataClose.getUTCHours()).padStart(2, "0")}:${String(kolkataClose.getUTCMinutes()).padStart(2, "0")}`;
     const recipients = await User.find({
       company: job.company,
       role: { $in: ["admin", "human-resource"] },
@@ -118,7 +117,7 @@ export async function closeExpiredEditWindows(): Promise<{ closed: number }> {
         company: job.company,
         type: "deadline",
         title: "Application Editing Closed",
-        message: `The application editing window for ${job.title} closed on ${when} UTC. Candidates can no longer update their applications.`,
+        message: `The application editing window for ${job.title} closed on ${when} IST. Candidates can no longer update their applications.`,
         link: `/recruitment/jobs/${job._id}`,
       });
       emitToUser(String(u._id), "notification:new", {

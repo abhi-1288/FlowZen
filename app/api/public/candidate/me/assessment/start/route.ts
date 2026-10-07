@@ -28,8 +28,8 @@ import {
 import { resolveActiveMockAttempt } from "@/lib/assessment-mock";
 
 /**
- * "09:00" -> "9:00 AM", for user-facing error text. UTC on purpose: slot times
- * are configured and displayed in UTC throughout the assessment flow.
+ * "09:00" -> "9:00 AM", for user-facing error text. Pure arithmetic on the
+ * configured HH:mm label — no timezone is involved.
  */
 function formatSlotLabel(start: string): string {
   const match = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec((start || "").trim());

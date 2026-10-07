@@ -16,7 +16,7 @@ import { User } from "@/models/User";
 import { WfhRequest } from "@/models/WfhRequest";
 import { CheckOutRequest } from "@/models/CheckOutRequest";
 import { addDays, startOfDay } from "./dates";
-import { startOfUtcDayMs } from "@/lib/date-utils";
+import { startOfKolkataDayMs } from "@/lib/date-utils";
 import { getColumnSets, getMyBoardIds } from "./trends";
 import { buildFilters, type CommandCenterFilters } from "./filters";
 import type { CommandCenterContext } from "./context";
@@ -493,10 +493,10 @@ async function jobsClosing(
 ): Promise<AttentionItem[]> {
   const companyId = ctx.companyId;
   if (!companyId) return [];
-  // `autoCloseDate` is a wall clock, and the shared startOfDay/addDays helpers
+  // `autoCloseDate` is a real instant, and the shared startOfDay/addDays helpers
   // build local-time boundaries (payroll and attendance depend on that), so the
-  // window for this query is computed on UTC day boundaries instead.
-  const dayStart = startOfUtcDayMs(ctx.now);
+  // window for this query is computed on IST day boundaries instead.
+  const dayStart = startOfKolkataDayMs(ctx.now);
   const end = dayStart + 14 * 86_400_000 + 86_400_000 - 1;
   const count = await ATSJob.countDocuments({
     company: companyId,

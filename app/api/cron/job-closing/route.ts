@@ -5,6 +5,7 @@ import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitToUser } from "@/lib/socket-emit";
 import { autoCloseOverdueJobs, closeExpiredEditWindows } from "@/lib/recruitment-utils";
+import { startOfKolkataDayMs } from "@/lib/date-utils";
 
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
@@ -22,13 +23,10 @@ export async function GET(request: Request) {
   // a missed run here delays the notification but never the cutoff.
   const editWindowsClosed = await closeExpiredEditWindows();
 
-  // NOTE: these boundaries are local setHours, while autoCloseDate is a UTC wall
-  // clock (lib/date-utils). That mismatch is pre-existing and left alone here,
-  // but it means "closing today" can be off by the host's UTC offset.
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date();
-  todayEnd.setHours(23, 59, 59, 999);
+  // Day boundaries for "closing today": IST midnights, matching how
+  // autoCloseDate is entered and read (lib/date-utils).
+  const todayStart = new Date(startOfKolkataDayMs(new Date()));
+  const todayEnd = new Date(todayStart.getTime() + 86_400_000 - 1);
 
   const results: { jobId: string; notified: string[] }[] = [];
 

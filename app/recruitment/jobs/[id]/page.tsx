@@ -23,7 +23,7 @@ import { AssessmentResultsModal } from "@/components/recruitment/assessment-resu
 import { AssessmentCandidatesModal } from "@/components/recruitment/assessment-candidates-modal";
 import { MockTestModal } from "@/components/recruitment/mock-test-modal";
 import { assessmentResultsUnlocked } from "@/lib/assessment";
-import { fmtJobDateTime as fmtDateTime, startOfUtcDayMs, utcWallClock, utcWallClockNow, dateInputValue, timeInputValue } from "@/lib/date-utils";
+import { fmtJobDateTime as fmtDateTime, startOfKolkataDayMs, wallClockToIso, dateInputValue, timeInputValue } from "@/lib/date-utils";
 import { useNotificationToast } from "@/lib/toast-context";
 import { MAX_EDIT_WINDOW_MS, isEditWindowOpen, validateEditWindowDeadline } from "@/lib/edit-window";
 import { JobModal } from "@/components/recruitment/job-modal";
@@ -49,15 +49,15 @@ const NO_DOMAIN_FILTER = "__none__";
 // onward (remains visible after the test day so HR can review who started/
 // submitted).
 //
-// `assessmentDate` is a wall clock, not a real instant, so both sides of this
-// comparison are resolved on UTC day boundaries — same frame as the formatter
+// `assessmentDate` is an absolute instant in IST, so both sides of this
+// comparison are resolved on IST day boundaries — same frame as the formatter
 // above and as lib/assessment-timing.ts, which builds the slot windows.
 function assessmentCandidatesVisible(dateStr: string | null | undefined): boolean {
   if (!dateStr) return false;
   const assess = new Date(dateStr);
   if (isNaN(assess.getTime())) return false;
-  const dayBefore = startOfUtcDayMs(assess) - 86_400_000;
-  return utcWallClockNow() >= dayBefore;
+  const dayBefore = startOfKolkataDayMs(assess) - 86_400_000;
+  return Date.now() >= dayBefore;
 }
 
 const INTERVIEWER_ROLES: Record<string, string> = {
@@ -271,7 +271,7 @@ export default function JobDetailPage() {
    * line and the API can never disagree about whether editing is open.
    */
   const editWindow = useMemo(
-    () => isEditWindowOpen(activeJob, utcWallClockNow()),
+    () => isEditWindowOpen(activeJob, Date.now()),
     [activeJob]
   );
 
@@ -1461,7 +1461,7 @@ function EditApplicationsModal({
     try {
       // Built here as well as validated server-side: the same rule, run early
       // enough that HR sees the problem before the request is made.
-      const wallClock = autoClose ? utcWallClock(closeDate, closeTime, "23:59") : null;
+      const wallClock = autoClose ? wallClockToIso(closeDate, closeTime, "23:59") : null;
       const check = validateEditWindowDeadline(wallClock);
       if (!check.ok) {
         setError(check.error);
@@ -1533,7 +1533,7 @@ function EditApplicationsModal({
                     </div>
                   </label>
                   <p className="mt-1.5 text-[11px] text-slate-500">
-                    Times are UTC, matching every other date on this job. Maximum{" "}
+                    Times are Indian Standard Time, matching every other date on this job. Maximum{" "}
                     {Math.round(MAX_EDIT_WINDOW_MS / 864e5)} days, because candidate portal links stop
                     working after 30.
                   </p>

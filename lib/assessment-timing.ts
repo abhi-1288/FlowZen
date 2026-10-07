@@ -1,10 +1,12 @@
 /**
  * Assessment scheduling math.
  *
- * `assessmentDate` is an absolute timestamp and `timeSlots` is a list of
- * "HH:mm" start times on that same calendar day. Every calculation here is plain
- * millisecond arithmetic on absolute instants — no `setHours`/day-boundary
- * construction — so results are identical regardless of the server timezone.
+ * `assessmentDate` is an absolute instant (entered as an IST wall clock, see
+ * lib/date-utils) and `timeSlots` is a list of "HH:mm" start times on that same
+ * IST calendar day. Every calculation here is plain millisecond arithmetic on
+ * absolute instants — no `setHours` construction — so results are identical
+ * regardless of the server timezone; only the day boundaries are IST, because
+ * "the 11th of October" means the candidate's day.
  *
  * Two window modes, chosen per assessment:
  *   - "uniform": the candidate picks a slot and is bound to that slot's fixed
@@ -18,6 +20,8 @@
  * enter early, read the notice and pick their domain, but questions are not
  * served until the start instant.
  */
+
+import { KOLKATA_OFFSET_MS } from "@/lib/date-utils";
 
 export const ASSESSMENT_JOIN_EARLY_MS = 10 * 60 * 1000;
 
@@ -54,13 +58,13 @@ function parseHhMm(value: string): number | null {
   return Number(match[1]) * 60 * 60 * 1000 + Number(match[2]) * 60 * 1000;
 }
 
-/** Midnight UTC of the day `reference` falls on, in ms. */
-function startOfUtcDayMs(reference: number): number {
-  return Math.floor(reference / 86_400_000) * 86_400_000;
+/** Midnight IST of the day `reference` falls on, in ms. */
+function startOfKolkataDayMs(reference: number): number {
+  return Math.floor((reference + KOLKATA_OFFSET_MS) / 86_400_000) * 86_400_000 - KOLKATA_OFFSET_MS;
 }
 
-function endOfUtcDayMs(reference: number): number {
-  return startOfUtcDayMs(reference) + 86_400_000 - 1;
+function endOfKolkataDayMs(reference: number): number {
+  return startOfKolkataDayMs(reference) + 86_400_000 - 1;
 }
 
 function durationMsOf(durationMinutes: number | null | undefined): number {
@@ -87,8 +91,8 @@ export function resolveAssessmentSlots(
   const base = assessmentDate ? new Date(assessmentDate).getTime() : NaN;
   if (!Number.isFinite(base)) return [];
 
-  const dayStart = startOfUtcDayMs(base);
-  const dayEnd = endOfUtcDayMs(base);
+  const dayStart = startOfKolkataDayMs(base);
+  const dayEnd = endOfKolkataDayMs(base);
   const durationMs = durationMsOf(options.durationMinutes);
   const mode: AssessmentWindowMode = options.mode === "uniform" ? "uniform" : "relief";
 

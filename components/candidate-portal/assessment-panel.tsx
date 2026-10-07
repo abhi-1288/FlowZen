@@ -798,8 +798,10 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
   }
 
   // ─── Render ────────────────────────────────────────────────
-  const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
-  const fmtClock = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "UTC" });
+  // Schedule labels are pinned to IST so every candidate sees the wall clock
+  // HR typed, regardless of their own device zone (lib/date-utils contract).
+  const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
+  const fmtClock = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" });
   const hasDomains = Array.isArray(assessment.domains) && assessment.domains.length > 0;
 
   // The scheduled anchor: the chosen slot for uniform mode, otherwise the

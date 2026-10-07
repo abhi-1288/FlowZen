@@ -152,7 +152,7 @@ export type ATSJob = {
   requiredExperienceMaxYears: number | null;
   atsScoreThreshold: number | null;
   editApplicationsEnabled: boolean;
-  /** UTC wall clock at which the editing window closes. See lib/date-utils. */
+  /** Instant at which the editing window closes, entered in IST. See lib/date-utils. */
   editApplicationsCloseAt: string | null;
   salaryRangeMin: number;
   salaryRangeMax: number;

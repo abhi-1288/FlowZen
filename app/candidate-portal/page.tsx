@@ -38,7 +38,6 @@ import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
 import { getInterviewJoinCountdownMs, isInterviewJoinWindowOpen, isInterviewJoinable, formatInterviewCountdown } from "@/lib/interview-timing";
-import { utcWallClockNow } from "@/lib/date-utils";
 import { isEditWindowOpen } from "@/lib/edit-window";
 import { JobDescription } from "@/components/recruitment/job-description";
 import { DEFAULT_ACCENT, hexToRgba, salarySuffix } from "@/lib/accent";
@@ -427,22 +426,16 @@ function CandidatePortalInner() {
    * Application-editing window, via the same helper the server gate and the HR
    * page use, so the button can never disagree with what the API will allow.
    *
-   * The deadline is a UTC wall clock, so it has to be compared against
-   * `utcWallClockNow()` rather than `Date.now()`: on a machine not running UTC
-   * those differ by the timezone offset, and the button would vanish hours early
-   * or stay live hours after the window shut. The offset is carried by `now` so
-   * the value still advances on the existing one-second tick, which is what makes
-   * the button disappear on the minute rather than on the next page load —
-   * otherwise a candidate who leaves the tab open past the deadline keeps a live
-   * button that only fails when they click it.
+   * `editApplicationsCloseAt` is a real instant (lib/date-utils), so the raw
+   * clock is the right comparison. The value is carried by `now` so it still
+   * advances on the existing one-second tick, which is what makes the button
+   * disappear on the minute rather than on the next page load — otherwise a
+   * candidate who leaves the tab open past the deadline keeps a live button
+   * that only fails when they click it.
    */
-  const editWallNow = useMemo(
-    () => Date.now() + (utcWallClockNow() - Date.now()),
-    [now]
-  );
   const editWindow = useMemo(
-    () => isEditWindowOpen(candidate?.job, editWallNow),
-    [candidate?.job, editWallNow]
+    () => isEditWindowOpen(candidate?.job, now),
+    [candidate?.job, now]
   );
   const editWindowOpen = editWindow.open;
   const editWindowExpired = editWindow.expired;
@@ -450,7 +443,7 @@ function CandidatePortalInner() {
   const editDeadlineLabel =
     editCloseAt && !Number.isNaN(editCloseAt.getTime())
       ? editCloseAt.toLocaleString("en-IN", {
-          timeZone: "UTC",
+          timeZone: "Asia/Kolkata",
           day: "numeric",
           month: "short",
           hour: "2-digit",

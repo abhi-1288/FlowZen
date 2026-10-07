@@ -46,8 +46,8 @@ const ATSJobSchema = new Schema(
     requiredExperienceMaxYears: { type: Number, default: null, min: 0, max: 50 },
     atsScoreThreshold: { type: Number, default: null, min: 0, max: 100 },
     editApplicationsEnabled: { type: Boolean, default: false },
-    // When the *editing window* closes, as a UTC wall clock (lib/date-utils).
-    // Unrelated to autoCloseDate, which closes the job itself.
+    // When the *editing window* closes, as a real instant entered in IST
+    // (lib/date-utils). Unrelated to autoCloseDate, which closes the job itself.
     editApplicationsCloseAt: { type: Date, default: null },
     autoCloseDate: { type: Date, default: null },
     description: { type: String, default: "", maxlength: 5000 },
