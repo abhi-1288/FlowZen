@@ -116,6 +116,8 @@ export async function POST(request: Request, { params }: Params) {
       scored++;
       if (status === "selected") selected++;
       else rejected++;
+      // Small pause between candidates to avoid hammering the Gemini API.
+      await new Promise((r) => setTimeout(r, 1000));
     } catch (err) {
       console.error(`ATS scoring failed for candidate ${candidate._id}:`, err);
       errors++;

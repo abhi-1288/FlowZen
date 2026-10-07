@@ -3,7 +3,8 @@ import { promises as fs } from "fs";
 import path from "path";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_MODEL = "gemini-3.6-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || "gemini-2.5-flash-lite";
 
 export type AtsScoreResult = {
   score: number;
@@ -69,30 +70,46 @@ ${contextMissing ? "- No job description or required skills were provided. Judge
 
 Return JSON: {"score":0-100,"reason":"brief","matchedSkills":[""],"missingSkills":[""]}`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 1024,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "object",
-          properties: {
-            score: { type: "number" },
-            reason: { type: "string" },
-            matchedSkills: { type: "array", items: { type: "string" } },
-            missingSkills: { type: "array", items: { type: "string" } },
+  const callGemini = async (model: string, attempt = 0): Promise<Response> => {
+    const u = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+    const res = await fetch(u, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 1024,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "object",
+            properties: {
+              score: { type: "number" },
+              reason: { type: "string" },
+              matchedSkills: { type: "array", items: { type: "string" } },
+              missingSkills: { type: "array", items: { type: "string" } },
+            },
+            required: ["score", "reason", "matchedSkills", "missingSkills"],
           },
-          required: ["score", "reason", "matchedSkills", "missingSkills"],
         },
-      },
-    }),
-  });
+      }),
+    });
+
+    // Retry transient overload / rate-limit failures with backoff.
+    if ((res.status === 503 || res.status === 429 || res.status === 500) && attempt < 3) {
+      const delayMs = [2000, 5000, 10000][attempt] ?? 10000;
+      console.warn(`[ATS] Gemini ${res.status} on ${model}, retrying in ${delayMs}ms (attempt ${attempt + 1})`);
+      await new Promise((r) => setTimeout(r, delayMs));
+      return callGemini(model, attempt + 1);
+    }
+    return res;
+  };
+
+  let response = await callGemini(GEMINI_MODEL);
+  if (!response.ok && GEMINI_FALLBACK_MODEL && GEMINI_FALLBACK_MODEL !== GEMINI_MODEL && (response.status === 503 || response.status === 429 || response.status === 500)) {
+    console.warn(`[ATS] Primary model ${GEMINI_MODEL} unavailable, falling back to ${GEMINI_FALLBACK_MODEL}`);
+    response = await callGemini(GEMINI_FALLBACK_MODEL);
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
