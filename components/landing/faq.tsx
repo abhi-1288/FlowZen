@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 
-const faqs = [
+export const faqs = [
   {
     q: "Is FlowZen free to use?",
     a: "Yes! FlowZen offers a free tier for small teams. Upgrade to a paid plan when you need more boards, advanced finance features, or priority support.",

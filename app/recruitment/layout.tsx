@@ -1,8 +1,13 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { RecruitmentSidebar } from "@/components/recruitment/recruitment-sidebar";
 import { RecruitmentSSEListener } from "@/components/recruitment/recruitment-sse-listener";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function RecruitmentLayout({ children, params }: { children: React.ReactNode; params: Promise<{ jobSlug?: string; candidateSlug?: string }> }) {
   const route = await params;

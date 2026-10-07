@@ -108,7 +108,7 @@ export default function JobDetailPage() {
   const [copied, setCopied] = useState(false);
   const [atsLoading, setAtsLoading] = useState(false);
   const [atsWarn, setAtsWarn] = useState<{ open: boolean; missingDesc: boolean; missingSkills: boolean; missingThreshold: boolean; force: boolean }>({ open: false, missingDesc: false, missingSkills: false, missingThreshold: false, force: false });
-  const [atsResultData, setAtsResultData] = useState<{ scored: number; selected: number; rejected: number; errors: number; missingResume?: number; total: number } | null>(null);
+  const [atsResultData, setAtsResultData] = useState<{ scored: number; selected: number; rejected: number; errors: number; missingResume?: number; errorReasons?: string[]; total: number } | null>(null);
   const [atsLastResult, setAtsLastResult] = useState<{ scored: number; selected: number; rejected: number; errors: number; total: number } | null>(null);
   const [atsDecisionPending, setAtsDecisionPending] = useState(false);
   const [atsAction, setAtsAction] = useState<"auto" | "manual">("auto");
@@ -1269,7 +1269,7 @@ function AtsResultModal({
   onMarkLater,
   onSubmit,
 }: {
-  result: { scored: number; selected: number; rejected: number; errors: number; missingResume?: number; total: number } | null;
+  result: { scored: number; selected: number; rejected: number; errors: number; missingResume?: number; errorReasons?: string[]; total: number } | null;
   action: "auto" | "manual";
   onActionChange: (value: "auto" | "manual") => void;
   onMarkLater: () => void;
@@ -1301,6 +1301,13 @@ function AtsResultModal({
               {result.errors} candidate(s) could not be scored due to errors.
               {typeof result.missingResume === "number" && result.missingResume > 0 && ` ${result.missingResume} had no resume uploaded.`}
             </p>
+          )}
+          {Array.isArray(result.errorReasons) && result.errorReasons.length > 0 && (
+            <ul className="mt-1 list-disc pl-4 text-xs text-amber-600">
+              {result.errorReasons.slice(0, 5).map((reason, i) => (
+                <li key={i}>{reason}</li>
+              ))}
+            </ul>
           )}
           <label className="mt-4 block text-sm font-medium text-slate-700">ATS timeline action</label>
           <select

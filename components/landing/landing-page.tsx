@@ -35,42 +35,6 @@ function useBrowserMounted() {
   return mounted;
 }
 
-const jsonLd = {
-  "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  name: "FlowZen",
-  applicationCategory: "BusinessApplication",
-  operatingSystem: "Web",
-  description:
-    "All-in-one workflow platform for managing kanban boards, attendance, finance, HR, document letters, recruitment, IT support, and chat.",
-  offers: {
-    "@type": "Offer",
-    price: "0",
-    priceCurrency: "USD",
-    description: "Free tier available with optional paid plans",
-  },
-  url: "https://flowzen.app",
-  logo: "https://flowzen.app/Logos/logo.jpg",
-  screenshot: "https://flowzen.app/screenshot.png",
-  featureList: [
-    "Kanban Boards",
-    "Real-time Sync",
-    "Attendance Tracking",
-    "Finance & Invoicing",
-    "HR Module",
-    "Document Letters & Co-signatures",
-    "Recruitment Pipeline",
-    "Team Chat",
-    "IT Support Helpdesk",
-    "Role-based Access Control",
-  ],
-  aggregateRating: {
-    "@type": "AggregateRating",
-    ratingValue: "4.8",
-    ratingCount: "150",
-  },
-};
-
 export function LandingPage() {
   const isLoaded = useBrowserMounted();
   const [scrolled, setScrolled] = useState(false);
@@ -83,10 +47,6 @@ export function LandingPage() {
 
   return (
     <LazyMotion features={domAnimation}>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
       <div className="min-h-screen bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-gray-100 overflow-x-hidden font-sans selection:bg-indigo-100 dark:selection:bg-indigo-900/40 selection:text-indigo-900 dark:selection:text-indigo-100">
         {/* Global Effects */}
         <ScrollProgress />

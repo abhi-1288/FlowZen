@@ -51,6 +51,7 @@ export async function POST(request: Request, { params }: Params) {
   let rejected = 0;
   let errors = 0;
   let missingResume = 0;
+  const errorReasons: string[] = [];
 
   for (const candidate of candidates) {
     try {
@@ -118,6 +119,8 @@ export async function POST(request: Request, { params }: Params) {
     } catch (err) {
       console.error(`ATS scoring failed for candidate ${candidate._id}:`, err);
       errors++;
+      const message = err instanceof Error ? err.message : String(err);
+      if (!errorReasons.includes(message)) errorReasons.push(message);
     }
   }
 
@@ -127,6 +130,7 @@ export async function POST(request: Request, { params }: Params) {
     rejected,
     errors,
     missingResume,
+    errorReasons,
     threshold,
     total: candidates.length,
   });

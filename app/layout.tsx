@@ -13,26 +13,29 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: {
-    default: "FlowZen — All-in-one workflow platform for modern teams",
+    default: "FlowZen — All-in-One HRMS Platform for HR, Recruitment & Workflow",
     template: "FlowZen - %s",
   },
   icons: {
-    icon: "/icon.jpg",
+    icon: "/Logos/logo.jpg",
   },
   description:
-    "Manage kanban boards, attendance, finance, HR, recruitment, and team chat in one unified workspace. Real-time collaboration for modern teams.",
+    "FlowZen is an all-in-one HRMS platform: manage HR, recruitment, attendance, payroll finance, kanban boards, IT helpdesk, and team chat in one workspace.",
   keywords: [
-    "kanban",
-    "project management",
-    "HR software",
+    "all-in-one HRMS platform",
+    "HRMS software",
+    "HR software for small business",
+    "recruitment management software",
+    "employee management platform",
     "attendance tracking",
-    "finance management",
-    "recruitment",
-    "team collaboration",
-    "workflow platform",
-    "task management",
-    "real-time boards",
+    "kanban board software",
+    "team chat",
+    "IT helpdesk",
+    "FlowZen",
   ],
+  alternates: {
+    canonical: "https://flowzen.app",
+  },
   authors: [{ name: "FlowZen", url: "https://github.com/abhi-1288" }],
   creator: "FlowZen",
   publisher: "FlowZen",
@@ -42,24 +45,24 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: "https://flowzen.app",
     siteName: "FlowZen",
-    title: "FlowZen — All-in-one workflow platform for modern teams",
+    title: "FlowZen — All-in-One HRMS Platform",
     description:
-      "Manage kanban boards, attendance, finance, HR, recruitment, and team chat in one unified workspace.",
+      "Manage HR, recruitment, attendance, finance, kanban boards, and team chat in one unified workspace.",
     images: [
       {
-        url: "/screenshot.png",
+        url: "/Logos/logo-text.jpg",
         width: 1200,
         height: 630,
-        alt: "FlowZen — Kanban boards, attendance, finance, HR, recruitment in one platform",
+        alt: "FlowZen — All-in-One HRMS Platform",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "FlowZen — All-in-one workflow platform",
+    title: "FlowZen — All-in-One HRMS Platform",
     description:
-      "Manage kanban boards, attendance, finance, HR, recruitment, and team chat in one unified workspace.",
-    images: ["/screenshot.png"],
+      "Manage HR, recruitment, attendance, finance, kanban boards, and team chat in one unified workspace.",
+    images: ["/Logos/logo-text.jpg"],
   },
   robots: {
     index: true,

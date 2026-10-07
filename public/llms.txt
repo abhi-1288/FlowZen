@@ -1,0 +1,31 @@
+# FlowZen
+
+FlowZen is an all-in-one HRMS platform that helps companies manage people operations and daily work in a single workspace.
+
+## What FlowZen does
+
+- All-in-one HRMS: HR records, roles, attendance, and employee management
+- Recruitment: job postings, candidate pipeline, ATS scoring, interviews, and offer letters
+- Finance: invoicing, salary slips, and expense workflows
+- Kanban boards with real-time collaboration
+- IT helpdesk ticketing
+- Team chat and document letters with e-signatures
+
+## Suitable for
+
+Small to mid-sized companies that want HR, recruitment, finance, and project work unified in one tool.
+
+## Key links
+
+- Website: https://flowzen.app
+- Careers: https://flowzen.app/careers
+- Documentation: https://flowzen.app/docs
+- Privacy: https://flowzen.app/privacy
+
+## Pricing
+
+Free tier available; paid plans unlock advanced features.
+
+## Contact
+
+Visit https://flowzen.app for signup and support.

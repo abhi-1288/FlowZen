@@ -54,9 +54,9 @@ export function Hero({ isLoaded }: HeroProps) {
               variants={itemVariants}
               className="text-base sm:text-xl md:text-2xl text-gray-500 dark:text-gray-400 mb-8 sm:mb-12 max-w-3xl mx-auto leading-relaxed px-2 sm:px-0"
             >
-              FlowZen is the all-in-one workflow platform where teams
-              manage kanban boards, attendance, finance, HR, document letters,
-              recruitment, IT support, chat, approvals, and roles in one
+              FlowZen is the all-in-one HRMS platform where companies
+              manage HR, recruitment, attendance, finance, kanban boards,
+              document letters, IT support, chat, and approvals in one
               workspace.
             </motion.p>
 
