@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { LandingPage } from "@/components/landing/landing-page";
-import { faqs } from "@/components/landing/faq";
+import { faqs } from "@/components/landing/faq-data";
 
 const softwareApplicationLd = {
   "@context": "https://schema.org",
