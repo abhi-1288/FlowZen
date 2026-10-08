@@ -258,7 +258,7 @@ export async function POST(request: Request, { params }: Params) {
   if (windowChanged) {
     await ATSCandidate.updateMany(
       { job: ctx.jobId, company: ctx.company, stage: { $in: MOCK_ELIGIBLE_STAGES } },
-      { $set: { "mockTest.inviteSentAt": null } }
+      { $set: { "mockTest.inviteSentAt": null, "mockTest.sameDayReminderSentAt": null } }
     );
   }
 

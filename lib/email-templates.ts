@@ -292,6 +292,7 @@ export function assessmentInvitationEmail({
   durationMinutes,
   portalLink,
   company,
+  reminder,
 }: {
   candidateName: string;
   jobTitle: string;
@@ -299,13 +300,40 @@ export function assessmentInvitationEmail({
   durationMinutes?: number | null;
   portalLink?: string;
   company?: { name?: string; icon?: string };
+  /** Nudges the copy for the automatic day-before / same-day reminders. */
+  reminder?: "day-before" | "same-day";
 }) {
+  const headline =
+    reminder === "day-before"
+      ? "Online Assessment Tomorrow"
+      : reminder === "same-day"
+        ? "Online Assessment Today"
+        : "Online Assessment Available";
+  const intro =
+    reminder === "day-before"
+      ? `Your online assessment for <strong>${jobTitle}</strong> is tomorrow.`
+      : reminder === "same-day"
+        ? `Your online assessment for <strong>${jobTitle}</strong> is today.`
+        : `Your online assessment for <strong>${jobTitle}</strong> is now available.`;
+  const subject =
+    reminder === "day-before"
+      ? `Online Assessment Tomorrow for ${jobTitle}`
+      : reminder === "same-day"
+        ? `Online Assessment Today for ${jobTitle}`
+        : `Online Assessment Available for ${jobTitle}`;
+  const textLine =
+    reminder === "day-before"
+      ? `Your online assessment for ${jobTitle} is tomorrow.`
+      : reminder === "same-day"
+        ? `Your online assessment for ${jobTitle} is today.`
+        : `Your online assessment for ${jobTitle} is now available.`;
+
   const html = baseEmailLayout(`
-    <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#1e293b;">Online Assessment Available</h2>
+    <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#1e293b;">${headline}</h2>
     <p style="margin:0 0 20px;font-size:14px;color:#64748b;">${jobTitle}</p>
 
     <p style="margin:0 0 8px;font-size:15px;color:#334155;">Dear ${candidateName},</p>
-    <p style="margin:0 0 24px;font-size:15px;color:#334155;">Your online assessment for <strong>${jobTitle}</strong> is now available.</p>
+    <p style="margin:0 0 24px;font-size:15px;color:#334155;">${intro}</p>
 
     <table role="presentation" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:4px 16px;width:100%;margin:0 0 24px;">
       <tr>
@@ -334,11 +362,11 @@ export function assessmentInvitationEmail({
     ${portalLink ? emailButton(portalLink, "Start Assessment") : ""}
 
     <p style="margin:0;font-size:14px;color:#64748b;">Complete the test before the time limit. It will auto-submit when the time is up. Good luck!</p>
-  `, { title: "Online Assessment Available", companyName: company?.name, companyLogo: company?.icon });
+  `, { title: headline, companyName: company?.name, companyLogo: company?.icon });
 
   return {
-    subject: `Online Assessment Available for ${jobTitle}`,
-    text: `Dear ${candidateName},\n\nYour online assessment for ${jobTitle} is now available.\n\nDate: ${dateStr}${durationMinutes ? `\nDuration: ${durationMinutes} minutes` : ""}${portalLink ? `\n\nStart Assessment: ${portalLink}` : ""}`,
+    subject,
+    text: `Dear ${candidateName},\n\n${textLine}\n\nDate: ${dateStr}${durationMinutes ? `\nDuration: ${durationMinutes} minutes` : ""}${portalLink ? `\n\nStart Assessment: ${portalLink}` : ""}`,
     html,
   };
 }
@@ -355,6 +383,7 @@ export function mockTestInvitationEmail({
   attemptNote,
   portalLink,
   company,
+  reminder,
 }: {
   candidateName: string;
   jobTitle: string;
@@ -365,13 +394,40 @@ export function mockTestInvitationEmail({
   attemptNote?: string;
   portalLink?: string;
   company?: { name?: string; icon?: string };
+  /** Nudges the copy for the automatic day-before / same-day reminders. */
+  reminder?: "day-before" | "same-day";
 }) {
+  const headline =
+    reminder === "day-before"
+      ? "Practice Mock Test Tomorrow"
+      : reminder === "same-day"
+        ? "Practice Mock Test Today"
+        : "Practice Mock Test Available";
+  const intro =
+    reminder === "day-before"
+      ? `A <strong>practice mock test</strong> for <strong>${jobTitle}</strong> is tomorrow.`
+      : reminder === "same-day"
+        ? `A <strong>practice mock test</strong> for <strong>${jobTitle}</strong> is today.`
+        : `A <strong>practice mock test</strong> is now available for <strong>${jobTitle}</strong>.`;
+  const subject =
+    reminder === "day-before"
+      ? `Practice Mock Test Tomorrow for ${jobTitle}`
+      : reminder === "same-day"
+        ? `Practice Mock Test Today for ${jobTitle}`
+        : `Practice Mock Test Available for ${jobTitle}`;
+  const textLine =
+    reminder === "day-before"
+      ? `A practice mock test for ${jobTitle} is tomorrow.`
+      : reminder === "same-day"
+        ? `A practice mock test for ${jobTitle} is today.`
+        : `A practice mock test is now available for ${jobTitle}.`;
+
   const html = baseEmailLayout(`
-    <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#1e293b;">Practice Mock Test Available</h2>
+    <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#1e293b;">${headline}</h2>
     <p style="margin:0 0 20px;font-size:14px;color:#64748b;">${jobTitle}</p>
 
     <p style="margin:0 0 8px;font-size:15px;color:#334155;">Dear ${candidateName},</p>
-    <p style="margin:0 0 16px;font-size:15px;color:#334155;">A <strong>practice mock test</strong> is now available for <strong>${jobTitle}</strong>.</p>
+    <p style="margin:0 0 16px;font-size:15px;color:#334155;">${intro}</p>
 
     <div style="margin:0 0 20px;padding:12px 16px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;">
       <p style="margin:0;font-size:14px;color:#92400e;">This is practice only. It is scored on a short paper drawn from the same question bank, and <strong>it does not affect your application or your assessment result</strong>.</p>
@@ -426,11 +482,11 @@ export function mockTestInvitationEmail({
 
     ${attemptNote ? `<p style="margin:0 0 12px;font-size:14px;color:#64748b;">${attemptNote}</p>` : ""}
     <p style="margin:0;font-size:14px;color:#64748b;">Use it to check your timing and get comfortable with the format before your real assessment. Good luck!</p>
-  `, { title: "Practice Mock Test Available", companyName: company?.name, companyLogo: company?.icon });
+  `, { title: headline, companyName: company?.name, companyLogo: company?.icon });
 
   return {
-    subject: `Practice Mock Test Available for ${jobTitle}`,
-    text: `Dear ${candidateName},\n\nA practice mock test is now available for ${jobTitle}.\n\nThis is practice only: it is scored on a short paper from the same question bank and does not affect your application or your assessment result.\n\nStart date-time: ${startLabel}\nEnd date-time: ${endLabel}${durationMinutes ? `\nDuration: ${durationMinutes} minutes` : ""}${maxAttempts ? `\nAttempts: ${maxAttempts}` : ""}${portalLink ? `\n\nOpen Mock Test: ${portalLink}` : ""}`,
+    subject,
+    text: `Dear ${candidateName},\n\n${textLine}\n\nThis is practice only: it is scored on a short paper from the same question bank and does not affect your application or your assessment result.\n\nStart date-time: ${startLabel}\nEnd date-time: ${endLabel}${durationMinutes ? `\nDuration: ${durationMinutes} minutes` : ""}${maxAttempts ? `\nAttempts: ${maxAttempts}` : ""}${portalLink ? `\n\nOpen Mock Test: ${portalLink}` : ""}`,
     html,
   };
 }

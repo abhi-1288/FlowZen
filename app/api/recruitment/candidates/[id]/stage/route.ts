@@ -45,6 +45,7 @@ export async function PATCH(request: Request, { params }: Params) {
     candidate.assessmentSlotStart = null;
     candidate.assessmentSubmittedAt = null;
     candidate.assessmentInviteSentAt = null;
+    candidate.assessmentSameDayReminderSentAt = null;
     candidate.assessmentResultPublishedAt = null;
     candidate.assessmentScore = null;
     candidate.assessmentStatus = "pending";

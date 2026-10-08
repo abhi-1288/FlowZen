@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
-import { sendAssessmentReminderEmails } from "@/lib/assessment-day-emails";
 import { sweepExpiredAssessments } from "@/lib/assessment-auto-submit";
 
+/**
+ * Assessment auto-submit backstop. The invitation/reminder emails are sent by
+ * the combined morning job (`/api/cron/reminders`), not here.
+ */
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
-  const result = await sendAssessmentReminderEmails();
 
   // Backstop for the background auto-submit. The hot path is the scoped
   // finalize on each portal load; this catches candidates who never come back
@@ -16,5 +17,5 @@ export async function GET(request: Request) {
   // on Vercel plans that only allow once-a-day crons.
   const sweep = await sweepExpiredAssessments();
 
-  return NextResponse.json({ ok: true, ...result, autoSubmitted: sweep.finalized, autoSubmitSkipped: sweep.skipped });
+  return NextResponse.json({ ok: true, autoSubmitted: sweep.finalized, autoSubmitSkipped: sweep.skipped });
 }

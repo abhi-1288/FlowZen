@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
-import { sendMockTestInvitationEmails } from "@/lib/assessment-mock-emails";
 import { sweepExpiredMockAttempts } from "@/lib/assessment-auto-submit";
 
+/**
+ * Mock auto-submit backstop. The invitation/reminder emails are sent by the
+ * combined morning job (`/api/cron/reminders`), not here.
+ */
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
-  const result = await sendMockTestInvitationEmails();
 
   // Backstop for the mock auto-submit, mirroring the real assessment: the hot
   // path is the scoped finalize on each portal load, and this catches
@@ -17,7 +18,6 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     ok: true,
-    ...result,
     autoSubmitted: sweep.finalized,
     autoSubmitSkipped: sweep.skipped,
   });

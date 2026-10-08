@@ -209,6 +209,25 @@ export async function POST(request: Request, { params }: Params) {
 
   await ATSJob.findByIdAndUpdate(job._id, { assessmentDurationMinutes: durationMinutes });
 
+  // A moved assessment schedule is a new set of reminders: without clearing the
+  // latches, candidates already emailed for the old slots would never hear
+  // about the new ones. Cosmetic saves (pass score, proctoring) leave them be.
+  const previousAssessment = await ATSAssessment.findOne({ job: id, company: user.company })
+    .select("timeSlots windowMode")
+    .lean();
+  const normalizeSlots = (slots: any[]) =>
+    (slots || []).map((s) => String(s?.start || "").trim()).filter(Boolean).sort();
+  const scheduleChanged =
+    ((previousAssessment as any)?.windowMode ?? "relief") !== windowMode ||
+    JSON.stringify(normalizeSlots((previousAssessment as any)?.timeSlots as any[])) !==
+      JSON.stringify(normalizeSlots(timeSlots));
+  if (scheduleChanged) {
+    await ATSCandidate.updateMany(
+      { job: id, company: user.company, stage: "assessment" },
+      { $set: { assessmentInviteSentAt: null, assessmentSameDayReminderSentAt: null } }
+    );
+  }
+
   const set = {
     passScore,
     negativeMarking,

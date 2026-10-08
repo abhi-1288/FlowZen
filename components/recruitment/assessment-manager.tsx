@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Trash2, FileText, PenLine, ArrowLeft, Loader2, Upload, CircleCheck } from "lucide-react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Trash2, FileText, PenLine, ArrowLeft, Loader2, Upload, CircleCheck, Check } from "lucide-react";
 import { formatNegativeMarking, parseNegativeMarking } from "@/lib/assessment-negative-marking";
+import { ConfirmDialog } from "@/components/recruitment/confirm-dialog";
+import { RequiredSplitter } from "@/components/recruitment/required-splitter";
 import {
   MAX_NOISE_THRESHOLD_DB,
   MIN_NOISE_THRESHOLD_DB,
@@ -130,6 +132,7 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const savingRef = useRef(false);
 
@@ -194,10 +197,11 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
   /** Fresh start: drops every saved/staged question locally. Persisted only on Save. */
   function discardAllQuestions() {
     if (totalCount === 0) return;
-    const ok = window.confirm(
-      `Remove all ${totalCount} question${totalCount === 1 ? "" : "s"} and start fresh? Nothing changes on the server until you press Save Assessment.`
-    );
-    if (!ok) return;
+    setConfirmDiscardOpen(true);
+  }
+
+  function performDiscard() {
+    setConfirmDiscardOpen(false);
     setGeneral([]);
     setDomains([]);
     setPdfQuestions([]);
@@ -536,6 +540,29 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
 
   const totalCount = general.length + domains.reduce((s, d) => s + d.questions.length, 0);
 
+  /**
+   * Parsed review questions grouped by their routed section (General first,
+   * then each domain), keeping the original `pdfQuestions` index in every group
+   * so edits still land on the right item when the list is shown regrouped.
+   */
+  const pdfGroups = useMemo(() => {
+    type Group = { key: string; label: string; indices: number[] };
+    const groups: Group[] = [
+      { key: "general", label: "General / Common questions", indices: [] },
+      ...domains.map((d) => ({ key: d.id, label: d.name.trim() || "Untitled domain", indices: [] as number[] })),
+    ];
+    pdfQuestions.forEach((_, qi) => {
+      const target = pdfTargets[qi] ?? "general";
+      let group = groups.find((g) => g.key === target);
+      if (!group) {
+        group = { key: target, label: "Unassigned domain", indices: [] };
+        groups.push(group);
+      }
+      group.indices.push(qi);
+    });
+    return groups.filter((g) => g.indices.length > 0);
+  }, [pdfQuestions, pdfTargets, domains]);
+
   function partsSummary(): string {
     const parts: string[] = [];
     if (general.length) parts.push(`general: ${general.length}`);
@@ -604,11 +631,11 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
     );
   };
 
-  const renderQuestionCard = (q: Question, idx: number, editable: boolean, list: Question[], setList: (v: Question[]) => void) => (
+  const renderQuestionCard = (q: Question, idx: number, editable: boolean, list: Question[], setList: (v: Question[]) => void, displayIdx?: number) => (
     <div key={idx} className={`rounded-lg border p-4 dark:border-zinc-800 ${q.type === "essay" ? "border-violet-200 bg-violet-50/40 dark:border-violet-900/40" : "border-slate-200"}`}>
       <div className="flex items-start justify-between gap-2">
         <label className="flex-1">
-          <span className="mb-1 block text-xs font-medium text-slate-500">Question {idx + 1}</span>
+          <span className="mb-1 block text-xs font-medium text-slate-500">Question {(displayIdx ?? idx) + 1}</span>
           <textarea
             value={q.text}
             onChange={(e) => updateQuestion(idx, { text: e.target.value }, list, setList)}
@@ -1016,6 +1043,11 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
         )}
       </div>
       {nameField}
+      <RequiredSplitter
+        count={list.length}
+        currentRequired={list.filter((q) => q.required).length}
+        onApply={(flags) => setList(list.map((q, i) => (flags[i] === undefined ? q : { ...q, required: flags[i] })))}
+      />
       <div className="mt-3 space-y-4">
         {list.map((q, qi) => renderQuestionCard(q, qi, true, list, setList))}
       </div>
@@ -1147,47 +1179,80 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
   if (loading) {
     return (
       <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/35 px-4">
-        <div className="w-full max-w-3xl rounded-lg bg-white shadow-soft dark:bg-[#000000] p-6">
+        <div className="w-full max-w-4xl rounded-2xl bg-white shadow-soft dark:bg-[#000000] p-6">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-slate-950" />
         </div>
       </div>
     );
   }
 
+  const STEP_CRUMBS = [
+    { key: "setup", label: "Setup" },
+    { key: "add", label: "Add questions" },
+    { key: "review", label: "Review" },
+    { key: "confirm", label: "Confirm" },
+  ] as const;
+  const crumbIndex = step === "menu" ? 0 : step === "final-check" ? 3 : step === "pdf-review" ? 2 : 1;
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/35 px-4">
-      <div className="w-full max-w-3xl rounded-lg bg-white shadow-soft dark:bg-[#000000]">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-zinc-800">
-          {step !== "menu" ? (
+      <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-soft dark:bg-[#000000]">
+        <div className="shrink-0 border-b border-slate-200 px-5 py-4 dark:border-zinc-800">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              {step !== "menu" && (
+                <button
+                  onClick={() => {
+                    // From the settings check, Back returns to the review list so
+                    // routing can be fixed; the staged merge is recomputed from
+                    // there, so it is safe to leave it in place.
+                    if (step === "final-check") { setStep("pdf-review"); return; }
+                    setPdfBatchActive(false);
+                    setAddingAnother(false);
+                    setPdfError("");
+                    setPdfPending(null);
+                    setPdfDraft({ kind: "general", domainName: "", domainLimit: 0 });
+                    setStep("menu");
+                  }}
+                  className="flex items-center gap-1 rounded-md px-1.5 py-1.5 text-sm text-slate-500 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                >
+                  <ArrowLeft size={16} /> {step === "final-check" ? "Back to questions" : "Back"}
+                </button>
+              )}
+              <h2 className="truncate text-base font-semibold text-slate-900 dark:text-zinc-100">Manage Assessment</h2>
+            </div>
             <button
-              onClick={() => {
-                // From the settings check, Back returns to the review list so
-                // routing can be fixed; the staged merge is recomputed from
-                // there, so it is safe to leave it in place.
-                if (step === "final-check") { setStep("pdf-review"); return; }
-                setPdfBatchActive(false);
-                setAddingAnother(false);
-                setPdfError("");
-                setPdfPending(null);
-                setPdfDraft({ kind: "general", domainName: "", domainLimit: 0 });
-                setStep("menu");
-              }}
-              className="flex items-center gap-1 rounded-md px-1.5 py-1.5 text-slate-500 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-zinc-700"
+              onClick={onClose}
+              className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-zinc-700"
+              title="Close"
             >
-              <ArrowLeft size={16} /> {step === "final-check" ? "Back to questions" : "Back"}
-            </button>
-          ) : (
-            <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100">Manage Assessment</h2>
-          )}
-          <div className="flex items-center gap-2">
-            {step !== "menu" && <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100">Manage Assessment</h2>}
-            <button onClick={onClose} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-zinc-700">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
           </div>
+
+          <ol className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+            {STEP_CRUMBS.map((crumb, i) => (
+              <Fragment key={crumb.key}>
+                {i > 0 && <li aria-hidden className="h-px w-5 bg-slate-200 dark:bg-zinc-700" />}
+                <li
+                  aria-current={i === crumbIndex ? "step" : undefined}
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                    i === crumbIndex
+                      ? "bg-emerald-600 text-white"
+                      : i < crumbIndex
+                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+                        : "bg-slate-100 text-slate-400 dark:bg-zinc-800 dark:text-zinc-500"
+                  }`}
+                >
+                  {i < crumbIndex && <Check size={11} strokeWidth={3} />}
+                  {i + 1}. {crumb.label}
+                </li>
+              </Fragment>
+            ))}
+          </ol>
         </div>
 
-        <div className="max-h-[78vh] space-y-4 overflow-y-auto p-5">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
           {step === "menu" && (
             <>
               {renderSettings()}
@@ -1460,48 +1525,78 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
                 </select>
               </label>
               <p className="text-xs text-slate-500 dark:text-zinc-400">
-                Each question below has its own section selector — set one to General or any domain, then confirm. Existing questions in each target section are kept.
+                Questions are grouped by the section they will be saved to. Each question has its own section selector — moving one puts it under that group. Existing questions in each target section are kept.
               </p>
               <div className="space-y-4">
-                {pdfQuestions.map((q, qi) => {
-                  const target = pdfTargets[qi] ?? "general";
-                  const isNew = pdfNewDomainFor === qi;
-                  return (
-                    <div key={qi}>
-                      <div className="mb-1 flex flex-wrap items-center justify-end gap-2">
-                        <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-zinc-400">
-                          <span>Section</span>
-                          <select
-                            value={isNew ? NEW_DOMAIN_VALUE : target}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              if (v === NEW_DOMAIN_VALUE) { setPdfNewDomainFor(qi); setPdfNewDomainName(""); return; }
-                              setPdfTargets((prev) => ({ ...prev, [qi]: v }));
-                            }}
-                            className="rounded-md border border-slate-200 px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-emerald-500 dark:border-zinc-800 dark:bg-zinc-900"
-                          >
-                            <option value="general">General / Common questions</option>
-                            {domains.map((d) => (
-                              <option key={d.id} value={d.id}>{d.name.trim() || "Untitled domain"}</option>
-                            ))}
-                            <option value={NEW_DOMAIN_VALUE}>+ New domain...</option>
-                          </select>
-                        </label>
-                        {isNew && (
-                          <input
-                            autoFocus
-                            value={pdfNewDomainName}
-                            onChange={(e) => setPdfNewDomainName(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitNewPdfDomain(); } }}
-                            placeholder="Domain name"
-                            className="rounded-md border border-slate-200 px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-emerald-500 dark:border-zinc-800 dark:bg-zinc-900"
-                          />
-                        )}
+                {pdfGroups.map((group) => (
+                  <div key={group.key} className="rounded-xl border border-slate-200 p-4 dark:border-zinc-800">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <h4 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">{group.label}</h4>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-zinc-800 dark:text-zinc-300">
+                          {group.indices.length} question{group.indices.length === 1 ? "" : "s"}
+                        </span>
                       </div>
-                      {renderQuestionCard(q, qi, true, pdfQuestions, setPdfQuestions)}
                     </div>
-                  );
-                })}
+
+                    <RequiredSplitter
+                      count={group.indices.length}
+                      currentRequired={group.indices.filter((qi) => pdfQuestions[qi].required).length}
+                      onApply={(flags) =>
+                        setPdfQuestions((prev) => {
+                          const next = [...prev];
+                          group.indices.forEach((qi, j) => {
+                            if (flags[j] !== undefined) next[qi] = { ...next[qi], required: flags[j] };
+                          });
+                          return next;
+                        })
+                      }
+                    />
+
+                    <div className="mt-3 space-y-4">
+                      {group.indices.map((qi, position) => {
+                        const q = pdfQuestions[qi];
+                        const target = pdfTargets[qi] ?? "general";
+                        const isNew = pdfNewDomainFor === qi;
+                        return (
+                          <div key={qi}>
+                            <div className="mb-1 flex flex-wrap items-center justify-end gap-2">
+                              <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-zinc-400">
+                                <span>Section</span>
+                                <select
+                                  value={isNew ? NEW_DOMAIN_VALUE : target}
+                                  onChange={(e) => {
+                                    const v = e.target.value;
+                                    if (v === NEW_DOMAIN_VALUE) { setPdfNewDomainFor(qi); setPdfNewDomainName(""); return; }
+                                    setPdfTargets((prev) => ({ ...prev, [qi]: v }));
+                                  }}
+                                  className="rounded-md border border-slate-200 px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-emerald-500 dark:border-zinc-800 dark:bg-zinc-900"
+                                >
+                                  <option value="general">General / Common questions</option>
+                                  {domains.map((d) => (
+                                    <option key={d.id} value={d.id}>{d.name.trim() || "Untitled domain"}</option>
+                                  ))}
+                                  <option value={NEW_DOMAIN_VALUE}>+ New domain...</option>
+                                </select>
+                              </label>
+                              {isNew && (
+                                <input
+                                  autoFocus
+                                  value={pdfNewDomainName}
+                                  onChange={(e) => setPdfNewDomainName(e.target.value)}
+                                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitNewPdfDomain(); } }}
+                                  placeholder="Domain name"
+                                  className="rounded-md border border-slate-200 px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-emerald-500 dark:border-zinc-800 dark:bg-zinc-900"
+                                />
+                              )}
+                            </div>
+                            {renderQuestionCard(q, qi, true, pdfQuestions, setPdfQuestions, position)}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             </>
           )}
@@ -1570,41 +1665,56 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
               </button>
             </>
           )}
+        </div>
 
-          {error && <p className="text-sm text-rose-600">{error}</p>}
-          {success && <p className="text-sm text-emerald-600">{success}</p>}
-
-          <div className="flex justify-end gap-2 border-t border-slate-100 pt-2 dark:border-zinc-800">
-            <button onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700">Cancel</button>
-            {(step === "manual" || step === "menu") && (
-              <button onClick={() => void handleSave()} disabled={saving} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-zinc-200">
-                {saving ? "Saving..." : "Save Assessment"}
-              </button>
-            )}
-            {step === "pdf-review" && (
-              <button onClick={handlePdfConfirm} disabled={saving} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50">
-                {saving ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                {saving ? "Saving..." : "Confirm & Save"}
-              </button>
-            )}
-            {step === "final-check" && (
-              <>
-                <button onClick={() => { setPdfPending(null); setStep("menu"); }} disabled={saving} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700">
-                  Discard
+        <div className="shrink-0 border-t border-slate-200 bg-white px-5 py-3.5 dark:border-zinc-800 dark:bg-[#000000]">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 space-y-1 text-sm">
+              {error && <p className="text-rose-600 dark:text-rose-400">{error}</p>}
+              {success && <p className="text-emerald-600 dark:text-emerald-400">{success}</p>}
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700">Cancel</button>
+              {(step === "manual" || step === "menu") && (
+                <button onClick={() => void handleSave()} disabled={saving} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-zinc-200">
+                  {saving ? "Saving..." : "Save Assessment"}
                 </button>
-                <button
-                  onClick={() => void handleSubmitPending()}
-                  disabled={saving || !pdfPending || !negativeMarking.ok}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-                >
-                  {saving ? <Loader2 size={14} className="animate-spin" /> : <CircleCheck size={14} />}
-                  {saving ? "Saving..." : "Submit assessment"}
+              )}
+              {step === "pdf-review" && (
+                <button onClick={handlePdfConfirm} disabled={saving} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50">
+                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                  {saving ? "Saving..." : "Confirm & Save"}
                 </button>
-              </>
-            )}
+              )}
+              {step === "final-check" && (
+                <>
+                  <button onClick={() => { setPdfPending(null); setStep("menu"); }} disabled={saving} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700">
+                    Discard
+                  </button>
+                  <button
+                    onClick={() => void handleSubmitPending()}
+                    disabled={saving || !pdfPending || !negativeMarking.ok}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+                  >
+                    {saving ? <Loader2 size={14} className="animate-spin" /> : <CircleCheck size={14} />}
+                    {saving ? "Saving..." : "Submit assessment"}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmDiscardOpen}
+        title="Remove all questions?"
+        description={`This removes all ${totalCount} question${totalCount === 1 ? "" : "s"} (general and every domain) from this assessment. Nothing changes on the server until you press Save Assessment.`}
+        confirmLabel="Remove all questions"
+        cancelLabel="Keep questions"
+        onConfirm={performDiscard}
+        onCancel={() => setConfirmDiscardOpen(false)}
+      />
     </div>
   );
 }

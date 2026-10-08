@@ -6,7 +6,7 @@ import { ATSCandidate } from "@/models/ATSCandidate";
 import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 import { ATSTimeline } from "@/models/ATSTimeline";
-import { extractResumeText, scoreResumeWithGemini } from "@/lib/ats-scorer";
+import { extractResumeText, resolveAtsModelConfig, scoreResume } from "@/lib/ats-scorer";
 import { closestRegionOf, isDetectedState } from "@/lib/candidate-region";
 import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
 
@@ -43,8 +43,17 @@ export async function POST(request: Request, { params }: Params) {
   const candidates = await ATSCandidate.find(filter);
   if (candidates.length === 0) return jsonError(force ? "No candidates to re-score." : "All candidates already scored.", 400);
 
-  const company = (await Company.findById(user.company).select("addresses multiOffice").lean()) as any;
+  const company = (await Company.findById(user.company).select("addresses multiOffice atsProvider atsModelApiKey atsModelName").lean()) as any;
   const regions = Array.isArray(company?.addresses) ? (company.addresses as any[]) : [];
+
+  const modelConfig = resolveAtsModelConfig(company);
+  if (!modelConfig.apiKey) {
+    const providerLabel = modelConfig.provider === "gemini" ? "Gemini" : "OpenRouter";
+    return jsonError(
+      `No ${providerLabel} API key configured for ATS scoring. Add one in Profile Hub → HR Policy → ATS Scoring, or set ${modelConfig.provider === "gemini" ? "GEMINI_API_KEY" : "OPENROUTER_API_KEY"}.`,
+      400,
+    );
+  }
 
   let scored = 0;
   let selected = 0;
@@ -82,13 +91,14 @@ export async function POST(request: Request, { params }: Params) {
         regions,
       });
 
-      const result = await scoreResumeWithGemini(
+      const result = await scoreResume(
         resumeText,
         (job as any).title || "",
         (job as any).description || "",
         (job as any).requiredSkills || [],
         (job as any).requiredExperienceYears ?? null,
         (job as any).requiredExperienceMaxYears ?? null,
+        modelConfig,
       );
 
       const status = result.score >= threshold ? "selected" : "rejected";
@@ -116,7 +126,7 @@ export async function POST(request: Request, { params }: Params) {
       scored++;
       if (status === "selected") selected++;
       else rejected++;
-      // Small pause between candidates to avoid hammering the Gemini API.
+      // Small pause between candidates to avoid hammering the scoring API.
       await new Promise((r) => setTimeout(r, 1000));
     } catch (err) {
       console.error(`ATS scoring failed for candidate ${candidate._id}:`, err);

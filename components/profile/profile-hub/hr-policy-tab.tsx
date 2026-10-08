@@ -10,6 +10,8 @@ import { ExitSettlementSection } from "./sections/exit-settlement-section";
 import { WfhAdminSection, type WfhAdminState } from "./sections/wfh-admin-section";
 import { usePolicySettings } from "./hooks/use-policy-settings";
 import { useWfh } from "./hooks/use-wfh";
+import { useAtsSettings } from "./hooks/use-ats-settings";
+import { AtsScoringSection } from "./sections/ats-scoring-section";
 
 export function HrPolicyTab({
   company,
@@ -29,6 +31,7 @@ export function HrPolicyTab({
   const { data: session } = useSession();
   const policy = usePolicySettings(company, refresh, showToast);
   const wfh = useWfh(company, refresh, showToast);
+  const ats = useAtsSettings(company, showToast);
 
   const [policyInfo, setPolicyInfo] = useState<{
     foodAmount: number;
@@ -79,9 +82,12 @@ export function HrPolicyTab({
   };
 
   const canManageWfh = (actorRole === "admin" || actorRole === "human-resource") && profile?.companyStatus === "approved";
+  const canManageAts = (actorRole === "admin" || actorRole === "human-resource") && profile?.companyStatus === "approved";
 
   return (
     <div className="space-y-6">
+      {canManageAts ? <AtsScoringSection state={ats} /> : null}
+
       {canEdit ? (
         <PolicyConfigSection
           companyName={String(company?.name ?? "")}

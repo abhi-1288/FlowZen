@@ -103,7 +103,13 @@ const CompanySchema = new Schema(
     stageOrder: {
       type: [String],
       default: ["applied", "screening", "assessment", "technical-interview", "manager-round", "hr-round", "offer", "joined", "ats-rejected", "rejected"],
-    }
+    },
+    // Company-wide ATS resume-scoring model. The API key is stored as plain
+    // text and is only ever returned to the UI masked; `atsModelName` blank
+    // means "use the provider default" (openrouter/free, gemini-3.5-flash).
+    atsProvider: { type: String, enum: ["openrouter", "gemini"], default: "openrouter" },
+    atsModelApiKey: { type: String, default: "" },
+    atsModelName: { type: String, default: "" }
   },
   { timestamps: true }
 );

@@ -167,6 +167,12 @@ const ATSCandidateSchema = new Schema(
     assessmentSlotStart: { type: Date, default: null },
     assessmentSubmittedAt: { type: Date, default: null },
     assessmentInviteSentAt: { type: Date, default: null },
+    /**
+     * Same-day morning reminder latch, separate from `assessmentInviteSentAt`
+     * (the day-before latch). Both are cleared when the candidate enters the
+     * assessment stage or the schedule moves, so a new window re-arms them.
+     */
+    assessmentSameDayReminderSentAt: { type: Date, default: null },
     // Stamped when this candidate is emailed an invite to update their
     // application. Drives the idempotent send in lib/edit-application-emails.ts,
     // and is cleared when HR re-enables editing so they are invited again.
@@ -248,6 +254,12 @@ const ATSCandidateSchema = new Schema(
       bestScore: { type: Number, default: null, min: 0, max: 100 },
       lastSubmittedAt: { type: Date, default: null },
       inviteSentAt: { type: Date, default: null },
+      /**
+       * Same-day morning reminder latch. `inviteSentAt` doubles as the
+       * day-before latch — a manual "Send invite emails now" already told the
+       * candidate, so this only covers the morning-of nudge.
+       */
+      sameDayReminderSentAt: { type: Date, default: null },
     },
     convertedEmail: { type: String, default: "", trim: true, lowercase: true },
     conversionOtpHash: { type: String, default: "", select: false },

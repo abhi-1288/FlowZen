@@ -33,9 +33,12 @@ export async function POST(request: Request, { params }: Params) {
   if (!hq.ok) return hq.response;
   if (!user.company) return jsonError("No company found.", 400);
 
-  const job = await ATSJob.findOne({ _id: id, company: user.company }).select("assessment").lean();
+  const job = await ATSJob.findOne({ _id: id, company: user.company }).select("assessment status").lean();
   if (!job) return jsonError("Job not found.", 404);
   if (!job?.assessment) return jsonError("Online assessment is not enabled for this job.", 400);
+  if (!["open", "draft"].includes(String((job as any).status))) {
+    return jsonError("This job is not open, so mock test invitations cannot be sent.", 400);
+  }
 
   const outcome = await sendMockTestInvitationsForJob(id);
   if (outcome.status === "unavailable") {

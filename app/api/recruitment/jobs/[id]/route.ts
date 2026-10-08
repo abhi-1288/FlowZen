@@ -425,6 +425,20 @@ if (body.requiredExperienceYears !== undefined) updates.requiredExperienceYears 
     }
   }
 
+  // A moved assessment date is a new set of reminders, so clear the latches for
+  // candidates already in the assessment stage; a cosmetic job save leaves them.
+  const previousAssessmentDateMs = (existingJob as any)?.assessmentDate
+    ? new Date((existingJob as any).assessmentDate).getTime()
+    : null;
+  const nextAssessmentDateMs =
+    updates.assessmentDate === undefined
+      ? previousAssessmentDateMs
+      : updates.assessmentDate
+        ? new Date(updates.assessmentDate as any).getTime()
+        : null;
+  const assessmentDateChanged =
+    updates.assessmentDate !== undefined && previousAssessmentDateMs !== nextAssessmentDateMs;
+
   let job = await ATSJob.findOneAndUpdate(
     { _id: id, company: companyId },
     { $set: updates },
@@ -432,6 +446,13 @@ if (body.requiredExperienceYears !== undefined) updates.requiredExperienceYears 
   );
   if (!job) return jsonError("Job not found.", 404);
   job = await ATSJob.findById(job._id).populate("company", "name");
+
+  if (assessmentDateChanged) {
+    await ATSCandidate.updateMany(
+      { job: id, company: companyId, stage: "assessment" },
+      { $set: { assessmentInviteSentAt: null, assessmentSameDayReminderSentAt: null } }
+    );
+  }
 
   await ATSAuditLog.create({
     actor: userId,
