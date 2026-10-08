@@ -5,6 +5,7 @@ import { ATSAssessment } from "@/models/ATSAssessment";
 import { jsonError } from "@/lib/api";
 import { findCandidateByToken } from "@/lib/candidate-portal";
 import { pickDomain } from "@/lib/assessment";
+import { buildServedAssessmentPaper } from "@/lib/assessment-paper";
 import {
   resolveBestMockAttempt,
   resolveBestReleasedMockAttempt,
@@ -123,15 +124,19 @@ export async function GET(request: Request) {
 
   if (!(assessment as any).answerKeyPublished) return jsonError("Answer key has not been published yet.", 403);
 
-  // Rebuild the exact question order the candidate received at /start.
+  // Rebuild the exact question order the candidate received at /start by
+  // replaying the sample committed there. Legacy attempts have no sample, so
+  // they fall back to the whole pool in order.
   const domainName = (candidate as any).assessmentDomain || "";
   const chosenDomain = pickDomain((assessment.domains as any[]) || [], domainName);
-  const sourceQuestions = [
-    ...(assessment.questions as any[]) || [],
-    ...(chosenDomain?.questions as any[]) || [],
-  ];
+  const served = (candidate as any).assessmentQuestionIndices;
+  const paper = buildServedAssessmentPaper(
+    (assessment.questions as any[]) || [],
+    (chosenDomain?.questions as any[]) || [],
+    Array.isArray(served) && served.length ? served : null
+  );
 
-  const questions = sourceQuestions.map((q: any, idx: number) => {
+  const questions = paper.served.map((q: any, idx: number) => {
     const a = ((candidate as any).assessmentAnswers || []).find((x: any) => x.questionIndex === idx);
     return {
       index: idx,

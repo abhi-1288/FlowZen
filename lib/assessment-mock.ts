@@ -206,6 +206,28 @@ export function sampleQuestionIndices(
 }
 
 /**
+ * Draw a fixed-*count* sample rather than a percentage.
+ *
+ * The mock paper is sized as a percentage of the bank, but the real assessment
+ * caps its paper by absolute counts (the total `questionLimit` and each domain's
+ * `limit`). Shares the seeded shuffle, so a candidate's paper is stable across a
+ * reload and two concurrent first-starts agree.
+ */
+export function sampleIndicesByCount(
+  poolSize: number,
+  count: number,
+  seed: string,
+  opts: { shuffleQuestions?: boolean } = {}
+): number[] {
+  const total = Math.max(0, Math.floor(Number(poolSize) || 0));
+  const size = Math.min(total, Math.max(0, Math.floor(Number(count) || 0)), MAX_SERVED_QUESTIONS);
+  if (size === 0) return [];
+  const picked = shuffledIndices(total, mulberry32(hashSeed(seed))).slice(0, size);
+  if (opts.shuffleQuestions === false) picked.sort((a, b) => a - b);
+  return picked;
+}
+
+/**
  * Drop anything that cannot address the pool: non-integers, negatives, indices
  * past the end, and repeats. Keeps first occurrence, because a duplicated index
  * would otherwise be served twice and graded against the same key.
@@ -231,7 +253,7 @@ export function normaliseMockIndices(
 
 // ── The served paper ─────────────────────────────────────────────────────────
 
-type PoolQuestion = {
+export type PoolQuestion = {
   type?: string;
   correctIndex?: number;
   marks?: number;

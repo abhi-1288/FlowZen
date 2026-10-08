@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { sweepExpiredMockAttempts } from "@/lib/assessment-auto-submit";
 
 /**
- * Mock auto-submit backstop. The invitation/reminder emails are sent by the
- * combined morning job (`/api/cron/reminders`), not here.
+ * Mock auto-submit backstop. The invitation email is sent by the assessment-day
+ * cron (`/api/cron/assessment-day`), not here.
  */
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");

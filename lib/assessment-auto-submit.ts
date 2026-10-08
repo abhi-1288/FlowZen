@@ -2,7 +2,8 @@ import { connectDb } from "@/lib/db";
 import { ATSCandidate } from "@/models/ATSCandidate";
 import { ATSJob } from "@/models/ATSJob";
 import { ATSAssessment } from "@/models/ATSAssessment";
-import { buildAssessmentQuestions, getCandidateDeadlineMs, pickDomain } from "@/lib/assessment";
+import { getCandidateDeadlineMs, pickDomain } from "@/lib/assessment";
+import { buildServedAssessmentPaper } from "@/lib/assessment-paper";
 import { finalizeAssessmentSubmission, finalizeMockSubmission, normalizeAssessmentAnswers } from "@/lib/assessment-finalize";
 import { loadCandidateAssessment } from "@/lib/assessment-window";
 import { buildMockPaper, resolveMockSitting } from "@/lib/assessment-mock-attempt";
@@ -60,10 +61,13 @@ export async function finalizeCandidateIfExpired(
   if (!assessment) return null;
 
   const chosenDomain = pickDomain((assessment.domains as any[]) || [], candidate.assessmentDomain);
-  const questions = buildAssessmentQuestions(
+  const served = (candidate as any).assessmentQuestionIndices;
+  const paper = buildServedAssessmentPaper(
     (assessment.questions as any[]) || [],
-    (chosenDomain?.questions as any[]) || []
+    (chosenDomain?.questions as any[]) || [],
+    Array.isArray(served) && served.length ? served : null
   );
+  const questions = paper.key;
   if (!questions.length) return null;
 
   // Re-check inside the write guard: another tab or a manual submit may have

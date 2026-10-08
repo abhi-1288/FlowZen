@@ -10,6 +10,7 @@ import {
   MIN_NOISE_THRESHOLD_DB,
   type ProctoringConfig,
 } from "@/lib/assessment-proctoring";
+import { useNotificationToast } from "@/lib/toast-context";
 
 type Question = {
   text: string;
@@ -95,8 +96,10 @@ function normalizeQuestion(q: any): Question {
 }
 
 export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onClose: () => void }) {
+  const { showSuccessToast } = useNotificationToast();
   const [passScore, setPassScore] = useState(50);
   const [durationMinutes, setDurationMinutes] = useState(60);
+  const [questionLimit, setQuestionLimit] = useState(0);
   // Kept as text so HR can type "1/4" as well as "0.25"; the number and the
   // fraction label are both derived from it.
   const [negativeMarkingText, setNegativeMarkingText] = useState("0");
@@ -174,6 +177,7 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
               }))
             : [];
           setDomains(pickedDomains);
+          setQuestionLimit(Number(data.assessment.questionLimit) || 0);
         }
         if (typeof data.job?.assessmentDurationMinutes === "number") {
           setDurationMinutes(data.job.assessmentDurationMinutes);
@@ -314,6 +318,7 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
       durationMinutes,
       negativeMarking: marking.ok ? marking.value : 0,
       negativeMarkingLabel: marking.ok ? marking.label : "",
+      questionLimit: Math.max(0, Math.min(500, questionLimit || 0)),
       windowMode,
       timeSlots: timeSlots.filter((s) => TIME_RE.test(s)).map((start) => ({ start })),
       proctoring,
@@ -349,6 +354,7 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error((data as { error?: string })?.error || `Server error (${res.status}).`);
       setSuccess("Assessment saved successfully.");
+      showSuccessToast("Assessment saved successfully.");
       return true;
     } catch (e: any) {
       setError(e.message);
@@ -528,14 +534,7 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
     if (!pdfPending) return;
     const ok = await handleSave(pdfPending.general, pdfPending.domains);
     if (!ok) return;
-    setGeneral(pdfPending.general);
-    setDomains(pdfPending.domains);
-    setPdfPending(null);
-    // End the batch so a later PDF starts a fresh review list instead of
-    // re-adding these same questions.
-    setPdfBatchActive(false);
-    setAddingAnother(false);
-    setStep("manual");
+    onClose();
   }
 
   const totalCount = general.length + domains.reduce((s, d) => s + d.questions.length, 0);
@@ -582,49 +581,86 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
     const pending = pdfPending;
     if (!pending) return null;
     const live = pending.domains.filter((d) => d.questions.length > 0);
-    const generalCount = pending.general.length;
-    const total = generalCount + live.reduce((s, d) => s + d.questions.length, 0);
+    const generalBank = pending.general.length;
+
+    // Compute what the candidate will actually see, using the same rule as the
+    // server (lib/assessment-paper.ts): domain limit fills first, then general
+    // takes the remainder up to the total questionLimit.
+    const getEffectiveCounts = (domainLimit: number, domainCount: number) => {
+      const dl = Math.max(0, domainLimit);
+      let domainServed = dl > 0 ? Math.min(dl, domainCount) : domainCount;
+      let generalServed = generalBank;
+      if (questionLimit > 0) {
+        if (domainServed > questionLimit) domainServed = questionLimit;
+        generalServed = Math.max(0, Math.min(questionLimit - domainServed, generalBank));
+      }
+      return { generalServed, domainServed };
+    };
+
+    // For the header total, we can't pick a single domain; show the max possible
+    // served across all domains (or the general-only case). This is a rough upper
+    // bound for the "questions to be saved" count.
+    let total = 0;
+    if (live.length === 0) {
+      total = getEffectiveCounts(0, 0).generalServed;
+    } else {
+      // The candidate picks one domain, so show the max they could see.
+      const maxServed = live.map((d) => {
+        const { generalServed, domainServed } = getEffectiveCounts(d.limit || 0, d.questions.length);
+        return generalServed + domainServed;
+      });
+      total = Math.max(...maxServed);
+    }
 
     return (
       <div className="rounded-xl border border-slate-200 p-4 dark:border-zinc-800">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Questions to be saved</h3>
           <span className="text-xs text-slate-500 dark:text-zinc-400">
-            {total} question{total === 1 ? "" : "s"}
+            {total} question{total === 1 ? "" : "s"} will be served
           </span>
         </div>
 
         <div className="mt-3 space-y-2 text-sm">
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="text-slate-600 dark:text-zinc-300">
-              General / Common
-              <span className="ml-1 text-xs text-slate-400">every candidate answers these</span>
-            </span>
-            <span className="shrink-0 font-medium text-slate-900 dark:text-zinc-100">{generalCount}</span>
-          </div>
-
           {live.length === 0 ? (
-            <p className="text-xs text-slate-400">
-              No domain questions. Every candidate gets the same paper.
-            </p>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-slate-600 dark:text-zinc-300">
+                General / Common
+                <span className="ml-1 text-xs text-slate-400">every candidate answers these</span>
+              </span>
+              <span className="shrink-0 font-medium text-slate-900 dark:text-zinc-100">{getEffectiveCounts(0, 0).generalServed}</span>
+            </div>
           ) : (
-            live.map((d) => {
-              const limit = Math.max(0, d.limit || 0);
-              const served = limit > 0 ? Math.min(limit, d.questions.length) : d.questions.length;
-              const capped = limit > 0 && limit < d.questions.length;
-              return (
-                <div key={d.id} className="flex items-baseline justify-between gap-3">
-                  <span className="min-w-0 text-slate-600 dark:text-zinc-300">
-                    {d.name.trim() || "Untitled domain"}
-                    <span className="ml-1 text-xs text-slate-400">
-                      candidate sees {generalCount} + {served} = {generalCount + served}
-                      {capped ? ` (limit ${limit})` : ""}
+            <>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-slate-600 dark:text-zinc-300">
+                  General / Common
+                  <span className="ml-1 text-xs text-slate-400">every candidate answers these</span>
+                </span>
+                <span className="shrink-0 font-medium text-slate-900 dark:text-zinc-100">
+                  {live.map((d) => getEffectiveCounts(d.limit || 0, d.questions.length).generalServed).join(" / ") || generalBank}
+                </span>
+              </div>
+              {live.map((d) => {
+                const limit = Math.max(0, d.limit || 0);
+                const { generalServed, domainServed } = getEffectiveCounts(limit, d.questions.length);
+                const capped = limit > 0 && limit < d.questions.length;
+                const totalServed = generalServed + domainServed;
+                return (
+                  <div key={d.id} className="flex items-baseline justify-between gap-3">
+                    <span className="min-w-0 text-slate-600 dark:text-zinc-300">
+                      {d.name.trim() || "Untitled domain"}
+                      <span className="ml-1 text-xs text-slate-400">
+                        candidate sees {generalServed} + {domainServed} = {totalServed}
+                        {capped ? ` (limit ${limit})` : ""}
+                        {questionLimit > 0 && domainServed < limit ? " (capped by total limit)" : ""}
+                      </span>
                     </span>
-                  </span>
-                  <span className="shrink-0 font-medium text-slate-900 dark:text-zinc-100">{d.questions.length}</span>
-                </div>
-              );
-            })
+                    <span className="shrink-0 font-medium text-slate-900 dark:text-zinc-100">{d.questions.length}</span>
+                  </div>
+                );
+              })}
+            </>
           )}
         </div>
       </div>
@@ -857,7 +893,7 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
 
   const renderSettings = () => (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <label className="block">
         <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Passing Score (%)</span>
         <input type="number" min="0" max="100" value={passScore} onChange={(e) => setPassScore(Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" />
@@ -892,6 +928,15 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
         ) : (
           <span className="mt-1 block text-[11px] text-rose-600">{negativeMarking.error}</span>
         )}
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Total questions (optional)</span>
+        <input type="number" min="0" max="500" value={questionLimit} onChange={(e) => setQuestionLimit(Number(e.target.value) || 0)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800" placeholder="0 = no limit" />
+        <span className="mt-1 block text-[11px] text-slate-400">
+          {questionLimit > 0
+            ? `Candidate gets up to ${questionLimit} questions total (domains fill first, general takes the rest).`
+            : "No total cap — all general + domain questions are served."}
+        </span>
       </label>
       </div>
       {renderScheduling()}
@@ -1676,7 +1721,7 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
             <div className="flex flex-wrap justify-end gap-2">
               <button onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700">Cancel</button>
               {(step === "manual" || step === "menu") && (
-                <button onClick={() => void handleSave()} disabled={saving} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-zinc-200">
+                <button onClick={() => void handleSave().then((ok) => { if (ok) onClose(); })} disabled={saving} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-zinc-200">
                   {saving ? "Saving..." : "Save Assessment"}
                 </button>
               )}

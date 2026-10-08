@@ -167,18 +167,23 @@ const ATSCandidateSchema = new Schema(
     assessmentSlotStart: { type: Date, default: null },
     assessmentSubmittedAt: { type: Date, default: null },
     assessmentInviteSentAt: { type: Date, default: null },
-    /**
-     * Same-day morning reminder latch, separate from `assessmentInviteSentAt`
-     * (the day-before latch). Both are cleared when the candidate enters the
-     * assessment stage or the schedule moves, so a new window re-arms them.
-     */
-    assessmentSameDayReminderSentAt: { type: Date, default: null },
     // Stamped when this candidate is emailed an invite to update their
     // application. Drives the idempotent send in lib/edit-application-emails.ts,
     // and is cleared when HR re-enables editing so they are invited again.
     editApplicationInviteSentAt: { type: Date, default: null },
     assessmentResultPublishedAt: { type: Date, default: null },
     assessmentDomain: { type: String, default: "", trim: true, maxlength: 100 },
+    /**
+     * The paper this candidate was actually served: indices into
+     * `[...assessment.questions, ...chosenDomain.questions]`, in served order.
+     *
+     * Load-bearing for the same reason the mock's `questionIndices` is: answers
+     * are keyed by position, and with the per-candidate random sample the paper
+     * cannot be re-derived from the bank at submit time. Empty means "not yet
+     * sampled" (or a legacy attempt from before sampling existed), in which case
+     * the callers serve the whole pool in order — today's behaviour.
+     */
+    assessmentQuestionIndices: { type: [Number], default: [] },
     assessmentRawMarks: { type: Number, default: null },
     assessmentMaxMarks: { type: Number, default: null },
     // selectedOption stays null for unanswered questions so an autosaved
@@ -254,12 +259,6 @@ const ATSCandidateSchema = new Schema(
       bestScore: { type: Number, default: null, min: 0, max: 100 },
       lastSubmittedAt: { type: Date, default: null },
       inviteSentAt: { type: Date, default: null },
-      /**
-       * Same-day morning reminder latch. `inviteSentAt` doubles as the
-       * day-before latch — a manual "Send invite emails now" already told the
-       * candidate, so this only covers the morning-of nudge.
-       */
-      sameDayReminderSentAt: { type: Date, default: null },
     },
     convertedEmail: { type: String, default: "", trim: true, lowercase: true },
     conversionOtpHash: { type: String, default: "", select: false },

@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
-import { ATSCandidate } from "@/models/ATSCandidate";
 import { ATSJob } from "@/models/ATSJob";
 import { jsonError } from "@/lib/api";
 import { findCandidateByToken } from "@/lib/candidate-portal";
-import { buildAssessmentQuestions, getCandidateDeadlineMs, pickDomain } from "@/lib/assessment";
+import { getCandidateDeadlineMs, pickDomain } from "@/lib/assessment";
+import { buildServedAssessmentPaper } from "@/lib/assessment-paper";
 import {
   finalizeAssessmentSubmission,
   finalizeMockSubmission,
@@ -120,12 +120,17 @@ export async function POST(request: Request) {
   const assessment = await loadCandidateAssessment(job._id, candidate.company);
   if (!assessment) return jsonError("Assessment not available.", 400);
 
-  // Rebuild the exact question order the candidate received at /start.
+  // Rebuild the exact question order the candidate received at /start by
+  // replaying the sample committed there. Legacy attempts have no sample, so
+  // they fall back to the whole pool in order.
   const chosenDomain = pickDomain((assessment.domains as any[]) || [], (candidate as any).assessmentDomain);
-  const questions = buildAssessmentQuestions(
+  const served = (candidate as any).assessmentQuestionIndices;
+  const paper = buildServedAssessmentPaper(
     (assessment.questions as any[]) || [],
-    (chosenDomain?.questions as any[]) || []
+    (chosenDomain?.questions as any[]) || [],
+    Array.isArray(served) && served.length ? served : null
   );
+  const questions = paper.key;
   if (!questions.length) return jsonError("Assessment not available.", 400);
 
   const durationMin = job.assessmentDurationMinutes || null;

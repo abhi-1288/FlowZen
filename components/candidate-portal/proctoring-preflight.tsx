@@ -88,7 +88,7 @@ export function ProctoringPreflight({
             </span>
           </div>
           <p className="text-[10px] leading-relaxed text-slate-400">
-            This preview stays on your own screen. Nothing is recorded, uploaded or shared.
+            This preview stays on your own screen.
           </p>
         </div>
 

@@ -6,6 +6,7 @@ import { ATSAssessment } from "@/models/ATSAssessment";
 import { ATSCandidate } from "@/models/ATSCandidate";
 import { User } from "@/models/User";
 import { pickDomain } from "@/lib/assessment";
+import { buildServedAssessmentPaper } from "@/lib/assessment-paper";
 import { parseNegativeMarking } from "@/lib/assessment-negative-marking";
 import {
   DEFAULT_PROCTORING,
@@ -73,17 +74,19 @@ export async function GET(_request: Request, { params }: Params) {
     assessmentStatus: "pending",
     assessmentSubmittedAt: { $ne: null },
   })
-    .select("firstName lastName email assessmentScore assessmentDomain assessmentAnswers")
+    .select("firstName lastName email assessmentScore assessmentDomain assessmentAnswers assessmentQuestionIndices")
     .lean();
 
   const essayReviews = essayPendingCandidates.map((c: any) => {
     const domain = pickDomain((assessment?.domains as any[]) || [], c.assessmentDomain);
-    const flat = [
-      ...(assessment?.questions || []),
-      ...(domain?.questions || []),
-    ];
+    const served = c.assessmentQuestionIndices;
+    const paper = buildServedAssessmentPaper(
+      (assessment?.questions || []) as any[],
+      (domain?.questions || []) as any[],
+      Array.isArray(served) && served.length ? served : null
+    );
     const qIndexToText = new Map<number, string>();
-    flat.forEach((q: any, i: number) => qIndexToText.set(i, q.text));
+    paper.served.forEach((q: any, i: number) => qIndexToText.set(i, q.text));
     return {
       _id: String(c._id),
       firstName: c.firstName,
@@ -162,6 +165,10 @@ export async function POST(request: Request, { params }: Params) {
     }
   }
 
+  const questionLimit = body.questionLimit != null
+    ? Math.max(0, Math.min(500, Number(body.questionLimit)))
+    : 0;
+
   const durationMinutes =
     body.durationMinutes != null
       ? Math.max(1, Math.min(600, Number(body.durationMinutes)))
@@ -209,29 +216,11 @@ export async function POST(request: Request, { params }: Params) {
 
   await ATSJob.findByIdAndUpdate(job._id, { assessmentDurationMinutes: durationMinutes });
 
-  // A moved assessment schedule is a new set of reminders: without clearing the
-  // latches, candidates already emailed for the old slots would never hear
-  // about the new ones. Cosmetic saves (pass score, proctoring) leave them be.
-  const previousAssessment = await ATSAssessment.findOne({ job: id, company: user.company })
-    .select("timeSlots windowMode")
-    .lean();
-  const normalizeSlots = (slots: any[]) =>
-    (slots || []).map((s) => String(s?.start || "").trim()).filter(Boolean).sort();
-  const scheduleChanged =
-    ((previousAssessment as any)?.windowMode ?? "relief") !== windowMode ||
-    JSON.stringify(normalizeSlots((previousAssessment as any)?.timeSlots as any[])) !==
-      JSON.stringify(normalizeSlots(timeSlots));
-  if (scheduleChanged) {
-    await ATSCandidate.updateMany(
-      { job: id, company: user.company, stage: "assessment" },
-      { $set: { assessmentInviteSentAt: null, assessmentSameDayReminderSentAt: null } }
-    );
-  }
-
   const set = {
     passScore,
     negativeMarking,
     negativeMarkingLabel,
+    questionLimit,
     windowMode,
     timeSlots,
     proctoring,

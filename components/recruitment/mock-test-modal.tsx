@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { KOLKATA_OFFSET_MS } from "@/lib/date-utils";
+import { useNotificationToast } from "@/lib/toast-context";
 
 /**
  * HR configuration for a job's mock test.
@@ -144,6 +145,7 @@ const inputCls =
 const cardCls = "rounded-lg border border-slate-200 p-4 dark:border-zinc-800";
 
 export function MockTestModal({ jobId, onClose, totalQuestions }: Props) {
+  const { showSuccessToast } = useNotificationToast();
   const [data, setData] = useState<Payload | null>(null);
   const [form, setForm] = useState<Form | null>(null);
   const [loading, setLoading] = useState(true);
@@ -276,8 +278,8 @@ export function MockTestModal({ jobId, onClose, totalQuestions }: Props) {
         setError(json.error || "Could not save the mock test.");
         return;
       }
-      setNotice("Mock test saved.");
-      await load();
+      showSuccessToast("Mock test saved.");
+      onClose();
     } catch {
       setError("Could not save the mock test.");
     } finally {

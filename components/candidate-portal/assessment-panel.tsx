@@ -379,6 +379,9 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
   const [proctorReady, setProctorReady] = useState(false);
   const [beginBusy, setBeginBusy] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  // Set when the browser refused the exam tab, so the candidate gets an
+  // explicit link instead of a silent no-op.
+  const [popupBlockedUrl, setPopupBlockedUrl] = useState("");
   const [extension, setExtension] = useState({
     status: (assessment.extensionRequest?.status ?? "none") as "none" | "pending" | "approved" | "denied",
     requestedMs: assessment.extensionRequest?.requestedMs ?? 0,
@@ -600,24 +603,35 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
    * The endpoint returns no questions while the candidate is in the waiting
    * room; the same call made after the start instant is what begins the exam, so
    * this single function covers lobby entry, starting, and resuming.
+   *
+   * Resolves to whether it succeeded — the caller keeps the preflight open on
+   * failure so the error (and the popup fallback link) stay on screen.
    */
-  async function handleStart(options?: { proctoringAck?: boolean; devices?: string }) {
+  async function handleStart(options?: { proctoringAck?: boolean; devices?: string }): Promise<boolean> {
     setError("");
     if (assessment.domains?.length && !selectedDomain && !assessment.domain) {
       setError("Please select your domain to start the assessment.");
-      return;
+      return false;
     }
 
     // Normal mode: the exam runs in its own tab so it survives navigating away
     // from the portal. Carry the pending domain, slot and track across with it.
+    //
+    // Must stay synchronous with the click that got us here: any await before
+    // window.open() lets the popup blocker reject it.
     if (!autoStart) {
       const params = new URLSearchParams({ token, test: "true" });
       if (isMock) params.set("mode", "mock");
       const domain = assessment.domain || selectedDomain;
       if (domain) params.set("domain", domain);
       if (selectedSlot) params.set("slot", selectedSlot);
-      window.open(`/candidate-portal?${params.toString()}`, "_blank");
-      return;
+      const url = `/candidate-portal?${params.toString()}`;
+      const opened = window.open(url, "_blank");
+      setPopupBlockedUrl(opened ? "" : url);
+      if (!opened) {
+        setError("Your browser blocked the exam tab. Allow popups for this site, or use the link below.");
+      }
+      return Boolean(opened);
     }
 
     try {
@@ -646,7 +660,7 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
         setSelectedDomain(data.domain || selectedDomain);
         if (data.slotStart) setSelectedSlot(data.slotStart);
         onRefresh();
-        return;
+        return true;
       }
 
       setQuestions(data.questions || []);
@@ -659,34 +673,45 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
       try {
         localStorage.setItem(cacheKey, JSON.stringify({ q: data.questions || [], e: data.endsAt }));
       } catch {}
+      return true;
     } catch (e: any) {
       setError(e.message);
       lobbyFetchRef.current = false;
+      return false;
     }
   }
 
   /**
    * The preflight's "Begin assessment".
    *
-   * Fullscreen is requested here, inside the click handler, because that is the
-   * only context in which a browser will grant it. The request is best-effort:
-   * if it is refused the exam still starts, and the guard downgrades to a
-   * warning rather than a block it could never satisfy.
+   * In the portal tab (!autoStart) the only job of this gesture is to open the
+   * exam tab, so `handleStart` runs first with no await in front of it — the
+   * popup blocker only lets window.open() through inside the click itself.
+   * Fullscreen is deliberately NOT requested here: the exam runs in the new
+   * tab, where the candidate's own Begin press (autoStart) requests it.
+   *
+   * In the exam tab (autoStart) fullscreen is requested first, still inside
+   * the click handler, because that is the only context in which a browser
+   * will grant it. The request is best-effort: if it is refused the exam still
+   * starts, and the guard downgrades to a warning rather than a block it could
+   * never satisfy.
    */
   async function beginProctoredAssessment() {
     setBeginBusy(true);
     setError("");
     try {
-      if (proctoringSettings?.requireFullscreen !== false) {
-        await proctoring.requestFullscreen().catch(() => false);
-      }
       const devices =
         media.stream?.getVideoTracks().some((t) => t.enabled) &&
         media.stream?.getAudioTracks().some((t) => t.enabled)
           ? "ok"
           : "partial";
-      await handleStart({ proctoringAck: true, devices });
-      setPreflight(false);
+      if (autoStart && proctoringSettings?.requireFullscreen !== false) {
+        await proctoring.requestFullscreen().catch(() => false);
+      }
+      const ok = await handleStart({ proctoringAck: true, devices });
+      // Stay on the preflight when the start failed, so the candidate reads the
+      // error (or the popup fallback link) instead of a silent close.
+      if (ok) setPreflight(false);
     } finally {
       setBeginBusy(false);
     }
@@ -701,6 +726,23 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
       setRestoring(false);
     }
   }
+
+  /**
+   * Shown when window.open() came back null. A direct click on an anchor is a
+   * fresh user gesture, so this link works even after the popup was blocked.
+   */
+  const popupBlockedLink = popupBlockedUrl ? (
+    <p className="mt-2 text-sm">
+      <a
+        href={popupBlockedUrl}
+        target="_blank"
+        rel="noopener"
+        className="font-medium text-slate-900 underline underline-offset-2 hover:opacity-75 dark:text-zinc-100"
+      >
+        Open the exam in a new tab
+      </a>
+    </p>
+  ) : null;
 
   // An HR-approved extension lands in the portal payload on the next refresh;
   // poll while sitting so a granted request moves the visible clock without the
@@ -1087,7 +1129,7 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
             tone={accent}
           />
         )}
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="sticky top-0 z-30 -mx-5 -mt-5 flex flex-wrap items-center justify-between gap-2 rounded-t-xl border-b border-[var(--c-border-light)] bg-[var(--c-bg-card)] px-5 py-3 dark:border-zinc-800">
           <div>
             <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">{isMock ? "Mock Test" : "Online Assessment"}</h3>
             {assessment.domain && (
@@ -1179,10 +1221,12 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
             </div>
           ))}
         </div>
-        {error && <p className="mt-2 flex items-center gap-1.5 text-sm text-rose-600"><AlertTriangle size={14} /> {error}</p>}
-        <button onClick={() => void handleSubmitClick()} disabled={submitting} className="mt-4 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: accent }}>
-          <Send size={14} /> {submitting ? "Submitting..." : isMock ? "Submit Mock Test" : "Submit Assessment"}
-        </button>
+        <div className="sticky bottom-0 z-30 -mx-5 -mb-5 mt-4 flex flex-wrap items-center gap-3 rounded-b-xl border-t border-[var(--c-border-light)] bg-[var(--c-bg-card)] px-5 py-3 dark:border-zinc-800">
+          <button onClick={() => void handleSubmitClick()} disabled={submitting} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: accent }}>
+            <Send size={14} /> {submitting ? "Submitting..." : isMock ? "Submit Mock Test" : "Submit Assessment"}
+          </button>
+          {error && <p className="flex items-center gap-1.5 text-sm text-rose-600"><AlertTriangle size={14} /> {error}</p>}
+        </div>
       </div>
     );
   }
@@ -1210,6 +1254,7 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
           tone={accent}
         />
         {error && <p className="mt-2 flex items-center gap-1.5 text-sm text-rose-600"><AlertTriangle size={14} /> {error}</p>}
+        {popupBlockedLink}
       </div>
     );
   }
@@ -1278,6 +1323,7 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
         </>
       )}
       {error && <p className="mt-2 flex items-center gap-1.5 text-sm text-rose-600"><AlertTriangle size={14} /> {error}</p>}
+      {popupBlockedLink}
     </div>
   );
 }

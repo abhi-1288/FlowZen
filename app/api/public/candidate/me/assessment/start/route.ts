@@ -5,7 +5,8 @@ import { ATSJob } from "@/models/ATSJob";
 import { ATSTimeline } from "@/models/ATSTimeline";
 import { jsonError } from "@/lib/api";
 import { findCandidateByToken } from "@/lib/candidate-portal";
-import { buildAssessmentQuestions, getCandidateDeadlineMs, pickDomain } from "@/lib/assessment";
+import { getCandidateDeadlineMs, pickDomain } from "@/lib/assessment";
+import { buildServedAssessmentPaper, resolveServedIndices } from "@/lib/assessment-paper";
 import { resolveProctoringConfig } from "@/lib/assessment-proctoring";
 import {
   getAssessmentAnchorMs,
@@ -20,7 +21,6 @@ import {
   buildMockPaper,
   drawMockSample,
   isMockMode,
-  mockPrefix,
   mockSampleSeed,
   resolveMockDomain,
   resolveMockSitting,
@@ -426,19 +426,42 @@ export async function POST(request: Request) {
     );
   }
 
-  const flatQuestions = buildAssessmentQuestions(
-    (assessment.questions as any[]) || [],
-    (chosenDomain?.questions || []) as any[]
-  );
-  if (!flatQuestions.length) return jsonError("Assessment questions are not yet available.", 400);
+  const generalBank = (assessment.questions as any[]) || [];
+  const domainBank = (chosenDomain?.questions || []) as any[];
 
-  if (!alreadyStarted) {
+  let paper: { served: any[]; key: any[] };
+  let paperDomainName = chosenDomain?.name || (candidate as any).assessmentDomain || null;
+
+  if (alreadyStarted) {
+    // Replay the paper committed at the first start. Legacy attempts (started
+    // before sampling existed) have no indices, so they serve the whole pool in
+    // order — the behaviour they were started under.
+    const persisted = (candidate as any).assessmentQuestionIndices;
+    paper = buildServedAssessmentPaper(
+      generalBank,
+      domainBank,
+      Array.isArray(persisted) && persisted.length ? persisted : null
+    );
+  } else {
+    // Draw this candidate's sample and commit it as part of the start write.
+    const servedIndices = resolveServedIndices({
+      generalPool: generalBank.length,
+      domainPool: domainBank.length,
+      domainLimit: chosenDomain ? Number((chosenDomain as any).limit) || 0 : 0,
+      questionLimit: Number((assessment as any).questionLimit) || 0,
+      seed: `${candidate._id}:${job._id}:assessment`,
+    });
+    const seedCheck = buildServedAssessmentPaper(generalBank, domainBank, servedIndices);
+    if (!seedCheck.served.length) return jsonError("Assessment questions are not yet available.", 400);
+    paper = seedCheck;
+
     const fromStage = candidate.stage;
     const updates: any = {
       assessmentStartedAt: new Date(
         getAssessmentAnchorMs(slot, mode, new Date((candidate as any).assessmentStartedAt || now).getTime())
       ),
       assessmentSlotStart: new Date(slot.startMs),
+      assessmentQuestionIndices: servedIndices,
     };
     if (chosenDomain) updates.assessmentDomain = chosenDomain.name;
     if (fromStage === "screening") updates.stage = "assessment";
@@ -460,47 +483,80 @@ export async function POST(request: Request) {
         },
       ].slice(-200);
     }
-    await ATSCandidate.findByIdAndUpdate(candidate._id, updates);
 
-    await ATSTimeline.create({
-      candidate: candidate._id,
-      job: job._id,
-      action: "assessment-started",
-      metadata: { jobTitle: job.title, ...(chosenDomain ? { domain: chosenDomain.name } : {}) },
-      company: candidate.company,
-    });
+    // Guarded so two tabs cannot both claim the first start. The filter pins the
+    // commit to an unstarted attempt: whoever lands first owns the paper.
+    const won = await ATSCandidate.findOneAndUpdate(
+      { _id: candidate._id, assessmentStartedAt: null, assessmentSubmittedAt: null },
+      updates,
+      { new: true }
+    );
 
-    if (fromStage === "screening") {
+    if (won) {
       await ATSTimeline.create({
         candidate: candidate._id,
         job: job._id,
-        action: "stage-changed",
-        metadata: {
-          from: "screening",
-          to: "assessment",
-          reason: "Started online assessment",
-          ...(chosenDomain ? { domain: chosenDomain.name } : {}),
-        },
+        action: "assessment-started",
+        metadata: { jobTitle: job.title, ...(chosenDomain ? { domain: chosenDomain.name } : {}) },
         company: candidate.company,
       });
+
+      if (fromStage === "screening") {
+        await ATSTimeline.create({
+          candidate: candidate._id,
+          job: job._id,
+          action: "stage-changed",
+          metadata: {
+            from: "screening",
+            to: "assessment",
+            reason: "Started online assessment",
+            ...(chosenDomain ? { domain: chosenDomain.name } : {}),
+          },
+          company: candidate.company,
+        });
+      }
+    } else {
+      // Lost the race. Serve the paper the winner committed to, which may be
+      // against a different domain than this request asked for. Answers are
+      // keyed to the served positions, so both tabs must see the same list.
+      const reread = await ATSCandidate.findById(candidate._id).select(
+        "assessmentQuestionIndices assessmentDomain"
+      );
+      const committedIndices = (reread as any)?.assessmentQuestionIndices;
+      if (Array.isArray(committedIndices) && committedIndices.length) {
+        const committedDomain = pickDomain(
+          (assessment?.domains as any[]) || [],
+          (reread as any)?.assessmentDomain || ""
+        );
+        const committedPaper = buildServedAssessmentPaper(
+          generalBank,
+          (committedDomain?.questions || []) as any[],
+          committedIndices
+        );
+        if (committedPaper.served.length) {
+          paper = committedPaper;
+          paperDomainName = committedDomain?.name || (reread as any)?.assessmentDomain || paperDomainName;
+        }
+      }
     }
   }
 
-  const sourceQuestions = [
-    ...(assessment.questions as any[]) || [],
-    ...(chosenDomain?.questions as any[]) || [],
-  ];
-  const questions = flatQuestions.map((q, idx) => {
-    const src = sourceQuestions[idx] || {};
-    return {
-      index: idx,
-      text: src.text ?? "",
-      options: Array.isArray(src.options) ? src.options : [],
-      type: q.type,
-      marks: q.marks,
-      required: q.required,
-    };
-  });
+  if (!paper.served.length) return jsonError("Assessment questions are not yet available.", 400);
 
-  return NextResponse.json({ ...responseBase, waiting: false, started: true, questions });
+  const questions = paper.served.map((src: any, i: number) => ({
+    index: i,
+    text: src?.text ?? "",
+    options: Array.isArray(src?.options) ? src.options : [],
+    type: src?.type === "essay" ? "essay" : "mcq",
+    marks: Math.max(0, Number(src?.marks) || 1),
+    required: Boolean(src?.required),
+  }));
+
+  return NextResponse.json({
+    ...responseBase,
+    domain: paperDomainName,
+    waiting: false,
+    started: true,
+    questions,
+  });
 }

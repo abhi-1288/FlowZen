@@ -133,6 +133,12 @@ const ATSAssessmentSchema = new Schema(
     // come from lib/assessment-proctoring.ts.
     proctoring: { type: ProctoringSchema, default: () => ({}) },
     instructions: { type: String, default: "", trim: true, maxlength: 2000 },
+    // Optional cap on the whole served paper. 0 means "no total limit": the
+    // candidate gets every general question plus their domain's questions (the
+    // domain's own `limit` still applies). When set, the domain's limit is filled
+    // first and the general section takes the remainder, so general + domain =
+    // questionLimit. Enforced at serve time in lib/assessment-paper.ts.
+    questionLimit: { type: Number, default: 0, min: 0, max: 500 },
     questions: { type: [ATSAssessmentQuestionSchema], default: [] },
     domains: { type: [ATSAssessmentDomainSchema], default: [] },
     // Practice-paper settings. Absent or partial configs are normal (a job may
