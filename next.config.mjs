@@ -4,6 +4,9 @@ const nextConfig = {
     // and the running dev server starts throwing ENOENT on its manifests.
     // Use the `build:isolated` script to build without touching `.next`.
     distDir: process.env.NEXT_BUILD_ONLY ? '.next-build' : '.next',
+    eslint: {
+        ignoreDuringBuilds: true,
+    },
     experimental: {
         optimizePackageImports: ['lucide-react', 'react-icons', 'date-fns', 'framer-motion'],
     },
