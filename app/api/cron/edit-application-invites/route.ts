@@ -9,6 +9,8 @@ import { sendEditApplicationInvites } from "@/lib/edit-application-emails";
  * `editApplicationInviteSentAt` marker makes the extra frequency free — a second
  * run with nobody outstanding does one indexed query and no mail.
  */
+export const maxDuration = 30;
+
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {

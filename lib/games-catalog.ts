@@ -39,6 +39,30 @@ export const GAMES = [
     unit: "score",
     lowerIsBetter: false,
   },
+  {
+    id: "word",
+    name: "Word Scramble",
+    description: "Unscramble mixed-up work words before time runs out. More words = higher score.",
+    short: "Word",
+    unit: "words",
+    lowerIsBetter: false,
+  },
+  {
+    id: "snakes-ladders",
+    name: "Snake & Ladders",
+    description: "Roll the dice, climb ladders, dodge snakes. Reach tile 100 in fewer moves.",
+    short: "Snakes",
+    unit: "score",
+    lowerIsBetter: false,
+  },
+  {
+    id: "chess",
+    name: "Chess",
+    description: "Classic chess vs AI or local 2-player. Win or draw for points.",
+    short: "Chess",
+    unit: "score",
+    lowerIsBetter: false,
+  },
 ] as const;
 
 export const GAME_IDS = GAMES.map((g) => g.id);

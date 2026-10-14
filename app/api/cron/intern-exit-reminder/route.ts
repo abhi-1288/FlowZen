@@ -18,6 +18,8 @@ async function alreadySent(userId: string, title: string, body: string) {
   return Boolean(existing);
 }
 
+export const maxDuration = 30;
+
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {

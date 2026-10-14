@@ -10,6 +10,8 @@ import { sweepExpiredAssessments } from "@/lib/assessment-auto-submit";
  * together keeps the deployment on the same daily cron count for Vercel plans
  * that only allow once-a-day jobs.
  */
+export const maxDuration = 30;
+
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {

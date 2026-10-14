@@ -5,6 +5,8 @@ import { sweepExpiredMockAttempts } from "@/lib/assessment-auto-submit";
  * Mock auto-submit backstop. The invitation email is sent by the assessment-day
  * cron (`/api/cron/assessment-day`), not here.
  */
+export const maxDuration = 30;
+
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {

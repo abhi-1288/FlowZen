@@ -3,6 +3,8 @@ import { connectDb } from "@/lib/db";
 import { Message } from "@/models/Message";
 import { deleteMessageAttachment } from "@/lib/message-attachments";
 
+export const maxDuration = 30;
+
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {

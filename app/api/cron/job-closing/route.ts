@@ -7,6 +7,8 @@ import { emitToUser } from "@/lib/socket-emit";
 import { autoCloseOverdueJobs, closeExpiredEditWindows } from "@/lib/recruitment-utils";
 import { startOfKolkataDayMs } from "@/lib/date-utils";
 
+export const maxDuration = 30;
+
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
