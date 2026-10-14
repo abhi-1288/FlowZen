@@ -27,6 +27,8 @@ export * from "./ResourceRequest";
 export * from "./Task";
 export * from "./Team";
 export * from "./User";
+export * from "./SessionLock";
+export * from "./PinResetRequest";
 export * from "./Message";
 export * from "./GameScore";
 export * from "./GameChallenge";

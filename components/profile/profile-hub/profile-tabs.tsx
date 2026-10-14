@@ -12,6 +12,7 @@ import { CompanyControlsSection } from "./sections/company-controls-section";
 import { TeamOnboardingCodesSection } from "./sections/team-onboarding-codes-section";
 import { DocumentLettersSection } from "./sections/document-letters-section";
 import { SecuritySection } from "./sections/security-section";
+import { GreenPinRecoverySection } from "./sections/green-pin-recovery-section";
 import { ReleaseNotesSection } from "./sections/release-notes-section";
 import { MonthlyCheckBox } from "./monthly-check-box";
 import { ConfirmActionModal } from "./modals/confirm-action-modal";
@@ -383,7 +384,13 @@ export function ProfileTab({
         <SecuritySection passwordResetRequired={passwordResetRequired} currentPassword={currentPassword}
           onCurrentPasswordChange={setCurrentPassword} newPassword={newPassword}
           onNewPasswordChange={setNewPassword} onUpdatePassword={updatePassword}
-          onDeleteAccount={() => setModal(true)} />
+          onDeleteAccount={() => setModal(true)} showToast={showToast} />
+
+        {(role === "admin" || role === "human-resource") && profile?.companyStatus === "approved" ? (
+          <div className="mt-4">
+            <GreenPinRecoverySection showToast={showToast} />
+          </div>
+        ) : null}
 
         <ReleaseNotesSection />
 

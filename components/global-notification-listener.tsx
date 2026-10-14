@@ -4,15 +4,20 @@ import { useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useNotificationToast } from "@/lib/toast-context";
 import { apiFetch } from "@/lib/client-utils";
+import { usePinLock } from "@/components/auth/pin-lock-provider";
 
 export function GlobalNotificationListener() {
   const { data: session } = useSession();
   const { showNotificationToast } = useNotificationToast();
+  const { enabled: pinEnabled, locked: pinLocked } = usePinLock();
   const audioUnlocked = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (!session?.user?.id) return;
+    // While the screen is locked, don't stream (or play sounds for) new
+    // notifications; reconnecting on unlock keeps the surface quiet.
+    if (pinEnabled && pinLocked) return;
 
     const unlock = () => {
       if (audioUnlocked.current) return;
@@ -70,7 +75,7 @@ export function GlobalNotificationListener() {
       eventSource?.close();
       document.removeEventListener("click", unlock);
     };
-  }, [session?.user?.id, showNotificationToast]);
+  }, [session?.user?.id, showNotificationToast, pinEnabled, pinLocked]);
 
   return null;
 }

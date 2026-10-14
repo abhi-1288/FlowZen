@@ -9,6 +9,7 @@
     "start": "node node_modules/next/dist/bin/next start",
     "lint": "node node_modules/eslint/bin/eslint.js .",
     "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
+    "test": "node --test lib/*.test.ts",
     "seed:demo": "node scripts/seed-demo-users.js",
     "backfill:ats-region": "node scripts/backfill-ats-region.js",
     "backfill:candidate-joining-regions": "node scripts/backfill-candidate-joining-regions.js",

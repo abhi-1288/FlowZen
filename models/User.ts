@@ -25,6 +25,15 @@ const UserSchema = new Schema(
     passwordResetTokenHash: { type: String, select: false },
     passwordResetExpiresAt: { type: Date, default: null, select: false },
     passwordResetRequired: { type: Boolean, default: false },
+    // Personal PIN screen lock. Only a salted bcrypt hash is ever persisted;
+    // the plaintext PIN is never stored or logged. `pinVersion` is bumped on
+    // every set/change/disable so that already-unlocked sessions (which record
+    // the version they unlocked against) fall back to locked.
+    pinEnabled: { type: Boolean, default: false, index: true },
+    pinHash: { type: String, select: false },
+    pinLength: { type: Number, enum: [4, 6], default: null },
+    pinSetAt: { type: Date, default: null },
+    pinVersion: { type: Number, default: 0 },
     authProvider: {
       type: String,
       enum: [

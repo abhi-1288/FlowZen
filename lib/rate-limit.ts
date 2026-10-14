@@ -2,6 +2,10 @@ const WINDOW_MS = 60 * 1000;
 const MAX_REQUESTS = 10;
 const LOGIN_WINDOW_MS = 60 * 1000;
 const LOGIN_MAX_REQUESTS = 5;
+const PIN_WINDOW_MS = 60 * 1000;
+const PIN_MAX_REQUESTS = 10;
+const PIN_USER_WINDOW_MS = 60 * 1000;
+const PIN_USER_MAX_REQUESTS = 8;
 const MAX_ENTRIES = 10_000;
 
 interface Bucket {
@@ -11,6 +15,8 @@ interface Bucket {
 
 const store = new Map<string, Bucket>();
 const loginStore = new Map<string, Bucket>();
+const pinStore = new Map<string, Bucket>();
+const pinUserStore = new Map<string, Bucket>();
 
 function evict(target: Map<string, Bucket>) {
   if (target.size <= MAX_ENTRIES) return;
@@ -64,4 +70,15 @@ export function rateLimit(ip: string) {
 
 export function rateLimitLogin(ip: string, email: string) {
   return checkBucket(loginStore, `${ip}::${email}`, LOGIN_WINDOW_MS, LOGIN_MAX_REQUESTS);
+}
+
+// PIN unlock throttles. Per-IP caps broad spraying, per-user caps attempts
+// spread across a user's devices/sessions (which each also have their own
+// persistent failed-attempt lockout in `SessionLock`).
+export function rateLimitPin(ip: string) {
+  return checkBucket(pinStore, `pin::${ip}`, PIN_WINDOW_MS, PIN_MAX_REQUESTS);
+}
+
+export function rateLimitPinUser(userId: string) {
+  return checkBucket(pinUserStore, `pin::user::${userId}`, PIN_USER_WINDOW_MS, PIN_USER_MAX_REQUESTS);
 }

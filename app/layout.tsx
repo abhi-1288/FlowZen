@@ -6,6 +6,7 @@ import { ToastProvider } from "@/lib/toast-context";
 import { GlobalNotificationListener } from "@/components/global-notification-listener";
 import { PushNotificationSetup } from "@/components/push-notification-setup";
 import { CookieConsentBanner } from "@/components/cookie-consent-banner";
+import { PinLockProvider } from "@/components/auth/pin-lock-provider";
 import { DevCronProvider } from "@/components/providers/DevCronProvider";
 import "./globals.css";
 
@@ -95,11 +96,13 @@ export default function RootLayout({
         <SessionProvider>
           <ThemeProvider>
             <ToastProvider>
-              <DevCronProvider />
-              <GlobalNotificationListener />
-              <PushNotificationSetup />
-              {children}
-              <CookieConsentBanner />
+              <PinLockProvider>
+                <DevCronProvider />
+                <GlobalNotificationListener />
+                <PushNotificationSetup />
+                {children}
+                <CookieConsentBanner />
+              </PinLockProvider>
             </ToastProvider>
           </ThemeProvider>
         </SessionProvider>

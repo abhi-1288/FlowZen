@@ -1,6 +1,7 @@
 ﻿import { Trash2 } from "lucide-react";
 import { FormEvent } from "react";
 import { ActionButton, SectionHeader } from "../shared";
+import { PinLockSection } from "./pin-lock-section";
 
 export function SecuritySection({
   passwordResetRequired,
@@ -10,6 +11,7 @@ export function SecuritySection({
   onNewPasswordChange,
   onUpdatePassword,
   onDeleteAccount,
+  showToast,
 }: {
   passwordResetRequired: boolean;
   currentPassword: string;
@@ -18,6 +20,7 @@ export function SecuritySection({
   onNewPasswordChange: (value: string) => void;
   onUpdatePassword: (event: FormEvent) => Promise<void>;
   onDeleteAccount: () => void;
+  showToast: (text: string, type?: "success" | "error") => void;
 }) {
   return (
     <section className="rounded-xl neu-card p-5 dark:border-zinc-800 dark:bg-[#000000]">
@@ -47,6 +50,7 @@ export function SecuritySection({
         />
         <ActionButton variant="primary">Update password</ActionButton>
       </form>
+      <PinLockSection showToast={showToast} />
       <ActionButton variant="danger" className="mt-5" onClick={onDeleteAccount}>
         <Trash2 size={16} />
         Delete account

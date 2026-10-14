@@ -44,6 +44,10 @@ declare module "next-auth" {
        * UX only — every server route re-derives this from the database.
        */
       isRecruitmentHQ?: boolean;
+      /** Server-issued per-device session id for the PIN screen lock. */
+      sessionId?: string | null;
+      /** Whether the user has configured a PIN screen lock (UX hint only). */
+      pinEnabled?: boolean;
     };
   }
 }
@@ -55,5 +59,8 @@ declare module "next-auth/jwt" {
     rememberMe?: boolean;
     isSeniorSecurity?: boolean;
     isRecruitmentHQ?: boolean;
+    /** Stable per-device session id for the PIN screen lock. */
+    sid?: string;
+    pinEnabled?: boolean;
   }
 }

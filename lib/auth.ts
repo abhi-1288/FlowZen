@@ -7,7 +7,7 @@ import AppleProvider from "next-auth/providers/apple";
 import GitHubProvider from "next-auth/providers/github";
 import DiscordProvider from "next-auth/providers/discord";
 import bcrypt from "bcryptjs";
-import { createHash } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { connectDb } from "@/lib/db";
 import { canRunRecruitmentPipeline } from "@/lib/recruitment-hq";
 import { User } from "@/models/User";
@@ -280,6 +280,14 @@ export const authOptions: NextAuthOptions = {
       if ((user as any)?.passwordResetRequired) token.passwordResetRequired = true;
       if (typeof (user as any)?.rememberMe === "boolean") token.rememberMe = (user as any).rememberMe;
 
+      // Stable per-device session id for the PIN screen lock. Generated once per
+      // sign-in and kept inside the signed JWT, so it can't be forged from the
+      // client. Multiple devices therefore get independent lock records while
+      // tabs on one device share this id.
+      if (token.sub && !(token as any).sid) {
+        (token as any).sid = randomUUID();
+      }
+
       // Periodically refresh user data from the database (every 15 min).
       // This caches company, team, and role in the token so the session
       // callback can read them without a DB query on every request.
@@ -327,6 +335,8 @@ export const authOptions: NextAuthOptions = {
             (token as any).team = team?.name || null;
             (token as any).teamId = team?._id ? String(team._id) : (typeof userDoc.team === "string" ? userDoc.team : null);
             (token as any).managedTeamCount = await Team.countDocuments({ manager: userDoc._id });
+            // Drives whether the client even checks for a PIN lock overlay.
+            (token as any).pinEnabled = Boolean((userDoc as any).pinEnabled);
             (token as any)._userCheckAt = now;
           } catch {
             // DB unreachable – keep the session alive
@@ -356,6 +366,11 @@ export const authOptions: NextAuthOptions = {
         session.user.isSeniorSecurity = Boolean((token as any).isSeniorSecurity);
         session.user.isCompanyOwner = Boolean((token as any).isCompanyOwner);
         session.user.isRecruitmentHQ = Boolean((token as any).isRecruitmentHQ);
+        // PIN screen-lock flags. `sessionId` is server-issued and carried inside
+        // the signed token; the server always re-derives lock state from the
+        // database and never trusts these values for enforcement.
+        session.user.sessionId = (token as any).sid || null;
+        session.user.pinEnabled = Boolean((token as any).pinEnabled);
       }
       return session;
     }
