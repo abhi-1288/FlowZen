@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { signIn } from "next-auth/react";
 import { FaGithub, FaGoogle } from "react-icons/fa";
@@ -16,11 +16,10 @@ export function OAuthProviderIcons({ callbackUrl = "/board" }: { callbackUrl?: s
         return (
           <button
             aria-label={`Continue with ${provider.label}`}
-            className="flex h-12 flex-1 items-center justify-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm active:bg-slate-100"
+            className="flex h-12 flex-1 items-center justify-center gap-2.5 rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-medium text-white/80 transition-all hover:border-white/20 hover:bg-white/10 hover:text-white active:bg-white/15"
             key={provider.id}
             onClick={() => signIn(provider.id, { callbackUrl })}
             title={`Continue with ${provider.label}`}
-            suppressHydrationWarning
             type="button"
           >
             <Icon aria-hidden="true" size={18} />
