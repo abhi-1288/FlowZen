@@ -1,8 +1,8 @@
 import { createContext, useContext } from "react";
 
-export type StoreView = "catalog" | "cart" | "orders" | "approvals" | "manage";
+export type StoreView = "catalog" | "cart" | "orders" | "approvals" | "manage" | "delivery";
 
-export const STORE_VIEWS: StoreView[] = ["catalog", "cart", "orders", "approvals", "manage"];
+export const STORE_VIEWS: StoreView[] = ["catalog", "cart", "orders", "approvals", "manage", "delivery"];
 
 export function isStoreView(value: string): value is StoreView {
   return (STORE_VIEWS as string[]).includes(value);

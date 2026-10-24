@@ -2,7 +2,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
-import { AlertTriangle, Loader2, Minus, Plus, ShoppingCart, Trash2, ArrowLeft } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Loader2,
+  Minus,
+  Plus,
+  ShoppingCart,
+  Store as StoreIcon,
+  Trash2,
+  Truck,
+} from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import { useStoreCart } from "@/components/store/cart-context";
 import { useStoreNav } from "@/components/store/store-nav";
@@ -31,6 +41,7 @@ export function StoreCart() {
   const [approverId, setApproverId] = useState("");
   const [deliveryName, setDeliveryName] = useState("");
   const [department, setDepartment] = useState("");
+  const [fulfillmentMethod, setFulfillmentMethod] = useState<"delivery" | "takeaway">("delivery");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -60,8 +71,14 @@ export function StoreCart() {
     setError("");
     if (lines.length === 0) return;
     if (!approverId) return setError("Pick an approver for this order.");
-    if (!deliveryName.trim()) return setError("A delivery name is required.");
-    if (!department.trim()) return setError("An address (department) is required.");
+    if (!deliveryName.trim()) {
+      return setError(
+        fulfillmentMethod === "takeaway" ? "A pickup person is required." : "A delivery name is required.",
+      );
+    }
+    if (fulfillmentMethod === "delivery" && !department.trim()) {
+      return setError("An address (department) is required.");
+    }
     setSubmitting(true);
     try {
       await apiFetch("/api/store/orders", {
@@ -70,6 +87,7 @@ export function StoreCart() {
           items: lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity })),
           deliveryName: deliveryName.trim(),
           department: department.trim(),
+          fulfillmentMethod,
           approverId,
         }),
       });
@@ -179,23 +197,71 @@ export function StoreCart() {
               Order details
             </h2>
 
-            <Field label="Delivery name">
+            <div className="mb-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setFulfillmentMethod("delivery")}
+                className={`flex flex-col items-start gap-1 rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                  fulfillmentMethod === "delivery"
+                    ? "border-sky-500 bg-sky-50 text-sky-700 dark:border-sky-700 dark:bg-sky-950/40 dark:text-sky-300"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+                }`}
+              >
+                <Truck size={16} />
+                <span className="text-xs font-semibold">Delivery</span>
+                <span className="text-[10px] opacity-70">Send to my desk</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFulfillmentMethod("takeaway")}
+                className={`flex flex-col items-start gap-1 rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                  fulfillmentMethod === "takeaway"
+                    ? "border-amber-500 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+                }`}
+              >
+                <StoreIcon size={16} />
+                <span className="text-xs font-semibold">Take-away</span>
+                <span className="text-[10px] opacity-70">I will collect it</span>
+              </button>
+            </div>
+
+            <Field label={fulfillmentMethod === "takeaway" ? "Pickup person" : "Delivery name"}>
               <input
                 value={deliveryName}
                 onChange={(e) => setDeliveryName(e.target.value)}
                 className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
-                placeholder="Who receives this?"
+                placeholder={
+                  fulfillmentMethod === "takeaway" ? "Who will collect this?" : "Who receives this?"
+                }
               />
             </Field>
 
-            <Field label="Address (department)">
-              <input
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
-                placeholder="e.g. Design · 2nd Floor"
-              />
-            </Field>
+            {fulfillmentMethod === "delivery" ? (
+              <Field label="Address (department)">
+                <input
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                  className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
+                  placeholder="e.g. Design · 2nd Floor"
+                />
+              </Field>
+            ) : (
+              <>
+                <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                  Collect from the {plan?.region || "company"} warehouse once the warehouse marks it
+                  packed and ready.
+                </div>
+                <Field label="Pickup note (optional)">
+                  <input
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    className="neu-inset w-full rounded-lg px-3 py-2 text-sm"
+                    placeholder="e.g. Collecting after lunch"
+                  />
+                </Field>
+              </>
+            )}
 
             <Field label="Approver">
               <select

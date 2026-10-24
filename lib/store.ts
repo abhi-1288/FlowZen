@@ -10,6 +10,7 @@ import {
   isUserInEffectiveRegion,
   type OfficeAddressLike,
 } from "@/lib/company-regions";
+import { dateInputValue } from "@/lib/date-utils";
 import { STORE_APPROVER_ROLES, isStoreApproverRole } from "@/lib/store-constants";
 
 type StoreCompanyLike = {
@@ -24,26 +25,130 @@ export {
   STORE_CATEGORY_LABELS,
   STORE_STATUS_LABELS,
   STORE_STATUS_COLORS,
+  STORE_DELIVERY_STATUSES,
+  STORE_DELIVERY_STATUS_LABELS,
+  STORE_DELIVERY_STATUS_COLORS,
+  STORE_SETTABLE_DELIVERY_STATUSES,
+  STORE_FULFILLMENT_METHODS,
+  STORE_FULFILLMENT_METHOD_LABELS,
+  STORE_TAKEAWAY_STATUSES,
+  STORE_TAKEAWAY_STATUS_LABELS,
+  STORE_TAKEAWAY_STATUS_COLORS,
+  deliveryStatusLabel,
+  deliveryStatusColor,
+  isSettableDeliveryStatus,
+  isStoreDeliveryStatus,
+  isStoreFulfillmentMethod,
+  fulfillmentMethodLabel,
+  takeAwayStatusLabel,
+  takeAwayStatusColor,
   canTransitionStoreOrder,
   isStoreManager,
   isStoreApproverRole,
 } from "@/lib/store-constants";
-export type { StoreCategory, StoreOrderStatus } from "@/lib/store-constants";
+export type {
+  StoreCategory,
+  StoreOrderStatus,
+  StoreFulfillmentMethod,
+  StoreTakeAwayStatus,
+} from "@/lib/store-constants";
 
+function cleanTagPart(value: unknown): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "")
+    .slice(0, 3);
+}
+
+/**
+ * Company tag used in store order/invoice numbers. Taken from the requester's
+ * unique identity code (the company segment, e.g. `TML-0007` → `tml`); when the
+ * requester has no identity code it falls back to the company name trimmed to
+ * three characters.
+ */
+export function storeOrderCompanyTag(input: {
+  identityCode?: string | null;
+  identityCodePrefix?: string | null;
+  name?: string | null;
+}): string {
+  const identityCode = String(input.identityCode ?? "").trim();
+  if (identityCode.includes("-")) {
+    const prefix = cleanTagPart(identityCode.split("-").slice(0, -1).join(""));
+    if (prefix) return prefix;
+  }
+
+  const configured = cleanTagPart(input.identityCodePrefix);
+  if (configured) return configured;
+
+  const fromName = cleanTagPart(input.name);
+  return fromName || "stor";
+}
+
+/** `YYYYMMDD` in IST — the day the order number belongs to. */
+export function storeOrderDateKey(reference: Date = new Date()): string {
+  return dateInputValue(reference.toISOString()).replace(/-/g, "");
+}
+
+/**
+ * New order numbers are `YYYYMMDD-TAG-NNN` and restart at 001 each day. The
+ * requester's identity code supplies the tag (the company segment of
+ * `companyIdentityCode`); without it the company name trimmed to three chars is
+ * used.
+ */
 export async function nextStoreOrderNumber(
   companyId: Types.ObjectId | string,
+  requester?: { companyIdentityCode?: string | null },
 ): Promise<string> {
-  const last = (await StoreOrder.findOne({ company: companyId })
-    .sort({ createdAt: -1 })
+  const company = (await Company.findById(companyId)
+    .select("name identityCodePrefix")
+    .lean()) as { name?: string; identityCodePrefix?: string | null } | null;
+  const tag = storeOrderCompanyTag({
+    identityCode: requester?.companyIdentityCode,
+    identityCodePrefix: company?.identityCodePrefix,
+    name: company?.name,
+  });
+  const dateKey = storeOrderDateKey();
+  const prefix = `${dateKey}-${tag}-`;
+
+  const todays = (await StoreOrder.find({
+    company: companyId,
+    orderNumber: { $regex: `^${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}` },
+  })
     .select("orderNumber")
-    .lean()) as { orderNumber?: string } | null;
-  let lastNumber = 0;
-  if (last?.orderNumber) {
-    const match = String(last.orderNumber).match(/(\d+)$/);
-    if (match) lastNumber = Number(match[1]);
+    .lean()) as Array<{ orderNumber?: string }>;
+
+  let lastSerial = 0;
+  for (const row of todays) {
+    const value = String(row.orderNumber ?? "");
+    if (!value.startsWith(prefix)) continue;
+    const serial = Number(value.slice(prefix.length));
+    if (Number.isFinite(serial) && serial > lastSerial) lastSerial = serial;
   }
-  const next = Math.max(lastNumber + 1, 1001);
-  return `SO-${next}`;
+
+  return `${prefix}${String(lastSerial + 1).padStart(3, "0")}`;
+}
+
+/**
+ * Marks an order fulfilled and issues its invoice. Kept in one place so every
+ * completion path (delivery, take-away) stamps the same fields.
+ */
+export function fulfilStoreOrder(
+  order: {
+    status: string;
+    fulfilledBy?: unknown;
+    fulfilledAt?: Date | null;
+    invoiceIssuedBy?: unknown;
+    invoiceIssuedAt?: Date | null;
+  },
+  user: { _id: unknown },
+  now: Date = new Date(),
+) {
+  order.status = "fulfilled";
+  order.fulfilledBy = user._id;
+  order.fulfilledAt = now;
+  order.invoiceIssuedBy = user._id;
+  order.invoiceIssuedAt = now;
 }
 
 export function pushStoreActivity(

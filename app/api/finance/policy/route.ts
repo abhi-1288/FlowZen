@@ -57,6 +57,7 @@ export async function GET(request: Request) {
       foodOptedOutMembers: [],
       travelOptedOutMembers: [],
       advanceSalaryEnabled: false,
+      autoSalaryEnabled: false,
       pfPercentage: 12,
       esicPercentage: 0.75,
       tdsPercentage: 0,
@@ -73,6 +74,7 @@ export async function GET(request: Request) {
     foodOptedOutMembers: policy.foodOptedOutMembers ?? [],
     travelOptedOutMembers: policy.travelOptedOutMembers ?? [],
     advanceSalaryEnabled: policy.advanceSalaryEnabled ?? false,
+    autoSalaryEnabled: policy.autoSalaryEnabled ?? false,
     pfPercentage: policy.pfPercentage ?? 12,
     esicPercentage: policy.esicPercentage ?? 0.75,
     tdsPercentage: policy.tdsPercentage ?? 0,
@@ -107,6 +109,10 @@ export async function POST(request: Request) {
     return jsonError(`You can only configure policies for your own region (${adminRegion}).`, 403);
   }
 
+  // Auto salary generation is an admin-only switch.
+  if (typeof body.autoSalaryEnabled === "boolean" && String(actor.role) !== "admin") {
+    return jsonError("Only admin can configure auto salary generation.", 403);
+  }
   const hasPctFields = "pfPercentage" in body || "esicPercentage" in body || "tdsPercentage" in body;
   if (hasPctFields && String(actor.role) !== "finance") {
     const financeCount = await User.countDocuments({
@@ -124,6 +130,9 @@ export async function POST(request: Request) {
   const update: Record<string, any> = { foodAmount, travelAccommodationAmount };
   if (typeof body.advanceSalaryEnabled === "boolean") {
     update.advanceSalaryEnabled = body.advanceSalaryEnabled;
+  }
+  if (typeof body.autoSalaryEnabled === "boolean") {
+    update.autoSalaryEnabled = body.autoSalaryEnabled;
   }
   if (typeof body.pfPercentage === "number") update.pfPercentage = Math.max(0, body.pfPercentage);
   if (typeof body.esicPercentage === "number") update.esicPercentage = Math.max(0, body.esicPercentage);
@@ -175,6 +184,7 @@ export async function POST(request: Request) {
     foodOptedOutMembers: policy.foodOptedOutMembers ?? [],
     travelOptedOutMembers: policy.travelOptedOutMembers ?? [],
     advanceSalaryEnabled: policy.advanceSalaryEnabled ?? false,
+    autoSalaryEnabled: policy.autoSalaryEnabled ?? false,
     pfPercentage: policy.pfPercentage ?? 12,
     esicPercentage: policy.esicPercentage ?? 0.75,
     tdsPercentage: policy.tdsPercentage ?? 0,
@@ -280,6 +290,7 @@ export async function PATCH(request: Request) {
     foodOptedOutMembers: policy.foodOptedOutMembers ?? [],
     travelOptedOutMembers: policy.travelOptedOutMembers ?? [],
     advanceSalaryEnabled: policy.advanceSalaryEnabled ?? false,
+    autoSalaryEnabled: policy.autoSalaryEnabled ?? false,
     pfPercentage: policy.pfPercentage ?? 12,
     esicPercentage: policy.esicPercentage ?? 0.75,
     tdsPercentage: policy.tdsPercentage ?? 0,

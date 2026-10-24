@@ -24,7 +24,8 @@ export function FinancePolicyTab({
   const [esicPct, setEsicPct] = useState("0.75");
   const [tdsPct, setTdsPct] = useState("0");
   const [advanceSalaryEnabled, setAdvanceSalaryEnabled] = useState(false);
-  
+  const [autoSalaryEnabled, setAutoSalaryEnabled] = useState(false);
+
   const [houseRentPct, setHouseRentPct] = useState("37.33");
   const [conveyancePct, setConveyancePct] = useState("5.92");
   const [medicalPct, setMedicalPct] = useState("4.63");
@@ -42,6 +43,7 @@ export function FinancePolicyTab({
         setEsicPct(String(data.esicPercentage ?? 0.75));
         setTdsPct(String(data.tdsPercentage ?? 0));
         setAdvanceSalaryEnabled(Boolean(data.advanceSalaryEnabled));
+        setAutoSalaryEnabled(Boolean(data.autoSalaryEnabled));
         setHouseRentPct(String(data.houseRentPercentage ?? 37.33));
         setConveyancePct(String(data.conveyancePercentage ?? 5.92));
         setMedicalPct(String(data.medicalPercentage ?? 4.63));
@@ -64,6 +66,8 @@ export function FinancePolicyTab({
         esicPercentage: Number(esicPct),
         tdsPercentage: Number(tdsPct),
         advanceSalaryEnabled,
+        // Admin-only switch; omitted for finance so their save is not rejected.
+        ...(actorRole === "admin" ? { autoSalaryEnabled } : {}),
         houseRentPercentage: Number(houseRentPct),
         conveyancePercentage: Number(conveyancePct),
         medicalPercentage: Number(medicalPct),
@@ -76,6 +80,7 @@ export function FinancePolicyTab({
       });
 
       setPolicyData(res);
+      setAutoSalaryEnabled(Boolean(res.autoSalaryEnabled));
       showToast("Finance policies successfully updated.", "success");
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Failed to update policies.", "error");
@@ -191,6 +196,40 @@ export function FinancePolicyTab({
                     Disabled
                   </button>
                 </div>
+              </div>
+
+              {/* Auto Salary Generation */}
+              <div className="flex items-center justify-between rounded-lg border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-muted)]/50 dark:bg-zinc-800/50 p-3.5">
+                <div>
+                  <p className="text-xs font-semibold text-slate-800 dark:text-zinc-200">Auto Salary Generation</p>
+                  <p className="text-[10px] text-slate-500 dark:text-zinc-500">Automatically generate member salaries on the payroll cycle day</p>
+                </div>
+                {actorRole === "admin" ? (
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={autoSalaryEnabled}
+                    aria-label="Auto Salary Generation"
+                    onClick={() => setAutoSalaryEnabled((prev) => !prev)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 ${
+                      autoSalaryEnabled ? "bg-emerald-500" : "bg-slate-300 dark:bg-zinc-600"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full neu-card ring-0 transition duration-200 ease-in-out mt-0.5 ${
+                        autoSalaryEnabled ? "translate-x-4 ml-0.5" : "translate-x-0 ml-0.5"
+                      }`}
+                    />
+                  </button>
+                ) : (
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                      autoSalaryEnabled ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" : "bg-slate-100 text-slate-500 dark:bg-zinc-800 dark:text-zinc-400"
+                    }`}
+                  >
+                    {autoSalaryEnabled ? "Enabled" : "Disabled"}
+                  </span>
+                )}
               </div>
 
               {/* Earnings Breakdown */}

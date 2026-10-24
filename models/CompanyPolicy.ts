@@ -26,6 +26,8 @@ const policySchema = new mongoose.Schema({
   salaryCycleChangeApprover: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   salaryCycleChangeRequestedAt: { type: Date, default: null },
   advanceSalaryEnabled: { type: Boolean, default: false },
+  // Per-region switch for the automatic monthly salary generation (admin only).
+  autoSalaryEnabled: { type: Boolean, default: false },
   // Exit & final settlement policy.
   settlementEnabled: { type: Boolean, default: true },
   settlementHourDays: { type: Number, default: 1, min: 0, max: 30 },

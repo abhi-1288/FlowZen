@@ -9,6 +9,8 @@ import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
 import { recordAudit } from "@/lib/audit";
 import {
+  fulfillmentMethodLabel,
+  isStoreFulfillmentMethod,
   nextStoreOrderNumber,
   storeRegionOf,
   validateStoreApprover,
@@ -39,6 +41,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const scope = String(url.searchParams.get("scope") ?? "my");
   const countOnly = url.searchParams.get("count") === "1";
+  const pendingDelivery = url.searchParams.get("pendingDelivery") === "1";
   const { region } = await storeRegionOf(user);
 
   let filter: Record<string, unknown> = { company: companyId };
@@ -51,6 +54,8 @@ export async function GET(request: Request) {
   } else {
     filter = { ...filter, requester: userId };
   }
+
+  if (pendingDelivery) filter = { ...filter, status: "approved" };
 
   if (countOnly) {
     const count = await StoreOrder.countDocuments(filter);
@@ -82,11 +87,19 @@ export async function POST(request: Request) {
   const deliveryName = String(body.deliveryName ?? "").trim().slice(0, 120);
   const department = String(body.department ?? "").trim().slice(0, 160);
   const approverId = String(body.approverId ?? "").trim();
+  const requestedMethod = String(body.fulfillmentMethod ?? "delivery").trim().toLowerCase();
+  if (!isStoreFulfillmentMethod(requestedMethod)) {
+    return jsonError("Choose delivery or take-away for this order.");
+  }
+  const fulfillmentMethod = requestedMethod;
+  const isTakeAway = fulfillmentMethod === "takeaway";
 
   if (rawItems.length === 0) return jsonError("Add at least one product to the cart.");
   if (rawItems.length > 50) return jsonError("An order can hold at most 50 lines.");
-  if (!deliveryName) return jsonError("A delivery name is required.");
-  if (!department) return jsonError("An address (department) is required.");
+  if (!deliveryName) {
+    return jsonError(isTakeAway ? "A pickup person is required." : "A delivery name is required.");
+  }
+  if (!isTakeAway && !department) return jsonError("An address (department) is required.");
 
   try {
     await connectDb();
@@ -97,7 +110,7 @@ export async function POST(request: Request) {
   }
 
   const user = await User.findById(userId).select(
-    "role company companyStatus name regionLabel team activeTeams",
+    "role company companyStatus name regionLabel team activeTeams companyIdentityCode",
   );
   if (!user) return jsonError("User not found.", 404);
   if (!user.company || user.companyStatus !== "approved") {
@@ -191,28 +204,53 @@ export async function POST(request: Request) {
     throw err;
   }
 
-  const orderNumber = await nextStoreOrderNumber(companyId);
-  const order = await StoreOrder.create({
-    company: companyId,
-    orderNumber,
-    requester: userId,
-    regionLabel: region,
-    items: lines,
-    deliveryName,
-    department,
-    status: "pending",
-    approver: new Types.ObjectId(approverId),
-    activity: [
-      { user: userId, action: "Order placed", detail: `${lines.length} product(s) — awaiting approval` },
-    ],
-  });
+  const methodLabel = fulfillmentMethodLabel(fulfillmentMethod);
+  let order: any = null;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const orderNumber = await nextStoreOrderNumber(companyId, user as any);
+    try {
+      order = await StoreOrder.create({
+        company: companyId,
+        orderNumber,
+        requester: userId,
+        regionLabel: region,
+        items: lines,
+        deliveryName,
+        department,
+        fulfillmentMethod,
+        takeAwayStatus: "pending",
+        status: "pending",
+        approver: new Types.ObjectId(approverId),
+        activity: [
+          {
+            user: userId,
+            action: "Order placed",
+            detail: `${lines.length} product(s) · ${methodLabel} — awaiting approval`,
+          },
+        ],
+      });
+      break;
+    } catch (err) {
+      // A concurrent order may have taken the same serial; pick the next one.
+      if ((err as { code?: number })?.code === 11000) continue;
+      throw err;
+    }
+  }
 
+  if (!order) {
+    for (const h of held) {
+      await StoreItem.updateOne({ _id: h.itemId }, { $inc: { stock: h.quantity } });
+    }
+    return jsonError("Could not allocate an order number. Please try again.", 409);
+  }
+
+  const orderNumber = String(order.orderNumber);
   await Notification.create({
     user: approverId,
     company: companyId,
     type: "approval",
     title: "Store order awaiting approval",
-    message: `${user.name} placed store order ${orderNumber} (${lines.length} product(s)) and needs your approval.`,
+    message: `${user.name} placed ${methodLabel.toLowerCase()} store order ${orderNumber} (${lines.length} product(s)) and needs your approval.`,
     link: "/profile/store/approvals",
   });
   emitNotification(approverId);
@@ -224,7 +262,13 @@ export async function POST(request: Request) {
     actor: { id: user._id, name: user.name, role: user.role },
     entityType: "store-order",
     entityId: String(order._id),
-    to: { orderNumber, items: lines.length, approver: approverId, region },
+    to: {
+      orderNumber,
+      items: lines.length,
+      approver: approverId,
+      region,
+      fulfillmentMethod,
+    },
     result: "success",
     request,
   });

@@ -8,6 +8,17 @@ import { Schema, model, models, type InferSchemaType } from "mongoose";
  *
  * Approver flow: pending → approved → fulfilled, with reject/cancel as
  * terminal branches that restore stock.
+ *
+ * Delivery: once approved, the warehouse moves every line through
+ * packing → out-for-delivery → delivered (see
+ * app/api/store/orders/[id]/delivery/route.ts). When the last line is marked
+ * delivered the order itself flips to fulfilled.
+ *
+ * Take-away: the warehouse first marks the order packed and ready for pickup,
+ * then marks it handed over (see app/api/store/orders/[id]/takeaway/route.ts).
+ *
+ * Fulfilment always issues the invoice: the order number doubles as the
+ * invoice number and `invoiceIssuedAt` records when it became available.
  */
 const ActivitySchema = new Schema(
   {
@@ -28,6 +39,16 @@ const StoreOrderItemSchema = new Schema(
     unit: { type: String, default: "piece" },
     price: { type: Number, default: 0, min: 0 },
     quantity: { type: Number, required: true, min: 1 },
+    /**
+     * Warehouse-set delivery progress for this line. Starts at `pending`
+     * ("awaiting packing") when the order is approved and moves through
+     * packing → out-for-delivery → delivered.
+     */
+    deliveryStatus: {
+      type: String,
+      enum: ["pending", "packing", "out-for-delivery", "delivered"],
+      default: "pending",
+    },
   },
   { _id: false },
 );
@@ -35,7 +56,7 @@ const StoreOrderItemSchema = new Schema(
 const StoreOrderSchema = new Schema(
   {
     company: { type: Schema.Types.ObjectId, ref: "Company", required: true, index: true },
-    orderNumber: { type: String, required: true, trim: true, uppercase: true, index: true },
+    orderNumber: { type: String, required: true, trim: true, index: true },
 
     requester: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     /**
@@ -49,6 +70,31 @@ const StoreOrderSchema = new Schema(
 
     deliveryName: { type: String, default: "", trim: true, maxlength: 120 },
     department: { type: String, default: "", trim: true, maxlength: 160 },
+
+    /** Whether the requester collects the order or wants it delivered. */
+    fulfillmentMethod: {
+      type: String,
+      enum: ["delivery", "takeaway"],
+      default: "delivery",
+      index: true,
+    },
+    /**
+     * Take-away progress: pending → ready (packed, requester notified) →
+     * handed-over. Ignored for delivery orders.
+     */
+    takeAwayStatus: {
+      type: String,
+      enum: ["pending", "ready", "handed-over"],
+      default: "pending",
+    },
+    takeAwayReadyAt: { type: Date, default: null },
+    takeAwayReadyBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    takeAwayHandedOverAt: { type: Date, default: null },
+    takeAwayHandedOverBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+
+    /** Invoice is available once this is set; number matches orderNumber. */
+    invoiceIssuedAt: { type: Date, default: null },
+    invoiceIssuedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
 
     status: {
       type: String,

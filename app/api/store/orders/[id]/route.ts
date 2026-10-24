@@ -6,7 +6,7 @@ import { StoreOrder } from "@/models/StoreOrder";
 import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
 import { recordAudit } from "@/lib/audit";
-import { canTransitionStoreOrder, restoreStoreOrderStock } from "@/lib/store";
+import { canTransitionStoreOrder, restoreStoreOrderStock, storeRegionOf } from "@/lib/store";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -76,8 +76,8 @@ export async function PATCH(request: Request, { params }: Params) {
   const reason = String(body.reason ?? "").trim().slice(0, 500);
 
   if (!nextStatus) return jsonError("A status transition is required.");
-  if (!["approved", "rejected", "cancelled", "fulfilled"].includes(nextStatus)) {
-    return jsonError("Unsupported order transition.");
+  if (!["approved", "rejected", "cancelled"].includes(nextStatus)) {
+    return jsonError("Unsupported order transition. Completion happens from the warehouse delivery or take-away screen.");
   }
   if ((nextStatus === "rejected" || nextStatus === "cancelled") && !reason) {
     return jsonError("A reason is required for this transition.");
@@ -91,7 +91,7 @@ export async function PATCH(request: Request, { params }: Params) {
     throw error;
   }
 
-  const user = await User.findById(userId).select("role company companyStatus name");
+  const user = await User.findById(userId).select("role company companyStatus name regionLabel");
   if (!user) return jsonError("User not found.", 404);
   if (!user.company || user.companyStatus !== "approved") {
     return jsonError("You must be an approved company member.", 403);
@@ -129,14 +129,10 @@ export async function PATCH(request: Request, { params }: Params) {
     if (order.status !== "pending") {
       return jsonError("Only a pending order can be cancelled.", 409);
     }
-  } else if (nextStatus === "fulfilled") {
-    if (!isApprover && !isWarehouse) {
-      return jsonError("Only the approver or the warehouse can fulfil this order.", 403);
-    }
   }
 
   const notifyId =
-    nextStatus === "cancelled" ? approverId : nextStatus === "approved" || nextStatus === "rejected" || nextStatus === "fulfilled" ? requesterId : "";
+    nextStatus === "cancelled" ? approverId : nextStatus === "approved" || nextStatus === "rejected" ? requesterId : "";
 
   if (nextStatus === "approved") {
     order.status = "approved";
@@ -154,10 +150,6 @@ export async function PATCH(request: Request, { params }: Params) {
     order.cancelledAt = new Date();
     order.cancelReason = reason;
     await restoreStoreOrderStock(order);
-  } else if (nextStatus === "fulfilled") {
-    order.status = "fulfilled";
-    order.fulfilledBy = user._id;
-    order.fulfilledAt = new Date();
   }
 
   if (!Array.isArray(order.activity)) order.activity = [];
@@ -175,7 +167,6 @@ export async function PATCH(request: Request, { params }: Params) {
       approved: `Store order ${orderNumber} has been approved.`,
       rejected: `Store order ${orderNumber} was rejected: ${reason}`,
       cancelled: `Store order ${orderNumber} was cancelled by the requester: ${reason}`,
-      fulfilled: `Store order ${orderNumber} has been fulfilled.`,
     };
     await Notification.create({
       user: notifyId,
@@ -186,6 +177,35 @@ export async function PATCH(request: Request, { params }: Params) {
       link: nextStatus === "cancelled" ? "/profile/store/approvals" : "/profile/store/orders",
     });
     emitNotification(notifyId);
+  }
+
+  if (nextStatus === "approved") {
+    const regionLabel =
+      String((order as any).regionLabel || "") || (await storeRegionOf(user)).region;
+    const warehouseUsers = await User.find({
+      company: companyId,
+      role: "warehouse",
+      companyStatus: "approved",
+      _id: { $ne: userId },
+      ...(regionLabel ? { regionLabel } : {}),
+    }).select("_id");
+
+    const isTakeAway = String((order as any).fulfillmentMethod ?? "delivery") === "takeaway";
+    const warehouseMessage = isTakeAway
+      ? `Store order ${orderNumber} is approved — pack it and mark it ready for pickup.`
+      : `Store order ${orderNumber} is approved and ready for packing.`;
+
+    for (const warehouseUser of warehouseUsers) {
+      await Notification.create({
+        user: String(warehouseUser._id),
+        company: companyId,
+        type: "approval",
+        title: `Store order ${orderNumber} — Approved`,
+        message: warehouseMessage,
+        link: "/profile/store/delivery",
+      });
+      emitNotification(String(warehouseUser._id));
+    }
   }
 
   await recordAudit({

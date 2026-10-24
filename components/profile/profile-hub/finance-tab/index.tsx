@@ -152,6 +152,19 @@ export function FinanceTab({
     }
   }
 
+  async function toggleAutoSalary(enabled: boolean) {
+    try {
+      const res = await apiFetch<{ autoSalaryEnabled: boolean }>("/api/finance/policy", {
+        method: "POST",
+        body: JSON.stringify({ autoSalaryEnabled: enabled, region: policyRegion }),
+      });
+      setPolicyData((prev) => prev ? { ...prev, autoSalaryEnabled: res.autoSalaryEnabled } : prev);
+      showToast(`Auto salary generation ${enabled ? "enabled" : "disabled"}.`, "success");
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Failed to update policy.", "error");
+    }
+  }
+
   async function savePercentages() {
     try {
     const res = await apiFetch<PolicyData>("/api/finance/policy", {
@@ -393,7 +406,7 @@ export function FinanceTab({
           <h4 className="mb-3 text-sm font-semibold text-slate-800">Reports</h4>
           <div className="space-y-5">
             <ReportsSection reports={reports} />
-<PoliciesSection policyData={policyData} foodOptedIn={foodOptedIn} travelOptedIn={travelOptedIn} actorRole={actorRole} salaryCycle={salaryCycle} hasFinanceMember={hasFinanceMember} onToggleOptInOut={toggleOptInOut} onToggleAdvanceSalary={toggleAdvanceSalary} pfPctInput={pfPctInput} esicPctInput={esicPctInput} tdsPctInput={tdsPctInput} onPfPctChange={setPfPctInput} onEsicPctChange={setEsicPctInput} onTdsPctChange={setTdsPctInput} onSavePercentages={savePercentages} />
+<PoliciesSection policyData={policyData} foodOptedIn={foodOptedIn} travelOptedIn={travelOptedIn} actorRole={actorRole} salaryCycle={salaryCycle} hasFinanceMember={hasFinanceMember} onToggleOptInOut={toggleOptInOut} onToggleAdvanceSalary={toggleAdvanceSalary} onToggleAutoSalary={toggleAutoSalary} pfPctInput={pfPctInput} esicPctInput={esicPctInput} tdsPctInput={tdsPctInput} onPfPctChange={setPfPctInput} onEsicPctChange={setEsicPctInput} onTdsPctChange={setTdsPctInput} onSavePercentages={savePercentages} />
             <LeaveImpactSection leaveImpacts={leaveImpacts} month={month} />
           </div>
         </div>
@@ -472,7 +485,7 @@ export function FinanceTab({
       {financeSubTab === "reports" ? (
         <div className="space-y-5">
           <ReportsSection reports={reports} />
-          <PoliciesSection policyData={policyData} foodOptedIn={foodOptedIn} travelOptedIn={travelOptedIn} actorRole={actorRole} salaryCycle={salaryCycle} hasFinanceMember={hasFinanceMember} onToggleOptInOut={toggleOptInOut} onToggleAdvanceSalary={toggleAdvanceSalary} pfPctInput={pfPctInput} esicPctInput={esicPctInput} tdsPctInput={tdsPctInput} onPfPctChange={setPfPctInput} onEsicPctChange={setEsicPctInput} onTdsPctChange={setTdsPctInput} onSavePercentages={savePercentages} />
+          <PoliciesSection policyData={policyData} foodOptedIn={foodOptedIn} travelOptedIn={travelOptedIn} actorRole={actorRole} salaryCycle={salaryCycle} hasFinanceMember={hasFinanceMember} onToggleOptInOut={toggleOptInOut} onToggleAdvanceSalary={toggleAdvanceSalary} onToggleAutoSalary={toggleAutoSalary} pfPctInput={pfPctInput} esicPctInput={esicPctInput} tdsPctInput={tdsPctInput} onPfPctChange={setPfPctInput} onEsicPctChange={setEsicPctInput} onTdsPctChange={setTdsPctInput} onSavePercentages={savePercentages} />
           <LeaveImpactSection leaveImpacts={leaveImpacts} month={month} />
           <SalarySlipSection mySlips={mySlips} slipsLoading={slipsLoading} month={month} />
         </div>

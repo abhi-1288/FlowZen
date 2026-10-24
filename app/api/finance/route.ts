@@ -149,7 +149,7 @@ export async function GET(request: Request) {
   let monthEndGenerated = false;
   const currentMonth = localMonthKey();
 
-  if (canManage && isCycleDay && month === currentMonth) {
+  if (canManage && isCycleDay && month === currentMonth && policy?.autoSalaryEnabled === true) {
     monthEndGenerated = await autoGenerateSalariesForMonth({
       actorCompany: actor.company,
       userId,

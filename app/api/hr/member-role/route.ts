@@ -7,8 +7,9 @@ import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
 import { effectiveRegionLabelOf, isUserInEffectiveRegion, type OfficeAddressLike } from "@/lib/company-regions";
 import { recordAudit } from "@/lib/audit";
+import { APP_ROLES } from "@/lib/roles";
 
-const VALID_ROLES = ["employee", "project-manager", "qa-tester", "human-resource", "finance", "admin", "security", "it-admin", "it-administration", "others", "warehouse"];
+const VALID_ROLES: readonly string[] = APP_ROLES;
 const ROLE_LABELS = [
   "Intern",
   "Trainee",

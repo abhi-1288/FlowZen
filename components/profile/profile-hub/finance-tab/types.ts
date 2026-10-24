@@ -37,6 +37,7 @@ export type PolicyData = {
   foodOptedOutMembers: { _id: string; name: string; email: string; role: string }[];
   travelOptedOutMembers: { _id: string; name: string; email: string; role: string }[];
   advanceSalaryEnabled: boolean;
+  autoSalaryEnabled: boolean;
   pfPercentage: number;
   esicPercentage: number;
   tdsPercentage: number;

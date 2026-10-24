@@ -63,11 +63,110 @@ export const STORE_STATUS_COLORS: Record<StoreOrderStatus, string> = {
 
 export const STORE_TRANSITION_ACTIONS: Record<StoreOrderStatus, StoreOrderStatus[]> = {
   pending: ["approved", "rejected", "cancelled"],
-  approved: ["fulfilled"],
+  // Fulfilment is no longer a manual transition: the warehouse completes a
+  // delivery (all lines delivered) or a take-away (handed over) instead.
+  approved: [],
   fulfilled: [],
   rejected: [],
   cancelled: [],
 };
+
+export const STORE_FULFILLMENT_METHODS = ["delivery", "takeaway"] as const;
+
+export type StoreFulfillmentMethod = (typeof STORE_FULFILLMENT_METHODS)[number];
+
+export const STORE_FULFILLMENT_METHOD_LABELS: Record<StoreFulfillmentMethod, string> = {
+  delivery: "Delivery",
+  takeaway: "Take-away",
+};
+
+export function isStoreFulfillmentMethod(value: unknown): value is StoreFulfillmentMethod {
+  return (STORE_FULFILLMENT_METHODS as readonly string[]).includes(String(value ?? ""));
+}
+
+export function fulfillmentMethodLabel(value: unknown): string {
+  const key = String(value ?? "delivery") as StoreFulfillmentMethod;
+  return STORE_FULFILLMENT_METHOD_LABELS[key] ?? key;
+}
+
+export const STORE_TAKEAWAY_STATUSES = ["pending", "ready", "handed-over"] as const;
+
+export type StoreTakeAwayStatus = (typeof STORE_TAKEAWAY_STATUSES)[number];
+
+export const STORE_TAKEAWAY_STATUS_LABELS: Record<StoreTakeAwayStatus, string> = {
+  pending: "Not packed",
+  ready: "Ready for pickup",
+  "handed-over": "Handed over",
+};
+
+export const STORE_TAKEAWAY_STATUS_COLORS: Record<StoreTakeAwayStatus, string> = {
+  pending: "bg-amber-50 text-amber-700",
+  ready: "bg-sky-50 text-sky-700",
+  "handed-over": "bg-emerald-50 text-emerald-700",
+};
+
+export function takeAwayStatusLabel(value: unknown): string {
+  const key = String(value ?? "pending") as StoreTakeAwayStatus;
+  return STORE_TAKEAWAY_STATUS_LABELS[key] ?? key;
+}
+
+export function takeAwayStatusColor(value: unknown): string {
+  const key = String(value ?? "pending") as StoreTakeAwayStatus;
+  return STORE_TAKEAWAY_STATUS_COLORS[key] ?? "bg-zinc-100 text-zinc-500";
+}
+
+/**
+ * Per-product delivery progress, set by the warehouse on an approved order.
+ * `pending` is the state every line lands in when the order is approved —
+ * the warehouse then moves each product through the three real stages.
+ */
+export const STORE_DELIVERY_STATUSES = [
+  "pending",
+  "packing",
+  "out-for-delivery",
+  "delivered",
+] as const;
+
+export type StoreDeliveryStatus = (typeof STORE_DELIVERY_STATUSES)[number];
+
+/** Stages the warehouse is allowed to set on a line (not `pending`). */
+export const STORE_SETTABLE_DELIVERY_STATUSES = [
+  "packing",
+  "out-for-delivery",
+  "delivered",
+] as const;
+
+export const STORE_DELIVERY_STATUS_LABELS: Record<StoreDeliveryStatus, string> = {
+  pending: "Awaiting packing",
+  packing: "Packing",
+  "out-for-delivery": "Out for delivery",
+  delivered: "Delivered",
+};
+
+export const STORE_DELIVERY_STATUS_COLORS: Record<StoreDeliveryStatus, string> = {
+  pending: "bg-zinc-100 text-zinc-500",
+  packing: "bg-amber-50 text-amber-700",
+  "out-for-delivery": "bg-sky-50 text-sky-700",
+  delivered: "bg-emerald-50 text-emerald-700",
+};
+
+export function isStoreDeliveryStatus(value: unknown): value is StoreDeliveryStatus {
+  return (STORE_DELIVERY_STATUSES as readonly string[]).includes(String(value ?? ""));
+}
+
+export function isSettableDeliveryStatus(value: unknown): value is StoreDeliveryStatus {
+  return (STORE_SETTABLE_DELIVERY_STATUSES as readonly string[]).includes(String(value ?? ""));
+}
+
+export function deliveryStatusLabel(value: unknown): string {
+  const key = String(value ?? "pending") as StoreDeliveryStatus;
+  return STORE_DELIVERY_STATUS_LABELS[key] ?? key;
+}
+
+export function deliveryStatusColor(value: unknown): string {
+  const key = String(value ?? "pending") as StoreDeliveryStatus;
+  return STORE_DELIVERY_STATUS_COLORS[key] ?? "bg-zinc-100 text-zinc-500";
+}
 
 export function canTransitionStoreOrder(from: unknown, to: unknown): boolean {
   const fromKey = String(from ?? "") as StoreOrderStatus;

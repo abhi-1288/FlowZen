@@ -600,7 +600,7 @@ export async function handleStatusUpdates(request: Request) {
       );
       const isCycleDay = dayOfMonth >= Math.max(1, newTriggerDay) && dayOfMonth <= lastDay;
 
-      if (isCycleDay) {
+      if (isCycleDay && policy.autoSalaryEnabled === true) {
         const currentMonth = now.toISOString().slice(0, 7);
         await autoGenerateSalariesForMonth({
           actorCompany: actor.company,

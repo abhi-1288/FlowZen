@@ -28,6 +28,7 @@ import {
   ShieldCheck,
   ShoppingCart,
   Store as StoreIcon,
+  Truck,
   User,
   Users,
   Wallet,
@@ -70,6 +71,7 @@ const StoreCartView = dynamic(() => import("@/components/store/store-cart").then
 const StoreOrdersView = dynamic(() => import("@/components/store/store-orders").then((m) => m.StoreOrders), { ssr: false });
 const StoreApprovalsView = dynamic(() => import("@/components/store/store-approvals").then((m) => m.StoreApprovals), { ssr: false });
 const StoreManageView = dynamic(() => import("@/components/store/store-manage").then((m) => m.StoreManage), { ssr: false });
+const StoreDeliveryView = dynamic(() => import("@/components/store/store-delivery").then((m) => m.StoreDelivery), { ssr: false });
 
 type ProfileHubCache = {
   userId: string;
@@ -182,7 +184,7 @@ export function ProfileHub() {
     const pathParts = window.location.pathname.replace(/\/profile\/?/, "").split("/").filter(Boolean);
     const raw = pathParts[0] ?? "";
     if (!raw) return { tab: undefined, storeView: undefined, showInvalid: false };
-    // /profile/store is one tab with six sub-views, so the second segment has
+    // /profile/store is one tab with seven sub-views, so the second segment has
     // to be resolved before the tab check or "store/cart" reads as invalid.
     if (raw === "store") {
       const sub = pathParts[1] ?? "";
@@ -375,6 +377,7 @@ export function ProfileHub() {
   // ── Store (a sub-view of this hub, navigated from its own accordion) ──
   const { count: storeCartCount } = useStoreCart();
   const [storeApprovalsCount, setStoreApprovalsCount] = useState(0);
+  const [storeDeliveryCount, setStoreDeliveryCount] = useState(0);
   const canManageStore = String(role) === "warehouse";
 
   const refreshStoreApprovals = () => {
@@ -386,8 +389,18 @@ export function ProfileHub() {
       .catch(() => setStoreApprovalsCount(0));
   };
 
+  const refreshStoreDelivery = () => {
+    if (!canManageStore || !canViewCompanyTabs) return;
+    apiFetch<{ count: number }>("/api/store/orders?scope=all&count=1&pendingDelivery=1", undefined, {
+      toast: false,
+    })
+      .then((res) => setStoreDeliveryCount(res.count ?? 0))
+      .catch(() => setStoreDeliveryCount(0));
+  };
+
   useEffect(() => {
     refreshStoreApprovals();
+    refreshStoreDelivery();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canViewCompanyTabs, tab, storeView]);
 
@@ -397,7 +410,10 @@ export function ProfileHub() {
     { view: "orders" as StoreView, label: "My Orders", icon: <Package size={14} /> },
     { view: "approvals" as StoreView, label: "Approvals", icon: <CheckSquare size={14} />, badge: storeApprovalsCount },
     ...(canManageStore
-      ? [{ view: "manage" as StoreView, label: "Inventory", icon: <Boxes size={14} /> }]
+      ? [
+          { view: "manage" as StoreView, label: "Inventory", icon: <Boxes size={14} /> },
+          { view: "delivery" as StoreView, label: "Delivery", icon: <Truck size={14} />, badge: storeDeliveryCount },
+        ]
       : []),
   ];
 
@@ -996,6 +1012,8 @@ export function ProfileHub() {
               onClick={() => router.push("/recruitment/candidates")}
             />
           ) : null}
+          {false && hasCompany ? null : null}
+
           {canViewCompanyTabs ? (
             <>
               <NavButton
@@ -1501,6 +1519,8 @@ export function ProfileHub() {
                     <StoreApprovalsView onChanged={refreshStoreApprovals} />
                   ) : storeView === "manage" ? (
                     canManageStore ? <StoreManageView /> : null
+                  ) : storeView === "delivery" ? (
+                    canManageStore ? <StoreDeliveryView onChanged={refreshStoreDelivery} /> : null
                   ) : (
                     <StoreCatalog />
                   )

@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 const WINDOW_MS = 60 * 1000;
 const MAX_REQUESTS = 10;
 const LOGIN_WINDOW_MS = 60 * 1000;
@@ -81,4 +82,19 @@ export function rateLimitPin(ip: string) {
 
 export function rateLimitPinUser(userId: string) {
   return checkBucket(pinUserStore, `pin::user::${userId}`, PIN_USER_WINDOW_MS, PIN_USER_MAX_REQUESTS);
+}
+const phase2Buckets = new Map<string, { count: number; resetAt: number }>();
+
+export function checkRateLimit(key: string, limit: number, windowMs: number): import("next/server").NextResponse | null {
+  const now = Date.now();
+  const bucket = phase2Buckets.get(key);
+  if (!bucket || bucket.resetAt <= now) {
+    phase2Buckets.set(key, { count: 1, resetAt: now + windowMs });
+    return null;
+  }
+  if (bucket.count >= limit) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+  }
+  bucket.count += 1;
+  return null;
 }

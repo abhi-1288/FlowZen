@@ -20,6 +20,7 @@ export function PoliciesSection({
   tdsPctInput,
   onToggleOptInOut,
   onToggleAdvanceSalary,
+  onToggleAutoSalary,
   onPfPctChange,
   onEsicPctChange,
   onTdsPctChange,
@@ -36,6 +37,7 @@ export function PoliciesSection({
   tdsPctInput?: string;
   onToggleOptInOut: (type: "food" | "travel", optedIn: boolean) => void;
   onToggleAdvanceSalary?: (enabled: boolean) => void;
+  onToggleAutoSalary?: (enabled: boolean) => void;
   onPfPctChange?: (value: string) => void;
   onEsicPctChange?: (value: string) => void;
   onTdsPctChange?: (value: string) => void;
@@ -154,6 +156,36 @@ export function PoliciesSection({
             ) : (
               <span className={`rounded-lg px-3 py-1.5 text-xs font-medium ${policyData.advanceSalaryEnabled ? "bg-emerald-50 text-emerald-700" : "bg-[var(--c-bg-muted)] text-slate-500"}`}>
                 {policyData.advanceSalaryEnabled ? "Enabled" : "Disabled"}
+              </span>
+            )}
+          </div>
+        ) : null}
+        {policyData ? (
+          <div className="flex items-center justify-between rounded-lg neu-inset px-4 py-3">
+            <div>
+              <p className="font-medium text-slate-900">Auto Salary Generation</p>
+              <p className="text-xs text-slate-500">Automatically generate member salaries on the payroll cycle day</p>
+            </div>
+            {actorRole === "admin" ? (
+              <button
+                type="button"
+                role="switch"
+                aria-checked={policyData.autoSalaryEnabled}
+                aria-label="Auto Salary Generation"
+                onClick={() => onToggleAutoSalary?.(!policyData.autoSalaryEnabled)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 ${
+                  policyData.autoSalaryEnabled ? "bg-emerald-500" : "bg-slate-300"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full neu-card ring-0 transition duration-200 ease-in-out mt-0.5 ${
+                    policyData.autoSalaryEnabled ? "translate-x-4 ml-0.5" : "translate-x-0 ml-0.5"
+                  }`}
+                />
+              </button>
+            ) : (
+              <span className={`rounded-lg px-3 py-1.5 text-xs font-medium ${policyData.autoSalaryEnabled ? "bg-emerald-50 text-emerald-700" : "bg-[var(--c-bg-muted)] text-slate-500"}`}>
+                {policyData.autoSalaryEnabled ? "Enabled" : "Disabled"}
               </span>
             )}
           </div>

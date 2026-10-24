@@ -1,9 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, X, Check, PackageCheck, Ban } from "lucide-react";
+import { Loader2, X, Check, Ban, Receipt } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
-import { statusLabel, statusColor, categoryLabel } from "@/lib/store-constants";
+import {
+  statusLabel,
+  statusColor,
+  categoryLabel,
+  deliveryStatusColor,
+  deliveryStatusLabel,
+  fulfillmentMethodLabel,
+  takeAwayStatusColor,
+  takeAwayStatusLabel,
+} from "@/lib/store-constants";
 
 export type StoreOrderLine = {
   item?: string;
@@ -14,6 +23,8 @@ export type StoreOrderLine = {
   unit?: string;
   price?: number;
   quantity?: number;
+  /** Warehouse-set delivery progress, visible once the order is approved. */
+  deliveryStatus?: string;
 };
 
 export type StoreOrderDto = {
@@ -23,6 +34,11 @@ export type StoreOrderDto = {
   regionLabel?: string;
   deliveryName?: string;
   department?: string;
+  fulfillmentMethod?: string;
+  takeAwayStatus?: string;
+  takeAwayReadyAt?: string | null;
+  takeAwayHandedOverAt?: string | null;
+  invoiceIssuedAt?: string | null;
   items: StoreOrderLine[];
   requester?: { id?: string; name?: string; email?: string; role?: string } | null;
   approver?: { id?: string; name?: string; email?: string; role?: string } | null;
@@ -46,17 +62,17 @@ type Props = {
   /** Which actions the viewer is allowed to attempt (server still enforces). */
   canApprove?: boolean;
   canCancel?: boolean;
-  canFulfil?: boolean;
   onChanged?: () => void;
 };
 
-export function StoreOrderCard({ order, canApprove, canCancel, canFulfil, onChanged }: Props) {
+export function StoreOrderCard({ order, canApprove, canCancel, onChanged }: Props) {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [reasonOpen, setReasonOpen] = useState<"" | "rejected" | "cancelled">("");
 
   const isPending = order.status === "pending";
   const isApproved = order.status === "approved";
+  const isTakeAway = String(order.fulfillmentMethod ?? "delivery") === "takeaway";
   const units = (order.items ?? []).reduce((sum, l) => sum + Number(l.quantity ?? 0), 0);
   const value = (order.items ?? []).reduce(
     (sum, l) => sum + Number(l.quantity ?? 0) * Number(l.price ?? 0),
@@ -84,13 +100,29 @@ export function StoreOrderCard({ order, canApprove, canCancel, canFulfil, onChan
     <article className="neu-card rounded-2xl p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-sm font-bold text-slate-800 dark:text-zinc-100">
               {order.orderNumber}
             </span>
             <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusColor(order.status)}`}>
               {statusLabel(order.status)}
             </span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                isTakeAway
+                  ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                  : "bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300"
+              }`}
+            >
+              {fulfillmentMethodLabel(order.fulfillmentMethod)}
+            </span>
+            {isTakeAway && (isApproved || order.status === "fulfilled") ? (
+              <span
+                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${takeAwayStatusColor(order.takeAwayStatus)}`}
+              >
+                {takeAwayStatusLabel(order.takeAwayStatus)}
+              </span>
+            ) : null}
           </div>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-zinc-400">
             {order.requester?.name ?? "Unknown requester"}
@@ -103,8 +135,11 @@ export function StoreOrderCard({ order, canApprove, canCancel, canFulfil, onChan
             {units} unit{units === 1 ? "" : "s"}
             {value > 0 ? ` · ₹${value.toFixed(2)}` : ""}
           </p>
-          <p>To: {order.deliveryName}</p>
-          <p>{order.department}</p>
+          <p>
+            {isTakeAway ? "Collector" : "To"}: {order.deliveryName}
+          </p>
+          {order.department ? <p>{order.department}</p> : null}
+          {isTakeAway && order.regionLabel ? <p>Pickup: {order.regionLabel}</p> : null}
         </div>
       </div>
 
@@ -119,9 +154,18 @@ export function StoreOrderCard({ order, canApprove, canCancel, canFulfil, onChan
                   {categoryLabel(line.category)}
                 </span>
               </span>
-              <span className="shrink-0 text-xs font-semibold text-slate-500">
-                {line.quantity} {line.unit}
-                {Number(line.price ?? 0) > 0 ? ` · ₹${(Number(line.price) * Number(line.quantity)).toFixed(2)}` : ""}
+              <span className="flex shrink-0 items-center gap-2">
+                {!isTakeAway && (isApproved || order.status === "fulfilled") ? (
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${deliveryStatusColor(line.deliveryStatus)}`}
+                  >
+                    {deliveryStatusLabel(line.deliveryStatus)}
+                  </span>
+                ) : null}
+                <span className="text-xs font-semibold text-slate-500">
+                  {line.quantity} {line.unit}
+                  {Number(line.price ?? 0) > 0 ? ` · ₹${(Number(line.price) * Number(line.quantity)).toFixed(2)}` : ""}
+                </span>
               </span>
             </li>
           ))}
@@ -148,8 +192,8 @@ export function StoreOrderCard({ order, canApprove, canCancel, canFulfil, onChan
         />
       ) : null}
 
-      {(canApprove && isPending) || (canCancel && isPending) || (canFulfil && isApproved) ? (
-        <div className="mt-3 flex flex-wrap gap-2">
+      {(canApprove && isPending) || (canCancel && isPending) || order.invoiceIssuedAt ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           {canApprove && isPending ? (
             <>
               <button
@@ -170,16 +214,6 @@ export function StoreOrderCard({ order, canApprove, canCancel, canFulfil, onChan
               </button>
             </>
           ) : null}
-          {canFulfil && isApproved ? (
-            <button
-              disabled={Boolean(busy)}
-              onClick={() => transition("fulfilled")}
-              className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {busy === "fulfilled" ? <Loader2 className="animate-spin" size={13} /> : <PackageCheck size={13} />}
-              Mark fulfilled
-            </button>
-          ) : null}
           {canCancel && isPending ? (
             <button
               disabled={Boolean(busy)}
@@ -189,6 +223,17 @@ export function StoreOrderCard({ order, canApprove, canCancel, canFulfil, onChan
               <Ban size={13} />
               Cancel
             </button>
+          ) : null}
+          {order.invoiceIssuedAt ? (
+            <a
+              href={`/store-invoice/${order.id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+            >
+              <Receipt size={13} />
+              View invoice
+            </a>
           ) : null}
         </div>
       ) : null}
