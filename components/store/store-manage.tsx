@@ -8,17 +8,20 @@ import {
   Plus,
   Minus,
   RefreshCw,
+  ScanLine,
   Search,
   Trash2,
   X,
 } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import { categoryLabel } from "@/lib/store-constants";
+import { StoreScanModal } from "./store-scan-modal";
 
 type StoreItemDto = {
   id: string;
   name: string;
   productNumber: string;
+  barcode: string;
   batchNumber: string;
   category: string;
   description: string;
@@ -33,6 +36,7 @@ type CategoryDto = { value: string; label: string };
 const emptyForm = {
   name: "",
   productNumber: "",
+  barcode: "",
   batchNumber: "",
   category: "stationery",
   description: "",
@@ -49,6 +53,7 @@ export function StoreManage() {
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const [editing, setEditing] = useState<StoreItemDto | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -81,9 +86,22 @@ export function StoreManage() {
     void load();
   }, [load]);
 
-  function openCreate() {
+  function openCreate(prefill?: {
+    productNumber?: string;
+    name?: string;
+    description?: string;
+    price?: string;
+    category?: string;
+  }) {
     setEditing(null);
-    setForm(emptyForm);
+    setForm({
+      ...emptyForm,
+      productNumber: prefill?.productNumber ?? "",
+      name: prefill?.name ?? "",
+      description: prefill?.description ?? "",
+      price: prefill?.price ?? "",
+      category: prefill?.category || emptyForm.category,
+    });
     setFormError("");
     setShowForm(true);
   }
@@ -93,6 +111,7 @@ export function StoreManage() {
     setForm({
       name: item.name,
       productNumber: item.productNumber,
+      barcode: item.barcode ?? "",
       batchNumber: item.batchNumber ?? "",
       category: item.category || "other",
       description: item.description ?? "",
@@ -113,6 +132,7 @@ export function StoreManage() {
       const payload = {
         name: form.name.trim(),
         productNumber: form.productNumber.trim(),
+        barcode: form.barcode.trim(),
         batchNumber: form.batchNumber.trim(),
         category: form.category,
         description: form.description.trim(),
@@ -188,7 +208,7 @@ export function StoreManage() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => void load()}
             className="neu-btn inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold"
@@ -196,7 +216,14 @@ export function StoreManage() {
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
           </button>
           <button
-            onClick={openCreate}
+            onClick={() => setShowScanner(true)}
+            className="neu-btn inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold"
+          >
+            <ScanLine size={15} />
+            Scan &amp; add stock
+          </button>
+          <button
+            onClick={() => openCreate()}
             className="neu-btn neu-btn-primary inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold"
           >
             <Plus size={15} />
@@ -227,7 +254,7 @@ export function StoreManage() {
         <div className="neu-card grid place-items-center gap-3 rounded-2xl p-12 text-center">
           <p className="text-sm text-slate-500">No products yet. Add your first product.</p>
           <button
-            onClick={openCreate}
+            onClick={() => openCreate()}
             className="neu-btn neu-btn-primary rounded-full px-4 py-2 text-sm font-semibold"
           >
             Add product
@@ -252,6 +279,9 @@ export function StoreManage() {
                   <td className="px-4 py-3">
                     <p className="font-semibold text-slate-800 dark:text-zinc-100">{item.name}</p>
                     <p className="font-mono text-[11px] text-slate-400">{item.productNumber}</p>
+                    {item.barcode ? (
+                      <p className="font-mono text-[10px] text-slate-400">Barcode: {item.barcode}</p>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3 text-slate-500 dark:text-zinc-400">{categoryLabel(item.category)}</td>
                   <td className="px-4 py-3 font-mono text-xs text-slate-500">{item.batchNumber || "—"}</td>
@@ -302,6 +332,26 @@ export function StoreManage() {
         </div>
       )}
 
+      {showScanner ? (
+        <StoreScanModal
+          onClose={() => {
+            setShowScanner(false);
+            void load();
+          }}
+          onStocked={() => void load()}
+          onUnknownCode={(code, prefill) => {
+            setShowScanner(false);
+            openCreate({
+              productNumber: code,
+              name: prefill?.name,
+              description: prefill?.description,
+              price: prefill?.price,
+              category: prefill?.category,
+            });
+          }}
+        />
+      ) : null}
+
       {showForm ? (
         <Modal title={editing ? "Edit product" : "Add product"} onClose={() => setShowForm(false)}>
           {formError ? (
@@ -313,6 +363,11 @@ export function StoreManage() {
               label="Product number"
               value={form.productNumber}
               onChange={(v) => setForm({ ...form, productNumber: v })}
+            />
+            <Input
+              label="Barcode (optional)"
+              value={form.barcode}
+              onChange={(v) => setForm({ ...form, barcode: v })}
             />
             <Input
               label="Batch number (optional)"

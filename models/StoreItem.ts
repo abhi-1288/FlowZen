@@ -36,6 +36,7 @@ const StoreItemSchema = new Schema(
     name: { type: String, required: true, trim: true, maxlength: 160 },
     description: { type: String, default: "", maxlength: 500 },
     productNumber: { type: String, required: true, trim: true, uppercase: true, maxlength: 60 },
+    barcode: { type: String, default: "", trim: true, uppercase: true, maxlength: 64 },
     batchNumber: { type: String, default: "", trim: true, uppercase: true, maxlength: 60 },
     unit: { type: String, default: "piece", trim: true, maxlength: 40 },
     price: { type: Number, default: 0, min: 0 },
@@ -48,6 +49,10 @@ const StoreItemSchema = new Schema(
 StoreItemSchema.index(
   { company: 1, regionLabel: 1, productNumber: 1 },
   { unique: true },
+);
+StoreItemSchema.index(
+  { company: 1, regionLabel: 1, barcode: 1 },
+  { unique: true, partialFilterExpression: { barcode: { $gt: "" } } },
 );
 StoreItemSchema.index({ company: 1, regionLabel: 1, category: 1 });
 

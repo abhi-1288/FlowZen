@@ -53,6 +53,7 @@ export async function GET(request: Request) {
     filter.$or = [
       { productNumber: { $regex: `^${escaped}$`, $options: "i" } },
       { batchNumber: { $regex: `^${escaped}$`, $options: "i" } },
+      { barcode: { $regex: `^${escaped}$`, $options: "i" } },
     ];
   } else if (search) {
     const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -60,6 +61,7 @@ export async function GET(request: Request) {
       { name: { $regex: escaped, $options: "i" } },
       { productNumber: { $regex: escaped, $options: "i" } },
       { batchNumber: { $regex: escaped, $options: "i" } },
+      { barcode: { $regex: escaped, $options: "i" } },
       { description: { $regex: escaped, $options: "i" } },
     ];
   }
@@ -81,6 +83,7 @@ export async function POST(request: Request) {
   const category = String(body.category ?? "other").toLowerCase();
   const name = String(body.name ?? "").trim();
   const productNumber = String(body.productNumber ?? "").trim().toUpperCase();
+  const barcode = String(body.barcode ?? "").trim().toUpperCase();
   const batchNumber = String(body.batchNumber ?? "").trim().toUpperCase();
   const description = String(body.description ?? "").trim().slice(0, 500);
   const unit = String(body.unit ?? "piece").trim().slice(0, 40) || "piece";
@@ -93,6 +96,7 @@ export async function POST(request: Request) {
   if (!productNumber) return jsonError("A product number is required.");
   if (productNumber.length > 60) return jsonError("Product number must be 60 characters or fewer.");
   if (batchNumber.length > 60) return jsonError("Batch number must be 60 characters or fewer.");
+  if (barcode.length > 64) return jsonError("Barcode must be 64 characters or fewer.");
   if (!Number.isFinite(price) || price < 0) return jsonError("Enter a valid price.");
   if (!Number.isFinite(stock) || stock < 0) return jsonError("Enter a valid stock count.");
 
@@ -128,12 +132,24 @@ export async function POST(request: Request) {
     return jsonError("This product number already exists in your region's store.", 409);
   }
 
+  if (barcode) {
+    const barcodeClash = await StoreItem.findOne({
+      company: companyId,
+      regionLabel: region,
+      barcode,
+    });
+    if (barcodeClash) {
+      return jsonError("This barcode already exists in your region's store.", 409);
+    }
+  }
+
   const item = await StoreItem.create({
     company: companyId,
     regionLabel: region,
     category,
     name,
     productNumber,
+    barcode,
     batchNumber,
     description,
     unit,

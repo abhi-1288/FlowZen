@@ -41,6 +41,8 @@ export async function PATCH(request: Request, { params }: Params) {
   const category = body.category === undefined ? undefined : String(body.category).toLowerCase();
   const productNumber =
     body.productNumber === undefined ? undefined : String(body.productNumber).trim().toUpperCase();
+  const barcode =
+    body.barcode === undefined ? undefined : String(body.barcode).trim().toUpperCase();
   const batchNumber =
     body.batchNumber === undefined ? undefined : String(body.batchNumber).trim().toUpperCase();
   const description = body.description === undefined ? undefined : String(body.description).trim().slice(0, 500);
@@ -58,6 +60,7 @@ export async function PATCH(request: Request, { params }: Params) {
     return jsonError("A product number is required.");
   }
   if (category !== undefined && !validCategory(category)) return jsonError("Invalid store category.");
+  if (barcode !== undefined && barcode.length > 64) return jsonError("Barcode must be 64 characters or fewer.");
   if (price !== undefined && (!Number.isFinite(price) || price < 0)) {
     return jsonError("Enter a valid price.");
   }
@@ -94,6 +97,18 @@ export async function PATCH(request: Request, { params }: Params) {
     });
     if (clash) return jsonError("This product number already exists in your region's store.", 409);
     item.productNumber = productNumber;
+  }
+  if (barcode !== undefined && barcode !== item.barcode) {
+    if (barcode) {
+      const clash = await StoreItem.findOne({
+        company: companyId,
+        regionLabel: region,
+        barcode,
+        _id: { $ne: item._id },
+      });
+      if (clash) return jsonError("This barcode already exists in your region's store.", 409);
+    }
+    item.barcode = barcode;
   }
   if (name !== undefined) item.name = name;
   if (category !== undefined) item.category = category;

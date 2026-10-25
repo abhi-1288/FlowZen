@@ -33,6 +33,32 @@ export async function connectDb() {
 
   try {
     cached.conn = await cached.promise;
+
+    // Self-heal the store catalogue index for the barcode feature: an older
+    // schema left a unique index on `barcode` that treated every null/empty
+    // value as a duplicate. Drop it and recreate it as a partial index so
+    // products without a barcode can coexist, then backfill legacy rows.
+    try {
+      const storeItemModel = mongoose.models.StoreItem;
+      if (storeItemModel?.collection) {
+        await storeItemModel.collection.dropIndex("company_1_regionLabel_1_barcode_1").catch(() => {});
+        await storeItemModel.collection.createIndex(
+          { company: 1, regionLabel: 1, barcode: 1 },
+          {
+            unique: true,
+            partialFilterExpression: { barcode: { $gt: "" } },
+            name: "company_1_regionLabel_1_barcode_1",
+          },
+        );
+        await storeItemModel.updateMany(
+          { $or: [{ barcode: { $exists: false } }, { barcode: null }] },
+          { $set: { barcode: "" } },
+        );
+      }
+    } catch {
+      // Index self-heal is best-effort; never block DB connection.
+    }
+
     return cached.conn;
   } catch (error) {
     cached.promise = null;
