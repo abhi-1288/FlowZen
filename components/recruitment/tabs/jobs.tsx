@@ -23,6 +23,7 @@ export function JobsTab() {
   // delegation takes effect at the next refresh rather than instantly — which is
   // why the server re-derives it on every write.
   const canCreateJobs = Boolean(session?.user?.isRecruitmentHQ);
+  const canPublishJobs = session?.user?.role === "admin" || Boolean(session?.user?.isCompanyOwner);
   const { jobs, loading, totalJobs, fetchJobs, updateJob, setModal } = useRecruitmentStore(
     useShallow((s) => ({ jobs: s.jobs, loading: s.loading, totalJobs: s.totalJobs, fetchJobs: s.fetchJobs, updateJob: s.updateJob, setModal: s.setModal }))
   );
@@ -191,7 +192,7 @@ export function JobsTab() {
                     </button>
                   )}
                   <div className="ml-auto flex flex-wrap items-center gap-2">
-                    {job.status === "draft" && canCreateJobs && (
+                    {job.status === "draft" && canPublishJobs && (
                       <button suppressHydrationWarning
                         onClick={() => { void updateJob(job.id, { status: "open" as JobStatus }); }}
                         className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-medium text-white hover:bg-emerald-700"

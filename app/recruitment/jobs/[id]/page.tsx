@@ -958,7 +958,7 @@ export default function JobDetailPage() {
             </div>
 
             <div className="mt-4 space-y-2.5 border-t border-[var(--c-border-light)] dark:border-zinc-800 pt-4">
-              {activeJob.status === "draft" && canRunPipeline && (
+              {activeJob.status === "draft" && (role === "admin" || Boolean(session?.user?.isCompanyOwner)) && (
                 <ActionButton accent={accent} icon={Globe} label="Publish Job" onClick={() => { void updateJob(id, { status: "open" as JobStatus }); }} />
               )}
               {activeJob.status === "open" && canRunPipeline && (

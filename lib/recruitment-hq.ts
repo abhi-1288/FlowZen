@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import {
   effectiveRegionLabelOf,
   isMainOfficeLabel,
+  isMainOfficeRegion,
+  mainOfficeLabelOf,
   regionEntryOf,
   regionPipelineManagerIdsOf,
   type OfficeAddressLike,
@@ -123,6 +125,41 @@ export function canReachAllCandidates(
 ): boolean {
   if (!actor) return false;
   return canRunRecruitmentPipeline(company, actor);
+}
+
+/**
+ * Whether an actor may publish (make live) a recruitment job.
+ *
+ * Publishing is an admin power, not a pipeline-runner one: HR drafts and marks
+ * the job ready, and an admin flips it live. Region scoping follows the job's
+ * `regionLabel` snapshot rather than the assignee, so a region's admin can
+ * publish jobs raised by their region's HR even without a pipeline delegation.
+ *
+ * Company owner and main-office admins keep company-wide authority; a regional
+ * admin (or a delegated pipeline manager) is limited to their own region.
+ */
+export function canPublishRecruitmentJob(
+  company: CompanyLike,
+  actor: RecruitmentScopeActor | null | undefined,
+  job: { regionLabel?: string | null } | null | undefined,
+): boolean {
+  if (!actor) return false;
+  if (isCompanyOwner(company as any, actor as any)) return true;
+  if (String(actor.role ?? "") !== "admin") return false;
+
+  // Main office admin can publish anything.
+  if (isMainOfficeRegion(company as any, actor as any)) return true;
+
+  const jobRegion =
+    String(job?.regionLabel ?? "").trim() || mainOfficeLabelOf(company as any);
+  // Delegated pipeline manager for the job's region.
+  const entry = regionEntryOf(company as any, jobRegion);
+  if (entry && regionPipelineManagerIdsOf(entry).includes(String(actor._id ?? ""))) {
+    return true;
+  }
+  // Regional admin sitting in the same region as the job.
+  const actorRegion = effectiveRegionLabelOf(company as any, actor as any);
+  return actorRegion.trim().toLowerCase() === jobRegion.trim().toLowerCase();
 }
 
 /**

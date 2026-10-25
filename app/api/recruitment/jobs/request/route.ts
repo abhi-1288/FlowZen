@@ -5,6 +5,7 @@ import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { jsonError, requireUserId, serializeDoc } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
+import { effectiveRegionOf } from "@/lib/region-scope";
 
 const REQUESTER_ROLES = ["project-manager", "qa-tester", "finance", "human-resource", "admin"];
 
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
     },
     createdBy: userId,
     company: user.company,
+    regionLabel: await effectiveRegionOf(hrUser as any),
   });
 
   await Notification.create({

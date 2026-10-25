@@ -19,7 +19,7 @@ import {
 } from "@/lib/recruitment-utils";
 import { deleteFileByUrl } from "@/lib/storage";
 import { sendEditApplicationInvites } from "@/lib/edit-application-emails";
-import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
+import { requireRecruitmentHQ, canPublishRecruitmentJob } from "@/lib/recruitment-hq";
 
 type Params = { params: Promise<{ id: string }> };
 const HR_ROLES = ["admin", "human-resource"];
@@ -73,15 +73,22 @@ export async function PATCH(request: Request, { params }: Params) {
   const existingJob = await ATSJob.findOne({ _id: id, company: companyId });
   if (!existingJob) return jsonError("Job not found.", 404);
 
-  // Every action below mutates the requisition — drafting, publishing, the edit
-  // window — so they share one gate. Checking per-branch would let the workflow
-  // actions (accept / forward / set-salary / publish) remain open to any region
-  // HR while the plain field edit was closed, which is not a distinction anyone
-  // could act on. See `lib/recruitment-hq.ts`.
-  const hq = await requireRecruitmentHQ(user as any);
-  if (!hq.ok) return hq.response;
-
   const action = body.action;
+
+  // Publishing (making the job live) is an admin power with its own region rule,
+  // so it bypasses the pipeline-HQ gate. Everything else keeps the shared gate.
+  const isPublishRequest = action === "publish" || body?.status === "open";
+  if (isPublishRequest) {
+    const { Company } = await import("@/models/Company");
+    const company = await Company.findById(user.company).select("owner addresses address").lean();
+    if (!company) return jsonError("No company found.", 400);
+    if (!canPublishRecruitmentJob(company as any, user as any, existingJob as any)) {
+      return jsonError("Only an admin in this job's region can publish it.", 403);
+    }
+  } else {
+    const hq = await requireRecruitmentHQ(user as any);
+    if (!hq.ok) return hq.response;
+  }
 
   if (action === "accept") {
     if (user.role !== "human-resource") return jsonError("Only HR can accept assignments.", 403);
