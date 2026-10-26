@@ -6,6 +6,7 @@ import { StoreOrder } from "@/models/StoreOrder";
 import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
 import { recordAudit } from "@/lib/audit";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 import {
   deliveryStatusLabel,
   fulfilStoreOrder,
@@ -66,7 +67,12 @@ export async function PATCH(request: Request, { params }: Params) {
   const companyId =
     typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
 
-  if (String(user.role) !== "warehouse") {
+  if ((await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(user.role ?? ""),
+    featureKeys: ["warehouse-delivery"],
+  })) !== "warehouse") {
     return jsonError("Only the warehouse can update delivery statuses.", 403);
   }
 

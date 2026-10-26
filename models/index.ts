@@ -29,6 +29,8 @@ export * from "./Team";
 export * from "./User";
 export * from "./SessionLock";
 export * from "./PinResetRequest";
+export * from "./FeatureDelegation";
+export * from "./AttendanceExportRequest";
 export * from "./Message";
 export * from "./GameScore";
 export * from "./GameChallenge";

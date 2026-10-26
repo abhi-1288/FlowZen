@@ -3,6 +3,7 @@ import { connectDb } from "@/lib/db";
 import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { User } from "@/models/User";
 import { LostCardReport } from "@/models/LostCardReport";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
 
@@ -83,12 +84,19 @@ export async function GET(request: Request) {
   const actor = await User.findById(userId).select("company role isSeniorSecurity");
   if (!actor) return jsonError("User not found.", 404);
   if (!actor.company) return jsonError("No company.", 400);
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: ["security-lost-cards", "security-access-review"],
+  });
+  const isDelegated = actingRole === "security" && String(actor.role) !== "security";
 
   const url = new URL(request.url);
   const status = url.searchParams.get("status") ?? "";
   const scope = url.searchParams.get("scope") ?? "";
 
-  const isAdminHrSecurity = ["admin", "human-resource", "security"].includes(String(actor.role));
+  const isAdminHrSecurity = ["admin", "human-resource", "security"].includes(actingRole);
 
   if (scope === "tickets") {
     // Dashboard tickets — accessible by all authenticated users (employees see their own)
@@ -96,10 +104,10 @@ export async function GET(request: Request) {
     if (!isAdminHrSecurity) {
       // Employee sees only their own tickets
       filter.user = userId;
-    } else if (String(actor.role) === "human-resource") {
+    } else if (actingRole === "human-resource") {
       // HR sees tickets assigned to them
       filter.assignedHR = userId;
-    } else if (String(actor.role) === "security" && !Boolean(actor.isSeniorSecurity)) {
+    } else if (actingRole === "security" && !Boolean(actor.isSeniorSecurity) && !isDelegated) {
       // Junior security sees tickets they accepted or tickets available
       filter.$or = [
         { assignedJuniorSecurity: userId },
@@ -164,7 +172,12 @@ export async function POST(request: Request) {
   if (!actor) return jsonError("User not found.", 404);
   if (!actor.company) return jsonError("No company.", 400);
 
-  const isHrOrSecurity = ["admin", "human-resource", "security"].includes(String(actor.role));
+  const isHrOrSecurity = ["admin", "human-resource", "security"].includes(await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: ["security-lost-cards", "security-access-review"],
+  }));
 
   const body = await request.json();
 

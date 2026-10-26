@@ -58,15 +58,19 @@ type EventRecord = {
 export function VisitorsTab({
   company,
   showToast,
+  delegationFeatureKey = "",
 }: {
   company: AnyRecord | null;
   showToast: (text: string, type?: "success" | "error") => void;
+  /** Exact delegated feature currently open, if any. */
+  delegationFeatureKey?: string;
 }) {
   const { data: session } = useSession();
   const role = String(session?.user?.role ?? "");
   const isAdminHr = ["admin", "human-resource"].includes(role);
   const isSeniorSec = Boolean((session?.user as any)?.isSeniorSecurity);
-  const canGenerate = role !== "employee" && (role !== "security" || isSeniorSec);
+  const isDelegatedVisitor = delegationFeatureKey === "security-visitors";
+  const canGenerate = isDelegatedVisitor || (role !== "employee" && (role !== "security" || isSeniorSec));
 
   /* ── Events ── */
   const [events, setEvents] = useState<EventRecord[]>([]);
@@ -257,6 +261,16 @@ export function VisitorsTab({
       showToast(err instanceof Error ? err.message : "Failed to decline.", "error");
     } finally {
       setDeclining(false);
+    }
+  }
+
+  async function verifyPass(pass: PassRecord) {
+    try {
+      await apiFetch(`/api/hr/visitor/passes/${pass.id || pass._id}/verify`, { method: "POST" });
+      showToast("Pass verified and sent for approval.", "success");
+      loadPasses();
+    } catch (err: any) {
+      showToast(err?.message ?? "Failed to verify pass.", "error");
     }
   }
 
@@ -533,15 +547,25 @@ export function VisitorsTab({
                     {pass.region ? <p className="text-[10px] text-slate-400">Region: {pass.region}</p> : null}
                   </div>
                   <div className="flex shrink-0 flex-col gap-1.5">
-                    {isPending && isAdminHr ? (
-                      <>
-                        <ActionButton variant="approve" className="px-3 py-1 text-xs" onClick={() => setPreviewPass(pass)}>
-                          Preview & Sign
-                        </ActionButton>
-                        <ActionButton variant="danger" className="px-3 py-1 text-xs" onClick={() => setDeclineTarget(pass)}>
-                          Decline
-                        </ActionButton>
-                      </>
+                    {isPending ? (
+                      (pass as any).verificationStatus === "pending-verification" ? (
+                        ((pass as any).authorizer && String((pass as any).authorizer) === String(session?.user?.id ?? "")) || isAdminHr ? (
+                          <ActionButton variant="approve" className="px-3 py-1 text-xs" onClick={() => verifyPass(pass)}>
+                            Verify
+                          </ActionButton>
+                        ) : null
+                      ) : (
+                        isAdminHr ? (
+                          <>
+                            <ActionButton variant="approve" className="px-3 py-1 text-xs" onClick={() => setPreviewPass(pass)}>
+                              Preview & Sign
+                            </ActionButton>
+                            <ActionButton variant="danger" className="px-3 py-1 text-xs" onClick={() => setDeclineTarget(pass)}>
+                              Decline
+                            </ActionButton>
+                          </>
+                        ) : null
+                      )
                     ) : null}
                     {isApproved ? (
                       <>
@@ -666,10 +690,10 @@ export function VisitorsTab({
             idDocumentUrl: previewPass.idDocumentUrl,
             region: previewPass.region || "",
             visitAddress: previewPass.visitAddress || "",
-            validFrom: previewPass.validFrom,
-            validUntil: previewPass.validUntil,
+            validFrom: previewPass.validFrom ?? previewPass.timeIn,
+            validUntil: previewPass.validUntil ?? previewPass.timeOut,
           }}
-          company={null}
+          company={company}
           avatarUrl=""
           displayName={previewPass.visitorName}
           displayRole="Visitor"

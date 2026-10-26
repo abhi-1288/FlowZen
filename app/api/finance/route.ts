@@ -15,6 +15,7 @@ import { effectiveRegionLabelOf } from "@/lib/company-regions";
 import { resolveRegionPolicy } from "@/lib/region-scope";
 import { formatAmount } from "@/lib/procurement";
 import { monthKey, localMonthKey, actorWithCompany, autoGenerateSalariesForMonth, canManageFinance, computeSalaryBreakdown, getSalaryPeriod, financeMemberScope, financeMemberSalaryFilter, financeMemberUserFilter, assertSalaryTargetInFinanceScope } from "./helpers";
+import { delegationForFeature, delegationIdFromRequest } from "@/lib/delegation-access";
 import { handleStatusUpdates } from "./status-updates";
 import { CompanyPolicy } from "@/models/CompanyPolicy";
 
@@ -199,7 +200,7 @@ export async function GET(request: Request) {
             .sort({ createdAt: -1 })
             .limit(50),
       canManage
-        ? ProjectBudget.find({ company: actor.company })
+        ? ProjectBudget.find({ company: actor.company, ...(scope.memberIds ? { region: scope.region } : {}) })
             .populate("board", "title description")
             .populate("decidedBy", "name")
             .populate("assignedTo", "name")
@@ -443,8 +444,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ expense }, { status: 201 });
   }
 
-  if (!canManageFinance(role))
-    return jsonError("Only finance or admins can manage finance.", 403);
+  if (!canManageFinance(role)) {
+    // Delegated access is scoped to one exact finance feature. Map the action
+    // to that feature before deciding whether the recipient may run it.
+    const featureByAction: Record<string, string> = {
+      "calculate-salary": "finance-salaries",
+      "generate-salary": "finance-salaries",
+      "edit-salary": "finance-salaries",
+      "set-budget": "finance-project-budgets",
+      "generate-bill": "finance-project-budgets",
+    };
+    const requiredFeature = featureByAction[action] ?? "";
+    const delegated = requiredFeature
+      ? await delegationForFeature(userId, delegationIdFromRequest(request), requiredFeature)
+      : null;
+    if (!delegated)
+      return jsonError("Only finance or admins can manage finance.", 403);
+  }
+
+  // Inside this block a delegated recipient acts with finance privileges for
+  // the one feature they were granted; admin-only branches stay admin-only.
+  const actingRole = canManageFinance(role) ? role : "finance";
+
+  const financeScope = await financeMemberScope(actor);
 
   if (action === "calculate-salary") {
     const employeeId = String(body.employeeId ?? "");
@@ -678,21 +700,17 @@ export async function POST(request: Request) {
 
   if (action === "set-budget") {
     const boardId = String(body.boardId ?? "");
+    const regionOwners = financeScope.memberIds
+      ? financeScope.memberIds
+      : await User.find({ company: actor.company, companyStatus: "approved" }).distinct("_id");
     const board = await Board.findOne({
       _id: boardId,
-      owner: {
-        $in: (
-          await User.find({
-            company: actor.company,
-            companyStatus: "approved",
-          }).distinct("_id")
-        ).map(String),
-      },
+      owner: { $in: regionOwners.map(String) },
     }).select("_id title");
     if (!board) return jsonError("Project not found.", 404);
     const deadline = body.deadline ? new Date(String(body.deadline)) : null;
     let assignedTo: string | null = null;
-    if (role === "admin") {
+    if (actingRole === "admin") {
       assignedTo = String(body.assignedTo ?? "");
       if (!assignedTo)
         return jsonError(
@@ -712,6 +730,7 @@ export async function POST(request: Request) {
       { company: actor.company, board: boardId },
       {
         $set: {
+          region: financeScope.region,
           totalBudget: Math.max(0, Number(body.totalBudget ?? 0)),
           teamSpendingLimit: Math.max(0, Number(body.teamSpendingLimit ?? 0)),
           resourceBudget: Math.max(0, Number(body.resourceBudget ?? 0)),
@@ -724,7 +743,7 @@ export async function POST(request: Request) {
       { new: true, upsert: true },
     );
     const boardTitle = String((board as any).title ?? "");
-    if (role === "admin") {
+    if (actingRole === "admin") {
       const notifyUserIds = assignedTo
         ? [assignedTo]
         : (
@@ -744,7 +763,7 @@ export async function POST(request: Request) {
       if (notifications.length) await Notification.insertMany(notifications);
       notifyUserIds.forEach((uid) => emitNotification(String(uid)));
     }
-    if (role === "finance") {
+    if (actingRole === "finance") {
       const admins = await User.find({
         company: actor.company,
         role: "admin",
@@ -772,6 +791,7 @@ export async function POST(request: Request) {
     const budget = await ProjectBudget.findOne({
       _id: budgetId,
       company: actor.company,
+      ...(financeScope.memberIds ? { region: financeScope.region } : {}),
       status: "approved",
     }).populate("board", "title");
     if (!budget) return jsonError("Approved budget not found.", 404);

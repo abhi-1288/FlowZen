@@ -96,6 +96,63 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
+/* The delegation workspace uses intentionally dark, slate surfaces in OLED
+   mode. Keep it isolated from the legacy global `.dark .bg-white` fallback,
+   which is needed by older profile tabs but makes this newer workspace
+   unreadable when applied indiscriminately. */
+.feature-delegation-shell .bg-white {
+  background-color: var(--c-bg-card) !important;
+}
+.feature-delegation-shell .bg-slate-50 {
+  background-color: var(--c-bg-muted) !important;
+}
+.feature-delegation-shell .bg-slate-100 {
+  background-color: var(--c-bg-hover) !important;
+}
+.feature-delegation-shell .border-slate-200,
+.feature-delegation-shell .border-slate-100 {
+  border-color: var(--c-border-light) !important;
+}
+.feature-delegation-shell .bg-gradient-to-r.from-violet-600.to-indigo-600 {
+  background-image: var(--neu-primary) !important;
+}
+.dark .feature-delegation-shell .bg-white {
+  background-color: var(--c-bg-card) !important;
+}
+.dark .feature-delegation-shell .bg-slate-50 {
+  background-color: var(--c-bg-muted) !important;
+}
+.dark .feature-delegation-shell .bg-slate-100 {
+  background-color: var(--c-bg-hover) !important;
+}
+.dark .feature-delegation-shell .border-slate-200,
+.dark .feature-delegation-shell .border-slate-100 {
+  border-color: rgba(148, 163, 184, 0.2) !important;
+}
+.dark .feature-delegation-shell .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(148, 163, 184, 0.14) !important;
+}
+.dark .feature-delegation-shell .text-slate-800,
+.dark .feature-delegation-shell .text-slate-700,
+.dark .feature-delegation-shell .text-slate-600 {
+  color: #edf2ff !important;
+}
+.dark .feature-delegation-shell .text-slate-500,
+.dark .feature-delegation-shell .text-slate-400 {
+  color: #aab5ca !important;
+}
+.dark .feature-delegation-shell input,
+.dark .feature-delegation-shell textarea,
+.dark .feature-delegation-shell select {
+  background-color: #20283a !important;
+  border-color: rgba(148, 163, 184, 0.25) !important;
+  color: #edf2ff !important;
+}
+.dark .feature-delegation-shell input::placeholder,
+.dark .feature-delegation-shell textarea::placeholder {
+  color: #8490a8 !important;
+}
+
 button,
 input,
 textarea,

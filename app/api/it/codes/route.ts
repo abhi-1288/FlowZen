@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { databaseUnavailable, jsonError, requireUserId, serializeDoc } from "@/lib/api";
 import { createItJoiningCode } from "@/lib/codes";
-import { Company } from "@/models/Company";
 import { ITJoiningCode } from "@/models/ITJoiningCode";
+import { Company } from "@/models/Company";
+import { actingRoleForRequest, delegationForFeature, delegationIdFromRequest } from "@/lib/delegation-access";
 import { User } from "@/models/User";
 import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
@@ -11,7 +12,7 @@ import { emitNotification } from "@/lib/realtime";
 const DEFAULT_EXPIRY_MS = 24 * 60 * 60 * 1000;
 const MAX_EXPIRY_HOURS = 168;
 
-export async function GET() {
+export async function GET(request: Request) {
   const userId = await requireUserId();
   if (!userId) return jsonError("Unauthorized", 401);
 
@@ -29,7 +30,12 @@ export async function GET() {
     return jsonError("You must be an approved company member to view IT joining codes.", 403);
   }
   const isItAdmin =
-    String(actor.role) === "it-admin" ||
+    (await actingRoleForRequest({
+      userId,
+      request,
+      realRole: String(actor.role ?? ""),
+      featureKeys: ["it-joining-codes"],
+    })) === "it-admin" ||
     String(actor.role) === "admin" ||
     (String(actor.role) === "human-resource" && Boolean(actor.isSeniorSecurity));
   if (!isItAdmin) {
@@ -77,7 +83,12 @@ export async function POST(request: Request) {
     return jsonError("You must be an approved company member to generate IT joining codes.", 403);
   }
   const isItAdmin =
-    String(actor.role) === "it-admin" ||
+    (await actingRoleForRequest({
+      userId,
+      request,
+      realRole: String(actor.role ?? ""),
+      featureKeys: ["it-joining-codes"],
+    })) === "it-admin" ||
     String(actor.role) === "admin" ||
     (String(actor.role) === "human-resource" && Boolean(actor.isSeniorSecurity));
   if (!isItAdmin) {
@@ -87,6 +98,8 @@ export async function POST(request: Request) {
   const companyId =
     typeof actor.company === "object" && actor.company ? (actor.company as any)._id : actor.company;
   const companyName = String((actor.company as any)?.name ?? "");
+  const delegation = await delegationForFeature(userId, delegationIdFromRequest(request), "it-joining-codes");
+  const requiresVerification = Boolean((delegation as any)?.requiresVerification);
 
   let code = "";
   let attempts = 0;
@@ -106,16 +119,20 @@ export async function POST(request: Request) {
     expiresAt: new Date(Date.now() + hours * 60 * 60 * 1000),
     maxUses,
     usedCount: 0,
-    status: "active",
+    status: requiresVerification ? "pending-verification" : "active",
+    verificationStatus: requiresVerification ? "pending-verification" : "none",
+    submittedBy: requiresVerification ? userId : null,
+    authorizer: requiresVerification ? (delegation as any).authorizer : null,
+    pendingAction: requiresVerification ? "create-joining-code" : "",
   });
 
-  await Notification.create({
-    user: userId,
-    company: companyId,
-    type: "info",
-    title: "IT joining code generated",
-    message: `Generated IT joining code ${code} (expires in ${hours}h, ${maxUses} use(s)).`,
-  });
+  if (requiresVerification && (delegation as any).authorizer) {
+    const authorizerId = String((delegation as any).authorizer);
+    await Notification.create({ user: authorizerId, company: companyId, type: "approval", title: "IT joining code pending verification", message: `${actor.name} prepared an IT joining code for verification.`, link: "/profile/it" });
+    emitNotification(authorizerId);
+  } else {
+    await Notification.create({ user: userId, company: companyId, type: "info", title: "IT joining code generated", message: `Generated IT joining code ${code} (expires in ${hours}h, ${maxUses} use(s)).` });
+  }
 
   return NextResponse.json({ code: serializeDoc(joinCode), companyName }, { status: 201 });
 }

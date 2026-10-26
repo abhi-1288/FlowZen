@@ -5,8 +5,9 @@ import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 import { identityCodePrefixOf, identityCodeRegionRemaining, identityCodeRegionsOf } from "@/lib/company-identity";
 import { mainOfficeLabelOf } from "@/lib/company-regions";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
-export async function GET() {
+export async function GET(request: Request) {
   const userId = await requireUserId();
   if (!userId) return jsonError("Unauthorized", 401);
 
@@ -21,9 +22,15 @@ export async function GET() {
   const user = await User.findById(userId).select("role company companyStatus");
   if (!user) return jsonError("User not found.", 404);
 
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(user.role ?? ""),
+    featureKeys: ["hr-member-management"],
+  });
   const isHrAdmin =
     user.role === "admin" ||
-    (user.role === "human-resource" && user.companyStatus === "approved");
+    (actingRole === "human-resource" && user.companyStatus === "approved");
 
   if (!isHrAdmin || !user.company) {
     return jsonError("Only HR or admin can view identity codes.", 403);

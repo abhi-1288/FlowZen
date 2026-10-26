@@ -39,6 +39,8 @@ export function FinanceTab({
   region,
   regionOptions = [],
   isOwner = false,
+  delegationId = "",
+  delegationFeatureKey = "",
 }: {
   actorRole: string;
   profileId: string;
@@ -48,6 +50,10 @@ export function FinanceTab({
   regionOptions?: string[];
   /** True when the actor is the company owner (global super-admin). */
   isOwner?: boolean;
+  /** Active temporary delegation opened from Feature Delegation, if any. */
+  delegationId?: string;
+  /** Exact feature key the delegation was granted for. */
+  delegationFeatureKey?: string;
 }) {
   const [month, setMonth] = useState(() => {
     const d = new Date();
@@ -80,9 +86,14 @@ export function FinanceTab({
   const [salaryDetailEmployee, setSalaryDetailEmployee] = useState("");
   const [editTarget, setEditTarget] = useState<AnyRecord | null>(null);
   const [editingSalary, setEditingSalary] = useState(false);
-  const { invoices, setInvoices } = useInvoices(data);
+  const invoiceDelegationId = delegationFeatureKey === "finance-invoices" ? delegationId : "";
+  const isFinanceOrAdmin = actorRole === "finance" || actorRole === "admin";
+  // Only ask for invoices when the caller can actually see them. Otherwise every
+  // non-finance member produces a guaranteed 403 on page load.
+  const { invoices, setInvoices } = useInvoices(data, invoiceDelegationId, isFinanceOrAdmin || Boolean(invoiceDelegationId));
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
-  const [invoiceForm, setInvoiceForm] = useState<InvoiceForm>({ boardId: "", clientName: "", clientEmail: "", amount: "", description: "" });
+  const emptyInvoiceForm = (): InvoiceForm => ({ boardId: "", clientName: "", clientEmail: "", serviceDescription: "", items: [{ description: "", quantity: "1", rate: "" }], gstRate: "18", dueDate: "", description: "" });
+  const [invoiceForm, setInvoiceForm] = useState<InvoiceForm>(() => emptyInvoiceForm());
   const reports = useReports(data);
   const leaveImpacts = useLeaveImpacts(data, month);
   const [showSalaryModal, setShowSalaryModal] = useState(false);
@@ -335,20 +346,29 @@ export function FinanceTab({
     await load();
   }
 
+  const invoiceQuery = invoiceDelegationId ? `?delegation=${encodeURIComponent(invoiceDelegationId)}` : "";
+
   async function createInvoice(event: FormEvent) {
     event.preventDefault();
-    await apiFetch("/api/finance/invoice", { method: "POST", body: JSON.stringify(invoiceForm) });
+    await apiFetch(`/api/finance/invoice${invoiceQuery}`, { method: "POST", body: JSON.stringify(invoiceForm) });
     setShowInvoiceForm(false);
-    setInvoiceForm({ boardId: "", clientName: "", clientEmail: "", amount: "", description: "" });
+    setInvoiceForm(emptyInvoiceForm());
     showToast("Invoice created.", "success");
-    const res = await apiFetch<{ invoices: AnyRecord[] }>("/api/finance/invoice");
+    const res = await apiFetch<{ invoices: AnyRecord[] }>(`/api/finance/invoice${invoiceQuery}`, undefined, { toast: false });
     setInvoices(res.invoices);
   }
 
   async function markInvoice(id: string, status: string) {
-    await apiFetch("/api/finance/invoice", { method: "PATCH", body: JSON.stringify({ id, status }) });
+    await apiFetch(`/api/finance/invoice${invoiceQuery}`, { method: "PATCH", body: JSON.stringify({ id, status }) });
     showToast(`Invoice ${status === "paid" ? "marked paid" : "marked pending"}.`, "success");
-    const res = await apiFetch<{ invoices: AnyRecord[] }>("/api/finance/invoice");
+    const res = await apiFetch<{ invoices: AnyRecord[] }>(`/api/finance/invoice${invoiceQuery}`, undefined, { toast: false });
+    setInvoices(res.invoices);
+  }
+
+  async function approveInvoice(id: string) {
+    await apiFetch(`/api/finance/invoice${invoiceQuery}`, { method: "PATCH", body: JSON.stringify({ id, action: "approve" }) });
+    showToast("Invoice approved and emailed to client.", "success");
+    const res = await apiFetch<{ invoices: AnyRecord[] }>(`/api/finance/invoice${invoiceQuery}`, undefined, { toast: false });
     setInvoices(res.invoices);
   }
 
@@ -364,7 +384,7 @@ export function FinanceTab({
     return <section className="rounded-xl neu-card p-5">Loading finance...</section>;
   }
 
-  const isFinanceOrAdmin = actorRole === "finance" || actorRole === "admin";
+  // const isFinanceOrAdmin = actorRole === "finance" || actorRole === "admin";
   const hasFinanceMember = (data.financeMembers ?? []).length > 0;
   const adminOptions = (data.people ?? []).filter((m) => String(m.role) === "admin");
   const approvers = (data.people ?? []).map((m) => ({
@@ -382,6 +402,15 @@ export function FinanceTab({
           </div>
           <input className="rounded-xl border border-[var(--c-border-light)] px-3 py-2 text-sm" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
         </div>
+
+        {invoiceDelegationId ? (
+          <div className="space-y-3">
+            <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-800">
+              You are working with delegated access to <strong>Finance · Create Invoices</strong>. Your normal role and permissions are unchanged.
+            </div>
+            <InvoicesSection invoices={invoices} isFinanceOrAdmin onCreateInvoice={() => setShowInvoiceForm(true)} onMarkInvoice={markInvoice} onApproveInvoice={actorRole === "admin" ? approveInvoice : undefined} />
+          </div>
+        ) : null}
 
         <div>
           <h4 className="mb-3 text-sm font-semibold text-slate-800">Monthly Payroll</h4>
@@ -412,9 +441,15 @@ export function FinanceTab({
         </div>
 
         <RejectModal rejectTarget={rejectTarget} rejectReason={rejectReason} onReasonChange={setRejectReason} onCancel={() => { setRejectTarget(null); setRejectReason(""); }} onConfirm={rejectItem} />
+      <InvoiceModal show={showInvoiceForm} invoiceForm={invoiceForm} onFormChange={setInvoiceForm} onSubmit={createInvoice} onCancel={() => { setShowInvoiceForm(false); setInvoiceForm(emptyInvoiceForm()); }} />
       </div>
     );
   }
+
+  // A finance delegation opens the matching operations surface even though the
+  // recipient's own role cannot manage finance. The server still enforces the
+  // exact feature key, so this only reveals the UI the delegation covers.
+  const hasFinanceDelegation = delegationFeatureKey.startsWith("finance-") && delegationFeatureKey !== "finance-invoices";
 
   return (
     <div className="space-y-5">
@@ -425,6 +460,12 @@ export function FinanceTab({
         </div>
         <input className="rounded-xl border border-[var(--c-border-light)] px-3 py-2 text-sm" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
       </div>
+
+      {hasFinanceDelegation ? (
+        <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-800">
+          You are working with delegated access to a finance feature. Your normal role and permissions are unchanged.
+        </div>
+      ) : null}
 
       {isFinanceOrAdmin ? <SalaryReminder actorRole={actorRole} onView={() => setShowSalaryModal(true)} /> : null}
 
@@ -468,13 +509,13 @@ export function FinanceTab({
         </div>
       ) : null}
 
-      {financeSubTab === "ops" && data.canManage ? (
+      {financeSubTab === "ops" && (data.canManage || hasFinanceDelegation) ? (
         <div className="space-y-5">
           <div className="grid gap-5 xl:grid-cols-2">
             <SalaryWizardSection actorRole={actorRole} salaryStep={salaryStep} salaryPeriod={salaryPeriod} salaryEmployeeId={salaryEmployeeId} salaryAllowances={salaryAllowances} salaryDeductions={salaryDeductions} salaryBreakdown={salaryBreakdown} memberPfNumber={memberPfNumber} memberEsicNumber={memberEsicNumber} memberPfExempted={memberPfExempted} memberEsicExempted={memberEsicExempted} memberTdsExempted={memberTdsExempted} salaryGenerating={salaryGenerating} members={data.members} region={data.region} regionFallback={data.regionFallback} pfPercentage={policyData?.pfPercentage ?? 0} esicPercentage={policyData?.esicPercentage ?? 0} tdsPercentage={policyData?.tdsPercentage ?? 0} onStepChange={setSalaryStep} onPeriodChange={setSalaryPeriod} onEmployeeChange={setSalaryEmployeeId} onAllowancesChange={setSalaryAllowances} onDeductionsChange={setSalaryDeductions} onPfNumberChange={setMemberPfNumber} onEsicNumberChange={setMemberEsicNumber} onCalculate={calculateSalary} onSubmit={submitSalary} />
             <ExpenseAllocatorSection expenses={data.expenses} onStatusUpdate={updateStatus} />
           </div>
-          <InvoicesSection invoices={invoices} isFinanceOrAdmin={isFinanceOrAdmin} onCreateInvoice={() => setShowInvoiceForm(true)} onMarkInvoice={markInvoice} />
+          <InvoicesSection invoices={invoices} isFinanceOrAdmin={isFinanceOrAdmin} onCreateInvoice={() => setShowInvoiceForm(true)} onMarkInvoice={markInvoice} onApproveInvoice={actorRole === "admin" ? approveInvoice : undefined} />
           <BudgetAllocateSection onAllocate={() => openBudgetModal()} />
           <BudgetListSection budgets={data.budgets} actorRole={actorRole} profileId={profileId} onEdit={openBudgetModal} onApprove={(id) => updateStatus("budget", id, "approved")} onReject={(id, type) => setRejectTarget({ id, type })} onViewExpired={() => setShowExpiredBudgets(true)} />
           <SalaryRecordsSection salaries={data.salaries} actorRole={actorRole} month={month} onDelete={(id, name) => { setDeleteSalaryId(id); setDeleteSalaryEmployee(name); }} onEdit={setEditTarget} onStatusUpdate={updateStatus} onReject={(id, type) => setRejectTarget({ id, type })} onBulkStatusUpdate={bulkStatusUpdate} onViewDetail={(id, name) => { setSalaryDetailId(id); setSalaryDetailEmployee(name); }} />
@@ -494,8 +535,8 @@ export function FinanceTab({
       <RejectModal rejectTarget={rejectTarget} rejectReason={rejectReason} onReasonChange={setRejectReason} onCancel={() => { setRejectTarget(null); setRejectReason(""); }} onConfirm={rejectItem} />
       <DeleteSalaryModal deleteSalaryId={deleteSalaryId} deleteSalaryEmployee={deleteSalaryEmployee} onCancel={() => { setDeleteSalaryId(null); setDeleteSalaryEmployee(""); }} onConfirm={deleteSalary} />
       <ExpiredBudgetsModal show={showExpiredBudgets} budgets={data.budgets} onClose={() => setShowExpiredBudgets(false)} />
-      <BudgetModal show={showBudgetModal} editingBudgetId={editingBudgetId} budgetForm={budgetForm} boards={data.boards} financeMembers={data.financeMembers} actorRole={actorRole} onFormChange={setBudgetForm} onSubmit={submitBudget} onCancel={() => { setShowBudgetModal(false); setEditingBudgetId(null); }} />
-      <InvoiceModal show={showInvoiceForm} invoiceForm={invoiceForm} onFormChange={setInvoiceForm} onSubmit={createInvoice} onCancel={() => { setShowInvoiceForm(false); setInvoiceForm({ boardId: "", clientName: "", clientEmail: "", amount: "", description: "" }); }} />
+      <BudgetModal show={showBudgetModal} editingBudgetId={editingBudgetId} budgetForm={budgetForm} boards={data.boards} financeMembers={data.financeMembers} actorRole={actorRole} region={data.region} onFormChange={setBudgetForm} onSubmit={submitBudget} onCancel={() => { setShowBudgetModal(false); setEditingBudgetId(null); }} />
+      <InvoiceModal show={showInvoiceForm} invoiceForm={invoiceForm} onFormChange={setInvoiceForm} onSubmit={createInvoice} onCancel={() => { setShowInvoiceForm(false); setInvoiceForm(emptyInvoiceForm()); }} />
       <SalaryOverviewModal show={showSalaryModal} salaryModalTab={salaryModalTab} expandedRoles={expandedRoles} salaries={data.salaries} members={data.members} memberRoleMap={memberRoleMap} onTabChange={setSalaryModalTab} onToggleRole={(role) => setExpandedRoles(toggleRoleInSet(expandedRoles, role))} onClose={() => { setShowSalaryModal(false); setExpandedRoles(new Set()); }} />
       <SalaryDetailModal salaryId={salaryDetailId} onClose={() => { setSalaryDetailId(null); setSalaryDetailEmployee(""); }} />
       <SalaryEditModal target={editTarget} submitting={editingSalary} onClose={() => setEditTarget(null)} onSubmit={submitEditSalary} />

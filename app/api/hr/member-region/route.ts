@@ -4,6 +4,7 @@ import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { User } from "@/models/User";
 import { Company } from "@/models/Company";
 import { addressLabelsOf, effectiveRegionLabelOf, isLegacyMainOfficeLabel, isUserInEffectiveRegion, regionEntryOf, type OfficeAddressLike } from "@/lib/company-regions";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 export async function PATCH(request: Request) {
   const userId = await requireUserId();
@@ -19,7 +20,13 @@ export async function PATCH(request: Request) {
 
   const actor = await User.findById(userId).select("company role companyStatus");
   if (!actor) return jsonError("User not found.", 404);
-  if (!["admin", "human-resource"].includes(String(actor.role))) return jsonError("Forbidden.", 403);
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: ["hr-member-management"],
+  });
+  if (!["admin", "human-resource"].includes(actingRole)) return jsonError("Forbidden.", 403);
   if (String(actor.companyStatus) !== "approved") return jsonError("Company not approved.", 403);
 
   const body = await request.json();

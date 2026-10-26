@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { jsonError, requireUserId } from "@/lib/api";
 import { User } from "@/models/User";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 import { CheckOutRequest } from "@/models/CheckOutRequest";
 import { Company } from "@/models/Company";
 import { Attendance } from "@/models/Attendance";
@@ -34,7 +35,12 @@ export async function PATCH(request: Request, { params }: Params) {
 
   const actor = await User.findById(userId);
   if (!actor) return jsonError("User not found.", 404);
-  const role = String(actor.role ?? "");
+  const role = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: ["finance-checkout-requests"],
+  });
   if (role !== "finance" && role !== "admin") {
     return jsonError("Only finance or admin can approve check-out requests.", 403);
   }
@@ -45,6 +51,30 @@ export async function PATCH(request: Request, { params }: Params) {
   const checkOutRequest = await CheckOutRequest.findById(id).populate("requester", "name email");
   if (!checkOutRequest) return jsonError("Request not found.", 404);
   if (checkOutRequest.status !== "pending") return jsonError("Request already processed.", 400);
+
+  // Verification step
+  const delegationId = (await import("@/lib/delegation-access")).delegationIdFromRequest(request);
+  if (delegationId && (action === "approve" || action === "reject")) {
+    const delegation = await (await import("@/lib/delegation-access")).delegationForFeature(userId, delegationId, "finance-checkout-requests");
+    if (delegation && (delegation as any).requiresVerification) {
+      (checkOutRequest as any).verificationStatus = "pending-verification";
+      (checkOutRequest as any).submittedBy = userId;
+      (checkOutRequest as any).authorizer = (delegation as any).authorizer;
+      (checkOutRequest as any).pendingAction = action;
+      await checkOutRequest.save();
+      const authorizerId = String((delegation as any).authorizer);
+      await Notification.create({
+        user: authorizerId,
+        company: actor.company,
+        type: "approval",
+        title: "Checkout Request Pending Verification",
+        message: `${actor.name ?? "Finance"} submitted a checkout ${action} for your verification.`,
+        link: "/profile/attendance",
+      });
+      emitNotification(authorizerId);
+      return NextResponse.json({ checkOutRequest });
+    }
+  }
 
   if (action === "approve") {
     const attendance = await Attendance.findById(checkOutRequest.attendance);

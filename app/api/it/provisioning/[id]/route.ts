@@ -6,10 +6,11 @@ import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
 import { canManageIt, pushProvisioningActivity } from "@/lib/it";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(request: Request, { params }: Params) {
   const userId = await requireUserId();
   if (!userId) return jsonError("Unauthorized", 401);
 
@@ -33,7 +34,12 @@ export async function GET(_request: Request, { params }: Params) {
   }
   const companyId =
     typeof actor.company === "object" && actor.company ? (actor.company as any)._id : actor.company;
-  const role = String(actor.role);
+  const role = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: ["it-provisioning"],
+  });
 
   const req = await ITProvisioningRequest.findOne({ _id: id, company: companyId })
     .populate("employee", "name email")
@@ -80,7 +86,13 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!actor.company || actor.companyStatus !== "approved") {
     return jsonError("You must be an approved company member to review provisioning requests.", 403);
   }
-  if (!canManageIt(String(actor.role), Boolean(actor.isSeniorSecurity))) {
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: ["it-provisioning"],
+  });
+  if (!canManageIt(actingRole, Boolean(actor.isSeniorSecurity))) {
     return jsonError("Only IT admins can review provisioning requests.", 403);
   }
   const companyId =

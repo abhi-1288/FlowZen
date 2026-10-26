@@ -103,6 +103,14 @@ const StoreOrderSchema = new Schema(
       index: true,
     },
 
+    verificationStatus: { type: String, enum: ["none", "pending-verification", "verified"], default: "none" },
+    submittedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    authorizer: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    verifiedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    verifiedAt: { type: Date, default: null },
+    pendingAction: { type: String, default: "" },
+    pendingReason: { type: String, default: "" },
+
     approver: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     approvedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     approvedAt: { type: Date, default: null },

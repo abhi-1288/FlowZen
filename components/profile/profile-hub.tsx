@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
@@ -35,7 +35,7 @@ import {
   CalendarDays,
   Wrench,
 } from "lucide-react";
-import { apiFetch } from "@/lib/client-utils";
+import { apiFetch, setActiveDelegationId } from "@/lib/client-utils";
 import { useNotificationToast } from "@/lib/toast-context";
 import { ProfileSkeleton, NavButton } from "./profile-hub/chrome";
 import { AttendanceTab } from "./profile-hub/attendance-tab";
@@ -54,6 +54,7 @@ import { CompanyCalendarTab } from "./profile-hub/company-calendar-tab";
 import { FinancePolicyTab } from "./profile-hub/finance-policy-tab";
 import { HrPolicyTab } from "./profile-hub/hr-policy-tab";
 import { ItTicketsView } from "@/components/it/it-tickets-view";
+import { FeatureDelegationWorkspace } from "@/components/feature-delegation/workspace";
 import { CommandCenterHub } from "@/components/command-center/command-center-hub";
 import { AnyRecord, AvatarBadge, formatRoleWithCustom } from "./profile-hub/shared";
 import { useStoreCart } from "@/components/store/cart-context";
@@ -117,9 +118,10 @@ export type Tab =
   | "finance-policy"
   | "hr-policy"
   | "it"
-  | "store";
+  | "store"
+  | "feature-delegation";
 
-const VALID_TABS = new Set<string>(["dashboard", "command-center", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers", "calendar", "visitors", "security", "games", "finance-policy", "hr-policy", "it", "store"]);
+const VALID_TABS = new Set<string>(["dashboard", "command-center", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers", "calendar", "visitors", "security", "games", "finance-policy", "hr-policy", "it", "store", "feature-delegation"]);
 
 const LEADER_DASH_ROLES = new Set<string>([
   "admin",
@@ -171,6 +173,17 @@ export function ProfileHub() {
   const { data: session } = useSession();
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // A delegation opened from Feature Delegation arrives as
+  // `?delegation=<id>&feature=<featureKey>`. Remember it for every API call the
+  // shared feature makes, and clear it again as soon as the user leaves.
+  const delegationId = searchParams?.get("delegation") ?? "";
+  const delegationFeatureKey = searchParams?.get("feature") ?? "";
+  useLayoutEffect(() => {
+    setActiveDelegationId(delegationId);
+    return () => setActiveDelegationId("");
+  }, [delegationId]);
 
   useEffect(() => {
     // Warm the top-level destinations while the profile shell is open so
@@ -231,6 +244,9 @@ export function ProfileHub() {
     setTabState(newTab);
     setShowInvalidRoute(false);
     if (newTab === "store") setStoreViewState("catalog");
+    // A manually chosen tab is no longer "inside" the shared feature, so the
+    // delegation header must stop riding along with its API calls.
+    setActiveDelegationId("");
     window.history.pushState(null, "", newTab === "store" ? "/profile/store" : `/profile/${newTab}`);
   };
 
@@ -259,6 +275,8 @@ export function ProfileHub() {
   const [wfhRequests, setWfhRequests] = useState<AnyRecord[]>([]);
   const [financeCount, setFinanceCount] = useState(0);
   const [checkOutRequestCount, setCheckOutRequestCount] = useState(0);
+  const [delegationSharedWithMeCount, setDelegationSharedWithMeCount] = useState(0);
+  const [delegationSharedByMeCount, setDelegationSharedByMeCount] = useState(0);
   const [jobsCount, setJobsCount] = useState(0);
   const [recruitmentCount, setRecruitmentCount] = useState(0);
   const [visitorPendingCount, setVisitorPendingCount] = useState(0);
@@ -335,11 +353,12 @@ export function ProfileHub() {
     : actorRegionLabel
       ? "Limited to this one region. There is no way to widen it from the UI."
       : "No region is set on your profile, so there is nothing to scope to.";
-  const canViewMembersTab = hasCompany && (["human-resource", "admin", "finance"].includes(String(role)) || actorIsSeniorSecurity);
-  const canCreatePass = role !== "employee" && (role !== "security" || actorIsSeniorSecurity);
+  const canViewMembersTab = hasCompany && (["human-resource", "admin", "finance"].includes(String(role)) || actorIsSeniorSecurity || ["hr-member-management", "hr-salary-management", "hr-export-excels", "finance-checkout-requests"].includes(delegationFeatureKey));
+  const canCreatePass = (role !== "employee" && (role !== "security" || actorIsSeniorSecurity)) || delegationFeatureKey === "security-visitors";
   const canViewVisitorsTab = hasCompany && canCreatePass;
   const canViewFinanceTab = hasCompany;
-  const canViewSecurityTab = hasCompany && ["human-resource", "admin", "security"].includes(String(role));
+  const canViewSecurityTab = hasCompany && (["human-resource", "admin", "security"].includes(String(role)) || delegationFeatureKey.startsWith("security-"));
+  const canViewFinancePolicyTab = hasCompany && (["finance", "admin"].includes(String(role)) || delegationFeatureKey === "finance-policy-editing");
   const canViewCompanyTabs = hasCompany;
   const canViewAuditCenter =
     hasCompany &&
@@ -356,6 +375,7 @@ export function ProfileHub() {
     "profile",
     "timeline",
     "onboarding",
+    ...(canViewCompanyTabs ? (["feature-delegation"] as Tab[]) : []),
     ...(canViewMembersTab ? (["members"] as Tab[]) : []),
     ...(canViewVisitorsTab ? (["visitors"] as Tab[]) : []),
     ...(canViewSecurityTab ? (["security"] as Tab[]) : []),
@@ -363,7 +383,7 @@ export function ProfileHub() {
     ...(canViewCompanyTabs || canViewArchivedDocumentsTab ? (["documents"] as Tab[]) : []),
     ...(canViewCompanyTabs ? (["messages"] as Tab[]) : []),
     ...(canViewFinanceTab ? (["finance"] as Tab[]) : []),
-    ...(canViewFinanceTab && ["finance", "admin"].includes(String(role)) ? (["finance-policy"] as Tab[]) : []),
+    ...(canViewFinanceTab && canViewFinancePolicyTab ? (["finance-policy"] as Tab[]) : []),
     ...(canViewCompanyTabs ? (["hr-policy"] as Tab[]) : []),
     ...(canViewCompanyTabs ? (["approvals"] as Tab[]) : []),
     "notifications",
@@ -378,7 +398,7 @@ export function ProfileHub() {
   const { count: storeCartCount } = useStoreCart();
   const [storeApprovalsCount, setStoreApprovalsCount] = useState(0);
   const [storeDeliveryCount, setStoreDeliveryCount] = useState(0);
-  const canManageStore = String(role) === "warehouse";
+  const canManageStore = String(role) === "warehouse" || delegationFeatureKey.startsWith("warehouse-");
 
   const refreshStoreApprovals = () => {
     if (!canViewCompanyTabs) return;
@@ -422,13 +442,17 @@ export function ProfileHub() {
   // Both branches go to the shared, portaled toast host so toasts stay visible
   // above any open modal. The signature is unchanged because ~40 tab/section
   // components receive this as a prop.
-  const showToast = (text: string, type: "success" | "error" = "success") => {
+  //
+  // This MUST stay referentially stable: data hooks depend on it, and a new
+  // identity on every render used to restart their fetches → 403 toast → parent
+  // re-render → fetch again, which is what exhausted memory in the finance tab.
+  const showToast = useCallback((text: string, type: "success" | "error" = "success") => {
     if (type === "error") {
       showErrorToast(text);
       return;
     }
     showSuccessToast(text);
-  };
+  }, [showErrorToast, showSuccessToast]);
 
   const setMessage = (text: string) => showToast(text, "success");
 
@@ -534,6 +558,12 @@ export function ProfileHub() {
           nextJobsCount = jobsResult.jobs.length;
           setJobsCount(nextJobsCount);
         }
+        const [sharedWithMe, sharedByMe] = await Promise.all([
+          apiFetch<{ delegations: AnyRecord[] }>("/api/delegations?view=shared", undefined, { toast: false }).catch(() => null),
+          apiFetch<{ delegations: AnyRecord[] }>("/api/delegations?view=managed", undefined, { toast: false }).catch(() => null),
+        ]);
+        if (sharedWithMe) setDelegationSharedWithMeCount((sharedWithMe.delegations ?? []).length);
+        if (sharedByMe) setDelegationSharedByMeCount((sharedByMe.delegations ?? []).length);
       }
 
       let nextRecruitmentCount = recruitmentCount;
@@ -972,6 +1002,14 @@ export function ProfileHub() {
               </div>
             </>
           ) : null}
+          {canViewCompanyTabs ? (
+            <NavButton
+              active={tab === "feature-delegation"}
+              icon={<Users size={16} />}
+              label={`Feature Delegation${delegationSharedWithMeCount || delegationSharedByMeCount ? ` (${delegationSharedWithMeCount}/${delegationSharedByMeCount})` : ""}`}
+              onClick={() => setTab("feature-delegation")}
+            />
+          ) : null}
           {canViewMembersTab ? (
             <NavButton
               active={tab === "members"}
@@ -1407,6 +1445,10 @@ export function ProfileHub() {
                   />
                 ) : null}
 
+                {tab === "feature-delegation" && canViewCompanyTabs ? (
+                  <FeatureDelegationWorkspace embedded />
+                ) : null}
+
                 {tab === "approvals" && canViewCompanyTabs ? (
                   <ApprovalsTab
                     approvals={approvals}
@@ -1483,11 +1525,11 @@ export function ProfileHub() {
                 ) : null}
 
                 {tab === "finance" ? (
-                  <FinanceTab actorRole={String(role)} profileId={String(profile?.id ?? session?.user?.id ?? "")} showToast={showToast} region={actorRegionLabel} regionOptions={Array.isArray(company?.addresses) && (company.addresses as AnyRecord[]).length > 0 ? (company.addresses as AnyRecord[]).map((a: AnyRecord) => String(a.label ?? "")).filter(Boolean) : company?.address ? ["Main Office"] : []} isOwner={actorIsCompanyOwner} />
+                  <FinanceTab actorRole={String(role)} profileId={String(profile?.id ?? session?.user?.id ?? "")} showToast={showToast} region={actorRegionLabel} regionOptions={Array.isArray(company?.addresses) && (company.addresses as AnyRecord[]).length > 0 ? (company.addresses as AnyRecord[]).map((a: AnyRecord) => String(a.label ?? "")).filter(Boolean) : company?.address ? ["Main Office"] : []} isOwner={actorIsCompanyOwner} delegationId={delegationId} delegationFeatureKey={delegationFeatureKey} />
                 ) : null}
 
-                {tab === "finance-policy" && ["finance", "admin"].includes(String(role)) ? (
-                  <FinancePolicyTab actorRole={String(role)} profileId={String(profile?.id ?? session?.user?.id ?? "")} showToast={showToast} />
+                {tab === "finance-policy" && canViewFinancePolicyTab ? (
+                  <FinancePolicyTab actorRole={String(role)} profileId={String(profile?.id ?? session?.user?.id ?? "")} showToast={showToast} delegationFeatureKey={delegationFeatureKey} />
                 ) : null}
 
                 {tab === "hr-policy" && canViewCompanyTabs ? (
@@ -1507,7 +1549,7 @@ export function ProfileHub() {
                 ) : null}
 
                 {tab === "visitors" && canViewVisitorsTab ? (
-                  <VisitorsTab company={company} showToast={showToast} />
+                  <VisitorsTab company={company} showToast={showToast} delegationFeatureKey={delegationFeatureKey} />
                 ) : null}
 
                 {tab === "store" && canViewCompanyTabs ? (

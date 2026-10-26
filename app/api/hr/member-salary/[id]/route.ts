@@ -5,6 +5,7 @@ import { resolveEnrollingHr } from "@/lib/enrolling-hr";
 import { User } from "@/models/User";
 import { Company } from "@/models/Company";
 import { effectiveRegionLabelOf, isUserInEffectiveRegion, type OfficeAddressLike } from "@/lib/company-regions";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 import { recordAudit } from "@/lib/audit";
 
 type Params = { params: Promise<{ id: string }> };
@@ -42,7 +43,12 @@ export async function POST(request: Request, { params }: Params) {
     return jsonError("Approved company access is required.", 403);
   }
 
-  const actorRole = String(actor.role ?? "");
+  const actorRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: ["hr-salary-management", "hr-member-management"],
+  });
   if (!["human-resource", "admin"].includes(actorRole)) {
     return jsonError("Only HR or admin can set member salary.", 403);
   }
@@ -54,7 +60,7 @@ export async function POST(request: Request, { params }: Params) {
   }).select("name company membershipHistory baseSalary salaryHistory");
   if (!member) return jsonError("Member not found.", 404);
 
-  if (actorRole === "human-resource") {
+  if (actorRole === "human-resource" && String(actor.role) === "human-resource") {
     const enrollingHr = await resolveEnrollingHr(member);
     if (enrollingHr?.id && enrollingHr.id !== userId) {
       return jsonError("Only the enrolling HR or admin can set this salary.", 403);

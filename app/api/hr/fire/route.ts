@@ -13,6 +13,7 @@ import { CompanyPolicy } from "@/models/CompanyPolicy";
 import { recordIdentityCodeRelease } from "@/lib/company-identity";
 import { effectiveRegionLabelOf, isUserInEffectiveRegion } from "@/lib/company-regions";
 import { recordAudit } from "@/lib/audit";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 async function cleanupBoardsForUser(userId: any) {
   const boards = await Board.find({ "members.user": userId });
@@ -56,7 +57,14 @@ export async function POST(request: Request) {
   const firedRegion = String((member as any).regionLabel ?? "");
 
   const actorIsSeniorSecurity = String(actor.role) === "security" && Boolean((actor as any).isSeniorSecurity);
-  if (!["human-resource", "admin"].includes(String(actor.role)) && !actorIsSeniorSecurity) {
+  const delegatedHr =
+    (await actingRoleForRequest({
+      userId,
+      request,
+      realRole: String(actor.role ?? ""),
+      featureKeys: ["hr-member-management"],
+    })) === "human-resource";
+  if (!["human-resource", "admin"].includes(String(actor.role)) && !actorIsSeniorSecurity && !delegatedHr) {
     return jsonError("Only approved HR, admins, or senior security can fire members.", 403);
   }
   if (actor.companyStatus !== "approved" || !actor.company) {

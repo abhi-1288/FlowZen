@@ -15,6 +15,7 @@ import {
   storeRegionOf,
   validateStoreApprover,
 } from "@/lib/store";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 export async function GET(request: Request) {
   const userId = await requireUserId();
@@ -43,12 +44,18 @@ export async function GET(request: Request) {
   const countOnly = url.searchParams.get("count") === "1";
   const pendingDelivery = url.searchParams.get("pendingDelivery") === "1";
   const { region } = await storeRegionOf(user);
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(user.role ?? ""),
+    featureKeys: ["warehouse-orders"],
+  });
 
   let filter: Record<string, unknown> = { company: companyId };
   if (scope === "awaiting") {
     filter = { ...filter, approver: userId, status: "pending" };
   } else if (scope === "all") {
-    const isWarehouse = String(user.role) === "warehouse";
+    const isWarehouse = actingRole === "warehouse";
     if (!isWarehouse) return jsonError("Only warehouse managers can view all orders.", 403);
     if (region) filter.regionLabel = region;
   } else {

@@ -5,12 +5,13 @@ import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { User } from "@/models/User";
 import { Company } from "@/models/Company";
 import { VisitorEvent } from "@/models/VisitorEvent";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 function generateSlug(): string {
   return crypto.randomBytes(6).toString("hex");
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const userId = await requireUserId();
   if (!userId) return jsonError("Unauthorized", 401);
 
@@ -25,8 +26,14 @@ export async function GET() {
   const actor = await User.findById(userId).select("company role companyStatus isSeniorSecurity");
   if (!actor) return jsonError("User not found.", 404);
   if (!actor.company) return jsonError("No company.", 400);
-  if (String(actor.role) === "employee") return jsonError("Forbidden.", 403);
-  if (String(actor.role) === "security" && !Boolean((actor as any).isSeniorSecurity)) return jsonError("Forbidden.", 403);
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: ["security-visitors"],
+  });
+  if (actingRole === "employee" && String(actor.role) === "employee") return jsonError("Forbidden.", 403);
+  if (actingRole === "security" && String(actor.role) === "security" && !Boolean((actor as any).isSeniorSecurity)) return jsonError("Forbidden.", 403);
 
   const events = await VisitorEvent.find({ company: actor.company })
     .sort({ createdAt: -1 })
@@ -50,7 +57,13 @@ export async function POST(request: Request) {
   const actor = await User.findById(userId).select("name company role companyStatus");
   if (!actor) return jsonError("User not found.", 404);
   if (!actor.company) return jsonError("No company.", 400);
-  if (!["admin", "human-resource"].includes(String(actor.role))) return jsonError("Forbidden.", 403);
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: ["security-visitors"],
+  });
+  if (!["admin", "human-resource", "security"].includes(actingRole)) return jsonError("Forbidden.", 403);
 
   const body = await request.json();
 

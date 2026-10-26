@@ -3,24 +3,29 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { RecruitmentSidebar } from "@/components/recruitment/recruitment-sidebar";
 import { RecruitmentSSEListener } from "@/components/recruitment/recruitment-sse-listener";
+import { DelegationSync } from "@/components/delegation-sync";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function RecruitmentLayout({ children, params }: { children: React.ReactNode; params: Promise<{ jobSlug?: string; candidateSlug?: string }> }) {
+export default async function RecruitmentLayout({ children, params, searchParams }: { children: React.ReactNode; params: Promise<{ jobSlug?: string; candidateSlug?: string }>; searchParams?: Promise<{ delegation?: string; feature?: string }> }) {
   const route = await params;
   if (route.jobSlug && route.candidateSlug) return <>{children}</>;
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/login");
 
+  const sp = (await searchParams) ?? {};
+  const hasDelegation = Boolean(String(sp.delegation ?? "").trim());
+
   const role = session.user.role ?? "";
   const isSeniorSecurity = role === "security" && Boolean((session.user as any)?.isSeniorSecurity);
-  if (!["admin", "human-resource", "project-manager", "qa-tester", "finance", "it-admin", "it-administration"].includes(role) && !isSeniorSecurity) redirect("/profile");
+  if (!hasDelegation && !["admin", "human-resource", "project-manager", "qa-tester", "finance", "it-admin", "it-administration"].includes(role) && !isSeniorSecurity) redirect("/profile");
 
   return (
     <div className="flex min-h-screen bg-app text-base">
+      <DelegationSync />
       <RecruitmentSSEListener />
       <RecruitmentSidebar />
       <main className="min-w-0 flex-1 overflow-y-auto bg-app">

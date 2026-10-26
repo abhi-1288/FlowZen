@@ -6,6 +6,7 @@ import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
 import { isItStaff, pushItActivity } from "@/lib/it";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -43,7 +44,13 @@ export async function POST(request: Request, { params }: Params) {
   if (!actor.company || actor.companyStatus !== "approved") {
     return jsonError("You must be an approved company member to resolve IT tickets.", 403);
   }
-  if (!isItStaff(String(actor.role))) {
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: ["it-tickets"],
+  });
+  if (!isItStaff(actingRole)) {
     return jsonError("Only IT staff can resolve IT tickets.", 403);
   }
   if (!RESOLUTION_TYPES.has(resolutionType)) return jsonError("Invalid resolution type.", 400);
@@ -56,8 +63,36 @@ export async function POST(request: Request, { params }: Params) {
     return jsonError(`Cannot resolve ticket from status ${ticket.status}.`, 400);
   }
   const isAssigned = ticket.assignedTo ? String(ticket.assignedTo) === userId : false;
-  if (String(actor.role) !== "it-admin" && !isAssigned) {
+  if (actingRole !== "it-admin" && !isAssigned) {
     return jsonError("You can only resolve tickets assigned to you.", 403);
+  }
+
+  // Verification step: when a delegated recipient resolves and the delegation
+  // requires verification, defer to the authorizer.
+  const delegationId = (await import("@/lib/delegation-access")).delegationIdFromRequest(request);
+  if (delegationId) {
+    const delegation = await (await import("@/lib/delegation-access")).delegationForFeature(userId, delegationId, "it-tickets");
+    if (delegation && (delegation as any).requiresVerification) {
+      (ticket as any).verificationStatus = "pending-verification";
+      (ticket as any).submittedBy = userId;
+      (ticket as any).authorizer = (delegation as any).authorizer;
+      (ticket as any).pendingResolution = resolution;
+      (ticket as any).pendingResolutionType = resolutionType;
+      await ticket.save();
+      const authorizerId = String((delegation as any).authorizer);
+      const { Notification } = await import("@/models/Notification");
+      const { emitNotification } = await import("@/lib/realtime");
+      await (Notification as any).create({
+        user: authorizerId,
+        company: companyId,
+        type: "approval",
+        title: "IT Ticket Pending Verification",
+        message: `${actor.name ?? "IT staff"} submitted a resolution for ticket ${ticket.ticketNumber} for your verification.`,
+        link: "/it/tickets",
+      });
+      (emitNotification as any)(authorizerId);
+      return NextResponse.json({ ticket: serializeDoc(ticket), deferred: true });
+    }
   }
 
   ticket.resolution = resolution;

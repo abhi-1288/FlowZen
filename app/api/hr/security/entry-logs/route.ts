@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { User } from "@/models/User";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 import { VisitorPass } from "@/models/VisitorPass";
 import { EntryLog } from "@/models/EntryLog";
 import { Attendance } from "@/models/Attendance";
@@ -22,7 +23,13 @@ export async function GET(request: Request) {
   const actor = await User.findById(userId).select("company role");
   if (!actor) return jsonError("User not found.", 404);
   if (!actor.company) return jsonError("No company.", 400);
-  if (!["admin", "human-resource", "security"].includes(String(actor.role))) return jsonError("Forbidden.", 403);
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: ["security-entry-logs"],
+  });
+  if (!["admin", "human-resource", "security"].includes(actingRole)) return jsonError("Forbidden.", 403);
 
   const url = new URL(request.url);
   const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));
@@ -99,7 +106,13 @@ export async function POST(request: Request) {
   const actor = await User.findById(userId).select("company role name");
   if (!actor) return jsonError("User not found.", 404);
   if (!actor.company) return jsonError("No company.", 400);
-  if (!["admin", "human-resource", "security"].includes(String(actor.role))) return jsonError("Forbidden.", 403);
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: ["security-entry-logs"],
+  });
+  if (!["admin", "human-resource", "security"].includes(actingRole)) return jsonError("Forbidden.", 403);
 
   const body = await request.json();
   const rawCode = String(body.code ?? "").trim();

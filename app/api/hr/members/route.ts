@@ -5,6 +5,7 @@ import { Company, Team, User } from "@/models";
 import { regionLabelsOf, type OfficeAddressLike } from "@/lib/company-regions";
 import { resolveMemberViewerScope } from "@/lib/member-viewer-scope";
 import { resolveRegionPolicy } from "@/lib/region-scope";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 /**
  * The members page's own data source, scoped by region.
@@ -52,7 +53,20 @@ export async function GET(request: Request) {
   // Senior security reaches the members page but is not a `role` value of its
   // own, so it is checked separately rather than widened into ALLOWED_ROLES.
   const isSeniorSecurity = String(actor.role) === "security" && Boolean(actor.isSeniorSecurity);
-  if (!ALLOWED_ROLES.has(String(actor.role)) && !isSeniorSecurity) {
+  // A verified delegation for any feature rendered on the members page acts as
+  // HR for this read; the exact feature key is still enforced on every write.
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: [
+      "hr-member-management",
+      "hr-salary-management",
+      "hr-export-excels",
+      "finance-checkout-requests",
+    ],
+  });
+  if (!ALLOWED_ROLES.has(actingRole) && !isSeniorSecurity) {
     return jsonError("Forbidden.", 403);
   }
 
@@ -78,7 +92,7 @@ export async function GET(request: Request) {
         _id: actor._id,
         company: companyId,
         regionLabel: actor.regionLabel,
-        role: String(actor.role),
+        role: actingRole,
       },
       requestedRegion,
     );

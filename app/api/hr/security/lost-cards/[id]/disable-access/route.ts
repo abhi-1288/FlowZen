@@ -3,6 +3,7 @@ import { connectDb } from "@/lib/db";
 import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { User } from "@/models/User";
 import { LostCardReport } from "@/models/LostCardReport";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 import { ATSAuditLog } from "@/models/ATSAuditLog";
 
 const ZONE_OPTIONS = [
@@ -32,7 +33,13 @@ export async function POST(
   const actor = await User.findById(userId).select("name role company");
   if (!actor) return jsonError("User not found.", 404);
   if (!actor.company) return jsonError("No company.", 400);
-  if (!["admin", "security"].includes(String(actor.role))) return jsonError("Forbidden.", 403);
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: ["security-lost-cards", "security-access-review"],
+  });
+  if (!["admin", "security"].includes(actingRole)) return jsonError("Forbidden.", 403);
 
   const { id } = await params;
   const body = await request.json();

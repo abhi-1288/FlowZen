@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { User } from "@/models/User";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 export async function GET(request: Request) {
   const userId = await requireUserId();
@@ -18,7 +19,13 @@ export async function GET(request: Request) {
   const actor = await User.findById(userId).select("company role");
   if (!actor) return jsonError("User not found.", 404);
   if (!actor.company) return jsonError("No company.", 400);
-  if (!["admin", "human-resource", "security"].includes(String(actor.role))) return jsonError("Forbidden.", 403);
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: ["security-access-review", "security-lost-cards", "security-entry-logs", "security-visitors"],
+  });
+  if (!["admin", "human-resource", "security"].includes(actingRole)) return jsonError("Forbidden.", 403);
 
   const url = new URL(request.url);
   const search = String(url.searchParams.get("search") ?? "").trim().toLowerCase();

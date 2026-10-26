@@ -8,6 +8,7 @@ import { User } from "@/models/User";
 import { Company } from "@/models/Company";
 import { effectiveRegionLabelOf, isUserInEffectiveRegion, type OfficeAddressLike } from "@/lib/company-regions";
 import { recordAudit } from "@/lib/audit";
+import { hasDelegatedFeatureFromRequest } from "@/lib/delegation-access";
 
 /**
  * Resolve the policy region for an actor. Regional admins manage their own
@@ -93,7 +94,9 @@ export async function POST(request: Request) {
   const actor = await User.findById(userId).select("role company companyStatus regionLabel");
   if (!actor || !actor.company || actor.companyStatus !== "approved")
     return jsonError("Approved company access is required.", 403);
-  if (!["finance", "admin"].includes(String(actor.role ?? "")))
+  const roleAllowed = ["finance", "admin"].includes(String(actor.role ?? ""));
+  const delegated = roleAllowed ? false : await hasDelegatedFeatureFromRequest(userId, request, "finance-policy-editing");
+  if (!roleAllowed && !delegated)
     return jsonError("Only finance or admin can configure policies.", 403);
 
   const body = await request.json();
@@ -110,11 +113,11 @@ export async function POST(request: Request) {
   }
 
   // Auto salary generation is an admin-only switch.
-  if (typeof body.autoSalaryEnabled === "boolean" && String(actor.role) !== "admin") {
+  if (typeof body.autoSalaryEnabled === "boolean" && String(actor.role) !== "admin" && !delegated) {
     return jsonError("Only admin can configure auto salary generation.", 403);
   }
   const hasPctFields = "pfPercentage" in body || "esicPercentage" in body || "tdsPercentage" in body;
-  if (hasPctFields && String(actor.role) !== "finance") {
+  if (hasPctFields && String(actor.role) !== "finance" && !delegated) {
     const financeCount = await User.countDocuments({
       company: actor.company,
       role: "finance",

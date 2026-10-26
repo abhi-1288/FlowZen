@@ -8,6 +8,7 @@ import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
 import { nextTicketNumber, pushItActivity, ticketVisibilityFilter } from "@/lib/it";
 import { listApprovedItAdminUserIds } from "@/lib/join-approvers";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 const CATEGORIES = new Set([
   "ACCOUNT_LOGIN",
@@ -48,7 +49,13 @@ export async function GET(request: Request) {
 
   const companyId =
     typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
-  const filter = await ticketVisibilityFilter({ role: String(user.role), _id: user._id }, companyId);
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(user.role ?? ""),
+    featureKeys: ["it-tickets"],
+  });
+  const filter = await ticketVisibilityFilter({ role: actingRole, _id: user._id }, companyId);
 
   if (status && status !== "ALL") filter.status = status;
   if (category && category !== "ALL") filter.category = category;
@@ -72,7 +79,7 @@ export async function GET(request: Request) {
       acc[item._id] = item.count;
       return acc;
     }, {}),
-    canAssign: String(user.role) === "it-admin" || String(user.role) === "admin" || String(user.role) === "human-resource",
+    canAssign: actingRole === "it-admin" || actingRole === "admin" || actingRole === "human-resource",
   });
 }
 

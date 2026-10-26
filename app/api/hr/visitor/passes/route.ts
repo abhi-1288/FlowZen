@@ -8,8 +8,11 @@ import { ATSInterview } from "@/models/ATSInterview";
 import { EntryLog } from "@/models/EntryLog";
 import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
+import { delegationIdFromRequest, delegationForFeature } from "@/lib/delegation-access";
+import { FeatureDelegation } from "@/models/FeatureDelegation";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
-export async function GET() {
+export async function GET(request: Request) {
   const userId = await requireUserId();
   if (!userId) return jsonError("Unauthorized", 401);
 
@@ -24,8 +27,14 @@ export async function GET() {
   const actor = await User.findById(userId).select("company role companyStatus isSeniorSecurity");
   if (!actor) return jsonError("User not found.", 404);
   if (!actor.company) return jsonError("No company.", 400);
-  if (String(actor.role) === "employee") return jsonError("Forbidden.", 403);
-  if (String(actor.role) === "security" && !Boolean((actor as any).isSeniorSecurity)) return jsonError("Forbidden.", 403);
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: ["security-visitors"],
+  });
+  if (actingRole === "employee" && String(actor.role) === "employee") return jsonError("Forbidden.", 403);
+  if (actingRole === "security" && String(actor.role) === "security" && !Boolean((actor as any).isSeniorSecurity)) return jsonError("Forbidden.", 403);
 
   type PassDoc = Record<string, unknown>;
   const passes = await VisitorPass.find({ company: actor.company })
@@ -152,8 +161,14 @@ export async function POST(request: Request) {
   const actor = await User.findById(userId).select("company role companyStatus name isSeniorSecurity");
   if (!actor) return jsonError("User not found.", 404);
   if (!actor.company) return jsonError("No company.", 400);
-  if (String(actor.role) === "employee") return jsonError("Forbidden.", 403);
-  if (String(actor.role) === "security" && !Boolean((actor as any).isSeniorSecurity)) return jsonError("Forbidden.", 403);
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: ["security-visitors"],
+  });
+  if (actingRole === "employee" && String(actor.role) === "employee") return jsonError("Forbidden.", 403);
+  if (actingRole === "security" && String(actor.role) === "security" && !Boolean((actor as any).isSeniorSecurity)) return jsonError("Forbidden.", 403);
 
   const body = await request.json();
 
@@ -163,6 +178,23 @@ export async function POST(request: Request) {
   const companyDoc = await Company.findById(actor.company).select("name").lean() as Record<string, unknown> | null;
   const companyName = companyDoc?.name ? String(companyDoc.name) : "";
 
+  // When a delegated recipient creates a visitor pass, the pass is created on
+  // behalf of the feature's authorizer (the person who shared the feature), so
+  // the host name reflects the forwarder, not the worker.
+  let hostName = actor.name ?? "";
+  const delegationId = delegationIdFromRequest(request);
+  let requiresVerification = false;
+  let authorizerId: string | null = null;
+  if (delegationId) {
+    const delegation = await delegationForFeature(userId, delegationId, "security-visitors");
+    if (delegation) {
+      const authorizer = await User.findById((delegation as any).authorizer).select("name").lean() as { name?: string } | null;
+      if (authorizer?.name) hostName = String(authorizer.name);
+      requiresVerification = Boolean((delegation as any).requiresVerification);
+      authorizerId = String((delegation as any).authorizer);
+    }
+  }
+
   const pass = await VisitorPass.create({
     createdBy: userId,
     company: actor.company,
@@ -170,27 +202,41 @@ export async function POST(request: Request) {
     visitorEmail: String(body.visitorEmail ?? "").trim().toLowerCase(),
     visitorPhone: String(body.visitorPhone ?? "").trim(),
     visitorCompany: companyName,
-    hostName: actor.name ?? "",
+    hostName: hostName,
     region: String(body.region ?? "").trim(),
     purpose: String(body.purpose ?? "").trim(),
     timeIn,
     timeOut,
+    validFrom: timeIn,
+    validUntil: timeOut,
     status: "pending",
+    verificationStatus: requiresVerification ? "pending-verification" : "none",
+    submittedBy: requiresVerification ? userId : null,
+    authorizer: requiresVerification && authorizerId ? authorizerId : null,
   });
 
-  // Notify all admin/HR users in the company to review the pending pass
-  const approvers = await User.find({ company: actor.company, role: { $in: ["admin", "human-resource"] } }).select("_id").lean();
-  for (const approver of approvers) {
+  // Notify approvers. When verification is required, only the authorizer is
+  // notified first; admins are notified after the authorizer verifies.
+  let approverUserIds: string[] = [];
+  if (requiresVerification && authorizerId) {
+    approverUserIds = [authorizerId];
+  } else {
+    const approvers = await User.find({ company: actor.company, role: { $in: ["admin", "human-resource"] } }).select("_id").lean();
+    approverUserIds = approvers.map((a: any) => String(a._id));
+  }
+  for (const approverId of approverUserIds) {
     const notif = await Notification.create({
-      user: approver._id,
+      user: approverId,
       company: actor.company,
       type: "approval",
-      title: "Visitor Pass Pending Approval",
-      message: `${actor.name ?? "Someone"} requested a visitor pass for ${pass.visitorName}.`,
+      title: requiresVerification ? "Visitor Pass Pending Verification" : "Visitor Pass Pending Approval",
+      message: requiresVerification
+        ? `${actor.name ?? "Someone"} submitted a visitor pass for ${pass.visitorName} for your verification.`
+        : `${actor.name ?? "Someone"} requested a visitor pass for ${pass.visitorName}.`,
       body: `Visitor: ${pass.visitorName}\nEmail: ${pass.visitorEmail}\nRegion: ${pass.region || "N/A"}\nTime In: ${timeIn ? timeIn.toLocaleString("en-IN") : "N/A"}\nTime Out: ${timeOut ? timeOut.toLocaleString("en-IN") : "N/A"}\nPurpose: ${pass.purpose || "N/A"}`,
       link: "/profile/visitors",
     });
-    emitNotification(String(approver._id));
+    emitNotification(approverId);
   }
 
   return NextResponse.json({ pass: { ...pass.toObject(), id: String(pass._id) } });

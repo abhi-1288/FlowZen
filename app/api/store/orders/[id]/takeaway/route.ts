@@ -7,6 +7,7 @@ import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
 import { recordAudit } from "@/lib/audit";
 import { fulfilStoreOrder, storeRegionOf, takeAwayStatusLabel } from "@/lib/store";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -46,7 +47,12 @@ export async function PATCH(request: Request, { params }: Params) {
   const companyId =
     typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
 
-  if (String(user.role) !== "warehouse") {
+  if ((await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(user.role ?? ""),
+    featureKeys: ["warehouse-delivery", "warehouse-orders"],
+  })) !== "warehouse") {
     return jsonError("Only the warehouse can update take-away orders.", 403);
   }
 

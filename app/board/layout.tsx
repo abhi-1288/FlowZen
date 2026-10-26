@@ -1,6 +1,7 @@
 ﻿import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { DelegationSync } from "@/components/delegation-sync";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -11,5 +12,10 @@ export default async function BoardLayout({ children }: { children: React.ReactN
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/login");
 
-  return children;
+  return (
+    <>
+      <DelegationSync />
+      {children}
+    </>
+  );
 }

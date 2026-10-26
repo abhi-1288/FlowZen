@@ -8,11 +8,12 @@ import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
 import { effectiveRegionLabelOf } from "@/lib/company-regions";
 import { recordAudit } from "@/lib/audit";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 const ALLOWED_NOTICE_PERIOD_DAYS = new Set([5, 15, 30, 45, 60, 90]);
 const ALLOWED_PAID_LEAVE_PERIODS = new Set(["monthly", "yearly"]);
 
-export async function GET() {
+export async function GET(request: Request) {
   const userId = await requireUserId();
   if (!userId) return jsonError("Unauthorized", 401);
 
@@ -26,7 +27,13 @@ export async function GET() {
 
   const user = await User.findById(userId).select("company companyStatus role regionLabel");
   if (!user) return jsonError("User not found.", 404);
-  if (!user.company || user.companyStatus !== "approved" || !["human-resource", "admin"].includes(String(user.role))) {
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(user.role ?? ""),
+    featureKeys: ["hr-policy-editing"],
+  });
+  if (!user.company || user.companyStatus !== "approved" || !["human-resource", "admin"].includes(actingRole)) {
     return jsonError("Only approved HR or admins can view policy.", 403);
   }
 
@@ -120,7 +127,13 @@ export async function PATCH(request: Request) {
 
   const hr = await User.findById(userId);
   if (!hr) return jsonError("User not found.", 404);
-  if (!["human-resource", "admin"].includes(String(hr.role ?? "")) || hr.companyStatus !== "approved" || !hr.company) {
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(hr.role ?? ""),
+    featureKeys: ["hr-policy-editing"],
+  });
+  if (!["human-resource", "admin"].includes(actingRole) || hr.companyStatus !== "approved" || !hr.company) {
     return jsonError("Only approved HR or admins can update policy.", 403);
   }
 

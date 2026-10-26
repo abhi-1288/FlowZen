@@ -960,6 +960,13 @@ export function visitorPassIdCardContent({
             </td>
           </tr>
 
+          <!-- Download Button -->
+          <tr>
+            <td style="padding:0 24px 16px;text-align:center;">
+              ${emailButton(verifyUrl, "Open &amp; Download ID Card (PDF)")}
+            </td>
+          </tr>
+
           <!-- Footer -->
           <tr>
             <td style="background:#f8fafc;padding:14px 24px;text-align:center;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;">

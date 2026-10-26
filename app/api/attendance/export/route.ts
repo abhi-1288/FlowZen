@@ -8,8 +8,11 @@ import { LeaveRequest } from "@/models/LeaveRequest";
 import { Team } from "@/models/Team";
 import { User } from "@/models/User";
 import { WfhRequest } from "@/models/WfhRequest";
+import { AttendanceExportRequest } from "@/models/AttendanceExportRequest";
 import { financeMemberScope } from "@/app/api/finance/helpers";
 import { recordAudit } from "@/lib/audit";
+import { effectiveRegionLabelOf } from "@/lib/company-regions";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 
 /** Parse a date string and return midnight local time (or null if invalid). */
@@ -81,9 +84,17 @@ export async function GET(request: Request) {
     return jsonError("You must belong to an approved company to export attendance.", 403);
   }
 
-  const role = String(actor.role ?? "");
+  const role = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: ["finance-attendance-export"],
+  });
+  const requestedRegion = String(url.searchParams.get("region") ?? "").trim();
+  const requestId = String(url.searchParams.get("requestId") ?? "").trim();
   let memberIds: string[] = [];
   let regionFilter: string | null = null;
+  let sameAsOwnRegion = false;
   if (["admin", "human-resource"].includes(role)) {
     const members = await User.find({
       company: actor.company,
@@ -91,6 +102,24 @@ export async function GET(request: Request) {
     }).select("_id");
     memberIds = members.map((member) => String(member._id));
   } else if (role === "finance") {
+    if (requestedRegion) {
+      const companyForRegion: any = await Company.findById(actor.company).select("addresses address").lean();
+      const ownRegion = effectiveRegionLabelOf(companyForRegion, actor);
+      sameAsOwnRegion = requestedRegion.toLowerCase() === ownRegion.toLowerCase();
+      if (!sameAsOwnRegion) {
+        if (!requestId) return jsonError("Approval is required before exporting another region.", 403);
+        const approvedRequest: any = await AttendanceExportRequest.findOne({ _id: requestId, requester: userId, company: actor.company, region: requestedRegion, from, to, status: "approved" });
+        if (!approvedRequest) return jsonError("This date range and region do not have an approved export request.", 403);
+        const candidates: any[] = await User.find({ company: actor.company, companyStatus: "approved" }).select("_id regionLabel").lean();
+        memberIds = candidates.filter((member) => effectiveRegionLabelOf(companyForRegion, member).toLowerCase() === requestedRegion.toLowerCase()).map((member) => String(member._id));
+        regionFilter = requestedRegion;
+      }
+    }
+    if (memberIds.length > 0) {
+      // A cross-region request has already established the exact member scope.
+    } else if (requestedRegion && !sameAsOwnRegion) {
+      return jsonError("No approved export scope was found for that region.", 403);
+    } else {
     // Finance exports are scoped to their own region, same rule as the salary
     // wizard, so one resolver serves both and they cannot drift.
     const scope = await financeMemberScope(actor);
@@ -103,6 +132,7 @@ export async function GET(request: Request) {
         companyStatus: "approved",
       }).select("_id");
       memberIds = members.map((member) => String(member._id));
+    }
     }
   } else if (["project-manager", "qa-tester"].includes(role)) {
     const teams = await Team.find({ manager: userId }).select("employees");

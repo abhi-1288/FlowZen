@@ -10,6 +10,7 @@ import {
   storeRegionOf,
   type StoreCategory,
 } from "@/lib/store";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 function validCategory(value: unknown): value is StoreCategory {
   return (STORE_CATEGORIES as readonly string[]).includes(String(value ?? "").toLowerCase());
@@ -67,11 +68,17 @@ export async function GET(request: Request) {
   }
 
   const items = await StoreItem.find(filter).sort({ category: 1, name: 1 });
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(user.role ?? ""),
+    featureKeys: ["warehouse-inventory", "warehouse-stock-movements", "warehouse-reports"],
+  });
 
   return NextResponse.json({
     items: serializeDocs(items as any),
     region,
-    canManage: isStoreManager(user.role),
+    canManage: isStoreManager(actingRole),
   });
 }
 
@@ -115,7 +122,12 @@ export async function POST(request: Request) {
   if (!user.company || user.companyStatus !== "approved") {
     return jsonError("You must be an approved company member to manage products.", 403);
   }
-  if (!isStoreManager(user.role)) {
+  if (!isStoreManager(await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(user.role ?? ""),
+    featureKeys: ["warehouse-inventory"],
+  }))) {
     return jsonError("Only warehouse managers can add products.", 403);
   }
   const companyId =

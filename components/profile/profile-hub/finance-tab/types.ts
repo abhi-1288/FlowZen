@@ -73,7 +73,10 @@ export type InvoiceForm = {
   boardId: string;
   clientName: string;
   clientEmail: string;
-  amount: string;
+  serviceDescription: string;
+  items: { description: string; quantity: string; rate: string }[];
+  gstRate: string;
+  dueDate: string;
   description: string;
 };
 

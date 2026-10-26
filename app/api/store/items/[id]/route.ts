@@ -5,6 +5,7 @@ import { User } from "@/models/User";
 import { StoreItem } from "@/models/StoreItem";
 import { recordAudit } from "@/lib/audit";
 import { STORE_CATEGORIES, isStoreManager, storeRegionOf, type StoreCategory } from "@/lib/store";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -12,7 +13,7 @@ function validCategory(value: unknown): value is StoreCategory {
   return (STORE_CATEGORIES as readonly string[]).includes(String(value ?? "").toLowerCase());
 }
 
-async function loadManagerForCompany(userId: string) {
+async function loadManagerForCompany(userId: string, request: Request, featureKeys: string[]) {
   const user = await User.findById(userId).select(
     "role company companyStatus name regionLabel",
   );
@@ -20,7 +21,13 @@ async function loadManagerForCompany(userId: string) {
   if (!user.company || user.companyStatus !== "approved") {
     return { error: jsonError("You must be an approved company member to manage products.", 403) };
   }
-  if (!isStoreManager(user.role)) {
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(user.role ?? ""),
+    featureKeys,
+  });
+  if (!isStoreManager(actingRole)) {
     return { error: jsonError("Only warehouse managers can manage products.", 403) };
   }
   const companyId =
@@ -79,7 +86,10 @@ export async function PATCH(request: Request, { params }: Params) {
     throw error;
   }
 
-  const gate = await loadManagerForCompany(userId);
+  const gate = await loadManagerForCompany(userId, request, [
+    "warehouse-inventory",
+    "warehouse-stock-movements",
+  ]);
   if (gate.error) return gate.error;
   const { user, companyId, region } = gate as any;
 
@@ -162,7 +172,7 @@ export async function DELETE(request: Request, { params }: Params) {
     throw error;
   }
 
-  const gate = await loadManagerForCompany(userId);
+  const gate = await loadManagerForCompany(userId, request, ["warehouse-inventory"]);
   if (gate.error) return gate.error;
   const { user, companyId, region } = gate as any;
 

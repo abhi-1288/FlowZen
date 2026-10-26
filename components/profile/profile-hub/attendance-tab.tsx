@@ -61,6 +61,13 @@ export function AttendanceTab({
   const [exportFrom, setExportFrom] = useState(currentMonthStart.toISOString().slice(0, 10));
   const [exportTo, setExportTo] = useState(new Date().toISOString().slice(0, 10));
   const [exporting, setExporting] = useState(false);
+  const [exportOwnRegion, setExportOwnRegion] = useState("");
+  const [exportRegion, setExportRegion] = useState("");
+  const [exportRegions, setExportRegions] = useState<{ region: string; approvers: AnyRecord[] }[]>([]);
+  const [exportApprover, setExportApprover] = useState("");
+  const [exportRequests, setExportRequests] = useState<AnyRecord[]>([]);
+  const [requestingExportAccess, setRequestingExportAccess] = useState(false);
+  const [incomingExportRequests, setIncomingExportRequests] = useState<AnyRecord[]>([]);
   const [leavePolicy, setLeavePolicy] = useState<AnyRecord | null>(null);
   const [wfhRequests, setWfhRequests] = useState<AnyRecord[]>([]);
   const [checkOutRequests, setCheckOutRequests] = useState<AnyRecord[]>([]);
@@ -131,15 +138,88 @@ export function AttendanceTab({
   };
   const isAttendanceEnabled = checkAttendanceEnabled(profile);
   const canExportAttendance = checkCanExport(profile);
+  const isFinanceExporter = String(profile?.role ?? "") === "finance";
+  const isOtherRegionExport = isFinanceExporter && Boolean(exportRegion) && exportRegion.toLowerCase() !== exportOwnRegion.toLowerCase();
+  const approvedExportRequest = exportRequests.find((item) =>
+    item.status === "approved" &&
+    String(item.region).toLowerCase() === exportRegion.toLowerCase() &&
+    String(item.from).slice(0, 10) === exportFrom &&
+    String(item.to).slice(0, 10) === exportTo,
+  );
+  const pendingExportRequest = exportRequests.find((item) =>
+    item.status === "pending" &&
+    String(item.region).toLowerCase() === exportRegion.toLowerCase() &&
+    String(item.from).slice(0, 10) === exportFrom &&
+    String(item.to).slice(0, 10) === exportTo,
+  );
+  useEffect(() => {
+    if (!canExportAttendance || !isFinanceExporter) return;
+    apiFetch<{ ownRegion: string; regions: { region: string; approvers: AnyRecord[] }[]; requests: AnyRecord[] }>("/api/attendance/export-request", undefined, { toast: false })
+      .then((result) => {
+        setExportOwnRegion(result.ownRegion ?? "");
+        setExportRegion((current) => current || result.ownRegion || "");
+        setExportRegions(result.regions ?? []);
+        setExportRequests(result.requests ?? []);
+      })
+      .catch(() => undefined);
+  }, [canExportAttendance, isFinanceExporter]);
+  useEffect(() => {
+    const role = String(profile?.role ?? "");
+    if (!canExportAttendance || !["admin", "human-resource"].includes(role)) return;
+    apiFetch<{ requests: AnyRecord[] }>("/api/attendance/export-request", undefined, { toast: false })
+      .then((result) => setIncomingExportRequests(result.requests ?? []))
+      .catch(() => undefined);
+  }, [canExportAttendance, profile?.role]);
+
+  const decideExportRequest = async (id: string, action: "approve" | "reject") => {
+    try {
+      await apiFetch(`/api/attendance/export-request/${id}`, { method: "PATCH", body: JSON.stringify({ action }) });
+      setIncomingExportRequests((current) => current.map((item) => String(item.id) === id ? { ...item, status: action === "approve" ? "approved" : "rejected" } : item));
+      showToast(action === "approve" ? "Attendance export approved." : "Attendance export rejected.", "success");
+    } catch {
+      showToast("Could not update the export request.", "error");
+    }
+  };
+
+  const requestOtherRegionExport = async () => {
+    if (!exportRegion || !exportApprover || !exportFrom || !exportTo) {
+      showToast("Select dates, a region, and an HR/Admin head.", "error");
+      return;
+    }
+    setRequestingExportAccess(true);
+    try {
+      await apiFetch("/api/attendance/export-request", {
+        method: "POST",
+        body: JSON.stringify({ from: exportFrom, to: exportTo, region: exportRegion, approverId: exportApprover }),
+      });
+      const refreshed = await apiFetch<{ requests: AnyRecord[] }>("/api/attendance/export-request", undefined, { toast: false });
+      setExportRequests(refreshed.requests ?? []);
+      showToast("Export approval request sent.", "success");
+    } catch {
+      showToast("Could not request regional export access.", "error");
+    } finally {
+      setRequestingExportAccess(false);
+    }
+  };
+
   const exportAttendance = async () => {
     if (!exportFrom || !exportTo) {
       showToast("Select a start and end date.", "error");
       return;
     }
+    if (isOtherRegionExport && !approvedExportRequest) {
+      showToast(pendingExportRequest ? "This export is waiting for approval." : "Request approval before exporting another region.", "error");
+      return;
+    }
     setExporting(true);
     try {
+      const params = new URLSearchParams({ from: exportFrom, to: exportTo });
+      if (isOtherRegionExport && approvedExportRequest) {
+        params.set("region", exportRegion);
+        params.set("requestId", String(approvedExportRequest.id ?? approvedExportRequest._id ?? ""));
+      }
       const res = await fetch(
-        `/api/attendance/export?from=${encodeURIComponent(exportFrom)}&to=${encodeURIComponent(exportTo)}`,
+        `/api/attendance/export?${params.toString()}`,
       );
       if (!res.ok) {
         // A plain navigation would dump this JSON in the browser.
@@ -466,6 +546,28 @@ export function AttendanceTab({
 }
   return (
     <>
+      {incomingExportRequests.some((item) => item.status === "pending") ? (
+        <section className="mb-5 rounded-xl neu-card p-5">
+          <div className="mb-3">
+            <h3 className="text-base font-semibold">Regional Attendance Export Requests</h3>
+            <p className="text-sm text-slate-500">Review Finance requests before they can download another region&apos;s attendance.</p>
+          </div>
+          <div className="space-y-2">
+            {incomingExportRequests.filter((item) => item.status === "pending").map((item) => (
+              <div key={String(item.id)} className="flex flex-wrap items-center justify-between gap-3 rounded-lg neu-inset px-3 py-3 text-sm">
+                <div>
+                  <p className="font-medium">{String((item.requester as AnyRecord | undefined)?.name ?? "Finance user")} requested {String(item.region)}</p>
+                  <p className="text-xs text-slate-500">{String(item.from).slice(0, 10)} to {String(item.to).slice(0, 10)}</p>
+                </div>
+                <div className="flex gap-2">
+                  <ActionButton variant="approve" onClick={() => decideExportRequest(String(item.id), "approve")}>Approve</ActionButton>
+                  <ActionButton variant="secondary" onClick={() => decideExportRequest(String(item.id), "reject")}>Reject</ActionButton>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
       <section className="rounded-xl neu-card p-5">
         <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
           <div>
@@ -494,12 +596,50 @@ export function AttendanceTab({
                   onChange={(event) => setExportTo(event.target.value)}
                 />
               </label>
+              {isFinanceExporter ? (
+                <>
+                  <label className="text-xs font-medium text-slate-600">
+                    Region
+                    <select
+                      className="mt-1 block max-w-[170px] rounded-md neu-inset px-2 py-1.5 text-sm text-slate-900"
+                      value={exportRegion || exportOwnRegion}
+                      onChange={(event) => {
+                        setExportRegion(event.target.value);
+                        setExportApprover("");
+                      }}
+                    >
+                      {exportRegions.length === 0 && exportOwnRegion ? <option value={exportOwnRegion}>{exportOwnRegion} (my region)</option> : null}
+                      {exportRegions.map((item) => <option key={item.region} value={item.region}>{item.region}{item.region.toLowerCase() === exportOwnRegion.toLowerCase() ? " (my region)" : ""}</option>)}
+                    </select>
+                  </label>
+                  {isOtherRegionExport ? (
+                    <>
+                      <label className="text-xs font-medium text-slate-600">
+                        Approver
+                        <select
+                          className="mt-1 block max-w-[190px] rounded-md neu-inset px-2 py-1.5 text-sm text-slate-900"
+                          value={exportApprover}
+                          onChange={(event) => setExportApprover(event.target.value)}
+                        >
+                          <option value="">Select HR/Admin head</option>
+                          {(exportRegions.find((item) => item.region === exportRegion)?.approvers ?? []).map((approver) => (
+                            <option key={String(approver.id)} value={String(approver.id)}>{String(approver.name)} ({String(approver.role).replaceAll("-", " ")})</option>
+                          ))}
+                        </select>
+                      </label>
+                      <ActionButton variant="secondary" className="px-3" onClick={requestOtherRegionExport} type="button" disabled={requestingExportAccess || Boolean(pendingExportRequest) || Boolean(approvedExportRequest)}>
+                        {approvedExportRequest ? "Approved" : pendingExportRequest ? "Pending approval" : requestingExportAccess ? "Requesting…" : "Request access"}
+                      </ActionButton>
+                    </>
+                  ) : null}
+                </>
+              ) : null}
               <ActionButton
                 variant="approve"
                 className="px-3"
                 onClick={exportAttendance}
                 type="button"
-                disabled={exporting}
+                disabled={exporting || (isOtherRegionExport && !approvedExportRequest)}
               >
                 {exporting ? "Exporting…" : "Export CSV"}
               </ActionButton>

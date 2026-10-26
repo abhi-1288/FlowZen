@@ -13,6 +13,7 @@ export function BudgetModal({
   boards,
   financeMembers,
   actorRole,
+  region,
   onFormChange,
   onSubmit,
   onCancel,
@@ -23,6 +24,7 @@ export function BudgetModal({
   boards: AnyRecord[];
   financeMembers: AnyRecord[];
   actorRole: string;
+  region: string;
   onFormChange: (form: BudgetForm) => void;
   onSubmit: (event: FormEvent) => void;
   onCancel: () => void;
@@ -34,6 +36,7 @@ export function BudgetModal({
       <div className={modalClass}>
         <h4 className="text-lg font-semibold">{editingBudgetId ? "Edit Budget" : "Allocate Budget"}</h4>
         <form className="mt-4 grid gap-3" onSubmit={onSubmit}>
+          {region ? <p className="rounded-lg bg-[var(--c-bg-muted)] px-3 py-2 text-sm text-[var(--c-text-muted)]">Region: <span className="font-medium text-[var(--c-text)]">{region}</span> (your regional budget)</p> : null}
           <select className="rounded-lg border border-[var(--c-border-light)] px-3 py-2" required value={budgetForm.boardId} onChange={(e) => onFormChange({ ...budgetForm, boardId: e.target.value })}>
             <option value="">Select project</option>
             {boards.map((board) => (

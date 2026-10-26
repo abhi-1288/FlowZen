@@ -6,6 +6,7 @@ import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
 import { isItAdminRole, pushItActivity } from "@/lib/it";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -31,7 +32,12 @@ export async function POST(request: Request, { params }: Params) {
   if (!actor.company || actor.companyStatus !== "approved") {
     return jsonError("You must be an approved company member to assign IT tickets.", 403);
   }
-  if (!isItAdminRole(String(actor.role))) {
+  if (!isItAdminRole(await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: ["it-tickets"],
+  }))) {
     return jsonError("Only IT admins can assign IT tickets.", 403);
   }
   if (!assigneeId) return jsonError("assigneeId is required.");

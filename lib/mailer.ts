@@ -2,6 +2,7 @@ import nodemailer from "nodemailer";
 
 type MailOptions = {
   to: string;
+  cc?: string;
   subject: string;
   text: string;
   html?: string;

@@ -6,6 +6,7 @@ import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
 import { effectiveRegionLabelOf, isUserInEffectiveRegion, type OfficeAddressLike } from "@/lib/company-regions";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 import { recordAudit } from "@/lib/audit";
 import { APP_ROLES } from "@/lib/roles";
 
@@ -51,9 +52,17 @@ export async function PATCH(request: Request) {
     addresses?: OfficeAddressLike[] | null;
     address?: string | null;
   } | null;
-  const actorRole = String(actor.role);
+  const realActorRole = String(actor.role);
+  const delegatedHr =
+    (await actingRoleForRequest({
+      userId,
+      request,
+      realRole: realActorRole,
+      featureKeys: ["hr-member-management"],
+    })) === "human-resource";
+  const actorRole = realActorRole;
   const isCompanyHr =
-    actorRole === "human-resource" &&
+    (realActorRole === "human-resource" || delegatedHr) &&
     String(actor.companyStatus) === "approved" &&
     String(actor.company ?? "") === String(member.company);
   const isCompanyAdmin =

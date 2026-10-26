@@ -8,6 +8,7 @@ import { User } from "@/models/User";
 import { Attendance } from "@/models/Attendance";
 import { emitNotification } from "@/lib/realtime";
 import { canManageIt, pushProvisioningActivity } from "@/lib/it";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 import { sendMail } from "@/lib/mailer";
 import { employeeAccountContent } from "@/lib/email-templates";
 import { buildOrigin } from "@/lib/candidate-portal";
@@ -38,7 +39,12 @@ export async function POST(request: Request, { params }: Params) {
   if (!actor.company || actor.companyStatus !== "approved") {
     return jsonError("You must be an approved company member to create accounts.", 403);
   }
-  if (!canManageIt(String(actor.role), Boolean(actor.isSeniorSecurity))) {
+  if (!canManageIt(await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: ["it-provisioning"],
+  }), Boolean(actor.isSeniorSecurity))) {
     return jsonError("Only IT admins can create accounts from provisioning requests.", 403);
   }
   const companyId =

@@ -544,7 +544,9 @@ export function IdCardModal({
                   ? formatDate(profile.validUntil)
                   : profile?.employmentEndDate
                     ? `${formatDate(profile.companyJoined)} — ${formatDate(profile.employmentEndDate)}`
-                    : "Active Employee"}
+                    : isVisitor
+                      ? "Active"
+                      : "Active Employee"}
               </p>
             </div>
           </div>
@@ -636,7 +638,11 @@ export function IdCardModal({
                     ? String(profile.region)
                     : profile?.visitAddress
                       ? String(profile.visitAddress)
-                      : "—"}
+                      : profile?.visitorCompany
+                        ? String(profile.visitorCompany)
+                        : regionLabel
+                          ? String(regionLabel)
+                          : "Main Office"}
                 </p>
               </div>
             </div>

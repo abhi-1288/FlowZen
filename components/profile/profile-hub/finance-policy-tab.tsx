@@ -10,10 +10,13 @@ export function FinancePolicyTab({
   actorRole,
   profileId,
   showToast,
+  delegationFeatureKey = "",
 }: {
   actorRole: string;
   profileId: string;
   showToast: (text: string, type?: "success" | "error") => void;
+  /** Exact delegated feature currently open, if any. */
+  delegationFeatureKey?: string;
 }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -116,6 +119,11 @@ export function FinancePolicyTab({
   return (
     <div className="grid gap-6 xl:grid-cols-2">
       <div className="space-y-6">
+        {delegationFeatureKey === "finance-policy-editing" ? (
+          <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-800">
+            You are working with delegated access to <strong>Finance · Edit Policies</strong>. Your normal role and permissions are unchanged.
+          </div>
+        ) : null}
         {/* Policy Configuration Form */}
         <form onSubmit={handleSave} className="space-y-6">
           <Card>

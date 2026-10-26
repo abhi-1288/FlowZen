@@ -3,6 +3,7 @@ import { connectDb } from "@/lib/db";
 import { jsonError, requireUserId } from "@/lib/api";
 import { Attendance } from "@/models/Attendance";
 import { User } from "@/models/User";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 import { Company } from "@/models/Company";
 import { CheckOutRequest } from "@/models/CheckOutRequest";
 import { Notification } from "@/models/Notification";
@@ -103,7 +104,7 @@ export async function POST(request: Request) {
   return NextResponse.json({ checkOutRequest });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const userId = await requireUserId();
   if (!userId) return jsonError("Unauthorized", 401);
 
@@ -116,7 +117,13 @@ export async function GET() {
   const user = await User.findById(userId).select("role company companyStatus");
   if (!user) return jsonError("User not found.", 404);
 
-  const role = String(user.role ?? "");
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(user.role ?? ""),
+    featureKeys: ["finance-checkout-requests"],
+  });
+  const role = actingRole;
   const isFinanceOrAdmin = role === "finance" || role === "admin";
 
   let requests;

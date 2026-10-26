@@ -36,6 +36,10 @@ const LostCardReportSchema = new Schema(
       default: "reported",
       index: true,
     },
+    verificationStatus: { type: String, enum: ["none", "pending-verification", "verified"], default: "none", index: true },
+    submittedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    authorizer: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    pendingAction: { type: String, default: "" },
 
     // Step 1: Report details
     reason: {

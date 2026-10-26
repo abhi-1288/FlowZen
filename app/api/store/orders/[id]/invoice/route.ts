@@ -4,6 +4,7 @@ import { databaseUnavailable, isObjectId, jsonError, requireUserId } from "@/lib
 import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 import { StoreOrder } from "@/models/StoreOrder";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -15,7 +16,7 @@ type Params = { params: Promise<{ id: string }> };
  * what it cost. Only the requester, the assigned approver and the warehouse
  * may read it, and only after the warehouse completed the order.
  */
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(request: Request, { params }: Params) {
   const userId = await requireUserId();
   if (!userId) return jsonError("Unauthorized", 401);
 
@@ -46,7 +47,13 @@ export async function GET(_request: Request, { params }: Params) {
 
   const requesterId = String((order.requester as any)?._id ?? order.requester ?? "");
   const approverId = String((order.approver as any)?._id ?? order.approver ?? "");
-  const isWarehouse = String(user.role) === "warehouse";
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(user.role ?? ""),
+    featureKeys: ["warehouse-orders", "warehouse-delivery"],
+  });
+  const isWarehouse = actingRole === "warehouse";
   if (!isWarehouse && requesterId !== userId && approverId !== userId) {
     return jsonError("You do not have access to this invoice.", 403);
   }

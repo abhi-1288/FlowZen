@@ -7,6 +7,8 @@ import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
 import { recordAudit } from "@/lib/audit";
 import { canTransitionStoreOrder, restoreStoreOrderStock, storeRegionOf } from "@/lib/store";
+import { actingRoleForRequest } from "@/lib/delegation-access";
+import { delegationForFeature, delegationIdFromRequest } from "@/lib/delegation-access";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -51,7 +53,13 @@ export async function GET(request: Request, { params }: Params) {
 
   const requesterId = String((order.requester as any)?._id ?? order.requester ?? "");
   const approverId = String((order.approver as any)?._id ?? order.approver ?? "");
-  const isWarehouse = String(user.role) === "warehouse";
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(user.role ?? ""),
+    featureKeys: ["warehouse-orders"],
+  });
+  const isWarehouse = actingRole === "warehouse";
   const isRequester = requesterId === userId;
   const isApprover = approverId === userId;
   if (!isWarehouse && !isRequester && !isApprover) {
@@ -105,7 +113,13 @@ export async function PATCH(request: Request, { params }: Params) {
 
   const requesterId = String((order as any).requester ?? "");
   const approverId = String((order as any).approver ?? "");
-  const isWarehouse = String(user.role) === "warehouse";
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(user.role ?? ""),
+    featureKeys: ["warehouse-orders"],
+  });
+  const isWarehouse = actingRole === "warehouse";
   const isRequester = requesterId === userId;
   const isApprover = approverId === userId;
 
@@ -128,6 +142,34 @@ export async function PATCH(request: Request, { params }: Params) {
     }
     if (order.status !== "pending") {
       return jsonError("Only a pending order can be cancelled.", 409);
+    }
+  }
+
+  // Verification step: when a delegated recipient performs an approval/rejection
+  // and the delegation requires verification, defer to the authorizer.
+  const delegationId = delegationIdFromRequest(request);
+  if (delegationId && (nextStatus === "approved" || nextStatus === "rejected") && isWarehouse && !isApprover) {
+    const delegation = await delegationForFeature(userId, delegationId, "warehouse-orders");
+    if (delegation && (delegation as any).requiresVerification) {
+      order.verificationStatus = "pending-verification";
+      (order as any).submittedBy = userId;
+      (order as any).authorizer = (delegation as any).authorizer;
+      (order as any).pendingAction = nextStatus;
+      (order as any).pendingReason = reason;
+      await order.save();
+      const authorizerId = String((delegation as any).authorizer);
+      try {
+        await Notification.create({
+          user: authorizerId,
+          company: user.company,
+          type: "approval",
+          title: "Store Order Pending Verification",
+          message: `${user.name ?? "Warehouse"} submitted an order decision (${nextStatus}) for ${order.orderNumber} for your verification.`,
+          link: "/profile/store/orders",
+        });
+        emitNotification(authorizerId);
+      } catch {}
+      return NextResponse.json({ order: serializeDoc(order), deferred: true });
     }
   }
 

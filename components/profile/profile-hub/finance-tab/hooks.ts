@@ -1,34 +1,47 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/client-utils";
 import type { AnyRecord } from "../shared";
 import type { FinanceData, ReportsData, LeaveImpact, PolicyData, PolicyApiResponse, SalaryCycleData } from "./types";
 
 export function useFinanceData(month: string, showToast: (text: string, type?: "success" | "error") => void) {
   const [data, setData] = useState<FinanceData | null>(null);
+  // Callers commonly pass an inline toast function. Keeping it in a ref means a
+  // parent re-render can never restart this fetch and create a request loop.
+  const showToastRef = useRef(showToast);
+  showToastRef.current = showToast;
 
   const load = useCallback(async () => {
-    const result = await apiFetch<FinanceData>(`/api/finance?month=${month}`);
+    const result = await apiFetch<FinanceData>(`/api/finance?month=${month}`, undefined, { toast: false });
     setData(result);
   }, [month]);
 
   useEffect(() => {
-    void load().catch(() => showToast("Unable to load finance data.", "error"));
-  }, [load, showToast]);
+    void load().catch(() => showToastRef.current("Unable to load finance data.", "error"));
+  }, [load]);
 
   return { data, setData, load };
 }
 
-export function useInvoices(data: FinanceData | null) {
+export function useInvoices(data: FinanceData | null, delegationId = "", enabled = true) {
   const [invoices, setInvoices] = useState<AnyRecord[]>([]);
 
   useEffect(() => {
-    if (!data) return;
-    apiFetch<{ invoices: AnyRecord[] }>("/api/finance/invoice")
-      .then((res) => setInvoices(res.invoices))
-      .catch(() => { });
-  }, [data]);
+    if (!data || !enabled) {
+      setInvoices([]);
+      return;
+    }
+    let cancelled = false;
+    const query = delegationId ? `?delegation=${encodeURIComponent(delegationId)}` : "";
+    // `toast: false` is deliberate: an expected 403 must never raise a global
+    // toast. A toast re-rendered this parent, which restarted this effect and
+    // produced the endless /api/finance + /api/finance/invoice request storm.
+    apiFetch<{ invoices: AnyRecord[] }>(`/api/finance/invoice${query}`, undefined, { toast: false })
+      .then((res) => { if (!cancelled) setInvoices(res.invoices); })
+      .catch(() => { if (!cancelled) setInvoices([]); });
+    return () => { cancelled = true; };
+  }, [data, delegationId, enabled]);
 
   return { invoices, setInvoices };
 }
@@ -38,7 +51,7 @@ export function useReports(data: FinanceData | null) {
 
   useEffect(() => {
     if (!data) return;
-    apiFetch<ReportsData>("/api/finance/reports")
+    apiFetch<ReportsData>("/api/finance/reports", undefined, { toast: false })
       .then(setReports)
       .catch(() => { });
   }, [data]);
@@ -51,7 +64,7 @@ export function useLeaveImpacts(data: FinanceData | null, month: string) {
 
   useEffect(() => {
     if (!data) return;
-    apiFetch<{ impacts: LeaveImpact[] }>(`/api/finance/leave-impact?month=${month}`)
+    apiFetch<{ impacts: LeaveImpact[] }>(`/api/finance/leave-impact?month=${month}`, undefined, { toast: false })
       .then((res) => setLeaveImpacts(res.impacts))
       .catch(() => { });
   }, [data, month]);
@@ -64,7 +77,7 @@ export function usePolicyData(data: FinanceData | null) {
 
   const loadPolicy = useCallback(async (region?: string) => {
     const query = region ? `?region=${encodeURIComponent(region)}` : "";
-    const res = await apiFetch<PolicyApiResponse>(`/api/finance/policy${query}`);
+    const res = await apiFetch<PolicyApiResponse>(`/api/finance/policy${query}`, undefined, { toast: false });
     setPolicyData({
       foodAmount: res.foodAmount,
       travelAccommodationAmount: res.travelAccommodationAmount,
@@ -94,7 +107,7 @@ export function useMySalarySlips(month: string) {
 
   useEffect(() => {
     setSlipsLoading(true);
-    apiFetch<{ salaries: AnyRecord[] }>("/api/finance/salary-slip?employee=me")
+    apiFetch<{ salaries: AnyRecord[] }>("/api/finance/salary-slip?employee=me", undefined, { toast: false })
       .then((res) => setMySlips(res.salaries ?? []))
       .catch(() => setMySlips([]))
       .finally(() => setSlipsLoading(false));
@@ -109,7 +122,7 @@ export function useSalaryCycle(data: FinanceData | null) {
   const refreshSalaryCycle = useCallback(async (region?: string) => {
     try {
       const query = region ? `?region=${encodeURIComponent(region)}` : "";
-      const result = await apiFetch<SalaryCycleData>(`/api/finance/salary-cycle${query}`);
+      const result = await apiFetch<SalaryCycleData>(`/api/finance/salary-cycle${query}`, undefined, { toast: false });
       setSalaryCycle(result);
     } catch {
       // ignore

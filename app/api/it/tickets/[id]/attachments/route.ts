@@ -9,6 +9,7 @@ import { deleteAttachments } from "@/lib/attachments";
 import { ITTicket } from "@/models/ITTicket";
 import { User } from "@/models/User";
 import { canViewTicket, pushItActivity } from "@/lib/it";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -49,7 +50,12 @@ export async function POST(request: Request, { params }: Params) {
     typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
   const ticket = await ITTicket.findOne({ _id: id, company: companyId });
   if (!ticket) return jsonError("Ticket not found.", 404);
-  const allowed = await canViewTicket({ role: String(user.role), _id: user._id }, companyId, ticket);
+  const allowed = await canViewTicket({ role: await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(user.role ?? ""),
+    featureKeys: ["it-tickets"],
+  }), _id: user._id }, companyId, ticket);
   if (!allowed) return jsonError("You do not have permission to add attachments to this ticket.", 403);
 
   let formData: FormData;
@@ -126,7 +132,12 @@ export async function DELETE(request: Request, { params }: Params) {
     typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
   const ticket = await ITTicket.findOne({ _id: id, company: companyId });
   if (!ticket) return jsonError("Ticket not found.", 404);
-  const allowed = await canViewTicket({ role: String(user.role), _id: user._id }, companyId, ticket);
+  const allowed = await canViewTicket({ role: await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(user.role ?? ""),
+    featureKeys: ["it-tickets"],
+  }), _id: user._id }, companyId, ticket);
   if (!allowed) return jsonError("You do not have permission to remove attachments from this ticket.", 403);
 
   const index = (ticket.attachments ?? []).findIndex((a: any) => String(a.id) === attachmentId);

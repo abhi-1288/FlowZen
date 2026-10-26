@@ -6,10 +6,11 @@ import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
 import { canTransitionTicket, canViewTicket, isItAdminRole, pushItActivity } from "@/lib/it";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(request: Request, { params }: Params) {
   const userId = await requireUserId();
   if (!userId) return jsonError("Unauthorized", 401);
 
@@ -40,7 +41,12 @@ export async function GET(_request: Request, { params }: Params) {
     .populate("manager", "name email");
   if (!ticket) return jsonError("Ticket not found.", 404);
 
-  const allowed = await canViewTicket({ role: String(user.role), _id: user._id }, companyId, ticket);
+  const allowed = await canViewTicket({ role: await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(user.role ?? ""),
+    featureKeys: ["it-tickets"],
+  }), _id: user._id }, companyId, ticket);
   if (!allowed) return jsonError("You do not have permission to view this ticket.", 403);
 
   return NextResponse.json({ ticket: serializeDoc(ticket) });
@@ -72,6 +78,12 @@ export async function PATCH(request: Request, { params }: Params) {
 
   const companyId =
     typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(user.role ?? ""),
+    featureKeys: ["it-tickets"],
+  });
   const ticket = await ITTicket.findOne({ _id: id, company: companyId });
   if (!ticket) return jsonError("Ticket not found.", 404);
 
@@ -80,7 +92,7 @@ export async function PATCH(request: Request, { params }: Params) {
     const newPriority = String(body.priority).toUpperCase();
     const allowedPriorities = ["LOW", "MEDIUM", "HIGH", "URGENT"];
     if (!allowedPriorities.includes(newPriority)) return jsonError("Invalid priority.", 400);
-    if (!isItAdminRole(String(user.role))) {
+    if (!isItAdminRole(actingRole)) {
       return jsonError("Only IT admins can change ticket priority.", 403);
     }
     if (String(ticket.priority) !== newPriority) {
@@ -99,7 +111,7 @@ export async function PATCH(request: Request, { params }: Params) {
       return jsonError("Use the resolve endpoint to resolve a ticket.", 400);
     }
     // Ticket scoping + transition validation.
-    const allowedView = await canViewTicket({ role: String(user.role), _id: user._id }, companyId, ticket);
+    const allowedView = await canViewTicket({ role: actingRole, _id: user._id }, companyId, ticket);
     if (!allowedView) return jsonError("You do not have permission to modify this ticket.", 403);
     if (!canTransitionTicket(ticket.status, newStatus)) {
       return jsonError(`Invalid status transition from ${ticket.status} to ${newStatus}.`, 400);

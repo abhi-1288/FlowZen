@@ -3,6 +3,7 @@ import { connectDb } from "@/lib/db";
 import { jsonError, requireUserId } from "@/lib/api";
 import { User } from "@/models/User";
 import { Company } from "@/models/Company";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -17,7 +18,13 @@ export async function GET(request: Request, { params }: Params) {
     const actor = await User.findById(actorId).select("role company companyStatus");
     if (!actor || !actor.company || actor.companyStatus !== "approved")
       return jsonError("Approved company access is required.", 403);
-    if (!["human-resource", "finance", "admin"].includes(String(actor.role ?? "")))
+    const actingRole = await actingRoleForRequest({
+      userId: actorId,
+      request,
+      realRole: String(actor.role ?? ""),
+      featureKeys: ["hr-member-management"],
+    });
+    if (!["human-resource", "finance", "admin"].includes(actingRole))
       return jsonError("Only HR, finance, or admin can view member documents.", 403);
 
     const member = await User.findById(memberId).select("documents name email role company");

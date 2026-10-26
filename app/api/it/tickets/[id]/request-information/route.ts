@@ -6,6 +6,7 @@ import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
 import { isItStaff, pushItActivity } from "@/lib/it";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -31,7 +32,13 @@ export async function POST(request: Request, { params }: Params) {
   if (!actor.company || actor.companyStatus !== "approved") {
     return jsonError("You must be an approved company member to request information.", 403);
   }
-  if (!isItStaff(String(actor.role))) {
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: ["it-tickets"],
+  });
+  if (!isItStaff(actingRole)) {
     return jsonError("Only IT staff can request information from the requester.", 403);
   }
   const companyId =
@@ -45,7 +52,7 @@ export async function POST(request: Request, { params }: Params) {
 
   // Ensure assigned IT member requesting; IT admin can also request.
   const isAssigned = ticket.assignedTo ? String(ticket.assignedTo) === userId : false;
-  if (String(actor.role) !== "it-admin" && !isAssigned) {
+  if (actingRole !== "it-admin" && !isAssigned) {
     return jsonError("You can only request information on tickets assigned to you.", 403);
   }
 

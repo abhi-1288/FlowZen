@@ -6,6 +6,7 @@ import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
 import { canViewTicket, pushItActivity, canManageIt } from "@/lib/it";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -37,7 +38,12 @@ export async function POST(request: Request, { params }: Params) {
     typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
   const ticket = await ITTicket.findOne({ _id: id, company: companyId });
   if (!ticket) return jsonError("Ticket not found.", 404);
-  const allowed = await canViewTicket({ role: String(user.role), _id: user._id }, companyId, ticket);
+  const allowed = await canViewTicket({ role: await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(user.role ?? ""),
+    featureKeys: ["it-tickets"],
+  }), _id: user._id }, companyId, ticket);
   if (!allowed) return jsonError("You do not have permission to comment on this ticket.", 403);
 
   if (!Array.isArray(ticket.comments)) ticket.comments = [];
@@ -92,7 +98,13 @@ export async function DELETE(request: Request, { params }: Params) {
     typeof user.company === "object" && user.company ? (user.company as any)._id : user.company;
   const ticket = await ITTicket.findOne({ _id: id, company: companyId });
   if (!ticket) return jsonError("Ticket not found.", 404);
-  const allowed = await canViewTicket({ role: String(user.role), _id: user._id }, companyId, ticket);
+  const actingRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(user.role ?? ""),
+    featureKeys: ["it-tickets"],
+  });
+  const allowed = await canViewTicket({ role: actingRole, _id: user._id }, companyId, ticket);
   if (!allowed) return jsonError("You do not have permission to remove comments from this ticket.", 403);
 
   const index = (ticket.comments ?? []).findIndex((c: any) => String(c._id) === commentId);
@@ -100,7 +112,7 @@ export async function DELETE(request: Request, { params }: Params) {
 
   const comment = ticket.comments[index];
   const isAuthor = String(comment.user) === String(user._id);
-  const isItStaff = await canManageIt(String(user.role));
+  const isItStaff = await canManageIt(actingRole);
   if (!isAuthor && !isItStaff) {
     return jsonError("You can only delete your own comments.", 403);
   }

@@ -6,7 +6,8 @@ import { formatAmount } from "@/lib/procurement";
 import { CompanyPolicy, FinanceSalary, ExpenseRequest, Notification, ProjectBudget, ExpenseBill, User } from "@/models";
 import { Company } from "@/models/Company";
 import { effectiveRegionLabelOf, type OfficeAddressLike } from "@/lib/company-regions";
-import { actorWithCompany, assertSalaryTargetInFinanceScope, autoGenerateSalariesForMonth, canManageFinance, syncProcurementFromExpense } from "./helpers";
+import { actorWithCompany, assertSalaryTargetInFinanceScope, autoGenerateSalariesForMonth, canManageFinance, syncProcurementFromExpense, financeMemberScope } from "./helpers";
+import { delegationForAnyFeature, delegationForFeature, delegationIdFromRequest } from "@/lib/delegation-access";
 
 export async function handleStatusUpdates(request: Request) {
   const userId = await requireUserId();
@@ -15,14 +16,33 @@ export async function handleStatusUpdates(request: Request) {
 
   const actor = await actorWithCompany(userId);
   if (!actor) return jsonError("Approved company access is required.", 403);
-  if (!canManageFinance(String(actor.role ?? ""))) {
-    return jsonError("Only finance or admins can approve payouts.", 403);
-  }
 
   const body = await request.json();
   const type = String(body.type ?? "");
   const id = String(body.id ?? "");
   const status = String(body.status ?? "");
+
+  const featureByType: Record<string, string> = {
+    salary: "finance-salaries",
+    "salary-bulk": "finance-salaries",
+    expense: "finance-expense-requests",
+    budget: "finance-project-budgets",
+    bill: "finance-project-budgets",
+  };
+  const requiredFeature = featureByType[type] ?? "";
+  const roleAllowed = canManageFinance(String(actor.role ?? ""));
+  const delegationRow = !roleAllowed && requiredFeature
+    ? await delegationForFeature(userId, delegationIdFromRequest(request), requiredFeature)
+    : null;
+  const delegated = Boolean(delegationRow);
+  if (!roleAllowed && !delegated) {
+    return jsonError("Only finance or admins can approve payouts.", 403);
+  }
+  // Delegated recipients perform the finance half of a workflow; admin-only
+  // decisions below still compare against the real role.
+  const actingRole = roleAllowed ? String(actor.role ?? "") : "finance";
+  const requiresVerification = delegated && Boolean((delegationRow as any)?.requiresVerification);
+  const authorizerId = delegated ? String((delegationRow as any)?.authorizer ?? "") : "";
 
   if (type === "salary") {
     if (!["approved", "paid", "rejected"].includes(status))
@@ -209,7 +229,7 @@ export async function handleStatusUpdates(request: Request) {
       existing.assignedTo && String(existing.assignedTo) === userId;
 
     if (status === "forwarded") {
-      if (String(actor.role) !== "finance")
+      if (actingRole !== "finance")
         return jsonError("Only finance can forward expense requests.", 403);
       if (!isAssigned)
         return jsonError("This expense is not assigned to you.", 403);
@@ -226,6 +246,33 @@ export async function handleStatusUpdates(request: Request) {
       }).select("_id");
       if (!targetAdmin)
         return jsonError("Selected admin is not available for this company.", 400);
+
+      // Verification step: when a delegated recipient forwards and requires
+      // verification, defer to the authorizer.
+      const delegationId = delegationIdFromRequest(request);
+      if (delegationId) {
+        const delegation = await delegationForFeature(userId, delegationId, "finance-expense-requests");
+        if (delegation && (delegation as any).requiresVerification) {
+          (existing as any).verificationStatus = "pending-verification";
+          (existing as any).submittedBy = userId;
+          (existing as any).authorizer = (delegation as any).authorizer;
+          (existing as any).pendingAction = "forwarded";
+          (existing as any).pendingAdminApprover = adminApprover;
+          await existing.save();
+          const authorizerId = String((delegation as any).authorizer);
+          await Notification.create({
+            user: authorizerId,
+            company: actor.company,
+            type: "approval",
+            title: "Expense Pending Verification",
+            message: `${actor.name ?? "Finance"} submitted an expense forward for ${existing.title} for your verification.`,
+            link: "/profile/finance",
+          });
+          emitNotification(authorizerId);
+          return NextResponse.json({ expense: existing });
+        }
+      }
+
       const expense = await ExpenseRequest.findOneAndUpdate(
         { _id: id, company: actor.company },
         { $set: { status, forwardedBy: userId, adminApprover: targetAdmin._id } },
@@ -243,12 +290,12 @@ export async function handleStatusUpdates(request: Request) {
     }
 
     if (status === "rejected") {
-      if (String(actor.role) === "finance") {
+      if (actingRole === "finance") {
         if (!isAssigned)
           return jsonError("This expense is not assigned to you.", 403);
         if (existing.status !== "pending")
           return jsonError("Expense request already processed.", 409);
-      } else if (String(actor.role) === "admin") {
+      } else if (actingRole === "admin") {
         if (existing.status !== "pending" && existing.status !== "forwarded")
           return jsonError("Expense request already processed.", 409);
         if (
@@ -331,7 +378,7 @@ export async function handleStatusUpdates(request: Request) {
     }
 
     if (status === "accepted") {
-      if (String(actor.role) !== "finance")
+      if (actingRole !== "finance")
         return jsonError("Only finance can accept expense requests.", 403);
       if (existing.status !== "approved")
         return jsonError(
@@ -367,7 +414,7 @@ export async function handleStatusUpdates(request: Request) {
     }
 
     if (status === "disbursed") {
-      if (String(actor.role) !== "finance")
+      if (actingRole !== "finance")
         return jsonError("Only finance can disburse expenses.", 403);
       if (existing.status !== "accepted")
         return jsonError("Expense must be accepted before disbursement.", 400);
@@ -409,17 +456,71 @@ export async function handleStatusUpdates(request: Request) {
       company: actor.company,
     }).populate("board", "title");
     if (!existing) return jsonError("Budget not found.", 404);
+    const budgetRegion = String((existing as any).region ?? "");
+    const actorScope = await financeMemberScope(actor);
+    if (actorScope.memberIds && budgetRegion !== actorScope.region)
+      return jsonError("This budget belongs to another region.", 403);
     const boardTitle = String((existing.board as any)?.title ?? "");
+
+    // Verification apply: if pending-verification and caller is authorizer/admin.
+    if ((existing as any).verificationStatus === "pending-verification") {
+      const isAuthorizer = (existing as any).authorizer && String((existing as any).authorizer) === userId;
+      const isAdmin = String(actor.role) === "admin";
+      if (!isAuthorizer && !isAdmin) return jsonError("Forbidden.", 403);
+      if (String((existing as any).submittedBy) === userId) return jsonError("You cannot verify your own submission.", 403);
+      const pendingStatus = String((existing as any).pendingStatus ?? status);
+      if (pendingStatus === "approved" || pendingStatus === "rejected") {
+        if (pendingStatus === "rejected") {
+          const rejectionReason = String((existing as any).pendingReason ?? body.rejectionReason ?? "").trim();
+          (existing as any).status = "rejected";
+          (existing as any).rejectionReason = rejectionReason;
+          (existing as any).rejectedAt = new Date();
+        } else {
+          (existing as any).status = "approved";
+        }
+        (existing as any).verificationStatus = "verified";
+        (existing as any).verifiedBy = userId;
+        (existing as any).verifiedAt = new Date();
+        await existing.save();
+        return NextResponse.json({ budget: existing });
+      }
+    }
+
+    // Verification step: when a delegated recipient approves/rejects and requires
+    // verification, defer to the authorizer.
+    if (requiresVerification && (status === "approved" || status === "rejected")) {
+      const delegationId = delegationIdFromRequest(request);
+      const delegation = await delegationForFeature(userId, delegationId, "finance-project-budgets");
+      if (delegation && (delegation as any).requiresVerification) {
+        (existing as any).verificationStatus = "pending-verification";
+        (existing as any).submittedBy = userId;
+        (existing as any).authorizer = (delegation as any).authorizer;
+        (existing as any).pendingStatus = status;
+        (existing as any).pendingReason = String(body.rejectionReason ?? "").trim();
+        await existing.save();
+        const authorizerId = String((delegation as any).authorizer);
+        await Notification.create({
+          user: authorizerId,
+          company: actor.company,
+          type: "approval",
+          title: "Budget Pending Verification",
+          message: `${actor.name ?? "Finance"} submitted a budget ${status} for ${boardTitle} for your verification.`,
+          link: "/profile/finance",
+        });
+        emitNotification(authorizerId);
+        return NextResponse.json({ budget: existing });
+      }
+    }
 
     if (status === "approved") {
       const isAssignedFinance =
         existing.assignedTo && String(existing.assignedTo) === userId;
       const canFinanceApprove =
-        String(actor.role) === "finance" &&
+        actingRole === "finance" &&
         existing.assignedTo &&
         isAssignedFinance;
       const canAdminApprove =
-        String(actor.role) === "admin" && !existing.assignedTo;
+        actingRole === "admin" && !existing.assignedTo;
       if (!canFinanceApprove && !canAdminApprove)
         return jsonError("You are not authorized to approve this budget.", 403);
       if (existing.status !== "pending")
@@ -446,11 +547,11 @@ export async function handleStatusUpdates(request: Request) {
       const isAssignedFinance =
         existing.assignedTo && String(existing.assignedTo) === userId;
       const canFinanceReject =
-        String(actor.role) === "finance" &&
+        actingRole === "finance" &&
         existing.assignedTo &&
         isAssignedFinance;
       const canAdminReject =
-        String(actor.role) === "admin" && !existing.assignedTo;
+        actingRole === "admin" && !existing.assignedTo;
       if (!canFinanceReject && !canAdminReject)
         return jsonError("You are not authorized to reject this budget.", 403);
       if (existing.status !== "pending")
@@ -476,7 +577,7 @@ export async function handleStatusUpdates(request: Request) {
         });
         notifyIds.push(String(existing.decidedBy));
       }
-      if (String(actor.role) === "admin") {
+      if (actingRole === "admin") {
         const financeUsers = await User.find({
           company: actor.company,
           role: "finance",
@@ -517,7 +618,7 @@ export async function handleStatusUpdates(request: Request) {
   }
 
   if (type === "bill") {
-    if (String(actor.role) !== "finance")
+    if (actingRole !== "finance")
       return jsonError("Only finance can manage bills.", 403);
     const existing = await ExpenseBill.findOne({
       _id: id,

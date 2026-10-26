@@ -4,10 +4,11 @@ import { databaseUnavailable, isObjectId, jsonError, requireUserId, serializeDoc
 import { ITJoiningCode } from "@/models/ITJoiningCode";
 import { User } from "@/models/User";
 import { Notification } from "@/models/Notification";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function DELETE(_request: Request, { params }: Params) {
+export async function DELETE(request: Request, { params }: Params) {
   const userId = await requireUserId();
   if (!userId) return jsonError("Unauthorized", 401);
 
@@ -28,7 +29,12 @@ export async function DELETE(_request: Request, { params }: Params) {
     return jsonError("You must be an approved company member to revoke IT joining codes.", 403);
   }
   const isItAdmin =
-    String(actor.role) === "it-admin" ||
+    (await actingRoleForRequest({
+      userId,
+      request,
+      realRole: String(actor.role ?? ""),
+      featureKeys: ["it-joining-codes"],
+    })) === "it-admin" ||
     String(actor.role) === "admin" ||
     (String(actor.role) === "human-resource" && Boolean(actor.isSeniorSecurity));
   if (!isItAdmin) {

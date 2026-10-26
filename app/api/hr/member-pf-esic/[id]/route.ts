@@ -5,6 +5,7 @@ import { resolveEnrollingHr } from "@/lib/enrolling-hr";
 import { User } from "@/models/User";
 import { Company } from "@/models/Company";
 import { effectiveRegionLabelOf, isUserInEffectiveRegion, type OfficeAddressLike } from "@/lib/company-regions";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -28,7 +29,12 @@ export async function PATCH(request: Request, { params }: Params) {
     return jsonError("Approved company access is required.", 403);
   }
 
-  const actorRole = String(actor.role ?? "");
+  const actorRole = await actingRoleForRequest({
+    userId,
+    request,
+    realRole: String(actor.role ?? ""),
+    featureKeys: ["hr-member-management", "hr-salary-management"],
+  });
   if (!["human-resource", "admin", "finance"].includes(actorRole)) {
     return jsonError("Only HR, admin, or finance can update PF/ESIC details.", 403);
   }
@@ -40,7 +46,7 @@ export async function PATCH(request: Request, { params }: Params) {
   }).select("name pfNumber pfDeductionAmount esicNumber esicDeductionAmount pfExempted esicExempted tdsDeductionAmount tdsExempted");
   if (!member) return jsonError("Member not found.", 404);
 
-  if (actorRole === "human-resource") {
+  if (actorRole === "human-resource" && String(actor.role) === "human-resource") {
     const enrollingHr = await resolveEnrollingHr(member);
     if (enrollingHr?.id && enrollingHr.id !== userId) {
       return jsonError("Only the enrolling HR or admin can update this member's PF/ESIC.", 403);

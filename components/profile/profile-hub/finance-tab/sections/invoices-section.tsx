@@ -6,11 +6,13 @@ export function InvoicesSection({
   isFinanceOrAdmin,
   onCreateInvoice,
   onMarkInvoice,
+  onApproveInvoice,
 }: {
   invoices: AnyRecord[];
   isFinanceOrAdmin: boolean;
   onCreateInvoice: () => void;
   onMarkInvoice: (id: string, status: string) => void;
+  onApproveInvoice?: (id: string) => void;
 }) {
   const pendingInvoicesCount = invoices.filter((inv) => String(inv.status ?? "") === "pending").length;
 
@@ -33,7 +35,7 @@ export function InvoicesSection({
         description="Generate client invoices and track payments."
       />
       <div className="mb-3 flex justify-end">
-        <ActionButton variant="primary" onClick={onCreateInvoice}>Create Invoice</ActionButton>
+        <ActionButton variant="primary" type="button" onClick={onCreateInvoice}>Create Invoice</ActionButton>
       </div>
       <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
         {invoices.length === 0 ? <p className="py-2 text-sm text-slate-500">No invoices yet.</p> : null}
@@ -44,6 +46,9 @@ export function InvoicesSection({
               <p className="text-xs text-slate-500 truncate">{String(inv.invoiceNumber)} &bull; {String(inv.status)}</p>
             </div>
             <div className="flex gap-2 shrink-0">
+              {onApproveInvoice && String(inv.approvalStatus ?? "pending-approval") === "pending-approval" ? (
+                <ActionButton variant="approve" className="px-2 py-1 text-xs" onClick={() => onApproveInvoice(String(inv.id))}>Approve</ActionButton>
+              ) : null}
               {isFinanceOrAdmin ? (
                 String(inv.status) === "pending" ? (
                   <ActionButton variant="approve" className="px-2 py-1 text-xs" onClick={() => onMarkInvoice(String(inv.id), "paid")}>Mark paid</ActionButton>

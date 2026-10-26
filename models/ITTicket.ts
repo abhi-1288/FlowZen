@@ -70,6 +70,14 @@ const ITTicketSchema = new Schema(
       index: true,
     },
 
+    verificationStatus: { type: String, enum: ["none", "pending-verification", "verified"], default: "none", index: true },
+    submittedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    authorizer: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    verifiedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    verifiedAt: { type: Date, default: null },
+    pendingResolution: { type: String, default: "" },
+    pendingResolutionType: { type: String, default: "" },
+
     requester: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     department: { type: String, default: "" },
     manager: { type: Schema.Types.ObjectId, ref: "User", default: null },

@@ -5,6 +5,7 @@ import { Company } from "@/models/Company";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { emitNotification } from "@/lib/realtime";
+import { actingRoleForRequest } from "@/lib/delegation-access";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -44,9 +45,17 @@ export async function PATCH(request: Request, { params }: Params) {
   }
 
   const company = await Company.findById(member.company).select("owner");
-  const actorRole = String(actor.role);
+  const realActorRole = String(actor.role);
+  const delegatedHr =
+    (await actingRoleForRequest({
+      userId,
+      request,
+      realRole: realActorRole,
+      featureKeys: ["hr-member-management"],
+    })) === "human-resource";
+  const actorRole = realActorRole;
   const isCompanyHr =
-    actorRole === "human-resource" &&
+    (realActorRole === "human-resource" || delegatedHr) &&
     String(actor.companyStatus) === "approved" &&
     String(actor.company ?? "") === String(member.company);
   const isCompanyAdmin =
