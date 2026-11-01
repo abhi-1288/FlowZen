@@ -14,6 +14,12 @@ import {
   Wrench,
   FileSignature,
   MapPin,
+  Gauge,
+  Package,
+  ShoppingCart,
+  KeyRound,
+  Gamepad2,
+  ScrollText,
 } from "lucide-react";
 
 const features = [
@@ -68,7 +74,7 @@ const features = [
   {
     icon: Lock,
     title: "Role-based Access",
-    desc: "Ten user roles with granular board-level permissions: Admin, HR, Finance, PM, QA, IT Admin, IT Support, Security, Employee, and more.",
+    desc: "Eleven user roles with granular board-level permissions — Admin, HR, Finance, PM, QA, IT Admin, IT Administration, Security, Warehouse, Employee, and Others.",
     color: "cyan",
   },
   {
@@ -86,8 +92,44 @@ const features = [
   {
     icon: Wrench,
     title: "IT Support & Helpdesk",
-    desc: "Internal IT support board with ticket lifecycle (pending → resolved), assignees, comments, attachments, and account provisioning with join codes.",
+    desc: "Internal IT support board with the full ticket lifecycle (pending → resolved), assignments, comments, attachments, activity logs, IT join codes, and account provisioning.",
     color: "lime",
+  },
+  {
+    icon: Gauge,
+    title: "Command Center",
+    desc: "Role-aware dashboards for admin, HR, finance, projects, IT, security, and personal workspaces — with KPIs, trends, project health, attention items, and quick actions.",
+    color: "blue",
+  },
+  {
+    icon: Package,
+    title: "Store & Warehouse",
+    desc: "Region-scoped office store with product catalogue, cart, approvals, delivery tracking, take-away handover, stock control, and printable issue invoices.",
+    color: "pink",
+  },
+  {
+    icon: ShoppingCart,
+    title: "Procurement & Purchases",
+    desc: "One purchase flow for laptops, desktops, software, electronics, internet, email, and office supplies — routed to IT or finance by role and tracked end to end.",
+    color: "amber",
+  },
+  {
+    icon: KeyRound,
+    title: "Temporary Feature Delegation",
+    desc: "Share specific HR, finance, project, QA, IT, warehouse, or security actions with a colleague for a set period, protected by an 8-digit Green-PIN and authorizer verification.",
+    color: "sky",
+  },
+  {
+    icon: Gamepad2,
+    title: "Games & Challenges",
+    desc: "Eight built-in games with company leaderboards, personal bests, and friendly challenges that keep distributed teams connected between sprints.",
+    color: "violet",
+  },
+  {
+    icon: ScrollText,
+    title: "Audit & Compliance",
+    desc: "Searchable audit trail of logins, approvals, role changes, delegations, store orders, provisioning, and other sensitive actions with IP, device, and result metadata.",
+    color: "orange",
   },
 ] as const;
 
@@ -104,6 +146,8 @@ const featureStyles = {
   lime: { icon: "bg-lime-50 dark:bg-lime-950/30 text-lime-600 dark:text-lime-400", border: "hover:border-lime-300 dark:hover:border-lime-700" },
   sky: { icon: "bg-sky-50 dark:bg-sky-950/30 text-sky-600 dark:text-sky-400", border: "hover:border-sky-300 dark:hover:border-sky-700" },
   fuchsia: { icon: "bg-fuchsia-50 dark:bg-fuchsia-950/30 text-fuchsia-600 dark:text-fuchsia-400", border: "hover:border-fuchsia-300 dark:hover:border-fuchsia-700" },
+  blue: { icon: "bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400", border: "hover:border-blue-300 dark:hover:border-blue-700" },
+  pink: { icon: "bg-pink-50 dark:bg-pink-950/30 text-pink-600 dark:text-pink-400", border: "hover:border-pink-300 dark:hover:border-pink-700" },
 } as const;
 
 export function Features() {
@@ -118,11 +162,11 @@ export function Features() {
           className="text-center mb-20"
         >
           <h2 className="text-4xl md:text-6xl font-bold mb-6 text-gray-900 dark:text-gray-50">
-            Everything you need to ship faster
+            One workspace for the whole company
           </h2>
           <p className="text-gray-500 dark:text-gray-400 text-xl max-w-2xl mx-auto">
-            We&apos;ve obsessed over every detail to give your team the perfect
-            environment to manage projects with zero friction.
+            From the first ticket to the final invoice, FlowZen connects HR,
+            finance, projects, IT, security, and operations with zero friction.
           </p>
         </motion.div>
 

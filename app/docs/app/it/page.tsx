@@ -1,0 +1,137 @@
+"use client";
+
+import Link from "next/link";
+
+export default function ItDocsPage() {
+  return (
+    <>
+      <aside className="docs-sidebar">
+        <div className="docs-sidebar-header">
+          <h1>FlowZen</h1>
+          <p>API Documentation</p>
+        </div>
+        <nav>
+          <div className="docs-nav-section">
+            <div className="docs-nav-section-title">Getting Started</div>
+            <Link href="/docs" className="docs-nav-link">Overview</Link>
+            <Link href="/docs/authentication" className="docs-nav-link">Authentication</Link>
+          </div>
+          <div className="docs-nav-section">
+            <div className="docs-nav-section-title">Public Endpoints</div>
+            <Link href="/docs/careers" className="docs-nav-link">Careers</Link>
+            <Link href="/docs/careers/apply" className="docs-nav-link">Apply for Job</Link>
+            <Link href="/docs/careers/candidate-portal" className="docs-nav-link">Candidate Portal</Link>
+            <Link href="/docs/careers/verify" className="docs-nav-link">Verify Identity</Link>
+          </div>
+          <div className="docs-nav-section">
+            <div className="docs-nav-section-title">App Module</div>
+            <Link href="/docs/app/dashboard" className="docs-nav-link">Dashboard</Link>
+            <Link href="/docs/app/profile" className="docs-nav-link">Profile</Link>
+            <Link href="/docs/app/onboarding" className="docs-nav-link">Onboarding</Link>
+            <Link href="/docs/app/members" className="docs-nav-link">Members</Link>
+            <Link href="/docs/app/visitors" className="docs-nav-link">Visitors</Link>
+            <Link href="/docs/app/security" className="docs-nav-link">Security</Link>
+            <Link href="/docs/app/documents" className="docs-nav-link">Documents</Link>
+            <Link href="/docs/app/approvals" className="docs-nav-link">Approvals</Link>
+            <Link href="/docs/app/messages" className="docs-nav-link">Messages</Link>
+            <Link href="/docs/app/finance" className="docs-nav-link">Finance</Link>
+            <Link href="/docs/app/attendance" className="docs-nav-link">Attendance</Link>
+            <Link href="/docs/app/calendar" className="docs-nav-link">Calendar</Link>
+            <Link href="/docs/app/notifications" className="docs-nav-link">Notifications</Link>
+            <Link href="/docs/app/command-center" className="docs-nav-link">Command Center</Link>
+            <Link href="/docs/app/it" className="docs-nav-link active">IT Support</Link>
+            <Link href="/docs/app/store" className="docs-nav-link">Store</Link>
+            <Link href="/docs/app/feature-delegation" className="docs-nav-link">Feature Delegation</Link>
+            <Link href="/docs/app/games" className="docs-nav-link">Games</Link>
+            <Link href="/docs/app/audit" className="docs-nav-link">Audit Center</Link>
+          </div>
+          <div className="docs-nav-section">
+            <div className="docs-nav-section-title">Recruitment</div>
+            <Link href="/docs/recruitment/dashboard" className="docs-nav-link">Dashboard</Link>
+            <Link href="/docs/recruitment/jobs" className="docs-nav-link">Jobs</Link>
+            <Link href="/docs/recruitment/candidates" className="docs-nav-link">Candidates</Link>
+            <Link href="/docs/recruitment/interviews" className="docs-nav-link">Interviews</Link>
+            <Link href="/docs/recruitment/offers" className="docs-nav-link">Offers</Link>
+            <Link href="/docs/recruitment/referrals" className="docs-nav-link">Referrals</Link>
+          </div>
+        </nav>
+      </aside>
+
+      <main className="docs-main">
+        <h1 style={{ fontSize: "2rem", fontWeight: 700, marginBottom: 24 }}>IT Support</h1>
+
+        <section className="docs-section">
+          <p>Internal IT helpdesk: tickets, join codes, team management, and account provisioning.</p>
+        </section>
+
+        <section className="docs-section">
+          <h2>Tickets</h2>
+          <div className="docs-card">
+            <div className="docs-card-header">
+              <span className="method-badge method-get">GET</span>
+              <code className="endpoint-path">/api/it/tickets</code>
+            </div>
+            <p>List tickets visible to the current user.</p>
+          </div>
+          <div className="docs-card">
+            <div className="docs-card-header">
+              <span className="method-badge method-post">POST</span>
+              <code className="endpoint-path">/api/it/tickets</code>
+            </div>
+            <p>Create a new IT ticket.</p>
+          </div>
+          <div className="docs-card">
+            <div className="docs-card-header">
+              <span className="method-badge method-get">GET</span>
+              <code className="endpoint-path">/api/it/tickets/[id]</code>
+            </div>
+            <p>Get ticket details, comments, attachments, and activity log.</p>
+          </div>
+          <div className="docs-card">
+            <div className="docs-card-header">
+              <span className="method-badge method-patch">PATCH</span>
+              <code className="endpoint-path">/api/it/tickets/[id]</code>
+            </div>
+            <p>Update ticket fields.</p>
+          </div>
+        </section>
+
+        <section className="docs-section">
+          <h2>Join Codes</h2>
+          <div className="docs-card">
+            <div className="docs-card-header">
+              <span className="method-badge method-get">GET</span>
+              <code className="endpoint-path">/api/it/codes</code>
+            </div>
+            <p>List IT join codes (IT Admin only).</p>
+          </div>
+          <div className="docs-card">
+            <div className="docs-card-header">
+              <span className="method-badge method-post">POST</span>
+              <code className="endpoint-path">/api/it/codes</code>
+            </div>
+            <p>Generate a new <code>IT-XXXX-XXXX</code> join code.</p>
+          </div>
+        </section>
+
+        <section className="docs-section">
+          <h2>Provisioning</h2>
+          <div className="docs-card">
+            <div className="docs-card-header">
+              <span className="method-badge method-get">GET</span>
+              <code className="endpoint-path">/api/it/provisioning</code>
+            </div>
+            <p>List account-provisioning requests.</p>
+          </div>
+          <div className="docs-card">
+            <div className="docs-card-header">
+              <span className="method-badge method-post">POST</span>
+              <code className="endpoint-path">/api/it/provisioning/[id]/create-account</code>
+            </div>
+            <p>Create the employee account from an approved provisioning request.</p>
+          </div>
+        </section>
+      </main>
+    </>
+  );
+}

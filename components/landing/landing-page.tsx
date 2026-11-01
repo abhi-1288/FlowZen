@@ -6,6 +6,7 @@ import { ArrowUp } from "lucide-react";
 
 import { LazyMotion, domAnimation } from "framer-motion";
 import { Navbar } from "./navbar";
+import AdSlot from "@/components/ads/ad-slot";
 import { Hero } from "./hero";
 import { DashboardMockup } from "./dashboard-mockup";
 import { Features } from "./features";
@@ -70,6 +71,15 @@ export function LandingPage() {
             <Features />
           </section>
 
+          {/* Sponsored */}
+          <section aria-label="Sponsored" className="py-6">
+            <AdSlot
+              placement="landing-after-features"
+              variant="banner"
+              className="mx-auto max-w-4xl px-6"
+            />
+          </section>
+
           {/* Chat Messaging Mockup */}
           <section aria-label="Chat demo">
             <ChatMockup />
@@ -93,6 +103,15 @@ export function LandingPage() {
           {/* Testimonials */}
           <section aria-label="Testimonials">
             <Testimonials />
+          </section>
+
+          {/* Sponsored */}
+          <section aria-label="Sponsored" className="py-6">
+            <AdSlot
+              placement="landing-after-testimonials"
+              variant="banner"
+              className="mx-auto max-w-4xl px-6"
+            />
           </section>
 
           {/* GitHub Stars */}

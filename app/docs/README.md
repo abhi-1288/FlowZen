@@ -210,6 +210,54 @@ Set session mode for the current user.
 
 **Response:** `{ "success": true }`
 
+### PIN Authentication (Web-only)
+
+Web clients can protect sensitive actions with a hashed 4-8 digit PIN. All endpoints require an authenticated web session and are rate-limited.
+
+#### POST /api/auth/pin/setup
+
+Set or rotate the current user's PIN.
+
+**Request Body:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| pin | string | Required | 4-8 digit PIN |
+
+#### GET /api/auth/pin/status
+
+Check whether a PIN is configured and the lock state.
+
+#### POST /api/auth/pin/unlock
+
+Verify the PIN and open a short-lived verified window.
+
+**Request Body:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| pin | string | Required | User PIN |
+
+#### POST /api/auth/pin/lock
+
+Lock the PIN-verified window immediately.
+
+#### POST /api/auth/pin/disable
+
+Remove the PIN after verifying the current one.
+
+#### POST /api/auth/pin/heartbeat
+
+Keep the PIN-verified window alive while active.
+
+#### POST /api/auth/pin/recovery
+
+Complete PIN recovery using a recovery code.
+
+#### POST /api/auth/pin/recovery/request
+
+Request a PIN recovery code by email.
+
+---
+
 ---
 
 ## Public Endpoints (No Auth Required)
@@ -2182,6 +2230,333 @@ full period (`companyJoined` — `employmentEndDate`).
 
 ---
 
+### Command Center
+
+Role-aware dashboard aggregating KPIs, trends, project health, attention items, upcoming events, and quick actions for the current user's role and region.
+
+#### GET /api/command-center
+
+**Query Params:**
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| period | string | Optional | `7d`, `30d`, `3m`, or `1y` (default `30d`) |
+| region | string | Optional | Region label to scope results |
+
+**Response:** `{ "variant": "admin|hr|finance|projects|it|security|personal", "kpis": {...}, "trends": [...], "projects": [...], "attention": [...], "upcoming": [...], "quickActions": [...] }`
+
+---
+
+### IT Support
+
+Internal IT helpdesk: tickets, join codes, team management, and account provisioning. IT staff use `/it`; other members raise tickets from the profile IT tab.
+
+#### GET /api/it/tickets
+
+List tickets visible to the current user.
+
+#### POST /api/it/tickets
+
+Create a new IT ticket.
+
+#### GET /api/it/tickets/[id]
+
+Get ticket details, comments, attachments, and activity log.
+
+#### PATCH /api/it/tickets/[id]
+
+Update ticket fields.
+
+#### POST /api/it/tickets/[id]/assign
+
+Assign a ticket to an IT staff member.
+
+#### POST /api/it/tickets/[id]/comments
+
+Add a comment to a ticket.
+
+#### POST /api/it/tickets/[id]/attachments
+
+Upload an attachment to a ticket.
+
+#### POST /api/it/tickets/[id]/cancel
+
+Cancel a ticket.
+
+#### POST /api/it/tickets/[id]/confirm
+
+Confirm resolution of a ticket.
+
+#### POST /api/it/tickets/[id]/request-information
+
+Request more information from the requester.
+
+#### POST /api/it/tickets/[id]/resolve
+
+Resolve a ticket.
+
+#### POST /api/it/tickets/[id]/verify
+
+Verify a resolution.
+
+#### GET /api/it/codes
+
+List IT join codes (IT Admin only).
+
+#### POST /api/it/codes
+
+Generate a new `IT-XXXX-XXXX` join code.
+
+#### PATCH /api/it/codes/[id]
+
+Update a join code (expiry, max uses).
+
+#### DELETE /api/it/codes/[id]
+
+Revoke a join code.
+
+#### GET /api/it/join/preview
+
+Preview an IT join code.
+
+#### POST /api/it/join
+
+Join the company via an IT join code.
+
+#### GET /api/it/team
+
+List IT team members.
+
+#### POST /api/it/team
+
+Manage IT team membership.
+
+#### GET /api/it/provisioning
+
+List account-provisioning requests.
+
+#### GET /api/it/provisioning/[id]
+
+Get a provisioning request.
+
+#### PATCH /api/it/provisioning/[id]
+
+Update a provisioning request.
+
+#### POST /api/it/provisioning/[id]/create-account
+
+Create the employee account from an approved provisioning request.
+
+---
+
+### Store & Warehouse
+
+Region-scoped office store: catalogue, cart, orders, approvals, delivery, take-away handover, stock, and printable issue invoices. Managed by the Warehouse role.
+
+#### GET /api/store/items
+
+List store items.
+
+#### POST /api/store/items
+
+Create a store item.
+
+#### GET /api/store/items/[id]
+
+Get an item.
+
+#### PATCH /api/store/items/[id]
+
+Update an item.
+
+#### DELETE /api/store/items/[id]
+
+Delete an item.
+
+#### GET /api/store/categories
+
+List store categories.
+
+#### POST /api/store/categories
+
+Create a store category.
+
+#### GET /api/store/approvers
+
+List roles/users who can approve store orders.
+
+#### GET /api/store/barcode-lookup
+
+Look up an item by barcode.
+
+#### GET /api/store/orders
+
+List store orders.
+
+#### POST /api/store/orders
+
+Place a new store order.
+
+#### GET /api/store/orders/[id]
+
+Get order details.
+
+#### PATCH /api/store/orders/[id]
+
+Update an order.
+
+#### POST /api/store/orders/[id]/delivery
+
+Update delivery status (`packing`, `out-for-delivery`, `delivered`).
+
+#### POST /api/store/orders/[id]/takeaway
+
+Update take-away status (`ready`, `handed-over`).
+
+#### POST /api/store/orders/[id]/verify
+
+Verify an order handover.
+
+#### GET /api/store/orders/[id]/invoice
+
+Download the printable issue invoice.
+
+---
+
+### Procurement & Purchases
+
+Single request flow for laptops, desktops, software, electronics, internet, email, and office supplies, routed to IT or finance by requester role.
+
+#### GET /api/procurement
+
+List procurement requests.
+
+#### POST /api/procurement
+
+Create a procurement request.
+
+#### GET /api/procurement/[id]
+
+Get a procurement request.
+
+#### PATCH /api/procurement/[id]
+
+Update a procurement request (status, assignment).
+
+#### GET /api/procurement/assignees
+
+List users who can be assigned procurement requests.
+
+---
+
+### Feature Delegation
+
+Temporarily delegate specific HR, finance, project, QA, IT, warehouse, or security actions to a colleague for up to 366 days, protected by an 8-digit Green-PIN.
+
+#### GET /api/delegations
+
+List delegations for the current user.
+
+#### POST /api/delegations
+
+Create a new delegation.
+
+#### GET /api/delegations/[id]
+
+Get delegation details.
+
+#### PATCH /api/delegations/[id]
+
+Update a delegation.
+
+#### POST /api/delegations/[id]/pin
+
+Set or rotate the Green-PIN for a delegation.
+
+#### POST /api/delegations/[id]/verify
+
+Verify the Green-PIN to complete a delegated action.
+
+---
+
+### Games
+
+Eight built-in games with company leaderboards, personal bests, and challenges.
+
+#### GET /api/games
+
+List available games and metadata.
+
+#### POST /api/games/score
+
+Submit a game score.
+
+#### GET /api/games/challenge
+
+List challenges.
+
+#### POST /api/games/challenge
+
+Create a challenge.
+
+#### GET /api/games/challenges
+
+List all challenges for the user.
+
+#### PATCH /api/games/challenge/[id]
+
+Respond to a challenge (accept/decline/poke-back).
+
+---
+
+### Audit Center
+
+Searchable audit trail of logins, approvals, role changes, delegations, store orders, provisioning, and other sensitive actions.
+
+#### GET /api/profile/audit
+
+**Query Params:**
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| page | number | Optional | Page number |
+| limit | number | Optional | Items per page |
+| q | string | Optional | Search query |
+| action | string | Optional | Filter by action |
+| result | string | Optional | Filter by result |
+| from | string | Optional | Start date (ISO) |
+| to | string | Optional | End date (ISO) |
+
+---
+
+### Push Notifications
+
+Web-push subscription management.
+
+#### GET /api/push/vapid
+
+Get the VAPID public key.
+
+#### GET /api/push/test
+
+Send a test push notification.
+
+#### POST /api/notifications/subscribe
+
+Subscribe to push notifications.
+
+#### DELETE /api/notifications/subscribe
+
+Unsubscribe from push notifications.
+
+---
+
+### Version & Release Notes
+
+#### GET /api/version
+
+Get the current app version, git commit/tag/date, and the last 30 commits grouped into release-note categories (feature, fix, improvement, technical, other).
+
+---
+
 ## Recruitment Module
 
 ### Recruitment Dashboard
@@ -2445,6 +2820,100 @@ Get generated offer letter HTML.
 **Offer Statuses:** draft, sent, accepted, rejected
 
 **Salary Types:** per-annum, per-month, per-day, per-hour
+
+### Recruitment Assessments
+
+Assessment authoring, delivery, grading, and mock-test tooling for jobs and candidates.
+
+#### GET /api/recruitment/jobs/[id]/assessment
+
+Get the assessment for a job.
+
+#### POST /api/recruitment/jobs/[id]/assessment
+
+Create or update a job assessment.
+
+#### GET /api/recruitment/jobs/[id]/assessment/answer-key
+
+Get the answer key for a job assessment.
+
+#### POST /api/recruitment/jobs/[id]/assessment/parse-pdf
+
+Parse a PDF into assessment questions.
+
+#### POST /api/recruitment/jobs/[id]/assessment/grade-essay
+
+Grade an essay answer.
+
+#### GET /api/recruitment/jobs/[id]/assessment/mock-test
+
+Get mock-test configuration.
+
+#### POST /api/recruitment/jobs/[id]/assessment/mock-test
+
+Create/update a mock test.
+
+#### POST /api/recruitment/jobs/[id]/assessment/mock-test/invite
+
+Invite a candidate to a mock test.
+
+#### POST /api/recruitment/jobs/[id]/assessment/mock-test/reset
+
+Reset a candidate's mock test.
+
+#### POST /api/recruitment/jobs/[id]/assessment-apply-rejections
+
+Apply auto-rejections based on assessment scores.
+
+#### GET /api/public/candidate/me/assessment/start
+
+Start an assessment (candidate).
+
+#### POST /api/public/candidate/me/assessment/answers
+
+Submit assessment answers (candidate).
+
+#### POST /api/public/candidate/me/assessment/submit
+
+Submit the assessment (candidate).
+
+#### GET /api/public/candidate/me/assessment/answer-key
+
+Get the answer key after submission (candidate).
+
+#### POST /api/public/candidate/me/assessment/extension
+
+Request an assessment time extension (candidate).
+
+#### POST /api/public/candidate/me/assessment/proctoring
+
+Submit proctoring events (candidate).
+
+#### GET /api/recruitment/jobs/[id]/assessment/answer-key
+
+Alias for job assessment answer key.
+
+---
+
+### Cron: Assessments
+
+#### GET /api/cron/assessment-day
+
+Daily assessment cron job.
+
+#### GET /api/cron/assessment-answer-key
+
+Assessment answer-key cron job.
+
+#### GET /api/dev/assessment-day
+
+Dev-only assessment day trigger.
+
+#### GET /api/dev/assessment-answer-key
+
+Dev-only answer-key trigger.
+
+---
 
 ### Recruitment Referrals
 

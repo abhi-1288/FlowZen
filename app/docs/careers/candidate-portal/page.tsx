@@ -38,6 +38,12 @@ export default function CandidatePortalDocsPage() {
             <Link href="/docs/app/attendance" className="docs-nav-link">Attendance</Link>
             <Link href="/docs/app/calendar" className="docs-nav-link">Calendar</Link>
             <Link href="/docs/app/notifications" className="docs-nav-link">Notifications</Link>
+            <Link href="/docs/app/command-center" className="docs-nav-link">Command Center</Link>
+            <Link href="/docs/app/it" className="docs-nav-link">IT Support</Link>
+            <Link href="/docs/app/store" className="docs-nav-link">Store</Link>
+            <Link href="/docs/app/feature-delegation" className="docs-nav-link">Feature Delegation</Link>
+            <Link href="/docs/app/games" className="docs-nav-link">Games</Link>
+            <Link href="/docs/app/audit" className="docs-nav-link">Audit Center</Link>
           </div>
           <div className="docs-nav-section">
             <div className="docs-nav-section-title">Recruitment</div>

@@ -13,14 +13,20 @@ FlowZen is a full-stack team productivity platform built with Next.js App Router
 - **Offboarding & Ex-member Access** — A scheduled contract-end job generates the final settlement, then disconnects the member once the settlement gap closes, notifying the member's regional HR/admin/finance at both the expiry and the disconnection. Disconnected members keep a reconstructed **Previous Employment** summary on their profile and read-only access to the documents they uploaded while they were a member.
 - **Recruitment & Hiring** — Full recruitment lifecycle: job posting, candidate applications with magic-link portal, interview scheduling & feedback (with email notifications to candidate and interviewer), structured notes (author/timestamp/deletable), auto-close overdue jobs with candidate stats notifications, pipeline conversion funnel with drop-off analytics, resume PDF parsing (DOB/address extraction), offer letter generation (with CTC, perks, food/travel allowances), candidate portal for offer acceptance/rejection, and convert-to-employee with welcome email.
 - **Chat & Messaging** — Real-time messaging with read/delivery receipt ticks (single grey ✓ sent, double grey ✓✓ received, double green ✓✓ read). Online presence indicators (green dot, "Online" / "Last online" text) in chat header and member sidebar. Info modal with user personal details (name, role, email, phone, DOB, employee ID, team, join date).
-- **Role-Based Access** — 10 user roles (Employee, Project Manager, QA Tester, Human Resource, Finance, Admin, Security, IT Admin, IT Administration, Others) with granular board-level permissions. Profile hub tabs gated by company status and role.
+- **Role-Based Access** — 11 user roles (Employee, Project Manager, QA Tester, Human Resource, Finance, Admin, Security, IT Admin, IT Administration, Warehouse, Others) with granular board-level permissions. Profile hub tabs gated by company status and role.
 - **IT Support Helpdesk** — Internal IT support board (`/it`) with a full ticket lifecycle (PENDING → ASSIGNED → QUEUED → IN_PROGRESS → WAITING_FOR_USER → AWAITING_CONFIRMATION → RESOLVED / CANCELLED). Backend-validated status transitions, priorities, categories, assignees (IT Admin / IT Administration), embedded comments, attachments, and an activity log. Includes dynamic `IT-XXXX-XXXX` join-code generation for onboarding IT Support staff, and an account-provisioning workflow where IT Admin reviews HR requests and creates employee accounts (with welcome email) for converted candidates.
+- **Command Center** — Role-aware dashboards (admin, HR, finance, projects, IT, security, personal) with KPIs, trends, project health, attention items, upcoming events, and quick actions, scoped by period (7d/30d/3m/1y) and region.
+- **Store & Warehouse** — Region-scoped office store with product catalogue, cart, approvals, delivery/take-away fulfilment, stock control, and printable issue invoices. Managed by the Warehouse role.
+- **Procurement & Purchases** — Single request flow for laptops, desktops, software, electronics, internet, email, and office supplies, routed to IT or finance by requester role and tracked from `PENDING_IT` to `DISBURSED`.
+- **Temporary Feature Delegation** — Share specific HR, finance, project, QA, IT, warehouse, or security actions with a colleague for up to 366 days, protected by an 8-digit Green-PIN, verified by the authorizer, with lockout after five failed attempts.
+- **Games & Challenges** — Eight built-in games (reaction, memory, pattern, typing, number, word, snakes & ladders, chess) with company leaderboards, personal bests, and challenges.
+- **Audit Center** — Searchable audit trail of logins, approvals, role changes, delegations, store orders, provisioning, and other sensitive actions with IP, device, and result metadata, for admin, HR, IT admin, and senior security.
 - **Multi-Step Approval Workflows** — Join requests (HR → Admin), leave requests (HR → Manager), quit requests with replacement tracking, and document letters whose advisory signatories are tracked separately from the single HR decision that issues them.
 - **Company & Team Management** — Company registration with identity codes, team creation with invite codes, freeze/takedown company, kick/quit team, and approval-based onboarding.
 - **Authentication** — Email/password with 6-digit OTP verification, magic-link password reset, and 5 social OAuth providers (Google, Azure AD / Microsoft, Apple, GitHub, Discord). "Remember me" session persistence control. Email change with current password verification + OTP to new email.
 - **Real-Time Updates** — Dual system: SSE (primary) via EventHub and legacy Socket.IO for instant board, notification, event, and message streaming.
 - **Notifications** — Join requests, approvals, system updates, task events, and HR messages — all with read/unread tracking, paginated listing (15 per page), and date-range filtering.
-- **Profile Center** — Multi-tab hub with dashboard, profile, timeline, onboarding, members, careers, documents, messages, finance, approvals, attendance, and notifications — all role-gated. Edit personal info (name, phone, DOB, address) via modal with country code select and confirmation step. Members who have left the company get a read-only Documents tab and a Previous Employment panel in place of the company/team rows.
+- **Profile Center** — Multi-tab hub with 22 tabs: dashboard, command center, profile, timeline, onboarding, members, messages, approvals, notifications, finance, attendance, documents, careers, calendar, visitors, security, games, finance policy, HR policy, IT, store, and feature delegation — all role-gated. Edit personal info (name, phone, DOB, address) via modal with country code select and confirmation step. Members who have left the company get a read-only Documents tab and a Previous Employment panel in place of the company/team rows.
 - **Avatar Upload** — Local filesystem uploads (max 2MB, PNG/JPG/WEBP).
 - **Invoice Generation** — Printable client invoices with items, tax, and totals.
 - **Offer Letters** — Generate and preview offer letters with full CTC breakdown, perks, food & travel allowances (from company policy). Downloadable HTML and candidate-facing portal view.
@@ -71,6 +77,13 @@ FlowZen is a full-stack team productivity platform built with Next.js App Router
    SMTP_USER=
    SMTP_PASS=
    SMTP_FROM="FlowZen <no-reply@flowzen.local>"
+   VAPID_PUBLIC_KEY=
+   VAPID_PRIVATE_KEY=
+   VAPID_SUBJECT=mailto:no-reply@flowzen.local
+   NEXT_PUBLIC_VAPID_PUBLIC_KEY=
+   DELEGATION_PIN_ENCRYPTION_KEY=
+   CRON_SECRET=
+   RAPIDAPI_KEY=
    ```
 
 3. Start MongoDB locally or point `MONGODB_URI` at MongoDB Atlas.
@@ -129,7 +142,7 @@ Run `npm run seed:demo` after setting `MONGODB_URI` to create or refresh these v
 - `/join?code=` — join company or team by invitation code
 - `/forgot-password` — request magic-link password reset email
 - `/reset-password?token=` — set new password via magic link
-- `/profile/[[...tab]]` — multi-tab profile hub (dashboard, profile, timeline, onboarding, members, careers, documents, messages, finance, approvals, attendance, notifications, calendar, visitors, security, games, finance policy, hr policy)
+- `/profile/[[...tab]]` — multi-tab profile hub (dashboard, command center, profile, timeline, onboarding, members, messages, approvals, notifications, finance, attendance, documents, careers, calendar, visitors, security, games, finance policy, HR policy, IT, store, feature delegation)
 - `/api/profile/email/verify` — POST: validates current password, sends OTP to new email
 - `/api/profile/email/confirm` — POST: validates OTP and updates email
 - `/board` — board list / workspace selector
@@ -180,7 +193,7 @@ The IT hierarchy mirrors the Security hierarchy (`HR → IT Admin → IT Adminis
 10. **HR** converts `joined` candidates to employees by setting a password — a welcome email with credentials is sent automatically. Resume-extracted DOB/address is copied to the new employee profile.
 11. Throughout the process, the candidate portal provides a timeline of all events, interview history, and the latest offer status.
 
-## User Roles (10)
+## User Roles (11)
 
 | Role | Capabilities |
 |------|-------------|
@@ -193,14 +206,17 @@ The IT hierarchy mirrors the Security hierarchy (`HR → IT Admin → IT Adminis
 | **IT Admin** | Senior IT authority — manage all tickets, assign work, review provisioning requests, generate `IT-XXXX-XXXX` join codes for IT Support, create employee accounts |
 | **IT Administration** | IT support staff — view and progress assigned/team tickets, resolve, request information, confirm resolution |
 | **Employee** | View assigned tasks, check-in/check-out, request leave, view attendance & finance data, file & confirm IT tickets |
+| **Warehouse** | Manage the office store: catalogue, stock, orders, approvals, delivery, and take-away handover |
 | **Others** | Fallback role with basic board access |
 
 ## Project Structure
 
-- `app/api` — 190+ API route handlers for auth, boards, columns, tasks, comments, attachments, company, team, profile (including `profile/email/verify` and `profile/email/confirm`), approvals, attendance, finance, HR, recruitment (jobs, candidates, interviews, offers, letters, auto-close, notes), events, notifications, messages, and IT support (tickets, join codes, team, provisioning).
+- `app/api` — 280+ API route handlers for auth, boards, columns, tasks, comments, attachments, company, team, profile (including `profile/email/verify` and `profile/email/confirm`), approvals, attendance, finance, HR, recruitment (jobs, candidates, interviews, offers, letters, auto-close, notes), events, notifications, messages, and IT support (tickets, join codes, team, provisioning).
 - `app/board/[id]` — board workspace and task collaboration route.
 - `app/it` — internal IT support helpdesk page.
-- `app/profile/[[...tab]]` — multi-tab profile hub with dashboard, settings, company, teams, boards, attendance, leave, finance, admin, members, documents, messages, approvals, careers, notifications, and onboarding.
+- `app/feature-delegation` — temporary feature delegation redirect.
+- `app/store-invoice/[id]` — printable store issue invoice.
+- `app/profile/[[...tab]]` — multi-tab profile hub with 22 tabs: dashboard, command center, profile, timeline, onboarding, members, messages, approvals, notifications, finance, attendance, documents, careers, calendar, visitors, security, games, finance policy, HR policy, IT, store, and feature delegation.
 - `app/invoice/[id]` — printable client invoice PDF.
 - `app/join` — company/team/IT join via invitation code.
 - `app/recruitment` — full recruitment dashboard: candidate pipeline, job management, offer management, and candidate detail pages.
@@ -208,13 +224,17 @@ The IT hierarchy mirrors the Security hierarchy (`HR → IT Admin → IT Adminis
 - `app/candidate-portal` — magic-link authenticated candidate dashboard with timeline, interviews, and offer acceptance.
 - `components/boards` — board canvas, columns, task cards, modals, and board UI.
 - `components/it` — IT helpdesk UI: ticket modal, kanban board, and IT shell (codes + provisioning panels).
+- `components/store` — office store UI: catalogue, cart, orders, approvals, delivery, and management.
+- `components/command-center` — role-aware dashboard widgets and KPI views.
+- `components/feature-delegation` — delegation workspace and Green-PIN flows.
+- `components/version` — release notes panel fed by `/api/version`.
 - `components/profile` — profile hub tabs, attendance, finance, admin tools, WFH assignment, and members management.
 - `components/recruitment` — recruitment-specific components: candidate cards, interview forms, offer modals, convert-to-employee.
 - `components/landing` — landing page UI.
 - `store/board-store.ts` — Zustand store for boards, columns, tasks, modals, and backend sync.
 - `store/message-store.ts` — Zustand store for chat messages, conversations, unread counts, and typing indicators.
 - `store/recruitment-store.ts` — Zustand store for recruitment state: jobs, candidates, filters, offer generation.
-- `models` — 40 Mongoose models for User, Board, Column, Task, Company, Team, JoinRequest (including the `signatories[]` advisory co-approver array), Notification, LeaveRequest, Attendance, Holiday, FinanceSalary, ClientInvoice, ExpenseRequest, ExpenseBill, ProjectBudget, ResourceRequest, ATSJob, ATSCandidate, ATSOffer, ATSInterview, CompanyPolicy, Message, ITTicket, ITJoiningCode, and ITProvisioningRequest.
+- `models` — 50 Mongoose models for User, Board, Column, Task, Company, Team, JoinRequest (including the `signatories[]` advisory co-approver array), Notification, LeaveRequest, Attendance, Holiday, FinanceSalary, ClientInvoice, ExpenseRequest, ExpenseBill, ProjectBudget, ResourceRequest, ATSJob, ATSCandidate, ATSOffer, ATSInterview, CompanyPolicy, Message, ITTicket, ITJoiningCode, and ITProvisioningRequest.
 - `lib` — shared database, auth, API, realtime (EventHub SSE + Socket.IO), mailer, code generators, board access, region/approver resolution (`lib/company-regions.ts` and `lib/join-approvers.ts`), document-letter co-approver rules (`lib/document-letter-approvers.ts` and the client-safe `lib/document-letter-signatories.ts`), employment history reconstruction (`lib/previous-employment.ts`), contract-end settlement and disconnection (`lib/contract-end-disconnect.ts`), IT support utilities (`lib/it.ts`), recruitment utilities (`recruitment-utils.ts`), resume parser (`resume-parser.ts`), email templates (`email-templates.ts`), the portaled toast host (`lib/toast-context.tsx`), and type utilities.
 - `types` — TypeScript type declarations for NextAuth, Socket.IO, recruitment types, and module shims.
 - `pages/api/socket.ts` — legacy Socket.IO server (Pages Router) for real-time events.

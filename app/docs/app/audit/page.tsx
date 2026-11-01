@@ -1,0 +1,134 @@
+"use client";
+
+import Link from "next/link";
+
+export default function AuditDocsPage() {
+  return (
+    <>
+      <aside className="docs-sidebar">
+        <div className="docs-sidebar-header">
+          <h1>FlowZen</h1>
+          <p>API Documentation</p>
+        </div>
+        <nav>
+          <div className="docs-nav-section">
+            <div className="docs-nav-section-title">Getting Started</div>
+            <Link href="/docs" className="docs-nav-link">Overview</Link>
+            <Link href="/docs/authentication" className="docs-nav-link">Authentication</Link>
+          </div>
+          <div className="docs-nav-section">
+            <div className="docs-nav-section-title">Public Endpoints</div>
+            <Link href="/docs/careers" className="docs-nav-link">Careers</Link>
+            <Link href="/docs/careers/apply" className="docs-nav-link">Apply for Job</Link>
+            <Link href="/docs/careers/candidate-portal" className="docs-nav-link">Candidate Portal</Link>
+            <Link href="/docs/careers/verify" className="docs-nav-link">Verify Identity</Link>
+          </div>
+          <div className="docs-nav-section">
+            <div className="docs-nav-section-title">App Module</div>
+            <Link href="/docs/app/dashboard" className="docs-nav-link">Dashboard</Link>
+            <Link href="/docs/app/profile" className="docs-nav-link">Profile</Link>
+            <Link href="/docs/app/onboarding" className="docs-nav-link">Onboarding</Link>
+            <Link href="/docs/app/members" className="docs-nav-link">Members</Link>
+            <Link href="/docs/app/visitors" className="docs-nav-link">Visitors</Link>
+            <Link href="/docs/app/security" className="docs-nav-link">Security</Link>
+            <Link href="/docs/app/documents" className="docs-nav-link">Documents</Link>
+            <Link href="/docs/app/approvals" className="docs-nav-link">Approvals</Link>
+            <Link href="/docs/app/messages" className="docs-nav-link">Messages</Link>
+            <Link href="/docs/app/finance" className="docs-nav-link">Finance</Link>
+            <Link href="/docs/app/attendance" className="docs-nav-link">Attendance</Link>
+            <Link href="/docs/app/calendar" className="docs-nav-link">Calendar</Link>
+            <Link href="/docs/app/notifications" className="docs-nav-link">Notifications</Link>
+            <Link href="/docs/app/command-center" className="docs-nav-link">Command Center</Link>
+            <Link href="/docs/app/it" className="docs-nav-link">IT Support</Link>
+            <Link href="/docs/app/store" className="docs-nav-link">Store</Link>
+            <Link href="/docs/app/feature-delegation" className="docs-nav-link">Feature Delegation</Link>
+            <Link href="/docs/app/games" className="docs-nav-link">Games</Link>
+            <Link href="/docs/app/audit" className="docs-nav-link active">Audit Center</Link>
+          </div>
+          <div className="docs-nav-section">
+            <div className="docs-nav-section-title">Recruitment</div>
+            <Link href="/docs/recruitment/dashboard" className="docs-nav-link">Dashboard</Link>
+            <Link href="/docs/recruitment/jobs" className="docs-nav-link">Jobs</Link>
+            <Link href="/docs/recruitment/candidates" className="docs-nav-link">Candidates</Link>
+            <Link href="/docs/recruitment/interviews" className="docs-nav-link">Interviews</Link>
+            <Link href="/docs/recruitment/offers" className="docs-nav-link">Offers</Link>
+            <Link href="/docs/recruitment/referrals" className="docs-nav-link">Referrals</Link>
+          </div>
+        </nav>
+      </aside>
+
+      <main className="docs-main">
+        <h1 style={{ fontSize: "2rem", fontWeight: 700, marginBottom: 24 }}>Audit Center</h1>
+
+        <section className="docs-section">
+          <p>Searchable audit trail of logins, approvals, role changes, delegations, store orders, provisioning, and other sensitive actions with IP, device, and result metadata.</p>
+        </section>
+
+        <section className="docs-section">
+          <h2>Get Audit Entries</h2>
+          <div className="docs-card">
+            <div className="docs-card-header">
+              <span className="method-badge method-get">GET</span>
+              <code className="endpoint-path">/api/profile/audit</code>
+            </div>
+            <p>Returns paginated audit entries accessible to admin, HR, IT admin, and senior security.</p>
+            <table className="docs-table">
+              <thead>
+                <tr>
+                  <th>Query Param</th>
+                  <th>Type</th>
+                  <th>Required</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>page</code></td>
+                  <td>number</td>
+                  <td><span className="badge-optional">Optional</span></td>
+                  <td>Page number</td>
+                </tr>
+                <tr>
+                  <td><code>limit</code></td>
+                  <td>number</td>
+                  <td><span className="badge-optional">Optional</span></td>
+                  <td>Items per page</td>
+                </tr>
+                <tr>
+                  <td><code>q</code></td>
+                  <td>string</td>
+                  <td><span className="badge-optional">Optional</span></td>
+                  <td>Search query</td>
+                </tr>
+                <tr>
+                  <td><code>action</code></td>
+                  <td>string</td>
+                  <td><span className="badge-optional">Optional</span></td>
+                  <td>Filter by action</td>
+                </tr>
+                <tr>
+                  <td><code>result</code></td>
+                  <td>string</td>
+                  <td><span className="badge-optional">Optional</span></td>
+                  <td>Filter by result</td>
+                </tr>
+                <tr>
+                  <td><code>from</code></td>
+                  <td>string</td>
+                  <td><span className="badge-optional">Optional</span></td>
+                  <td>Start date (ISO)</td>
+                </tr>
+                <tr>
+                  <td><code>to</code></td>
+                  <td>string</td>
+                  <td><span className="badge-optional">Optional</span></td>
+                  <td>End date (ISO)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </>
+  );
+}

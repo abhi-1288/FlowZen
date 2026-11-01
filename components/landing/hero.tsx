@@ -36,8 +36,8 @@ export function Hero({ isLoaded }: HeroProps) {
               <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 text-[10px] sm:text-sm font-medium mb-6 sm:mb-8 border border-indigo-100 dark:border-indigo-800/40 hover:bg-indigo-100 dark:hover:bg-indigo-950/60 transition-colors cursor-default max-w-[90vw]">
                 <Zap className="w-3 h-3 sm:w-4 sm:h-4 text-indigo-500 dark:text-indigo-400 shrink-0" />
                 <span className="truncate">
-                  Kanban &middot; Attendance &middot; Finance &middot; HR
-                  &middot; Letters &middot; Recruitment &middot; IT Support
+                  Boards &middot; HR &middot; Finance &middot; Recruitment
+                  &middot; IT &middot; Store &middot; Audit
                 </span>
               </div>
             </motion.div>
@@ -54,10 +54,11 @@ export function Hero({ isLoaded }: HeroProps) {
               variants={itemVariants}
               className="text-base sm:text-xl md:text-2xl text-gray-500 dark:text-gray-400 mb-8 sm:mb-12 max-w-3xl mx-auto leading-relaxed px-2 sm:px-0"
             >
-              FlowZen is the all-in-one HRMS platform where companies
-              manage HR, recruitment, attendance, finance, kanban boards,
-              document letters, IT support, chat, and approvals in one
-              workspace.
+              FlowZen is the all-in-one HRMS and operations platform where
+              companies manage HR, recruitment, attendance, finance, kanban
+              boards, document letters, IT support, procurement, an office
+              store, feature delegation, games, audit logs, chat, and approvals
+              in one workspace.
             </motion.p>
 
             <motion.div

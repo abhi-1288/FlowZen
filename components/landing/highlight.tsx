@@ -5,17 +5,23 @@ import { CheckCircle } from "lucide-react";
 
 const highlights = [
   "Real-time kanban boards with drag-and-drop task management",
+  "Role-aware Command Center with KPIs, trends, project health, and quick actions",
   "Attendance check-in/check-out with location & WFH modes",
   "Finance module: salaries, expenses, budgets, invoices, and automated payroll",
-  "Full recruitment pipeline: jobs, candidates, interviews, offers, and hiring",
+  "Full recruitment pipeline: jobs, ATS scoring, assessments, interviews, offers, and hiring",
   "Multi-step approval workflows for joins, leaves, and quits",
   "Document letters with regional HR approval and optional co-approver signatures",
   "Contract-end settlement, exit notifications, and read-only ex-member document archive",
-  "Ten user roles with granular board-level permissions",
+  "Eleven user roles with granular board-level permissions, including Warehouse",
+  "IT helpdesk with ticket lifecycle, join codes, and account provisioning",
+  "Procurement requests routed to IT or finance by role, with a linked expense on approval",
+  "Office store with cart, approvals, delivery/take-away tracking, stock, and issue invoices",
+  "Temporary feature delegation protected by an 8-digit Green-PIN and authorizer verification",
+  "Company games leaderboards, personal bests, and challenge notifications",
+  "Searchable audit center with actor, target, IP, device, and result metadata",
   "HR tools: policies, broadcasts, meeting invites, and role changes",
   "Real-time chat with read receipts, online presence, and delivery tracking",
   "Security & visitor management with entry/exit scanning and QR passes",
-  "IT Support helpdesk: ticket lifecycle, assignments, and account provisioning",
 ];
 
 export function Highlight() {
@@ -35,9 +41,9 @@ export function Highlight() {
           </h2>
           <p className="text-gray-500 dark:text-gray-400 text-xl leading-relaxed">
             Stop juggling multiple tools. FlowZen brings kanban boards,
-            attendance tracking, finance, HR, and team communication into
-            one unified workspace. Experience the speed of true real-time
-            collaboration.
+            attendance, finance, HR, recruitment, IT, procurement, an office
+            store, and team communication into one unified workspace. Experience
+            the speed of true real-time collaboration.
           </p>
           <ul className="space-y-4">
             {highlights.map((item, i) => (

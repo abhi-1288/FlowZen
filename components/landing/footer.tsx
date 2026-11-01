@@ -7,16 +7,21 @@ import { FaXTwitter, FaLinkedin } from "react-icons/fa6";
 
 const productLinks = [
   { label: "Kanban Boards", href: "/board" },
-  { label: "Attendance", href: "/profile" },
-  { label: "Finance", href: "/profile" },
-  { label: "HR Module", href: "/profile" },
+  { label: "Command Center", href: "/profile/command-center" },
+  { label: "Attendance", href: "/profile/attendance" },
+  { label: "Finance", href: "/profile/finance" },
   { label: "Recruitment", href: "/recruitment" },
+  { label: "Office Store", href: "/profile/store" },
   { label: "IT Support", href: "/it" },
-  { label: "Chat", href: "/profile" },
+  { label: "Approvals", href: "/profile/approvals" },
+  { label: "Feature Delegation", href: "/profile/feature-delegation" },
+  { label: "Games", href: "/profile/games" },
 ];
 
 const resourceLinks = [
   { label: "Documentation", href: "/docs" },
+  { label: "API Reference", href: "/docs/authentication" },
+  { label: "Release Notes", href: "/profile/profile" },
 ];
 
 const companyLinks = [
@@ -52,7 +57,7 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-xs leading-relaxed">
-              The all-in-one workflow platform for modern teams. Manage boards, attendance, finance, HR, recruitment, and IT support in one workspace.
+              The all-in-one workflow platform for modern teams. Manage boards, attendance, finance, HR, recruitment, IT support, the office store, procurement, and audit in one workspace.
             </p>
             <div className="flex items-center gap-3">
               {socialLinks.map((social) => (

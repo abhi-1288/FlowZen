@@ -41,6 +41,12 @@ export default function DocsPage() {
             <Link href="/docs/app/attendance" className="docs-nav-link">Attendance</Link>
             <Link href="/docs/app/calendar" className="docs-nav-link">Calendar</Link>
             <Link href="/docs/app/notifications" className="docs-nav-link">Notifications</Link>
+            <Link href="/docs/app/command-center" className="docs-nav-link">Command Center</Link>
+            <Link href="/docs/app/it" className="docs-nav-link">IT Support</Link>
+            <Link href="/docs/app/store" className="docs-nav-link">Store</Link>
+            <Link href="/docs/app/feature-delegation" className="docs-nav-link">Feature Delegation</Link>
+            <Link href="/docs/app/games" className="docs-nav-link">Games</Link>
+            <Link href="/docs/app/audit" className="docs-nav-link">Audit Center</Link>
           </div>
 
           <div className="docs-nav-section">
@@ -146,6 +152,30 @@ export default function DocsPage() {
             <Link href="/docs/app/notifications" className="docs-grid-card">
               <h3>Notifications</h3>
               <p>User notifications</p>
+            </Link>
+            <Link href="/docs/app/command-center" className="docs-grid-card">
+              <h3>Command Center</h3>
+              <p>Role-aware dashboards</p>
+            </Link>
+            <Link href="/docs/app/it" className="docs-grid-card">
+              <h3>IT Support</h3>
+              <p>Tickets and provisioning</p>
+            </Link>
+            <Link href="/docs/app/store" className="docs-grid-card">
+              <h3>Store</h3>
+              <p>Office store and warehouse</p>
+            </Link>
+            <Link href="/docs/app/feature-delegation" className="docs-grid-card">
+              <h3>Feature Delegation</h3>
+              <p>Temporary delegation</p>
+            </Link>
+            <Link href="/docs/app/games" className="docs-grid-card">
+              <h3>Games</h3>
+              <p>Games and challenges</p>
+            </Link>
+            <Link href="/docs/app/audit" className="docs-grid-card">
+              <h3>Audit Center</h3>
+              <p>Audit trail</p>
             </Link>
           </div>
         </section>

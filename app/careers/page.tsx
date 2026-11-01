@@ -7,6 +7,7 @@ import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
 import { formatJobDuration } from "@/lib/format-duration";
 import { stripMarkdown } from "@/components/recruitment/job-description";
 import { fmtJobDateTime } from "@/lib/date-utils";
+import AdSlot from "@/components/ads/ad-slot";
 
 type CompanyInfo = {
   id: string;
@@ -191,6 +192,12 @@ export default function CareersPage() {
           </div>
         )}
       </section>
+
+      <AdSlot
+        placement="careers"
+        variant="banner"
+        className="mx-auto max-w-6xl px-6 pb-16 sm:px-8"
+      />
     </main>
   );
 }

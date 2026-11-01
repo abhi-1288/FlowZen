@@ -1,15 +1,15 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Shield, CreditCard, Clock } from "lucide-react";
+import { Shield, Layers, Zap } from "lucide-react";
 import { MagneticButton } from "./effects/magnetic-button";
 import { AuroraGradient } from "./effects/aurora-gradient";
 import { FloatingOrbs } from "./effects/floating-orbs";
 
 const trustSignals = [
-  { icon: CreditCard, text: "No credit card required" },
-  { icon: Clock, text: "Free forever" },
-  { icon: Shield, text: "SOC 2 ready" },
+  { icon: Layers, text: "22 profile modules" },
+  { icon: Shield, text: "11 role-based access levels" },
+  { icon: Zap, text: "Real-time boards and notifications" },
 ];
 
 export function Cta() {
@@ -28,15 +28,15 @@ export function Cta() {
             Ready to find your flow?
           </h2>
           <p className="text-2xl text-gray-500 dark:text-gray-400 mb-12 max-w-2xl mx-auto">
-            Join the high-performing teams that are already managing
-            boards, attendance, finance, HR, recruitment, and IT support with FlowZen.
+            Run boards, attendance, finance, HR, recruitment, IT support, the
+            office store, procurement, and security from one connected workspace.
           </p>
           <MagneticButton strength={0.3}>
             <a
               href="/signup"
               className="inline-flex px-10 py-5 rounded-lg bg-indigo-600 text-white font-bold text-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/25 dark:shadow-indigo-500/10"
             >
-              Start your free trial today
+              Create your workspace
             </a>
           </MagneticButton>
 

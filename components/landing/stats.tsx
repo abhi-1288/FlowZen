@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { motion, useInView } from "framer-motion";
 
 const stats = [
-  { value: 15000, suffix: "+", label: "Tasks Completed", prefix: "" },
-  { value: 500, suffix: "+", label: "Active Teams", prefix: "" },
-  { value: 99.9, suffix: "%", label: "Uptime", prefix: "" },
-  { value: 24, suffix: "/7", label: "Support", prefix: "" },
+  { value: 11, suffix: "", label: "User Roles", prefix: "" },
+  { value: 22, suffix: "", label: "Profile Modules", prefix: "" },
+  { value: 282, suffix: "+", label: "API Endpoints", prefix: "" },
+  { value: 50, suffix: "", label: "Data Models", prefix: "" },
 ] as const;
 
 function Counter({ target }: { target: number }) {
@@ -52,7 +52,7 @@ export function Stats() {
           className="text-center mb-16"
         >
           <p className="text-sm font-semibold tracking-widest uppercase text-indigo-600 dark:text-indigo-400 mb-3">
-            Trusted by high-performing teams
+            Platform at a glance
           </p>
           <h2 className="text-3xl md:text-5xl font-bold text-gray-900 dark:text-gray-50">
             FlowZen by the numbers

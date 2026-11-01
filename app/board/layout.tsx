@@ -2,6 +2,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { DelegationSync } from "@/components/delegation-sync";
+import AdSlot from "@/components/ads/ad-slot";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -16,6 +17,11 @@ export default async function BoardLayout({ children }: { children: React.ReactN
     <>
       <DelegationSync />
       {children}
+      <AdSlot
+        placement="board"
+        variant="banner"
+        className="mx-auto max-w-4xl px-4 pb-10"
+      />
     </>
   );
 }
