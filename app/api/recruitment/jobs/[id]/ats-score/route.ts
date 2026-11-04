@@ -6,6 +6,7 @@ import { ATSCandidate } from "@/models/ATSCandidate";
 import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 import { ATSTimeline } from "@/models/ATSTimeline";
+import { ATS_PROVIDERS, providerLabel } from "@/lib/ats-providers";
 import { extractResumeText, resolveAtsModelConfig, scoreResume } from "@/lib/ats-scorer";
 import { closestRegionOf, isDetectedState } from "@/lib/candidate-region";
 import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
@@ -43,14 +44,14 @@ export async function POST(request: Request, { params }: Params) {
   const candidates = await ATSCandidate.find(filter);
   if (candidates.length === 0) return jsonError(force ? "No candidates to re-score." : "All candidates already scored.", 400);
 
-  const company = (await Company.findById(user.company).select("addresses multiOffice atsProvider atsModelApiKey atsModelName").lean()) as any;
+  const company = (await Company.findById(user.company).select("addresses multiOffice atsProvider atsModelApiKey atsModelName atsBaseUrl").lean()) as any;
   const regions = Array.isArray(company?.addresses) ? (company.addresses as any[]) : [];
 
   const modelConfig = resolveAtsModelConfig(company);
   if (!modelConfig.apiKey) {
-    const providerLabel = modelConfig.provider === "gemini" ? "Gemini" : "OpenRouter";
+    const envVar = ATS_PROVIDERS[modelConfig.provider]?.envKeyVars[0] ?? "";
     return jsonError(
-      `No ${providerLabel} API key configured for ATS scoring. Add one in Profile Hub → HR Policy → ATS Scoring, or set ${modelConfig.provider === "gemini" ? "GEMINI_API_KEY" : "OPENROUTER_API_KEY"}.`,
+      `No ${providerLabel(modelConfig.provider)} API key configured for ATS scoring. Add one in Profile Hub → HR Policy → ATS Scoring${envVar ? `, or set ${envVar}` : ""}.`,
       400,
     );
   }

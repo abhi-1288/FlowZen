@@ -1,12 +1,19 @@
 import pdf from "pdf-parse/lib/pdf-parse.js";
 import { promises as fs } from "fs";
 import path from "path";
+import {
+  ATS_ENV_FALLBACK_PROVIDERS,
+  ATS_PROVIDERS,
+  isAtsProvider,
+  providerLabel,
+  type AtsProvider,
+} from "./ats-providers";
 
-export const DEFAULT_OPENROUTER_MODEL = "openrouter/free";
-export const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
+export const DEFAULT_OPENROUTER_MODEL = ATS_PROVIDERS.openrouter.defaultModel;
+export const DEFAULT_GEMINI_MODEL = ATS_PROVIDERS.gemini.defaultModel;
 export const DEFAULT_GEMINI_FALLBACK_MODEL = "gemini-3.5-flash-lite";
 
-export type AtsProvider = "openrouter" | "gemini";
+export type { AtsProvider };
 
 export type AtsScoreResult = {
   score: number;
@@ -20,55 +27,89 @@ export type AtsModelConfig = {
   apiKey: string;
   model: string;
   fallbackModel?: string;
+  /** Chat-completions base URL. Only used with OpenAI-compatible providers; required for the `other` provider. */
+  baseUrl?: string;
 };
 
 type CompanyAtsLike = {
   atsProvider?: string | null;
   atsModelApiKey?: string | null;
   atsModelName?: string | null;
+  atsBaseUrl?: string | null;
 } | null;
 
-/**
- * Resolves which provider/model/key to score with.
- *
- * Precedence: the company's stored setting wins; otherwise fall back to the
- * server env. When no provider is stored, prefer OpenRouter if its key is
- * present, then Gemini if its key is present, and finally OpenRouter so the
- * default free router is attempted.
- */
-export function resolveAtsModelConfig(company: CompanyAtsLike): AtsModelConfig {
-  const envOpenRouter = process.env.OPENROUTER_API_KEY || "";
-  const envGemini = process.env.GEMINI_API_KEY || "";
-
-  const storedProvider = String(company?.atsProvider ?? "").trim();
-  const companyKey = String(company?.atsModelApiKey ?? "").trim();
-  const companyModel = String(company?.atsModelName ?? "").trim();
-
-  let provider: AtsProvider;
-  if (storedProvider === "gemini" || storedProvider === "openrouter") {
-    provider = storedProvider;
-  } else if (envOpenRouter) {
-    provider = "openrouter";
-  } else if (envGemini) {
-    provider = "gemini";
-  } else {
-    provider = "openrouter";
+/** First present server env key among a provider's candidates. */
+function envKeyFor(provider: AtsProvider): string {
+  for (const envVar of ATS_PROVIDERS[provider]?.envKeyVars ?? []) {
+    const value = process.env[envVar];
+    if (value && value.trim()) return value.trim();
   }
+  return "";
+}
 
+/**
+ * Builds the runtime config for one provider. `companyModel` is the
+ * company-stored override (blank = provider default); historical env model
+ * overrides for openrouter/gemini keep working.
+ */
+function providerConfig(
+  provider: AtsProvider,
+  apiKey: string,
+  companyModel: string,
+  companyBaseUrl: string,
+): AtsModelConfig {
   if (provider === "gemini") {
     return {
       provider,
-      apiKey: companyKey || envGemini,
+      apiKey,
       model: companyModel || process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
       fallbackModel: process.env.GEMINI_FALLBACK_MODEL || DEFAULT_GEMINI_FALLBACK_MODEL,
     };
   }
 
-  return {
-    provider: "openrouter",
-    apiKey: companyKey || envOpenRouter,
-    model: companyModel || process.env.OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL,
-  };
+  const baseUrl =
+    provider === "other" ? companyBaseUrl : ATS_PROVIDERS[provider]?.baseUrl || "";
+  const model =
+    companyModel ||
+    (provider === "openrouter" ? process.env.OPENROUTER_MODEL : "") ||
+    ATS_PROVIDERS[provider]?.defaultModel ||
+    "";
+
+  return { provider, apiKey, model, baseUrl };
+}
+
+/**
+ * Resolves which provider/model/key to score with.
+ *
+ * Precedence: the company's stored setting wins (the `other` provider also
+ * needs a stored base URL); otherwise fall back to the first free-tier server
+ * env key; finally default to OpenRouter so the free router is attempted.
+ */
+export function resolveAtsModelConfig(company: CompanyAtsLike): AtsModelConfig {
+  const storedProvider = String(company?.atsProvider ?? "").trim();
+  const companyKey = String(company?.atsModelApiKey ?? "").trim();
+  const companyModel = String(company?.atsModelName ?? "").trim();
+  const companyBaseUrl = String(company?.atsBaseUrl ?? "").trim();
+
+  if (isAtsProvider(storedProvider)) {
+    // The custom provider is only usable once a base URL exists; until then
+    // treat it as unset so the resolver falls back below.
+    if (storedProvider !== "other" || companyBaseUrl) {
+      return providerConfig(
+        storedProvider,
+        companyKey || envKeyFor(storedProvider),
+        companyModel,
+        companyBaseUrl,
+      );
+    }
+  }
+
+  for (const provider of ATS_ENV_FALLBACK_PROVIDERS) {
+    const envKey = envKeyFor(provider);
+    if (envKey) return providerConfig(provider, envKey, "", "");
+  }
+
+  return providerConfig("openrouter", "", "", "");
 }
 
 export async function extractResumeText(resumeUrl: string): Promise<string> {
@@ -153,7 +194,7 @@ function normalizeResult(raw: string, provider: AtsProvider, finishReason: strin
     parsed = JSON.parse(extractJson(raw)) as AtsScoreResult;
   } catch (e) {
     console.error("[ATS] JSON parse error:", e, "raw:", String(raw).substring(0, 500));
-    throw new Error(`Failed to parse ${provider} response as JSON (finishReason: ${finishReason || "unknown"}).`);
+    throw new Error(`Failed to parse ${providerLabel(provider)} response as JSON (finishReason: ${finishReason || "unknown"}).`);
   }
   const score = Math.max(0, Math.min(100, Math.round(Number(parsed.score) || 0)));
   return {
@@ -216,24 +257,32 @@ async function scoreResumeWithGemini(
   return normalizeResult(text, "gemini", finishReason);
 }
 
-async function scoreResumeWithOpenRouter(
-  prompt: string,
-  apiKey: string,
-  model: string,
-): Promise<AtsScoreResult> {
+/**
+ * Generic scorer for every OpenAI-compatible endpoint (OpenRouter, Groq,
+ * NVIDIA, Hugging Face, Mistral, Cohere, OpenAI, Anthropic compat, or a
+ * custom URL from the `other` provider).
+ */
+async function scoreResumeWithOpenAICompatible(config: AtsModelConfig, prompt: string): Promise<AtsScoreResult> {
+  const provider = config.provider;
+  const baseUrl = (config.baseUrl || ATS_PROVIDERS[provider]?.baseUrl || "").replace(/\/+$/, "");
+  if (!baseUrl) throw new Error(`${providerLabel(provider)} provider requires a base URL.`);
+
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${apiKey}`,
+    Authorization: `Bearer ${config.apiKey}`,
     "Content-Type": "application/json",
   };
-  if (process.env.NEXT_PUBLIC_APP_URL) headers["HTTP-Referer"] = process.env.NEXT_PUBLIC_APP_URL;
-  if (process.env.PROJECT_NAME) headers["X-Title"] = process.env.PROJECT_NAME;
+  if (provider === "openrouter") {
+    if (process.env.NEXT_PUBLIC_APP_URL) headers["HTTP-Referer"] = process.env.NEXT_PUBLIC_APP_URL;
+    if (process.env.PROJECT_NAME) headers["X-Title"] = process.env.PROJECT_NAME;
+  }
+  if (provider === "anthropic") headers["anthropic-version"] = "2023-06-01";
 
   const call = (withJsonMode: boolean): Promise<Response> =>
-    postWithRetry("https://openrouter.ai/api/v1/chat/completions", {
+    postWithRetry(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers,
       body: JSON.stringify({
-        model,
+        model: config.model,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
         max_tokens: 2048,
@@ -243,22 +292,25 @@ async function scoreResumeWithOpenRouter(
 
   // Not every free model accepts `response_format`; retry once without it.
   let response = await call(true);
-  if ((response.status === 400 || response.status === 422) && model !== "openrouter/free") {
+  if (
+    (response.status === 400 || response.status === 422) &&
+    !(provider === "openrouter" && config.model === DEFAULT_OPENROUTER_MODEL)
+  ) {
     const detail = await response.text();
-    console.warn(`[ATS] OpenRouter ${response.status} on ${model}, retrying without response_format: ${detail.slice(0, 200)}`);
+    console.warn(`[ATS] ${providerLabel(provider)} ${response.status} on ${config.model}, retrying without response_format: ${detail.slice(0, 200)}`);
     response = await call(false);
   }
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`OpenRouter API error: ${response.status} - ${errorText}`);
+    throw new Error(`${providerLabel(provider)} API error: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
   const text = data?.choices?.[0]?.message?.content || "";
   const finishReason = data?.choices?.[0]?.finish_reason;
-  console.log("[ATS] OpenRouter finishReason:", finishReason, "| length:", text.length);
-  return normalizeResult(text, "openrouter", finishReason);
+  console.log(`[ATS] ${providerLabel(provider)} finishReason:`, finishReason, "| length:", text.length);
+  return normalizeResult(text, provider, finishReason);
 }
 
 /**
@@ -276,7 +328,13 @@ export async function scoreResume(
   config: AtsModelConfig,
 ): Promise<AtsScoreResult> {
   if (!config.apiKey) {
-    throw new Error(`No ${config.provider === "gemini" ? "Gemini" : "OpenRouter"} API key configured.`);
+    throw new Error(`No ${providerLabel(config.provider)} API key configured.`);
+  }
+  if (config.provider === "other" && !config.baseUrl) {
+    throw new Error(`The custom ${providerLabel(config.provider)} provider has no Base URL configured.`);
+  }
+  if (config.provider === "other" && !config.model.trim()) {
+    throw new Error(`The custom ${providerLabel(config.provider)} provider has no model name set.`);
   }
 
   const prompt = buildPrompt(
@@ -291,5 +349,5 @@ export async function scoreResume(
   if (config.provider === "gemini") {
     return scoreResumeWithGemini(prompt, config.apiKey, config.model, config.fallbackModel);
   }
-  return scoreResumeWithOpenRouter(prompt, config.apiKey, config.model);
+  return scoreResumeWithOpenAICompatible(config, prompt);
 }

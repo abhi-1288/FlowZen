@@ -106,10 +106,17 @@ const CompanySchema = new Schema(
     },
     // Company-wide ATS resume-scoring model. The API key is stored as plain
     // text and is only ever returned to the UI masked; `atsModelName` blank
-    // means "use the provider default" (openrouter/free, gemini-3.5-flash).
-    atsProvider: { type: String, enum: ["openrouter", "gemini"], default: "openrouter" },
+    // means "use the provider default" (see lib/ats-providers.ts), and
+    // `atsBaseUrl` is only used by the `other` provider (a custom
+    // OpenAI-compatible endpoint).
+    atsProvider: {
+      type: String,
+      enum: ["openrouter", "groq", "gemini", "openai", "anthropic", "huggingface", "nvidia", "mistral", "cohere", "zai", "other"],
+      default: "openrouter",
+    },
     atsModelApiKey: { type: String, default: "" },
-    atsModelName: { type: String, default: "" }
+    atsModelName: { type: String, default: "" },
+    atsBaseUrl: { type: String, default: "" }
   },
   { timestamps: true }
 );

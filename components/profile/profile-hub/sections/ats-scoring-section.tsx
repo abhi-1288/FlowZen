@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Eye, EyeOff, KeyRound, Loader2, Sparkles } from "lucide-react";
+import { ATS_PROVIDERS, ATS_PROVIDER_LIST, type AtsProvider } from "@/lib/ats-providers";
 import type { AtsSettingsState } from "../hooks/use-ats-settings";
 
 const cardBase = "rounded-lg border border-[var(--c-border-light)] dark:border-zinc-800 p-4";
@@ -8,6 +9,7 @@ const inputBase =
 
 export function AtsScoringSection({ state }: { state: AtsSettingsState }) {
   const [reveal, setReveal] = useState(false);
+  const meta = ATS_PROVIDERS[state.provider];
 
   return (
     <section className="rounded-xl neu-card p-5">
@@ -25,17 +27,16 @@ export function AtsScoringSection({ state }: { state: AtsSettingsState }) {
           <span className="text-sm font-semibold text-slate-900">Provider</span>
           <select
             value={state.provider}
-            onChange={(e) => state.setProvider(e.target.value === "gemini" ? "gemini" : "openrouter")}
+            onChange={(e) => state.setProvider(e.target.value as AtsProvider)}
             className={inputBase}
           >
-            <option value="openrouter">OpenRouter</option>
-            <option value="gemini">Google Gemini</option>
+            {ATS_PROVIDER_LIST.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
           </select>
-          <span className="mt-1.5 block text-xs text-slate-500">
-            {state.provider === "openrouter"
-              ? "Free models via OpenRouter (e.g. the free router below)."
-              : "Google AI Studio API key."}
-          </span>
+          <span className="mt-1.5 block text-xs text-slate-500">{meta.note}</span>
         </label>
 
         <label className={`block ${cardBase}`}>
@@ -43,13 +44,37 @@ export function AtsScoringSection({ state }: { state: AtsSettingsState }) {
           <input
             value={state.model}
             onChange={(e) => state.setModel(e.target.value)}
-            placeholder={state.defaults[state.provider]}
+            placeholder={state.defaults[state.provider] || "e.g. openai/gpt-oss-120b"}
             className={inputBase}
           />
-          <span className="mt-1.5 block text-xs text-slate-500">
-            Leave blank to use <span className="font-medium">{state.defaults[state.provider]}</span>.
-          </span>
+          {state.provider === "other" ? (
+            <span className="mt-1.5 block text-xs text-slate-500">
+              Required for the custom endpoint — e.g. <span className="font-medium">gpt-oss:20b</span>.
+            </span>
+          ) : (
+            <span className="mt-1.5 block text-xs text-slate-500">
+              Leave blank to use <span className="font-medium">{state.defaults[state.provider]}</span>.
+            </span>
+          )}
         </label>
+
+        {state.provider === "other" ? (
+          <label className={`block sm:col-span-2 ${cardBase}`}>
+            <span className="text-sm font-semibold text-slate-900">Custom base URL</span>
+            <input
+              value={state.baseUrl}
+              onChange={(e) => state.setBaseUrl(e.target.value)}
+              placeholder="https://your-provider.com/v1"
+              autoComplete="off"
+              spellCheck={false}
+              className={inputBase}
+            />
+            <span className="mt-1.5 block text-xs text-slate-500">
+              Any OpenAI-compatible <span className="font-medium">/v1</span> endpoint (HTTPS). Stored for this
+              company and only used with the &quot;Other (custom endpoint)&quot; provider.
+            </span>
+          </label>
+        ) : null}
       </div>
 
       <div className={`mt-4 ${cardBase}`}>
@@ -65,7 +90,7 @@ export function AtsScoringSection({ state }: { state: AtsSettingsState }) {
                   type={reveal ? "text" : "password"}
                   value={state.apiKeyDraft}
                   onChange={(e) => state.setApiKeyDraft(e.target.value)}
-                  placeholder={state.provider === "gemini" ? "AIza..." : "sk-or-v1-..."}
+                  placeholder={meta.keyPlaceholder || "API key"}
                   autoComplete="off"
                   spellCheck={false}
                   className="min-w-0 flex-1 rounded-lg border border-[var(--c-border-light)] dark:border-zinc-800 bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
@@ -109,7 +134,8 @@ export function AtsScoringSection({ state }: { state: AtsSettingsState }) {
 
       <div className="mt-4 flex items-center justify-between gap-3">
         <p className="text-xs text-slate-400">
-          Free OpenRouter models allow ~50 requests/day (1,000 after a one-time $10 top-up).
+          Free tiers vary by provider — e.g. OpenRouter free models allow ~50 requests/day (1,000 after a
+          one-time $10 top-up) and Groq ~1,000/day.
         </p>
         <button
           type="button"

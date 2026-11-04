@@ -2,18 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client-utils";
-
-export type AtsProvider = "openrouter" | "gemini";
+import { ATS_PROVIDERS, type AtsProvider } from "@/lib/ats-providers";
 
 type AtsSettingsResponse = {
   provider: AtsProvider;
   model: string;
+  baseUrl: string;
   hasApiKey: boolean;
   maskedApiKey: string;
-  defaults: { openrouter: string; gemini: string };
+  defaults: Record<string, string>;
 };
 
-const FALLBACK_DEFAULTS = { openrouter: "openrouter/free", gemini: "gemini-3.5-flash" };
+const FALLBACK_DEFAULTS: Record<string, string> = Object.fromEntries(
+  Object.values(ATS_PROVIDERS).map((meta) => [meta.id, meta.defaultModel]),
+);
 
 export function useAtsSettings(
   company: unknown,
@@ -21,6 +23,7 @@ export function useAtsSettings(
 ) {
   const [provider, setProvider] = useState<AtsProvider>("openrouter");
   const [model, setModel] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
   const [hasApiKey, setHasApiKey] = useState(false);
   const [maskedApiKey, setMaskedApiKey] = useState("");
   const [apiKeyDraft, setApiKeyDraft] = useState("");
@@ -33,8 +36,9 @@ export function useAtsSettings(
     if (!company) return;
     apiFetch<AtsSettingsResponse>("/api/hr/ats-settings", undefined, { toast: false })
       .then((data) => {
-        setProvider(data.provider === "gemini" ? "gemini" : "openrouter");
+        setProvider(data.provider);
         setModel(data.model ?? "");
+        setBaseUrl(data.baseUrl ?? "");
         setHasApiKey(Boolean(data.hasApiKey));
         setMaskedApiKey(data.maskedApiKey ?? "");
         if (data.defaults) setDefaults(data.defaults);
@@ -56,7 +60,7 @@ export function useAtsSettings(
   async function save(): Promise<boolean> {
     try {
       setSaving(true);
-      const body: Record<string, unknown> = { provider, model };
+      const body: Record<string, unknown> = { provider, model, baseUrl };
       // Only send the key when the user actually changed it, so an untouched
       // masked value never round-trips back to the server.
       if (editingKey) body.apiKey = apiKeyDraft;
@@ -66,6 +70,7 @@ export function useAtsSettings(
       });
       setProvider(data.provider);
       setModel(data.model ?? "");
+      setBaseUrl(data.baseUrl ?? "");
       setHasApiKey(Boolean(data.hasApiKey));
       setMaskedApiKey(data.maskedApiKey ?? "");
       if (data.defaults) setDefaults(data.defaults);
@@ -86,6 +91,8 @@ export function useAtsSettings(
     setProvider,
     model,
     setModel,
+    baseUrl,
+    setBaseUrl,
     hasApiKey,
     maskedApiKey,
     apiKeyDraft,

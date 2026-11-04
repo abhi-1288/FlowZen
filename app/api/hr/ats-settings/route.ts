@@ -4,12 +4,8 @@ import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
-import {
-  DEFAULT_GEMINI_MODEL,
-  DEFAULT_OPENROUTER_MODEL,
-  resolveAtsModelConfig,
-  type AtsProvider,
-} from "@/lib/ats-scorer";
+import { resolveAtsModelConfig } from "@/lib/ats-scorer";
+import { ATS_PROVIDER_LIST, isAtsProvider, type AtsProvider } from "@/lib/ats-providers";
 
 /** Never return the raw key — the UI only ever sees this shape. */
 function maskApiKey(key: string): string {
@@ -21,8 +17,22 @@ function maskApiKey(key: string): string {
 
 function normalizeProvider(raw: unknown): AtsProvider | null {
   const value = String(raw ?? "").trim();
-  if (value === "openrouter" || value === "gemini") return value;
-  return null;
+  return isAtsProvider(value) ? value : null;
+}
+
+/** Strips trailing slashes and enforces HTTPS on a custom base URL. */
+function normalizeBaseUrl(raw: string): { url: string } | { error: string } {
+  const value = raw.replace(/\/+$/, "");
+  if (!value) return { url: "" };
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return { error: "Base URL must be a valid URL (e.g. https://api.example.com/v1)." };
+  }
+  if (url.protocol !== "https:") return { error: "Base URL must use HTTPS." };
+  if (value.length > 300) return { error: "Base URL must be 300 characters or fewer." };
+  return { url: value };
 }
 
 /**
@@ -36,12 +46,10 @@ function serializeSettings(company: Record<string, unknown> | null) {
   return {
     provider: resolved.provider,
     model: String(company?.atsModelName ?? ""),
+    baseUrl: String(company?.atsBaseUrl ?? ""),
     hasApiKey: Boolean(resolved.apiKey),
     maskedApiKey: companyKey ? maskApiKey(companyKey) : resolved.apiKey ? "(from server environment)" : "",
-    defaults: {
-      openrouter: DEFAULT_OPENROUTER_MODEL,
-      gemini: DEFAULT_GEMINI_MODEL,
-    },
+    defaults: Object.fromEntries(ATS_PROVIDER_LIST.map((meta) => [meta.id, meta.defaultModel])),
   };
 }
 
@@ -71,7 +79,7 @@ export async function GET() {
   if ("error" in actor) return actor.error;
 
   const company = await Company.findById(actor.user.company)
-    .select("atsProvider atsModelApiKey atsModelName")
+    .select("atsProvider atsModelApiKey atsModelName atsBaseUrl")
     .lean();
   if (!company) return jsonError("Company not found.", 404);
 
@@ -89,7 +97,12 @@ export async function PATCH(request: Request) {
 
   if (Object.prototype.hasOwnProperty.call(body, "provider")) {
     const provider = normalizeProvider((body as any).provider);
-    if (!provider) return jsonError("Provider must be 'openrouter' or 'gemini'.", 400);
+    if (!provider) {
+      return jsonError(
+        `Provider must be one of: ${ATS_PROVIDER_LIST.map((meta) => meta.id).join(", ")}.`,
+        400,
+      );
+    }
     (company as any).atsProvider = provider;
   }
 
@@ -98,6 +111,12 @@ export async function PATCH(request: Request) {
     if (model.length > 120) return jsonError("Model name must be 120 characters or fewer.", 400);
     if (/\s/.test(model)) return jsonError("Model name cannot contain spaces.", 400);
     (company as any).atsModelName = model;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, "baseUrl")) {
+    const normalized = normalizeBaseUrl(String((body as any).baseUrl ?? "").trim());
+    if ("error" in normalized) return jsonError(normalized.error, 400);
+    (company as any).atsBaseUrl = normalized.url;
   }
 
   if (Object.prototype.hasOwnProperty.call(body, "apiKey")) {
