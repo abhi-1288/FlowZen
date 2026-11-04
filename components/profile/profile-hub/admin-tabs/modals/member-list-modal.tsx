@@ -1,7 +1,8 @@
 import { useMemo } from "react";
-import { X, Download } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Download, Search, SearchX, X } from "lucide-react";
 import * as XLSX from "xlsx";
-import { AnyRecord, ActionButton, formatRole, formatRoleWithCustom } from "../../shared";
+import { AnyRecord, formatRole, formatRoleWithCustom } from "../../shared";
 import { currencySymbol } from "../helpers";
 import { effectiveRegionLabelOf, withMainOfficeSuffix } from "@/lib/company-regions";
 import { MemberCard } from "./member-card";
@@ -80,6 +81,18 @@ export function MemberListModal({
     });
   }, [modalRole, members, selectedOtherRole]);
 
+  const filteredMembers = useMemo(() => {
+    const query = modalSearchQuery.toLowerCase().trim();
+    if (!query) return modalMembers;
+    return modalMembers.filter((m) => {
+      const name = String(m.name ?? "").toLowerCase();
+      const email = String(m.email ?? "").toLowerCase();
+      const code = String(m.companyIdentityCode ?? "").toLowerCase();
+      const codeNum = code.split("-").pop() ?? "";
+      return name.includes(query) || email.includes(query) || code.includes(query) || codeNum.includes(query);
+    });
+  }, [modalMembers, modalSearchQuery]);
+
   function exportToExcel() {
     const fmtDate = (val: unknown): string => {
       if (!val) return "";
@@ -124,121 +137,167 @@ export function MemberListModal({
     showToast("Excel file exported.", "success");
   }
 
-  if (!modalRole) return null;
+  const modalTitle = modalRole
+    ? modalRole === "all"
+      ? "All members"
+      : modalRole === "senior-security"
+        ? "Senior Security"
+        : modalRole === "junior-security"
+          ? "Junior Security"
+          : formatRole(modalRole)
+    : "";
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4"
-      role="presentation"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div
-        className="max-h-[min(90vh,720px)] w-full max-w-3xl overflow-hidden rounded-xl neu-card dark:border-zinc-800 dark:bg-[#000000]"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="members-modal-title"
-      >
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--c-border-light)] px-6 py-4 dark:border-zinc-800">
-          <div>
-            <h4 className="text-sm font-semibold text-slate-900 dark:text-zinc-100" id="members-modal-title">{modalRole === "all" ? "All members" : modalRole === "senior-security" ? "Senior Security" : modalRole === "junior-security" ? "Junior Security" : formatRole(modalRole)}</h4>
-            <p className="text-sm text-slate-500 dark:text-zinc-400">
-              {modalMembers.length} member{modalMembers.length === 1 ? "" : "s"}
-            </p>
-          </div>
-          <div className="flex items-start gap-3">
-            <button
-              type="button"
-              onClick={exportToExcel}
-              className="inline-flex items-center gap-1.5 rounded-md neu-card px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] hover:text-slate-800 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              <Download size={14} />
-              Export Excel
-            </button>
-            <button
-              aria-label="Close"
-              className="inline-flex items-center justify-center gap-2 rounded-md p-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 text-slate-500 hover:text-slate-700 hover:bg-[var(--c-bg-muted)] dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-800"
-              type="button"
-              onClick={onClose}
-            >
-              <X size={18} />
-            </button>
-          </div>
-        </div>
+    <AnimatePresence>
+      {modalRole ? (
+        <motion.div
+          key="member-list-overlay"
+          className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4"
+          role="presentation"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+        >
+          <motion.div
+            className="max-h-[min(90vh,720px)] w-full max-w-3xl overflow-hidden rounded-2xl neu-card dark:border-zinc-800 dark:bg-[#000000]"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="members-modal-title"
+            initial={{ opacity: 0, scale: 0.94, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 12 }}
+            transition={{ type: "spring", stiffness: 280, damping: 26 }}
+          >
+            {/* ── Header ── */}
+            <div className="flex items-center justify-between gap-4 border-b border-[var(--c-border-light)] px-6 py-4 dark:border-zinc-800">
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-500 dark:bg-indigo-950/60 dark:text-indigo-400">
+                  <Search size={17} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900 dark:text-zinc-100" id="members-modal-title">{modalTitle}</h4>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400">
+                    {filteredMembers.length} member{filteredMembers.length === 1 ? "" : "s"}
+                    {modalSearchQuery.trim() && filteredMembers.length !== modalMembers.length
+                      ? ` · filtered from ${modalMembers.length}`
+                      : ""}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <motion.button
+                  type="button"
+                  onClick={exportToExcel}
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.96 }}
+                  className="inline-flex items-center gap-1.5 rounded-lg neu-card px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] hover:text-slate-800 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  <Download size={14} />
+                  Export Excel
+                </motion.button>
+                <button
+                  aria-label="Close"
+                  className="inline-flex items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-[var(--c-bg-muted)] hover:text-slate-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                  type="button"
+                  onClick={onClose}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
 
-        {modalRole === "others" ? (
-          <div className="border-b border-[var(--c-border-light)] px-6 py-4 dark:border-zinc-800">
-            <label className="text-xs font-semibold uppercase text-slate-500 dark:text-zinc-500" htmlFor="others-role-filter">
-              Filter others by label
-            </label>
-            <select
-              id="others-role-filter"
-              className="mt-2 w-full max-w-xs rounded-md neu-inset px-3 py-1.5 text-xs dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-100"
-              value={selectedOtherRole}
-              onChange={(e) => onSelectedOtherRoleChange(e.target.value)}
-            >
-              <option value="all">All others</option>
-              {otherRoleOptions.map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-          </div>
-        ) : null}
+            {modalRole === "others" ? (
+              <div className="flex items-center justify-between gap-4 border-b border-[var(--c-border-light)] px-6 py-3 dark:border-zinc-800">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-500" htmlFor="others-role-filter">
+                  Filter others by label
+                </label>
+                <select
+                  id="others-role-filter"
+                  className="max-w-[220px] flex-1 rounded-lg neu-inset px-3 py-1.5 text-xs dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-100"
+                  value={selectedOtherRole}
+                  onChange={(e) => onSelectedOtherRoleChange(e.target.value)}
+                >
+                  <option value="all">All others</option>
+                  {otherRoleOptions.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
 
-        <div className="px-6 pt-4">
-          <div className="flex gap-2">
-            <input
-              value={modalSearchInput}
-              onChange={(e) => onSearchInputChange(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") onSearch(); }}
-              placeholder="Search members..."
-              className="neu-inset flex-1 rounded-md px-3 py-1.5 text-xs dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-100 dark:placeholder:text-zinc-500"
-            />
-            <ActionButton variant="primary" onClick={onSearch}>Search</ActionButton>
-          </div>
-        </div>
+            {/* ── Live search ── */}
+            <div className="px-6 pt-4">
+              <div className="relative">
+                <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
+                <input
+                  value={modalSearchInput}
+                  onChange={(e) => onSearchInputChange(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") onSearch(); }}
+                  placeholder="Search by name, email or ID number…"
+                  className="neu-inset w-full rounded-lg py-2 pl-9 pr-8 text-xs dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                />
+                {modalSearchInput ? (
+                  <button
+                    type="button"
+                    aria-label="Clear search"
+                    onClick={() => onSearchInputChange("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                  >
+                    <X size={13} />
+                  </button>
+                ) : null}
+              </div>
+            </div>
 
-        <div className="max-h-[min(55vh,420px)] overflow-y-auto px-6 py-4">
-          {(() => {
-            const query = modalSearchQuery.toLowerCase().trim();
-            const filtered = query
-              ? modalMembers.filter((m) => {
-                  const name = String(m.name ?? "").toLowerCase();
-                  const email = String(m.email ?? "").toLowerCase();
-                  const code = String(m.companyIdentityCode ?? "").toLowerCase();
-                  const codeNum = code.split("-").pop() ?? "";
-                  return name.includes(query) || email.includes(query) || code.includes(query) || codeNum.includes(query);
-                })
-              : modalMembers;
-            if (filtered.length === 0) {
-              return <p className="py-8 text-center text-sm text-slate-500 dark:text-zinc-500">No members match your search.</p>;
-            }
-            return (
-              <ul className="space-y-4">
-                {filtered.map((member) => (
-                  <MemberCard
-                    key={String(member.id)}
-                    member={member}
-                    company={company}
-                    selfId={selfId}
-                    canEditOthersRole={canEditOthersRole}
-                    firingFor={firingFor}
-                    onRequestFire={onRequestFire}
-                    onOpenSalaryModal={onOpenSalaryModal}
-                    onOpenPfEsicModal={onOpenPfEsicModal}
-                    onOpenDocModal={onOpenDocModal}
-                    onOpenRoleModal={onOpenRoleModal}
-                    onOpenCustomRoleModal={onOpenCustomRoleModal}
-                    onOpenRegionModal={onOpenRegionModal}
-                    onOpenEmploymentModal={onOpenEmploymentModal}
-                    showToast={showToast}
-                    onRefresh={onRefresh}
-                  />
-                ))}
-              </ul>
-            );
-          })()}
-        </div>
-      </div>
-    </div>
+            {/* ── List ── */}
+            <div className="max-h-[min(55vh,420px)] overflow-y-auto px-6 py-4">
+              {filteredMembers.length === 0 ? (
+                <div className="grid min-h-[190px] place-items-center text-center">
+                  <div>
+                    <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[var(--c-bg-muted)] text-slate-400 dark:text-zinc-500">
+                      <SearchX size={22} />
+                    </div>
+                    <p className="mt-3 text-sm font-medium text-slate-600 dark:text-zinc-300">No members match your search.</p>
+                    <p className="mt-1 text-xs text-slate-400 dark:text-zinc-500">Try a name, email or the ID number.</p>
+                  </div>
+                </div>
+              ) : (
+                <motion.ul
+                  className="space-y-4"
+                  variants={{
+                    hidden: {},
+                    visible: { transition: { staggerChildren: 0.05 } },
+                  }}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  {filteredMembers.map((member) => (
+                    <MemberCard
+                      key={String(member.id)}
+                      member={member}
+                      company={company}
+                      selfId={selfId}
+                      canEditOthersRole={canEditOthersRole}
+                      firingFor={firingFor}
+                      onRequestFire={onRequestFire}
+                      onOpenSalaryModal={onOpenSalaryModal}
+                      onOpenPfEsicModal={onOpenPfEsicModal}
+                      onOpenDocModal={onOpenDocModal}
+                      onOpenRoleModal={onOpenRoleModal}
+                      onOpenCustomRoleModal={onOpenCustomRoleModal}
+                      onOpenRegionModal={onOpenRegionModal}
+                      onOpenEmploymentModal={onOpenEmploymentModal}
+                      showToast={showToast}
+                      onRefresh={onRefresh}
+                    />
+                  ))}
+                </motion.ul>
+              )}
+            </div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   );
 }

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Download, Hash } from "lucide-react";
+import { motion, useMotionValueEvent, useSpring } from "framer-motion";
+import { Briefcase, Building2, ChevronDown, Download, Hash, MapPin, UserMinus, UserPlus, Users, type LucideIcon } from "lucide-react";
 import * as XLSX from "xlsx";
 import { apiFetch } from "@/lib/client-utils";
 import { effectiveRegionLabelOf, withMainOfficeSuffix } from "@/lib/company-regions";
 import { AnyRecord, formatRole, formatRoleWithCustom, SectionHeader, ActionButton } from "../shared";
 import { FinanceMembersView } from "../finance-members-tab";
-import { HR_MEMBER_ROLE_KEYS } from "./types";
+import { HR_MEMBER_ROLE_KEYS, memberRoleChipMeta } from "./types";
 import { IdCodesModal, type IdCodesData } from "./id-codes-modal";
 import { FireModal } from "./modals/fire-modal";
 import { SalaryModal } from "./modals/salary-modal";
@@ -451,6 +452,56 @@ export function MembersTab({
   const actorIsSeniorSecurity = actorRole === "security" && Boolean((session?.user as any)?.isSeniorSecurity);
   const canEditOthersRole = actorRole === "human-resource" || actorRole === "admin" || actorIsSeniorSecurity;
 
+  /**
+   * One tile per member group the actor can open, in render order.
+   *
+   * The visual identity (icon + accent chip) comes from MEMBER_ROLE_META so
+   * these tiles and the role chips inside the member modal never drift.
+   */
+  const roleTiles = useMemo(() => {
+    const tiles: { key: string; title: string; count: number; hint: string; meta: { chip: string; icon: LucideIcon } }[] = [];
+    if (actorIsSeniorSecurity) {
+      // Senior security has no per-role tabs — they are scoped out of the role
+      // grid above — so they get one unfiltered tab instead. Without it, hiding
+      // the outer list would leave them with no way to reach any member at all,
+      // which is a regression rather than a simplification.
+      tiles.push({
+        key: "all",
+        title: "All members",
+        count: members.length,
+        hint: "View",
+        meta: { chip: "bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-zinc-300", icon: Users },
+      });
+      return tiles;
+    }
+    HR_MEMBER_ROLE_KEYS.forEach((roleName) => {
+      tiles.push({
+        key: roleName,
+        title: formatRole(roleName),
+        count: Number(roleCounts[roleName] ?? 0),
+        hint: "View & invite",
+        meta: memberRoleChipMeta(roleName),
+      });
+    });
+    tiles.push({
+      key: "senior-security",
+      title: "Senior Security",
+      count: members.filter((m) => String(m.role) === "security" && Boolean((m as any).isSeniorSecurity)).length,
+      hint: "View & invite",
+      meta: memberRoleChipMeta("security", true),
+    });
+    if (actorRole !== "human-resource" && actorRole !== "admin") {
+      tiles.push({
+        key: "junior-security",
+        title: "Junior Security",
+        count: members.filter((m) => String(m.role) === "security" && !Boolean((m as any).isSeniorSecurity)).length,
+        hint: "View & invite",
+        meta: memberRoleChipMeta("security", false),
+      });
+    }
+    return tiles;
+  }, [actorRole, actorIsSeniorSecurity, members, roleCounts]);
+
   function requestFire(member: AnyRecord) {
     setFireConfirmText("");
     setFireConfirmMember(member);
@@ -527,15 +578,50 @@ export function MembersTab({
 
   return (
     <section className="rounded-xl neu-card p-5">
-      <SectionHeader title="Company Members" description="Manage roles, salaries, and memberships." accent="indigo" />
+      <SectionHeader
+        title="Company Members"
+        description="Manage roles, salaries, and memberships."
+        accent="indigo"
+        action={
+          <div className="flex items-center gap-2">
+            {members.length > 0 ? (
+              <motion.button
+                type="button"
+                onClick={exportAllToExcel}
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.97 }}
+                className="inline-flex items-center gap-1.5 rounded-lg neu-card px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] hover:text-slate-800 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                <Download size={14} />
+                Export Excel
+              </motion.button>
+            ) : null}
+            {canViewIdCodes ? (
+              <motion.button
+                type="button"
+                onClick={openIdCodes}
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.97 }}
+                className="inline-flex items-center gap-1.5 rounded-lg neu-card px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] hover:text-slate-800 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                <Hash size={14} />
+                Show ID numbers
+              </motion.button>
+            ) : null}
+          </div>
+        }
+      />
       {allRegions.length > 0 ? (
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <label className="text-xs font-medium text-slate-500" htmlFor="members-region-filter">Region</label>
+        <div className="mt-4 mb-4 flex flex-wrap items-center gap-3">
+          <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-zinc-400" htmlFor="members-region-filter">
+            <MapPin size={13} className="text-slate-400 dark:text-zinc-500" />
+            Region
+          </label>
           {payload?.canSwitchRegion && switchableRegions.length > 0 ? (
-            <>
+            <div className="relative">
               <select
                 id="members-region-filter"
-                className="rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-sm"
+                className="appearance-none rounded-xl border border-[var(--c-border-light)] bg-[var(--c-bg-card)] py-2 pl-3 pr-8 text-sm font-medium text-slate-700 transition focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-50 dark:text-zinc-200 dark:focus:ring-indigo-600"
                 // With no explicit pick the server resolves to the viewer's own
                 // region; the owner resolves to the company-wide view, which is
                 // why "All offices" is the "" option for them and absent here.
@@ -548,14 +634,16 @@ export function MembersTab({
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
+              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" size={14} />
               {scopedToRegion ? (
-                <span className="text-xs text-slate-400">
+                <span className="ml-2 text-xs text-slate-400 dark:text-zinc-500">
                   Showing {payload?.regionLabel}
                 </span>
               ) : null}
-            </>
+            </div>
           ) : (
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-zinc-800 dark:text-zinc-300">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--c-bg-muted)] px-3 py-1 text-xs font-medium text-slate-600 dark:text-zinc-300">
+              <MapPin size={12} className="text-slate-400 dark:text-zinc-500" />
               {scopedToRegion ? payload?.regionLabel : "All offices"}
             </span>
           )}
@@ -573,95 +661,103 @@ export function MembersTab({
           This list is limited to {payload?.regionLabel}.
         </p>
       ) : null}
-      <div className="mb-5 flex items-center gap-2">
-        <div className="rounded-xl bg-[var(--c-bg-muted)] px-5 py-3 ring-1 ring-slate-100">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-            {scopedToRegion ? "Members in region" : "Total members"}
-          </p>
-          {/* The scoped list length, not a company-wide total, so the number
-              matches what is actually listed below it. */}
-          <p className="mt-0.5 text-2xl font-bold text-slate-900">
-            {membersLoading && !payload ? "—" : members.length}
-          </p>
-        </div>
-        {members.length > 0 ? (
-          <button
-            type="button"
-            onClick={exportAllToExcel}
-            className="inline-flex items-center gap-1.5 rounded-xl neu-card px-4 py-3 text-sm font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] hover:text-slate-800 ring-1 ring-slate-100"
+
+      {/* ── Animated stats band ── */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          {
+            icon: Users,
+            tone: "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400",
+            // The scoped list length, not a company-wide total, so the number
+            // matches what is actually listed below it.
+            label: scopedToRegion ? "Members in region" : "Total members",
+            value: members.length,
+          },
+          {
+            icon: UserPlus,
+            tone: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400",
+            label: "Joined this month",
+            value: Number(payload?.joinedThisMonth ?? 0),
+          },
+          {
+            icon: UserMinus,
+            tone: "bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400",
+            label: "Left this month",
+            value: Number(payload?.leftThisMonth ?? 0),
+          },
+          {
+            icon: Building2,
+            tone: "bg-violet-50 text-violet-600 dark:bg-violet-950/60 dark:text-violet-400",
+            label: "Offices",
+            value: allRegions.length,
+          },
+        ].map((stat, index) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.05, duration: 0.3, ease: "easeOut" }}
+            className="flex items-center gap-3 rounded-2xl border border-[var(--c-border-light)] bg-[var(--c-bg-card)] p-4"
           >
-            <Download size={15} />
-            Export Excel
-          </button>
-        ) : null}
-        {canViewIdCodes ? (
-          <button
-            type="button"
-            onClick={openIdCodes}
-            className="inline-flex items-center gap-1.5 rounded-xl neu-card px-4 py-3 text-sm font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] hover:text-slate-800 ring-1 ring-slate-100"
-          >
-            <Hash size={15} />
-            Show ID numbers
-          </button>
-        ) : null}
+            <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${stat.tone}`}>
+              <stat.icon size={18} />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-medium text-slate-500 dark:text-zinc-400">{stat.label}</p>
+              <p className="mt-0.5 text-xl font-bold text-slate-900 dark:text-zinc-100">
+                {membersLoading && !payload ? "—" : <AnimatedNumber value={stat.value} />}
+              </p>
+            </div>
+          </motion.div>
+        ))}
       </div>
 
-      <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-        {/* Senior security has no per-role tabs — they are scoped out of the role
-            grid above — so they get one unfiltered tab instead. Without it, hiding
-            the outer list would leave them with no way to reach any member at all,
-            which is a regression rather than a simplification. */}
-        {actorIsSeniorSecurity ? (
-          <button className="rounded-lg border border-transparent bg-[var(--c-bg-muted)] px-3 py-2 text-left transition hover:border-[var(--c-border-light)] focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
-            type="button"
-            onClick={() => { setModalRole("all"); setModalSearchQuery(""); setModalSearchInput(""); }}
-          >
-            <p className="text-xs font-medium text-slate-500">All members</p>
-            <p className="text-lg font-semibold">{members.length}</p>
-            <p className="mt-0.5 text-[11px] text-slate-400">View</p>
-          </button>
-        ) : null}
-        {actorIsSeniorSecurity ? null : HR_MEMBER_ROLE_KEYS.map((roleName) => {
-          const count = Number(roleCounts[roleName] ?? 0);
+      {/* ── Role tiles ── */}
+      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {roleTiles.map((tile, index) => {
+          const TileIcon = tile.meta.icon;
           return (
-            <button className="rounded-lg border border-transparent bg-[var(--c-bg-muted)] px-3 py-2 text-left transition hover:border-[var(--c-border-light)] hover:bg-[var(--c-bg-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
-              key={roleName} type="button"
-              onClick={() => { setModalRole(roleName); setModalSearchQuery(""); setModalSearchInput(""); }}
+            <motion.button
+              key={tile.key}
+              type="button"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.03, duration: 0.25, ease: "easeOut" }}
+              whileHover={{ y: -3 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => { setModalRole(tile.key); setModalSearchQuery(""); setModalSearchInput(""); }}
+              className="group rounded-2xl border border-[var(--c-border-light)] bg-[var(--c-bg-card)] p-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
             >
-              <p className="text-xs font-medium text-slate-500">{formatRole(roleName)}</p>
-              <p className="text-lg font-semibold">{count}</p>
-              <p className="mt-0.5 text-[11px] text-slate-400">View & invite</p>
-            </button>
+              <div className="flex items-center justify-between gap-2">
+                <span className={`grid h-9 w-9 place-items-center rounded-xl ${tile.meta.chip}`}>
+                  <TileIcon size={16} />
+                </span>
+                <span className="rounded-full bg-[var(--c-bg-muted)] px-2 py-0.5 text-[11px] font-bold text-slate-600 dark:text-zinc-300">
+                  {tile.count}
+                </span>
+              </div>
+              <p className="mt-3 text-sm font-semibold text-slate-800 transition-colors group-hover:text-indigo-600 dark:text-zinc-100 dark:group-hover:text-indigo-400">
+                {tile.title}
+              </p>
+              <p className="mt-0.5 text-[11px] text-slate-400 dark:text-zinc-500">{tile.hint}</p>
+            </motion.button>
           );
         })}
-        {actorIsSeniorSecurity ? null : (
-          <button className="rounded-lg border border-transparent bg-[var(--c-bg-muted)] px-3 py-2 text-left transition hover:border-[var(--c-border-light)] hover:bg-[var(--c-bg-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
-            type="button"
-            onClick={() => { setModalRole("senior-security"); setModalSearchQuery(""); setModalSearchInput(""); }}
-          >
-            <p className="text-xs font-medium text-slate-500">Senior Security</p>
-            <p className="text-lg font-semibold">{members.filter((m) => String(m.role) === "security" && Boolean((m as any).isSeniorSecurity)).length}</p>
-            <p className="mt-0.5 text-[11px] text-slate-400">View & invite</p>
-          </button>
-        )}
-        {actorRole === "human-resource" || actorRole === "admin" ? null : (
-          <button className="rounded-lg border border-transparent bg-[var(--c-bg-muted)] px-3 py-2 text-left transition hover:border-[var(--c-border-light)] hover:bg-[var(--c-bg-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
-            type="button"
-            onClick={() => { setModalRole("junior-security"); setModalSearchQuery(""); setModalSearchInput(""); }}
-          >
-            <p className="text-xs font-medium text-slate-500">Junior Security</p>
-            <p className="text-lg font-semibold">{members.filter((m) => String(m.role) === "security" && !Boolean((m as any).isSeniorSecurity)).length}</p>
-            <p className="mt-0.5 text-[11px] text-slate-400">View & invite</p>
-          </button>
-        )}
       </div>
 
       {members.length === 0 && !membersLoading ? (
-        <p className="mt-5 rounded-lg bg-[var(--c-bg-muted)] px-3 py-6 text-center text-sm text-slate-500">
-          {scopedToRegion
-            ? `No members in ${payload?.regionLabel}.`
-            : "No approved company members yet."}
-        </p>
+        <div className="mt-5 grid place-items-center rounded-2xl bg-[var(--c-bg-muted)] px-3 py-8 text-center">
+          <div>
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[var(--c-bg-card)] text-slate-400 dark:text-zinc-500">
+              <Users size={22} />
+            </div>
+            <p className="mt-3 text-sm text-slate-500 dark:text-zinc-400">
+              {scopedToRegion
+                ? `No members in ${payload?.regionLabel}.`
+                : "No approved company members yet."}
+            </p>
+          </div>
+        </div>
       ) : null}
 
       <MemberListModal
@@ -682,7 +778,7 @@ export function MembersTab({
         onOpenDocModal={openDocModal}
         onOpenRoleModal={openRoleModal}
         onOpenCustomRoleModal={openCustomRoleModal}
-        onSearchInputChange={setModalSearchInput}
+        onSearchInputChange={(value) => { setModalSearchInput(value); setModalSearchQuery(value.trim()); }}
         onSearch={() => setModalSearchQuery(modalSearchInput.trim())}
         onSelectedOtherRoleChange={setSelectedOtherRole}
         showToast={showToast}
@@ -756,11 +852,25 @@ export function MembersTab({
 
       {/* ── Region Modal ── */}
       {regionModalMember ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-          <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl">
-            <h3 className="mb-3 text-sm font-semibold text-slate-800">
-              Assign Region — {String(regionModalMember.name ?? "")}
-            </h3>
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          <motion.div
+            className="w-full max-w-sm rounded-2xl bg-[var(--c-bg-card)] p-5 shadow-xl"
+            initial={{ opacity: 0, scale: 0.94, y: 14 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 320, damping: 26 }}
+          >
+            <div className="mb-3 flex items-center gap-2.5">
+              <span className="grid h-8 w-8 place-items-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-950/60 dark:text-violet-400">
+                <MapPin size={15} />
+              </span>
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-zinc-100">
+                Assign Region — {String(regionModalMember.name ?? "")}
+              </h3>
+            </div>
             <select
               className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
               value={regionLabelValue}
@@ -788,17 +898,31 @@ export function MembersTab({
                 {savingRegion ? "Saving..." : "Save"}
               </ActionButton>
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       ) : null}
 
       {/* ── Employment Type Modal ── */}
       {employmentModalMember ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-          <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl">
-            <h3 className="mb-3 text-sm font-semibold text-slate-800">
-              Employment Type — {String(employmentModalMember.name ?? "")}
-            </h3>
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          <motion.div
+            className="w-full max-w-sm rounded-2xl bg-[var(--c-bg-card)] p-5 shadow-xl"
+            initial={{ opacity: 0, scale: 0.94, y: 14 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 320, damping: 26 }}
+          >
+            <div className="mb-3 flex items-center gap-2.5">
+              <span className="grid h-8 w-8 place-items-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-950/60 dark:text-violet-400">
+                <Briefcase size={15} />
+              </span>
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-zinc-100">
+                Employment Type — {String(employmentModalMember.name ?? "")}
+              </h3>
+            </div>
             <div className="space-y-3">
               <div>
                 <label className="mb-1 block text-xs font-medium text-slate-500">Employment Type</label>
@@ -841,8 +965,8 @@ export function MembersTab({
                 {savingEmployment ? "Saving..." : "Save"}
               </ActionButton>
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       ) : null}
 
       <IdCodesModal
@@ -853,4 +977,20 @@ export function MembersTab({
       />
     </section>
   );
+}
+
+/**
+ * Count-up number for the stats band.
+ *
+ * Springs to the latest value whenever it changes (region switch, mutation
+ * refresh), so the numbers visibly roll instead of snapping.
+ */
+function AnimatedNumber({ value }: { value: number }) {
+  const [display, setDisplay] = useState(0);
+  const spring = useSpring(0, { stiffness: 70, damping: 18 });
+  useEffect(() => {
+    spring.set(value);
+  }, [spring, value]);
+  useMotionValueEvent(spring, "change", (latest) => setDisplay(Math.round(Number(latest))));
+  return <>{display.toLocaleString("en-IN")}</>;
 }
