@@ -20,6 +20,23 @@ const FeatureDelegationSchema = new Schema(
     },
     // Delegated authority always needs the original authorizer's review.
     requiresVerification: { type: Boolean, default: true },
+    // Work review loop: when the recipient finishes the delegated work they
+    // submit it for approval here, and the original authorizer approves and
+    // publishes it or requests changes. Kept separate from `status` so the
+    // temporary access / PIN flow is never affected by the review state.
+    review: {
+      status: {
+        type: String,
+        enum: ["none", "submitted", "approved", "changes-requested"],
+        default: "none",
+        index: true,
+      },
+      submittedAt: { type: Date, default: null },
+      submitNote: { type: String, default: "", trim: true, maxlength: 2000 },
+      reviewedAt: { type: Date, default: null },
+      reviewedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+      reviewNote: { type: String, default: "", trim: true, maxlength: 2000 },
+    },
     reason: { type: String, default: "", trim: true, maxlength: 500 },
     failedAttempts: { type: Number, default: 0 },
     lockedUntil: { type: Date, default: null },

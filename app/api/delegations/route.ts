@@ -12,11 +12,19 @@ import { emitNotification } from "@/lib/realtime";
 
 function serialize(item: any, includePin = false) {
   const row = item.toObject ? item.toObject() : item;
+  const review = row.review ?? {};
   return {
     id: String(row._id ?? row.id), featureKey: row.featureKey, featureName: row.featureName,
     scope: row.scope ?? [], status: row.expiresAt && new Date(row.expiresAt) < new Date() && row.status === "active" ? "expired" : row.status,
     requiresVerification: Boolean(row.requiresVerification),
     createdAt: row.createdAt, expiresAt: row.expiresAt, reason: row.reason ?? "",
+    review: {
+      status: review.status ?? "none",
+      submittedAt: review.submittedAt ?? null,
+      submitNote: review.submitNote ?? "",
+      reviewedAt: review.reviewedAt ?? null,
+      reviewNote: review.reviewNote ?? "",
+    },
     authorizer: row.authorizer && { id: String(row.authorizer._id ?? row.authorizer), name: row.authorizer.name, role: row.authorizer.role, avatarUrl: row.authorizer.avatarUrl },
     recipient: row.recipient && { id: String(row.recipient._id ?? row.recipient), name: row.recipient.name, role: row.recipient.role, avatarUrl: row.recipient.avatarUrl },
     ...(includePin ? { pin: row.pin } : {}),
@@ -58,8 +66,11 @@ export async function GET(request: Request) {
     .populate("recipient", "name role avatarUrl")
     .sort({ createdAt: -1 }).limit(100);
   const active = rows.filter((r: any) => r.status === "active" && new Date(r.expiresAt) > new Date());
+  // `pending` counts works the members submitted and are waiting on the
+  // authorizer's approval — this is what the Approval Inbox surfaces.
+  const pendingWork = rows.filter((r: any) => (r.review?.status ?? "none") === "submitted").length;
   return NextResponse.json({ delegations: rows.map((r) => serialize(r)), features: featuresForRole(String(me.role), Boolean((me as any).isSeniorSecurity)), metrics: {
-    active: active.length, pending: rows.filter((r: any) => r.status === "pending-approval").length,
+    active: active.length, pending: pendingWork,
     expiring: active.filter((r: any) => Number(r.expiresAt) - Date.now() < 7 * 86400000).length,
     members: new Set(active.map((r: any) => String(r.recipient?._id ?? r.recipient))).size,
   }, user: { id: String(me._id), name: me.name, role: me.role, company: String(me.company) } });
