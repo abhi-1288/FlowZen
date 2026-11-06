@@ -47,15 +47,15 @@ export async function sendAssessmentReminderEmails(): Promise<{ emailed: number;
       assessmentInviteSentAt: null,
     });
 
-    for (const candidate of candidates) {
-      if ((candidate as any).assessmentSubmittedAt || (candidate as any).assessmentStartedAt) continue;
+    const companyDoc = await Company.findById(job.company).select("name icon");
 
+    const handleOne = async (candidate: any): Promise<number> => {
+      if ((candidate as any).assessmentSubmittedAt || (candidate as any).assessmentStartedAt) return 0;
       try {
         const token = await resolveCandidatePortalToken(String(candidate._id));
-        if (!token) continue;
+        if (!token) return 0;
         const origin = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
         const portalLink = buildPortalLink(origin, token);
-        const companyDoc = await Company.findById(job.company).select("name icon");
         const dateStr = new Date(job.assessmentDate!).toLocaleDateString("en-US", {
           timeZone: "Asia/Kolkata",
           weekday: "long",
@@ -73,10 +73,18 @@ export async function sendAssessmentReminderEmails(): Promise<{ emailed: number;
         });
         await sendMail({ to: candidate.email, subject: emailBody.subject, text: emailBody.text, html: emailBody.html });
         await ATSCandidate.findByIdAndUpdate(candidate._id, { assessmentInviteSentAt: new Date() });
-        emailed++;
+        return 1;
       } catch (err) {
         console.error(`Assessment email failed for ${candidate._id}:`, err);
+        return 0;
       }
+    };
+
+    const CHUNK = 5;
+    for (let i = 0; i < candidates.length; i += CHUNK) {
+      const batch = candidates.slice(i, i + CHUNK);
+      const counts = await Promise.all(batch.map(handleOne));
+      emailed += counts.reduce((a, b) => a + b, 0);
     }
   }
 

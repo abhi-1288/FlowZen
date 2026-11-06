@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  Check,
   ChevronDown,
   Loader2,
   PackageCheck,
@@ -20,6 +21,7 @@ import {
   takeAwayStatusLabel,
 } from "@/lib/store-constants";
 import type { StoreOrderDto, StoreOrderLine } from "@/components/store/order-card";
+import { StoreChip, StoreEmpty, StoreShell } from "@/components/store/store-shell";
 
 const SECTIONS = [
   { value: "delivery", label: "Delivery orders", icon: Truck },
@@ -36,26 +38,28 @@ const FILTERS = [
 
 type FilterValue = (typeof FILTERS)[number]["value"];
 
-const STAGE_BUTTONS = [
-  {
-    value: "packing",
-    label: "Packing",
-    active: "bg-amber-500 text-white",
-    idle: "bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-950",
-  },
-  {
-    value: "out-for-delivery",
-    label: "Out for delivery",
-    active: "bg-sky-600 text-white",
-    idle: "bg-sky-50 text-sky-700 hover:bg-sky-100 dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-950",
-  },
-  {
-    value: "delivered",
-    label: "Delivered",
-    active: "bg-emerald-600 text-white",
-    idle: "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950",
-  },
+/** The three warehouse stages in the order they happen. */
+const STAGES = [
+  { value: "packing", label: "Packing" },
+  { value: "out-for-delivery", label: "Out for delivery" },
+  { value: "delivered", label: "Delivered" },
 ] as const;
+
+const STAGE_SOLID: Record<string, string> = {
+  packing: "bg-amber-500 text-white",
+  "out-for-delivery": "bg-sky-600 text-white",
+  delivered: "bg-emerald-600 text-white",
+};
+
+const STAGE_SOFT: Record<string, string> = {
+  packing: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+  "out-for-delivery": "bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300",
+  delivered: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+};
+
+function stageIndex(status: string) {
+  return STAGES.findIndex((s) => s.value === status);
+}
 
 function lineStatus(line: StoreOrderLine) {
   return String(line.deliveryStatus ?? "pending");
@@ -76,16 +80,14 @@ function invoiceLink(order: StoreOrderDto) {
 export function StoreDelivery({ onChanged }: { onChanged?: () => void } = {}) {
   const [orders, setOrders] = useState<StoreOrderDto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [section, setSection] = useState<Section>("delivery");
   const [filter, setFilter] = useState<FilterValue>("active");
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState("");
-  const { showSuccessToast } = useNotificationToast();
+  const { showSuccessToast, showErrorToast } = useNotificationToast();
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError("");
     try {
       const res = await apiFetch<{ orders: StoreOrderDto[] }>(
         "/api/store/orders?scope=all",
@@ -95,8 +97,8 @@ export function StoreDelivery({ onChanged }: { onChanged?: () => void } = {}) {
       setOrders(
         (res.orders ?? []).filter((o) => o.status === "approved" || o.status === "fulfilled"),
       );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load deliveries.");
+    } catch {
+      /* toast surfaced by apiFetch */
     } finally {
       setLoading(false);
     }
@@ -114,7 +116,6 @@ export function StoreDelivery({ onChanged }: { onChanged?: () => void } = {}) {
 
   async function setStatus(order: StoreOrderDto, index: number, status: string) {
     setBusy(`${order.id}:${index}:${status}`);
-    setError("");
     try {
       const res = await apiFetch<{ order: StoreOrderDto & { id: string } }>(
         `/api/store/orders/${order.id}/delivery`,
@@ -125,12 +126,12 @@ export function StoreDelivery({ onChanged }: { onChanged?: () => void } = {}) {
         { toast: false },
       );
       patchOrder(res.order);
-      const label = STAGE_BUTTONS.find((b) => b.value === status)?.label ?? status;
+      const label = STAGES.find((b) => b.value === status)?.label ?? status;
       const productName = order.items?.[index]?.name ?? "product";
       showSuccessToast(`${label} marked for ${productName}`);
       onChanged?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to update this product.");
+      showErrorToast(err instanceof Error ? err.message : "Unable to update this product.");
     } finally {
       setBusy("");
     }
@@ -138,7 +139,6 @@ export function StoreDelivery({ onChanged }: { onChanged?: () => void } = {}) {
 
   async function setAllPacking(order: StoreOrderDto, indexes: number[]) {
     setBusy(`${order.id}:batch:packing`);
-    setError("");
     try {
       const res = await apiFetch<{ order: StoreOrderDto & { id: string } }>(
         `/api/store/orders/${order.id}/delivery`,
@@ -152,7 +152,7 @@ export function StoreDelivery({ onChanged }: { onChanged?: () => void } = {}) {
       showSuccessToast(`${indexes.length} products marked Packing`);
       onChanged?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to update products.");
+      showErrorToast(err instanceof Error ? err.message : "Unable to update products.");
     } finally {
       setBusy("");
     }
@@ -160,7 +160,6 @@ export function StoreDelivery({ onChanged }: { onChanged?: () => void } = {}) {
 
   async function setTakeAway(order: StoreOrderDto, status: "ready" | "handed-over") {
     setBusy(`${order.id}:takeaway:${status}`);
-    setError("");
     try {
       const res = await apiFetch<{ order: StoreOrderDto & { id: string } }>(
         `/api/store/orders/${order.id}/takeaway`,
@@ -178,7 +177,7 @@ export function StoreDelivery({ onChanged }: { onChanged?: () => void } = {}) {
       );
       onChanged?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to update this take-away order.");
+      showErrorToast(err instanceof Error ? err.message : "Unable to update this take-away order.");
     } finally {
       setBusy("");
     }
@@ -200,28 +199,21 @@ export function StoreDelivery({ onChanged }: { onChanged?: () => void } = {}) {
   };
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 md:px-8">
-      <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-lg bg-sky-600 text-white">
-            <Truck size={21} />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-slate-900 dark:text-zinc-100">Delivery</h1>
-            <p className="text-sm text-slate-500 dark:text-zinc-400">
-              Approved orders — pack deliveries, prepare take-aways and hand them over.
-            </p>
-          </div>
-        </div>
+    <StoreShell
+      view="delivery"
+      title="Delivery"
+      subtitle="Approved orders — pack deliveries, prepare take-aways and hand them over."
+      actions={
         <button
           onClick={() => void load()}
-          className="neu-btn inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold"
+          disabled={loading}
+          className="neu-btn inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold disabled:opacity-50"
         >
           <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
           Refresh
         </button>
-      </header>
-
+      }
+    >
       <div className="mb-4 grid grid-cols-2 gap-2">
         {SECTIONS.map((item) => {
           const Icon = item.icon;
@@ -233,9 +225,10 @@ export function StoreDelivery({ onChanged }: { onChanged?: () => void } = {}) {
                 setSection(item.value);
                 setFilter("active");
               }}
+              aria-pressed={active}
               className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors ${
                 active
-                  ? "border-sky-500 bg-sky-50 text-sky-700 dark:border-sky-700 dark:bg-sky-950/40 dark:text-sky-300"
+                  ? "border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300"
                   : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
               }`}
             >
@@ -253,32 +246,33 @@ export function StoreDelivery({ onChanged }: { onChanged?: () => void } = {}) {
 
       <div className="mb-4 flex flex-wrap gap-2">
         {FILTERS.map((f) => (
-          <button
+          <StoreChip
             key={f.value}
+            active={filter === f.value}
             onClick={() => setFilter(f.value)}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-              filter === f.value
-                ? "bg-sky-600 text-white"
-                : "bg-white text-slate-600 hover:bg-slate-50 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            }`}
+            count={
+              f.value === "all"
+                ? sectionOrders.length
+                : sectionOrders.filter((o) =>
+                    f.value === "completed" ? o.status === "fulfilled" : o.status === "approved",
+                  ).length
+            }
           >
             {f.label}
-          </button>
+          </StoreChip>
         ))}
       </div>
-
-      {error ? (
-        <p className="mb-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
-      ) : null}
 
       {loading ? (
         <div className="grid place-items-center py-20 text-slate-400">
           <Loader2 className="animate-spin" size={26} />
         </div>
       ) : visible.length === 0 ? (
-        <div className="neu-card grid place-items-center gap-2 rounded-2xl p-12 text-center text-sm text-slate-500">
-          {section === "takeaway" ? "No take-away orders here right now." : "Nothing to deliver right now."}
-        </div>
+        <StoreEmpty
+          icon={Truck}
+          title={section === "takeaway" ? "No take-away orders here" : "Nothing to deliver"}
+          message="Approved orders show up here with their packing progress."
+        />
       ) : (
         <div className="space-y-3">
           {visible.map((order) => {
@@ -308,7 +302,7 @@ export function StoreDelivery({ onChanged }: { onChanged?: () => void } = {}) {
                   aria-expanded={expanded}
                   className="flex w-full items-start justify-between gap-3 text-left"
                 >
-                  <div>
+                  <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-sm font-bold text-slate-800 dark:text-zinc-100">
                         {order.orderNumber}
@@ -318,8 +312,8 @@ export function StoreDelivery({ onChanged }: { onChanged?: () => void } = {}) {
                           takeAway
                             ? takeAwayStatusColor(order.takeAwayStatus)
                             : order.status === "fulfilled"
-                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                              : "bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300"
+                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+                              : "bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300"
                         }`}
                       >
                         {takeAway
@@ -387,11 +381,9 @@ export function StoreDelivery({ onChanged }: { onChanged?: () => void } = {}) {
                             type="button"
                             disabled={busy !== ""}
                             onClick={() => void setAllPacking(order, pendingIndexes)}
-                            className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                            className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
                           >
-                            {batchBusy ? (
-                              <Loader2 size={11} className="mr-1 inline animate-spin" />
-                            ) : null}
+                            {batchBusy ? <Loader2 size={11} className="animate-spin" /> : null}
                             Mark all as packing
                           </button>
                         </div>
@@ -430,7 +422,7 @@ export function StoreDelivery({ onChanged }: { onChanged?: () => void } = {}) {
           })}
         </div>
       )}
-    </div>
+    </StoreShell>
   );
 }
 
@@ -466,19 +458,15 @@ function TakeAwayActions({
   if (!canAct && !hasInvoice) return null;
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2">
+    <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
       {canAct && status === "pending" ? (
         <button
           type="button"
           disabled={Boolean(busyStatus)}
           onClick={onReady}
-          className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
         >
-          {busyStatus === "ready" ? (
-            <Loader2 size={13} className="animate-spin" />
-          ) : (
-            <PackageCheck size={13} />
-          )}
+          {busyStatus === "ready" ? <Loader2 size={13} className="animate-spin" /> : <PackageCheck size={13} />}
           Mark packed &amp; ready for pickup
         </button>
       ) : null}
@@ -487,13 +475,9 @@ function TakeAwayActions({
           type="button"
           disabled={Boolean(busyStatus)}
           onClick={onHandOver}
-          className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
         >
-          {busyStatus === "handed-over" ? (
-            <Loader2 size={13} className="animate-spin" />
-          ) : (
-            <PackageCheck size={13} />
-          )}
+          {busyStatus === "handed-over" ? <Loader2 size={13} className="animate-spin" /> : <PackageCheck size={13} />}
           Mark handed over
         </button>
       ) : null}
@@ -508,7 +492,7 @@ function InvoiceLink({ order }: { order: StoreOrderDto }) {
       href={invoiceLink(order)}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+      className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
     >
       <Receipt size={13} />
       View invoice
@@ -516,6 +500,11 @@ function InvoiceLink({ order }: { order: StoreOrderDto }) {
   );
 }
 
+/**
+ * One product line with its three-stage stepper: Packing → Out for delivery →
+ * Delivered. Every stage is directly clickable (the API accepts any settable
+ * status), so the warehouse can also correct a mis-click by stepping back.
+ */
 function ProductLine({
   line,
   busyStatus,
@@ -529,10 +518,11 @@ function ProductLine({
 }) {
   const status = lineStatus(line);
   const busy = Boolean(busyStatus);
+  const current = stageIndex(status); // -1 for pending
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="truncate text-sm text-slate-700 dark:text-zinc-200">
+        <span className="truncate text-sm font-medium text-slate-700 dark:text-zinc-200">
           {line.name}
           <span className="ml-2 font-mono text-[11px] text-slate-400">{line.productNumber}</span>
         </span>
@@ -549,23 +539,53 @@ function ProductLine({
       </div>
 
       {!locked ? (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {STAGE_BUTTONS.map((btn) => (
-            <button
-              key={btn.value}
-              disabled={busy}
-              onClick={() => onSet(btn.value)}
-              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50 ${
-                status === btn.value ? btn.active : btn.idle
-              }`}
-            >
-              {busyStatus === btn.value ? (
-                <Loader2 size={11} className="mr-1 inline animate-spin" />
-              ) : null}
-              {btn.label}
-            </button>
-          ))}
-        </div>
+        <ol className="mt-2.5 flex items-center gap-1" aria-label="Delivery stages">
+          {STAGES.map((stage, idx) => {
+            const isCurrent = status === stage.value;
+            const isDone = current >= 0 && idx < current;
+            // Stepping to an earlier stage is allowed through the API too, so
+            // "future" stages stay subtle but still clickable for corrections.
+            const isAhead = current >= 0 && idx > current;
+            const isPending = current < 0;
+            const base =
+              isCurrent
+                ? STAGE_SOLID[stage.value]
+                : isDone
+                  ? STAGE_SOFT[stage.value]
+                  : "border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800";
+            return (
+              <li key={stage.value} className="flex flex-1 items-center gap-1">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onSet(stage.value)}
+                  title={`Set this product to “${stage.label}”`}
+                  className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50 ${base}`}
+                >
+                  {isCurrent || isDone ? (
+                    <Check size={10} strokeWidth={3.5} className={isCurrent ? "" : "opacity-60"} />
+                  ) : isPending ? (
+                    <span className="leading-none opacity-60">{idx + 1}</span>
+                  ) : isAhead ? (
+                    <span className="leading-none opacity-60">{idx + 1}</span>
+                  ) : null}
+                  {stage.label}
+                  {busyStatus === stage.value ? (
+                    <Loader2 size={10} className="animate-spin" />
+                  ) : null}
+                </button>
+                {idx < STAGES.length - 1 ? (
+                  <span
+                    aria-hidden
+                    className={`h-px w-2 flex-none sm:w-3 ${
+                      current >= 0 && idx <= current - 1 ? "bg-emerald-400" : "bg-slate-200 dark:bg-zinc-700"
+                    }`}
+                  />
+                ) : null}
+              </li>
+            );
+          })}
+        </ol>
       ) : null}
     </>
   );

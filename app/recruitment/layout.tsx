@@ -11,18 +11,18 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function RecruitmentLayout({ children, params, searchParams }: { children: React.ReactNode; params: Promise<{ jobSlug?: string; candidateSlug?: string }>; searchParams?: Promise<{ delegation?: string; feature?: string }> }) {
+export default async function RecruitmentLayout({ children, params }: { children: React.ReactNode; params: Promise<{ jobSlug?: string; candidateSlug?: string }> }) {
   const route = await params;
   if (route.jobSlug && route.candidateSlug) return <>{children}</>;
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/login");
 
-  const sp = (await searchParams) ?? {};
-  const hasDelegation = Boolean(String(sp.delegation ?? "").trim());
-
+  // Next.js does not pass `searchParams` to layouts, so the delegation id
+  // cannot be read here. `DelegationSync` picks it up on the client; this shell
+  // stays limited to staff roles (and senior security).
   const role = session.user.role ?? "";
   const isSeniorSecurity = role === "security" && Boolean((session.user as any)?.isSeniorSecurity);
-  if (!hasDelegation && !["admin", "human-resource", "project-manager", "qa-tester", "finance", "it-admin", "it-administration"].includes(role) && !isSeniorSecurity) redirect("/profile");
+  if (!["admin", "human-resource", "project-manager", "qa-tester", "finance", "it-admin", "it-administration"].includes(role) && !isSeniorSecurity) redirect("/profile");
 
   return (
     <div className="flex min-h-screen bg-app text-base">

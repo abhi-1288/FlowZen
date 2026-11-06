@@ -10,6 +10,8 @@ export type CartLine = {
   price: number;
   stock: number;
   quantity: number;
+  /** Optional so carts persisted before this field existed still load. */
+  category?: string;
 };
 
 type CartContextValue = {

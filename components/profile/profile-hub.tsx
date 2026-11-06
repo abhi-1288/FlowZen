@@ -8,13 +8,11 @@ import Image from "next/image";
 import dynamic from "next/dynamic";
 import {
   Bell,
-  Boxes,
   Briefcase,
   Building2,
   Calendar,
   CalendarCheck,
   CheckSquare,
-  ChevronDown,
   ChevronRight,
   ClipboardList,
   Clock,
@@ -26,9 +24,6 @@ import {
   MessageSquare,
   Package,
   ShieldCheck,
-  ShoppingCart,
-  Store as StoreIcon,
-  Truck,
   User,
   Users,
   Wallet,
@@ -57,13 +52,13 @@ import { ItTicketsView } from "@/components/it/it-tickets-view";
 import { FeatureDelegationWorkspace } from "@/components/feature-delegation/workspace";
 import { CommandCenterHub } from "@/components/command-center/command-center-hub";
 import { AnyRecord, AvatarBadge, formatRoleWithCustom } from "./profile-hub/shared";
-import { useStoreCart } from "@/components/store/cart-context";
 import {
   StoreNavContext,
   isStoreView,
   storePath,
   type StoreView,
 } from "@/components/store/store-nav";
+import { StoreChromeContext } from "@/components/store/store-shell";
 
 // The store is a sub-view of the profile hub, not a route of its own, so its
 // screens stay out of the hub chunk until someone actually opens the Store.
@@ -216,7 +211,6 @@ export function ProfileHub() {
 
   const [tab, setTabState] = useState<Tab>(initialRoute.tab || "dashboard");
   const [storeView, setStoreViewState] = useState<StoreView>(initialRoute.storeView || "catalog");
-  const [storeOpen, setStoreOpen] = useState(initialRoute.tab === "store");
 
   // Sync tab from URL on popstate (browser back/forward)
   useEffect(() => {
@@ -225,7 +219,6 @@ export function ProfileHub() {
       setShowInvalidRoute(showInvalid);
       if (t) setTabState(t);
       if (sv) setStoreViewState(sv);
-      if (t === "store") setStoreOpen(true);
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -237,7 +230,6 @@ export function ProfileHub() {
     setShowInvalidRoute(showInvalid);
     if (t) setTabState(t);
     if (sv) setStoreViewState(sv);
-    if (t === "store") setStoreOpen(true);
   }, [pathname]);
 
   const setTab = (newTab: Tab) => {
@@ -256,7 +248,6 @@ export function ProfileHub() {
     setTabState("store");
     setStoreViewState(view);
     setShowInvalidRoute(false);
-    setStoreOpen(true);
     window.history.pushState(null, "", storePath(view));
   };
 
@@ -394,8 +385,7 @@ export function ProfileHub() {
     ...(canViewCompanyTabs ? (["store"] as Tab[]) : []),
   ];
 
-  // ── Store (a sub-view of this hub, navigated from its own accordion) ──
-  const { count: storeCartCount } = useStoreCart();
+  // ── Store (a sub-view of this hub; sub-navigation lives in the store shell) ──
   const [storeApprovalsCount, setStoreApprovalsCount] = useState(0);
   const [storeDeliveryCount, setStoreDeliveryCount] = useState(0);
   const canManageStore = String(role) === "warehouse" || delegationFeatureKey.startsWith("warehouse-");
@@ -423,19 +413,6 @@ export function ProfileHub() {
     refreshStoreDelivery();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canViewCompanyTabs, tab, storeView]);
-
-  const storeNavItems = [
-    { view: "catalog" as StoreView, label: "Browse", icon: <StoreIcon size={14} /> },
-    { view: "cart" as StoreView, label: "Cart", icon: <ShoppingCart size={14} />, badge: storeCartCount },
-    { view: "orders" as StoreView, label: "My Orders", icon: <Package size={14} /> },
-    { view: "approvals" as StoreView, label: "Approvals", icon: <CheckSquare size={14} />, badge: storeApprovalsCount },
-    ...(canManageStore
-      ? [
-          { view: "manage" as StoreView, label: "Inventory", icon: <Boxes size={14} /> },
-          { view: "delivery" as StoreView, label: "Delivery", icon: <Truck size={14} />, badge: storeDeliveryCount },
-        ]
-      : []),
-  ];
 
   const { showNotificationToast, showSuccessToast, showErrorToast } = useNotificationToast();
 
@@ -922,6 +899,15 @@ export function ProfileHub() {
 
   return (
     <StoreNavContext.Provider value={setStoreView}>
+    <StoreChromeContext.Provider
+      value={{
+        view: storeView,
+        setView: setStoreView,
+        canManage: canManageStore,
+        approvalsCount: storeApprovalsCount,
+        deliveryCount: storeDeliveryCount,
+      }}
+    >
     <main className="min-h-screen bg-[var(--c-bg)] text-[var(--c-text)] dark:bg-[#1a1a1a]">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-[var(--c-bg-card)] shadow-[10px_0_24px_-14px_rgba(151,163,184,0.65)] lg:flex dark:bg-[#000000] dark:border-r dark:border-zinc-800">
         <div className="shrink-0 p-4">
@@ -1053,60 +1039,12 @@ export function ProfileHub() {
           {false && hasCompany ? null : null}
 
           {canViewCompanyTabs ? (
-            <>
-              <NavButton
-                active={tab === "store"}
-                icon={<Package size={16} />}
-                label={`Store${storeApprovalsCount ? ` (${storeApprovalsCount})` : ""}`}
-                onClick={() => {
-                  if (tab === "store") {
-                    setStoreOpen((open) => !open);
-                    return;
-                  }
-                  setStoreView("catalog");
-                }}
-                after={
-                  <ChevronDown
-                    size={13}
-                    className={`shrink-0 text-slate-400 transition-transform duration-300 dark:text-zinc-500 ${
-                      storeOpen ? "rotate-180" : ""
-                    }`}
-                  />
-                }
-              />
-              <div
-                className={`grid transition-all duration-300 ease-out ${
-                  storeOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
-                }`}
-              >
-                <div className="overflow-hidden">
-                  <div className="ml-4 space-y-0.5 border-l border-slate-200 pl-2.5 pt-0.5 dark:border-zinc-800">
-                    {storeNavItems.map((item) => (
-                      <button
-                        key={item.view}
-                        suppressHydrationWarning
-                        className={`group flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] font-medium transition-colors duration-150 ${
-                          tab === "store" && storeView === item.view
-                            ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300"
-                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
-                        }`}
-                        onClick={() => setStoreView(item.view)}
-                      >
-                        <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                          {item.icon}
-                        </span>
-                        <span className="truncate">{item.label}</span>
-                        {item.badge ? (
-                          <span className="ml-auto rounded-full bg-indigo-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white dark:bg-indigo-500">
-                            {item.badge}
-                          </span>
-                        ) : null}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </>
+            <NavButton
+              active={tab === "store"}
+              icon={<Package size={16} />}
+              label={`Store${storeApprovalsCount ? ` (${storeApprovalsCount})` : ""}`}
+              onClick={() => setStoreView("catalog")}
+            />
           ) : null}
           {canViewCompanyTabs ? (
             <NavButton
@@ -1330,26 +1268,6 @@ export function ProfileHub() {
               );
             })}
           </div>
-          {/* Store sub-views only have an accordion on the desktop sidebar, so
-              mobile gets its own animated strip when the Store tab is open. */}
-          {tab === "store" ? (
-            <div className="mt-2 flex gap-1 overflow-x-auto lg:hidden">
-              {storeNavItems.map((item) => (
-                <button
-                  key={item.view}
-                  className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors duration-100 ${
-                    storeView === item.view
-                      ? "neu-tab-pressed dark:bg-zinc-100 dark:text-zinc-900"
-                      : "bg-[var(--c-bg-muted)] text-slate-600 hover:bg-[var(--c-bg-hover)] dark:bg-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700"
-                  }`}
-                  onClick={() => setStoreView(item.view)}
-                >
-                  {item.label}
-                  {item.badge ? ` (${item.badge})` : ""}
-                </button>
-              ))}
-            </div>
-          ) : null}
         </div>
 
         <div className="bg-[var(--c-bg)] p-5 sm:p-6 dark:bg-[#1a1a1a]">
@@ -1577,6 +1495,7 @@ export function ProfileHub() {
         </div>
       </section>
     </main>
+    </StoreChromeContext.Provider>
     </StoreNavContext.Provider>
   );
 }

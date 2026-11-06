@@ -10,7 +10,7 @@ import { sweepExpiredAssessments } from "@/lib/assessment-auto-submit";
  * together keeps the deployment on the same daily cron count for Vercel plans
  * that only allow once-a-day jobs.
  */
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
@@ -18,8 +18,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const assessment = await sendAssessmentReminderEmails();
-  const mock = await sendMockTestReminderEmails();
+  const [assessment, mock] = await Promise.all([
+    sendAssessmentReminderEmails(),
+    sendMockTestReminderEmails(),
+  ]);
 
   // Backstop for the background auto-submit. The hot path is the scoped
   // finalize on each portal load; this catches candidates who never come back

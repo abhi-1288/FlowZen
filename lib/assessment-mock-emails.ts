@@ -106,25 +106,18 @@ async function inviteCandidatesForJob(job: any, nowMs: number, kind: InviteKind)
   let emailed = 0;
   let candidatesSkipped = 0;
 
-  for (const candidate of candidates) {
+  const handleOne = async (candidate: any): Promise<{ emailed: number; skipped: number }> => {
     try {
-      // A candidate who has already used every attempt cannot sit another, so an
-      // automatic reminder would be noise. The manual invite keeps the old
-      // behaviour of explaining the exhausted attempts instead of dropping them.
       const used = ((candidate as any).mockTest?.attempts || []).filter((a: any) => a?.submittedAt).length;
       if (kind === "auto" && used >= config.maxAttempts) {
-        candidatesSkipped++;
-        continue;
+        return { emailed: 0, skipped: 1 };
       }
 
       const token = await resolveCandidatePortalToken(String(candidate._id));
       const portalLink = token ? buildPortalLink(origin, token) : undefined;
       if (!portalLink) {
-        candidatesSkipped++;
-        continue;
+        return { emailed: 0, skipped: 1 };
       }
-      // The portal only opens the dedicated mock shell when both flags are
-      // present, so the CTA has to carry them or it lands on the dashboard.
       const mockLink = `${portalLink}&test=true&mode=mock`;
 
       const attemptNote =
@@ -145,12 +138,20 @@ async function inviteCandidatesForJob(job: any, nowMs: number, kind: InviteKind)
       });
       await sendMail({ to: candidate.email, subject: emailBody.subject, text: emailBody.text, html: emailBody.html });
       await ATSCandidate.findByIdAndUpdate(candidate._id, { "mockTest.inviteSentAt": new Date() });
-      emailed++;
+      return { emailed: 1, skipped: 0 };
     } catch (err) {
-      // One bad address must not stop the rest of the run; the latch stays
-      // unset so the next run retries this candidate.
       console.error(`Mock test email failed for ${candidate._id}:`, err);
-      candidatesSkipped++;
+      return { emailed: 0, skipped: 1 };
+    }
+  };
+
+  const CHUNK = 5;
+  for (let i = 0; i < candidates.length; i += CHUNK) {
+    const batch = candidates.slice(i, i + CHUNK);
+    const results = await Promise.all(batch.map(handleOne));
+    for (const r of results) {
+      emailed += r.emailed;
+      candidatesSkipped += r.skipped;
     }
   }
 

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { ArrowLeft, Pencil, PencilOff, Trash2, Globe, Archive, Share2, Check, Cog, Briefcase, Building2, MapPin, Clock, Users, Banknote, ShieldCheck, CalendarClock, UserPlus, CalendarPlus, Columns3, ChevronDown, Download, ExternalLink, Upload, Loader2, CheckCircle, Layers, ShieldAlert, ShieldOff, ClipboardCheck, Send } from "lucide-react";
+import { ArrowLeft, Pencil, PencilOff, Trash2, Globe, Archive, Share2, Check, Cog, Briefcase, Building2, MapPin, Clock, Users, Banknote, ShieldCheck, CalendarClock, UserPlus, CalendarPlus, Columns3, ChevronDown, Download, ExternalLink, Upload, Loader2, CheckCircle, Layers, ShieldAlert, ShieldOff, ClipboardCheck, Send, Eye } from "lucide-react";
 import { DEFAULT_ACCENT, salarySuffix, hexToRgba } from "@/lib/accent";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
@@ -22,6 +22,7 @@ import { AssessmentManagerModal } from "@/components/recruitment/assessment-mana
 import { AssessmentResultsModal } from "@/components/recruitment/assessment-results-modal";
 import { AssessmentCandidatesModal } from "@/components/recruitment/assessment-candidates-modal";
 import { MockTestModal } from "@/components/recruitment/mock-test-modal";
+import { AssessmentPreviewModal } from "@/components/recruitment/assessment-preview-modal";
 import { assessmentResultsUnlocked } from "@/lib/assessment";
 import { fmtJobDateTime as fmtDateTime, startOfKolkataDayMs, wallClockToIso, dateInputValue, timeInputValue } from "@/lib/date-utils";
 import { useNotificationToast } from "@/lib/toast-context";
@@ -117,6 +118,7 @@ export default function JobDetailPage() {
   const [distributeOpen, setDistributeOpen] = useState(false);
   const [assessmentManagerOpen, setAssessmentManagerOpen] = useState(false);
   const [mockTestOpen, setMockTestOpen] = useState(false);
+  const [assessmentPreviewOpen, setAssessmentPreviewOpen] = useState(false);
   const [assessmentResultsOpen, setAssessmentResultsOpen] = useState(false);
   const [assessmentCandidatesOpen, setAssessmentCandidatesOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -938,6 +940,9 @@ export default function JobDetailPage() {
               {canRunPipeline && activeJob.assessment && (
                 <ActionButton accent={accent} icon={ClipboardCheck} label="Mock Test" onClick={() => setMockTestOpen(true)} />
               )}
+              {canRunPipeline && activeJob.assessment && (
+                <ActionButton accent={accent} icon={Eye} label="Preview as Candidate" onClick={() => setAssessmentPreviewOpen(true)} />
+              )}
               {canRunPipeline && activeJob.status === "closed" && (
                 <ActionButton accent={accent} icon={Download} label={exporting ? "Exporting…" : "Export Candidates"} disabled={exporting} onClick={() => { void handleExport(); }} />
               )}
@@ -1121,6 +1126,15 @@ export default function JobDetailPage() {
           jobId={id}
           totalQuestions={questionBankTotal}
           onClose={() => setMockTestOpen(false)}
+        />
+      )}
+      {assessmentPreviewOpen && (
+        <AssessmentPreviewModal
+          jobId={id}
+          accent={accent}
+          companyName={companyName}
+          mode="assessment"
+          onClose={() => setAssessmentPreviewOpen(false)}
         />
       )}
       {assessmentCandidatesOpen && (

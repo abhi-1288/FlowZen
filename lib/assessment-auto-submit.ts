@@ -189,15 +189,21 @@ export async function sweepExpiredAssessments(nowMs: number = Date.now()): Promi
   let finalized = 0;
   let skipped = 0;
 
-  for (const candidate of candidates) {
-    try {
-      const result = await finalizeCandidateIfExpired(candidate._id, nowMs);
-      if (result) finalized++;
-      else skipped++;
-    } catch (err) {
-      skipped++;
-      console.error(`Assessment auto-submit failed for ${candidate._id}:`, err);
-    }
+  const CHUNK = 4;
+  for (let i = 0; i < candidates.length; i += CHUNK) {
+    const batch = candidates.slice(i, i + CHUNK);
+    await Promise.all(
+      batch.map(async (candidate: any) => {
+        try {
+          const result = await finalizeCandidateIfExpired(candidate._id, nowMs);
+          if (result) finalized++;
+          else skipped++;
+        } catch (err) {
+          skipped++;
+          console.error(`Assessment auto-submit failed for ${candidate._id}:`, err);
+        }
+      })
+    );
   }
 
   return { finalized, skipped };
@@ -228,15 +234,21 @@ export async function sweepExpiredMockAttempts(nowMs: number = Date.now()): Prom
   let finalized = 0;
   let skipped = 0;
 
-  for (const candidate of candidates) {
-    try {
-      const result = await finalizeMockAttemptIfExpired(candidate._id, nowMs);
-      if (result) finalized++;
-      else skipped++;
-    } catch (err) {
-      skipped++;
-      console.error(`Mock auto-submit failed for ${candidate._id}:`, err);
-    }
+  const CHUNK = 4;
+  for (let i = 0; i < candidates.length; i += CHUNK) {
+    const batch = candidates.slice(i, i + CHUNK);
+    await Promise.all(
+      batch.map(async (candidate: any) => {
+        try {
+          const result = await finalizeMockAttemptIfExpired(candidate._id, nowMs);
+          if (result) finalized++;
+          else skipped++;
+        } catch (err) {
+          skipped++;
+          console.error(`Mock auto-submit failed for ${candidate._id}:`, err);
+        }
+      })
+    );
   }
 
   return { finalized, skipped };

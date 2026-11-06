@@ -54,11 +54,11 @@ export const STORE_STATUS_LABELS: Record<StoreOrderStatus, string> = {
 };
 
 export const STORE_STATUS_COLORS: Record<StoreOrderStatus, string> = {
-  pending: "bg-amber-50 text-amber-700",
-  approved: "bg-emerald-50 text-emerald-700",
-  fulfilled: "bg-indigo-50 text-indigo-700",
-  rejected: "bg-rose-50 text-rose-600",
-  cancelled: "bg-zinc-100 text-zinc-500",
+  pending: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+  approved: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+  fulfilled: "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300",
+  rejected: "bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300",
+  cancelled: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
 };
 
 export const STORE_TRANSITION_ACTIONS: Record<StoreOrderStatus, StoreOrderStatus[]> = {
@@ -100,9 +100,9 @@ export const STORE_TAKEAWAY_STATUS_LABELS: Record<StoreTakeAwayStatus, string> =
 };
 
 export const STORE_TAKEAWAY_STATUS_COLORS: Record<StoreTakeAwayStatus, string> = {
-  pending: "bg-amber-50 text-amber-700",
-  ready: "bg-sky-50 text-sky-700",
-  "handed-over": "bg-emerald-50 text-emerald-700",
+  pending: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+  ready: "bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300",
+  "handed-over": "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
 };
 
 export function takeAwayStatusLabel(value: unknown): string {
@@ -144,10 +144,10 @@ export const STORE_DELIVERY_STATUS_LABELS: Record<StoreDeliveryStatus, string> =
 };
 
 export const STORE_DELIVERY_STATUS_COLORS: Record<StoreDeliveryStatus, string> = {
-  pending: "bg-zinc-100 text-zinc-500",
-  packing: "bg-amber-50 text-amber-700",
-  "out-for-delivery": "bg-sky-50 text-sky-700",
-  delivered: "bg-emerald-50 text-emerald-700",
+  pending: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
+  packing: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+  "out-for-delivery": "bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300",
+  delivered: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
 };
 
 export function isStoreDeliveryStatus(value: unknown): value is StoreDeliveryStatus {

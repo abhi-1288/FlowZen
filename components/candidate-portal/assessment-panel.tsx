@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { PlayCircle, Clock, Send, CheckCircle, XCircle, Layers, AlertTriangle, Download, Loader2 } from "lucide-react";
+import { PlayCircle, Clock, Send, CheckCircle, XCircle, Layers, AlertTriangle, Download, Loader2, ChevronLeft, ChevronRight, Eraser, Flag } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { formatMarks, formatNegativeMarking, negativeMarkingShort } from "@/lib/assessment-negative-marking";
 import { MediaDevicesProvider, useMediaDevices } from "@/components/recruitment/interview-room/media-devices";
@@ -39,6 +39,8 @@ type Props = {
     negativeMarking: number;
     negativeMarkingLabel?: string;
     proctoring?: ProctoringSettings;
+    /** The real configured proctoring, surfaced to the preview walkthrough. */
+    previewProctoring?: ProctoringSettings;
     extensionRequest?: { status: "none" | "pending" | "approved" | "denied"; requestedMs: number };
     domains: { name: string; limit: number; questionCount: number }[];
     domain: string;
@@ -68,6 +70,7 @@ type Props = {
     // Mock-only. The mock track never writes the real assessment's status or
     // score fields, so it reports its outcome through these instead.
     resultRelease?: "immediate" | "delayed" | "never";
+    resultDelayHours?: number;
     maxAttempts?: number;
     attemptsUsed?: number;
     attemptNumber?: number | null;
@@ -90,6 +93,36 @@ type Props = {
   autoStart?: boolean;
   /** Which track this render is for. Defaults to the real assessment. */
   mode?: "assessment" | "mock";
+  /**
+   * HR candidate-experience preview. Every server write path (start, autosave,
+   * submit, proctoring logging, extension polling) is replaced by local state
+   * and the HR preview endpoints, so nothing about a real candidate moves.
+   */
+  preview?: boolean;
+  /** The job whose preview endpoints serve this render (preview mode only). */
+  previewJobId?: string;
+};
+
+/** What the preview grade endpoint returns (nothing persisted anywhere). */
+type PreviewGrade = {
+  mode?: "assessment" | "mock";
+  sample?: boolean;
+  score?: number | null;
+  rawMarks?: number | null;
+  maxMarks?: number | null;
+  passed?: boolean | null;
+  correct?: number | null;
+  wrong?: number | null;
+  mcqTotal?: number | null;
+  essayCount?: number | null;
+  hasEssays?: boolean;
+  questionCount?: number;
+  passScore?: number;
+  negativeMarking?: number;
+  negativeMarkingLabel?: string;
+  answerKeyVisible?: boolean;
+  submittedAt?: string | null;
+  answerKey?: AnswerKeyPayload | null;
 };
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
@@ -345,7 +378,7 @@ export function AssessmentPanel(props: Props) {
   );
 }
 
-function AssessmentPanelInner({ token, assessment, accent, companyName, onRefresh, autoStart, mode = "assessment" }: Props) {
+function AssessmentPanelInner({ token, assessment, accent, companyName, onRefresh, autoStart, mode = "assessment", preview = false, previewJobId = "" }: Props) {
   // The mock track is a separate sitting with its own paper, answers and clock,
   // so every request and every cache key is scoped by mode. Nothing is shared
   // with the real assessment, and omitting the param keeps the real endpoints.
@@ -365,6 +398,12 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
   const [started, setStarted] = useState(assessment.submittable);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<number, { selectedOption?: number; textAnswer?: string }>>({});
+  // Exam-console navigation: one question on screen at a time, a numbered
+  // palette with statuses, and review flags. All array-index (display order)
+  // keyed; the flags travel in the localStorage cache so a resume keeps them.
+  const [currentQ, setCurrentQ] = useState(0);
+  const [marked, setMarked] = useState<Set<number>>(new Set());
+  const [visited, setVisited] = useState<Set<number>>(new Set());
   const [submitted, setSubmitted] = useState(Boolean(assessment.submittedAt));
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -387,14 +426,27 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
     requestedMs: assessment.extensionRequest?.requestedMs ?? 0,
     grantedMs: 0,
   });
+  const [previewClock, setPreviewClock] = useState<{ startedAt: string | null; endsAt: string | null }>({
+    startedAt: null,
+    endsAt: null,
+  });
+  const [previewGrade, setPreviewGrade] = useState<PreviewGrade | null>(null);
+  // True while this run is on flagged sample questions (empty bank fallback).
+  const [previewSample, setPreviewSample] = useState(false);
   const autoSubmittedRef = useRef(false);
   const autoSubmitRef = useRef<() => void>(() => {});
   const autoStartRef = useRef(false);
   const lobbyFetchRef = useRef(false);
 
   const media = useMediaDevices();
-  const proctoringSettings = assessment.proctoring ?? null;
-  const proctoringWanted = Boolean(proctoringSettings?.active);
+  // Proctoring: in preview the walkthrough config comes from `previewProctoring`,
+  // while the config handed to useProctoring below stays blank so its violation
+  // logging and overlays never run — nothing is recorded or uploaded here.
+  const proctoringSettings = (preview ? assessment.previewProctoring : assessment.proctoring) ?? null;
+  const proctoringWanted = preview ? false : Boolean(proctoringSettings?.active);
+  // The preflight flow in the pre-exam card; in preview it is driven by the real
+  // configured settings, but nothing behind it posts anywhere.
+  const preflightWanted = preview ? Boolean(assessment.previewProctoring?.active) : proctoringWanted;
   // A candidate resuming an already-started paper skips the preflight; the
   // devices are opened in the background and the overlay covers any gap.
   const sitting = started && questions.length > 0 && !submitted;
@@ -402,13 +454,13 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
     token,
     stream: media.stream,
     running: sitting,
-    config: proctoringSettings,
+    config: preview ? null : proctoringSettings,
     cameraReady: Boolean(media.stream?.getVideoTracks().some((t) => t.enabled)),
     onRetryCamera: () => void media.retry(),
   });
   // The preflight needs its own mic reading, taken before the exam starts, so
   // this one is deliberately not driven by the sitting flag above.
-  const preflightMic = useMicLevel(media.stream, preflight && proctoringWanted);
+  const preflightMic = useMicLevel(media.stream, preflight && preflightWanted);
 
   // "The device attempt has settled" — either it worked or it failed with a
   // message, and in both cases the preflight is ready to be acted on rather than
@@ -461,9 +513,12 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
   // serves no questions) would be indistinguishable from being ready to start.
   const startsAtMs = assessment.startsAt ? new Date(assessment.startsAt).getTime() : null;
   const lobbyOpensAtMs = assessment.lobbyOpensAt ? new Date(assessment.lobbyOpensAt).getTime() : null;
-  const examEndsAtMs = assessment.endsAt ? new Date(assessment.endsAt).getTime() : null;
+  // In preview the exam clock is anchored client-side when HR presses Start;
+  // the payload itself carries no candidate, so both fields start out blank.
+  const previewEndsAt = preview ? previewClock.endsAt : assessment.endsAt;
+  const examEndsAtMs = previewEndsAt ? new Date(previewEndsAt).getTime() : null;
 
-  const isExam = assessment.phase === "open" && Boolean(assessment.startedAt);
+  const isExam = assessment.phase === "open" && Boolean(preview ? previewClock.startedAt : assessment.startedAt);
   const isClosed = assessment.phase === "closed";
   const isExpired = assessment.phase === "expired";
   const inExamWindow = isExam && examEndsAtMs !== null && now < examEndsAtMs;
@@ -490,6 +545,26 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
         selectedOption: answers[q.index]?.selectedOption ?? null,
         ...(q.type === "essay" ? { textAnswer: answers[q.index]?.textAnswer ?? "" } : {}),
       }));
+      if (preview) {
+        // Grade-only dry run: the HR endpoint rebuilds the same preview paper
+        // and scores it with the shared scorer, persisting nothing anywhere.
+        const res = await fetch(`/api/recruitment/jobs/${previewJobId}/assessment/preview/grade`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mode: isMock ? "mock" : undefined,
+            domain: assessment.domain || selectedDomain || "",
+            autoSubmitted: examEndsAtMs !== null && Date.now() >= examEndsAtMs,
+            answers: answerArray,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Preview grading failed.");
+        setPreviewGrade(data as PreviewGrade);
+        setSubmitted(true);
+        onRefresh();
+        return;
+      }
       const res = await fetch(`/api/public/candidate/me/assessment/submit?token=${encodeURIComponent(token)}${trackQs}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -504,7 +579,7 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
     } finally {
       setSubmitting(false);
     }
-  }, [answers, questions, submitted, submitting, token, trackQs, onRefresh]);
+  }, [answers, questions, submitted, submitting, token, trackQs, onRefresh, preview, previewJobId, isMock, assessment.domain, selectedDomain, examEndsAtMs]);
 
   const autoSubmit = useCallback(async () => {
     if (autoSubmittedRef.current || submitting || submitted) return;
@@ -544,10 +619,16 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
       try {
         const stored = localStorage.getItem(cacheKey);
         if (stored) {
-          const { q, a } = JSON.parse(stored);
+          const { q, a, m } = JSON.parse(stored);
           if (Array.isArray(q) && q.length > 0) {
             setQuestions(q);
             if (a && typeof a === "object") setAnswers(a);
+            if (Array.isArray(m))
+              setMarked(
+                new Set<number>(
+                  m.filter((i: unknown) => typeof i === "number" && i >= 0 && i < q.length)
+                )
+              );
             // Proctoring still has to bring the camera up, even when the paper is
             // being restored from cache rather than re-fetched.
             if (proctoringWanted) void media.acquire();
@@ -584,11 +665,17 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
     try {
       const stored = localStorage.getItem(cacheKey);
       if (stored) {
-        const { q, a } = JSON.parse(stored);
+        const { q, a, m } = JSON.parse(stored);
         if (Array.isArray(q) && q.length > 0) {
           setQuestions(q);
           setStarted(true);
           if (a && typeof a === "object") setAnswers(a);
+          if (Array.isArray(m))
+            setMarked(
+              new Set<number>(
+                m.filter((i: unknown) => typeof i === "number" && i >= 0 && i < q.length)
+              )
+            );
           return;
         }
       }
@@ -612,6 +699,38 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
     if (assessment.domains?.length && !selectedDomain && !assessment.domain) {
       setError("Please select your domain to start the assessment.");
       return false;
+    }
+
+    // Preview: no server-side sitting and no new tab — the paper comes from the
+    // HR preview endpoint and the clock is anchored here.
+    if (preview) {
+      try {
+        const params = new URLSearchParams({ start: "1" });
+        if (isMock) params.set("mode", "mock");
+        const domain = assessment.domain || selectedDomain;
+        if (domain) params.set("domain", domain);
+        const url = `/api/recruitment/jobs/${previewJobId}/assessment/preview?${params.toString()}`;
+        console.warn("[preview] starting:", url, "domain=", domain, "assessment.domain=", assessment.domain);
+        const res = await fetch(url);
+        const data = await res.json().catch((e) => { console.error("[preview] json parse err", e); return null as any; });
+        console.warn("[preview] status:", res.status, "questions:", (data && data.questions && data.questions.length) || 0, "data=", data);
+        if (!res.ok) throw new Error((data && data.error) || "Could not load the preview paper.");
+        setQuestions(data.questions || []);
+        setStarted(true);
+        setInLobby(false);
+        setPreviewClock({ startedAt: new Date().toISOString(), endsAt: data.endsAt || null });
+        setPreviewSample(Boolean(data.sample));
+        if (data.domain) setSelectedDomain(data.domain);
+        // Don't refetch the whole info payload here: it would reset state
+        // mid-transition. The panel holds all it needs in local state.
+        return true;
+      } catch (e: any) {
+        const msg = e?.message || String(e);
+        console.error("[preview] handleStart error:", msg, e);
+        try { window.alert("Preview start failed: " + msg); } catch {}
+        setError(msg);
+        return false;
+      }
     }
 
     // Normal mode: the exam runs in its own tab so it survives navigating away
@@ -705,7 +824,7 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
         media.stream?.getAudioTracks().some((t) => t.enabled)
           ? "ok"
           : "partial";
-      if (autoStart && proctoringSettings?.requireFullscreen !== false) {
+      if (!preview && autoStart && proctoringSettings?.requireFullscreen !== false) {
         await proctoring.requestFullscreen().catch(() => false);
       }
       const ok = await handleStart({ proctoringAck: true, devices });
@@ -778,7 +897,7 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
   }, [answers]);
 
   useEffect(() => {
-    if (!isExam || submitted) return;
+    if (!isExam || submitted || preview) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       const payload = questions.map((q) => ({
@@ -798,6 +917,28 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
     };
   }, [answers, questions, isExam, submitted, token, trackQs]);
 
+  // A fresh paper always opens on its first question with a clean palette.
+  useEffect(() => {
+    setCurrentQ(0);
+    setVisited(new Set([0]));
+  }, [questions]);
+
+  // Mirror the console flags (and the answers, which the resume path below
+  // reads back) into the localStorage cache, so a reload keeps the palette
+  // state as the server autosave only knows about answer payloads.
+  useEffect(() => {
+    if (!started || questions.length === 0 || preview) return;
+    try {
+      const raw = localStorage.getItem(cacheKey);
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (!parsed || !Array.isArray(parsed.q)) return;
+      localStorage.setItem(cacheKey, JSON.stringify({ ...parsed, a: answers, m: Array.from(marked) }));
+    } catch {}
+    // cacheKey and trackQs are stable for a token; listed for lint honesty.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answers, marked, started, questions]);
+
+
   function setAnswer(qIndex: number, selectedOption: number) {
     setAnswers((prev) => ({ ...prev, [qIndex]: { ...prev[qIndex], selectedOption } }));
   }
@@ -806,18 +947,67 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
     setAnswers((prev) => ({ ...prev, [qIndex]: { ...prev[qIndex], textAnswer } }));
   }
 
+  /** NTA-style answer status the palette and its counters rely on. */
+  function isAnsweredQuestion(q: Question): boolean {
+    return q.type === "essay"
+      ? Boolean(String(answers[q.index]?.textAnswer ?? "").trim())
+      : typeof answers[q.index]?.selectedOption === "number";
+  }
+
+  const questionCardRef = useRef<HTMLDivElement>(null);
+
+  function goToQuestion(qi: number) {
+    const next = Math.min(Math.max(qi, 0), questions.length - 1);
+    setCurrentQ(next);
+    setVisited((prev) => {
+      if (prev.has(next)) return prev;
+      const set = new Set(prev);
+      set.add(next);
+      return set;
+    });
+    // Keep the question in view when moving between long or short entries.
+    requestAnimationFrame(() => questionCardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
+  }
+
+  function clearCurrentResponse() {
+    const q = questions[currentQ];
+    if (!q) return;
+    setAnswers((prev) => {
+      const next = { ...prev };
+      next[q.index] = { ...next[q.index], selectedOption: undefined, textAnswer: undefined };
+      return next;
+    });
+  }
+
+  function toggleMarkCurrent() {
+    setMarked((prev) => {
+      const set = new Set(prev);
+      if (set.has(currentQ)) set.delete(currentQ);
+      else set.add(currentQ);
+      return set;
+    });
+  }
+
   async function handleSubmitClick() {
-    const missing = questions
-      .filter((q) => q.required)
-      .filter((q) => {
-        const a = answers[q.index];
-        return q.type === "essay"
-          ? !(a && String(a.textAnswer || "").trim())
-          : a == null || typeof a.selectedOption !== "number";
-      })
-      .map((q) => q.index + 1);
+    // Exam consoles don't leave the candidate to hunt for a missed required
+    // question: report the numbers and jump straight to the first one.
+    const missing: number[] = [];
+    questions.forEach((q, qi) => {
+      if (!q.required) return;
+      const a = answers[q.index];
+      const answered =
+        q.type === "essay"
+          ? Boolean(a && String(a.textAnswer || "").trim())
+          : a != null && typeof a.selectedOption === "number";
+      if (!answered) missing.push(qi);
+    });
     if (missing.length) {
-      setError(`Please answer the required question${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}.`);
+      setError(
+        `Please answer the required question${missing.length > 1 ? "s" : ""}: ${missing
+          .map((qi) => qi + 1)
+          .join(", ")}.`
+      );
+      goToQuestion(missing[0]);
       return;
     }
     await doSubmit();
@@ -828,6 +1018,11 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
     setDownloading(true);
     setError("");
     try {
+      if (preview) {
+        if (previewGrade?.answerKey) generateAnswerKeyPdf(previewGrade.answerKey, accent, companyName);
+        setDownloading(false);
+        return;
+      }
       const res = await fetch(`/api/public/candidate/me/assessment/answer-key?token=${encodeURIComponent(token)}${trackQs}`);
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error((data as { error?: string })?.error || "Could not load the answer key.");
@@ -1003,6 +1198,63 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
     );
   };
 
+  // 0. Preview result view: preview-only, reached when the dry run has been
+  // graded — a real candidate never lands here.
+  if (preview && submitted && previewGrade) {
+    const answerKeyShown = previewGrade.answerKeyVisible !== false && Boolean(previewGrade.answerKey);
+    const releaseNote = isMock
+      ? assessment.resultRelease === "immediate"
+        ? "This configuration releases results straight after submitting."
+        : assessment.resultRelease === "never"
+          ? "With this configuration the candidate would never see this result."
+          : `With this configuration the candidate would see it about ${assessment.resultDelayHours ?? 0}h after submitting.`
+      : assessment.answerKeyPublished
+        ? "The answer key is published for the real assessment."
+        : "For the real assessment the answer key stays hidden until HR publishes it.";
+    return (
+      <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-5">
+        <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">
+          {isMock ? "Mock Test Preview Complete" : "Assessment Preview Complete"}
+        </h3>
+        <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">
+          Dry run only — no candidate record was touched. {releaseNote}
+        </p>
+        {previewGrade.sample && (
+          <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+            Sample questions were used because this job has no questions in its bank yet — this score reflects
+            placeholders, not the real paper.
+          </p>
+        )}
+        <div className={`mt-3 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold ${previewGrade.passed ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
+          {previewGrade.passed ? <CheckCircle size={16} /> : <XCircle size={16} />}
+          {previewGrade.score}/100 — {previewGrade.passed ? "Passed" : "Failed"}
+        </div>
+        {previewGrade.rawMarks != null && (
+          <p className="mt-2 text-xs text-slate-500 dark:text-zinc-400">
+            {formatMarks(previewGrade.rawMarks)}/{formatMarks(previewGrade.maxMarks ?? 0)} marks · Passing threshold: {previewGrade.passScore ?? assessment.passScore}% · Correct {previewGrade.correct} / Wrong {previewGrade.wrong}
+            {previewGrade.hasEssays ? ` · ${previewGrade.essayCount} essay(s) marked for manual review` : ""}
+          </p>
+        )}
+        {previewGrade.answerKeyVisible === false && (
+          <p className="mt-2 text-xs text-slate-500 dark:text-zinc-400">
+            The answer key stays hidden for this setup, exactly as candidates will see it.
+          </p>
+        )}
+        {answerKeyShown && (
+          <button
+            onClick={() => void handleDownloadAnswerKey()}
+            disabled={downloading}
+            className="mt-4 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+            style={{ backgroundColor: accent }}
+          >
+            {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            {downloading ? "Preparing PDF…" : "Download Question Paper & Answer Key"}
+          </button>
+        )}
+      </div>
+    );
+  }
+
   // 1. Submitted view
   if (submitted && assessment.submittedAt) {
     // The mock track is never reviewed by a human, so it never has an
@@ -1108,11 +1360,59 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
     );
   }
 
-  // 2. Started test view
+  // 2. Started test view — exam-console style: one question on screen at a
+  // time, a numbered palette with statuses, and the Save & Next / Clear
+  // Response / Mark for Review action row. The proctoring surfaces (selfie
+  // tile, banner, block overlay) stay exactly as they were.
   if (started && questions.length > 0) {
-    const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
+    const formatTime = (s: number) => {
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = s % 60;
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
+    };
+    const activeIndex = currentQ < questions.length ? currentQ : 0;
+    const activeQ = questions[activeIndex];
+    const activeMarked = marked.has(activeIndex);
+    const isLastQuestion = activeIndex === questions.length - 1;
+    const chipFor = (qi: number) => {
+      const q = questions[qi];
+      const answered = isAnsweredQuestion(q);
+      const isMarked = marked.has(qi);
+      const cls = isMarked
+        ? "bg-violet-500 text-white"
+        : answered
+          ? "bg-emerald-600 text-white"
+          : visited.has(qi)
+            ? "bg-rose-500 text-white"
+            : "border border-slate-200 bg-white text-slate-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
+      return {
+        cls,
+        answered,
+        isMarked,
+        style: qi === activeIndex ? { boxShadow: `0 0 0 2px ${accent}` } : undefined,
+      };
+    };
+    // Palette counters follow exam-console semantics: a marked question is
+    // counted as marked, with a separate count when it also has an answer.
+    const answeredCount = questions.filter((q, qi) => isAnsweredQuestion(q) && !marked.has(qi)).length;
+    const markedAnsweredCount = questions.filter((q, qi) => marked.has(qi) && isAnsweredQuestion(q)).length;
+    const markedCount = Math.min(marked.size, questions.length) - markedAnsweredCount;
+    const notAnsweredCount = questions.filter((q, qi) => !isAnsweredQuestion(q) && !marked.has(qi) && visited.has(qi)).length;
+    const notVisitedCount = questions.length - answeredCount - markedAnsweredCount - markedCount - notAnsweredCount;
+
     return (
       <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-5">
+        {preview && previewSample && (
+          <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+            <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+            <span>
+              Sample questions: this job&apos;s question bank is empty, so these are placeholders showing how the
+              experience works. They are not this job&apos;s questions.
+            </span>
+          </div>
+        )}
         {proctoring.active && <SelfieTile stream={media.stream} micDb={proctoring.peakDb} requireMic={proctoringSettings?.requireMic !== false} micLevel={proctoring.micFraction} />}
         {proctoring.blocked && (
           <ProctoringOverlay
@@ -1129,7 +1429,7 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
             tone={accent}
           />
         )}
-        <div className="sticky top-0 z-30 -mx-5 -mt-5 flex flex-wrap items-center justify-between gap-2 rounded-t-xl border-b border-[var(--c-border-light)] bg-[var(--c-bg-card)] px-5 py-3 dark:border-zinc-800">
+        <div className={`${preview ? "" : "sticky top-[53px] z-10"} -mx-5 -mt-5 flex flex-wrap items-center justify-between gap-2 rounded-t-xl border-b border-[var(--c-border-light)] bg-[var(--c-bg-card)] px-5 py-3 dark:border-zinc-800`}>
           <div>
             <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">{isMock ? "Mock Test" : "Online Assessment"}</h3>
             {assessment.domain && (
@@ -1149,7 +1449,7 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
               />
             )}
             {remaining !== null && remaining > 0 && (
-              <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-mono font-bold ${remaining < 60 ? "bg-rose-50 text-rose-700 animate-pulse" : "bg-amber-50 text-amber-700"}`}>
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-mono font-bold ${remaining < 60 ? "bg-rose-50 text-rose-700 animate-pulse dark:bg-rose-500/15 dark:text-rose-300" : "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"}`}>
                 <Clock size={14} /> {formatTime(remaining)}
               </span>
             )}
@@ -1159,8 +1459,9 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
           <span>Passing threshold: {assessment.passScore}%</span>
           {assessment.negativeMarking > 0 && <span>Negative marking: -{negativeMarkingShort(assessment.negativeMarking, assessment.negativeMarkingLabel)} per wrong answer</span>}
           {proctoring.active && <span>Proctored — camera on, Microphone on, Screen sharing</span>}
-          <span>Answers save automatically</span>
+          <span>{preview ? "Preview only — answers are not saved" : "Answers save automatically"}</span>
           {isMock && <span className="font-semibold text-slate-500 dark:text-zinc-400">Practice run — does not affect your application</span>}
+          {preview && <span className="font-semibold text-slate-500 dark:text-zinc-400">Preview — nothing is recorded</span>}
         </div>
         {proctoring.active && (
           <div className="mt-3">
@@ -1184,48 +1485,203 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
             Time is up — your saved answers are being submitted.
           </p>
         )}
-        <div className="mt-4 space-y-4">
-          {questions.map((q, qi) => (
-            <div key={q.index} className="rounded-lg border border-slate-100 dark:border-zinc-800 p-4">
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-sm font-medium text-slate-900 dark:text-zinc-100">{qi + 1}. {q.text}{q.required && <span className="ml-1 text-rose-500">*</span>}</p>
+
+        <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start">
+          {/* Question area — one question at a time */}
+          <section className="min-w-0 flex-1">
+            <div
+              ref={questionCardRef}
+              className="rounded-lg border border-[var(--c-border-light)] p-4 dark:border-zinc-800 sm:p-5"
+              aria-live="polite"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-dashed border-slate-200 pb-3 dark:border-zinc-700">
+                <p className="text-sm font-bold text-slate-900 dark:text-zinc-100">
+                  Question {activeIndex + 1}
+                  <span className="ml-1 font-normal text-slate-400 dark:text-zinc-500">of {questions.length}</span>
+                </p>
                 <div className="flex shrink-0 items-center gap-1.5">
                   <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
-                    +{q.marks || 1}
+                    +{activeQ.marks || 1}
                   </span>
-                  {q.required ? (
+                  {assessment.negativeMarking > 0 && (
+                    <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-600 dark:bg-rose-500/15 dark:text-rose-300">
+                      -{negativeMarkingShort(assessment.negativeMarking, assessment.negativeMarkingLabel)}
+                    </span>
+                  )}
+                  {activeQ.required ? (
                     <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-600 dark:bg-amber-500/15 dark:text-amber-300">Required</span>
                   ) : (
                     <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500 dark:bg-zinc-800 dark:text-zinc-400">Optional</span>
                   )}
+                  {activeMarked && (
+                    <span className="rounded-md bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">
+                      Marked for review
+                    </span>
+                  )}
                 </div>
               </div>
-              {q.type === "essay" ? (
+
+              <p className="mt-3 text-sm leading-relaxed text-slate-900 dark:text-zinc-100">
+                {activeQ.text}
+                {activeQ.required && <span className="ml-1 text-rose-500">*</span>}
+              </p>
+
+              {activeQ.type === "essay" ? (
                 <textarea
-                  rows={4}
-                  value={answers[q.index]?.textAnswer ?? ""}
-                  onChange={(e) => setTextAnswer(q.index, e.target.value)}
+                  rows={5}
+                  value={answers[activeQ.index]?.textAnswer ?? ""}
+                  onChange={(e) => setTextAnswer(activeQ.index, e.target.value)}
                   placeholder="Type your answer here..."
-                  className="mt-2 w-full rounded-lg border border-slate-100 px-3 py-2 text-sm outline-none focus:ring-2 dark:border-zinc-800 dark:bg-zinc-900"
+                  className="mt-3 w-full rounded-lg border border-slate-100 px-3 py-2 text-sm outline-none focus:ring-2 dark:border-zinc-800 dark:bg-zinc-900"
                 />
               ) : (
-                <div className="mt-2 space-y-2">
-                  {q.options.map((opt, oi) => (
-                    <label key={oi} className="flex items-center gap-2 cursor-pointer rounded-lg border border-slate-100 px-3 py-2 hover:bg-[var(--c-bg-muted)] dark:border-zinc-800">
-                      <input type="radio" name={`q-${q.index}`} checked={answers[q.index]?.selectedOption === oi} onChange={() => setAnswer(q.index, oi)} className="h-3 w-3" />
-                      <span className="text-sm text-slate-700 dark:text-zinc-300">{opt}</span>
-                    </label>
-                  ))}
+                <div className="mt-3 space-y-2">
+                  {activeQ.options.map((opt, oi) => {
+                    const selected = answers[activeQ.index]?.selectedOption === oi;
+                    return (
+                      <button
+                        key={oi}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => setAnswer(activeQ.index, oi)}
+                        className={`flex w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                          selected
+                            ? ""
+                            : "border-slate-100 hover:bg-[var(--c-bg-muted)] dark:border-zinc-800"
+                        }`}
+                        style={selected ? { borderColor: accent, backgroundColor: accent + "14" } : undefined}
+                      >
+                        <span
+                          aria-hidden
+                          className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border text-xs font-bold transition-colors ${
+                            selected
+                              ? "border-transparent text-white"
+                              : "border-slate-300 text-slate-500 dark:border-zinc-600 dark:text-zinc-400"
+                          }`}
+                          style={selected ? { backgroundColor: accent } : undefined}
+                        >
+                          {String.fromCharCode(65 + oi)}
+                        </span>
+                        <span className="text-sm text-slate-700 dark:text-zinc-300">{opt}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
-          ))}
-        </div>
-        <div className="sticky bottom-0 z-30 -mx-5 -mb-5 mt-4 flex flex-wrap items-center gap-3 rounded-b-xl border-t border-[var(--c-border-light)] bg-[var(--c-bg-card)] px-5 py-3 dark:border-zinc-800">
-          <button onClick={() => void handleSubmitClick()} disabled={submitting} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: accent }}>
-            <Send size={14} /> {submitting ? "Submitting..." : isMock ? "Submit Mock Test" : "Submit Assessment"}
-          </button>
-          {error && <p className="flex items-center gap-1.5 text-sm text-rose-600"><AlertTriangle size={14} /> {error}</p>}
+
+            {/* Exam action row */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={clearCurrentResponse}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] dark:border-zinc-800 dark:text-zinc-300"
+              >
+                <Eraser size={14} /> Clear Response
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  toggleMarkCurrent();
+                  if (activeIndex < questions.length - 1) goToQuestion(activeIndex + 1);
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+                  activeMarked
+                    ? "bg-violet-500 text-white hover:bg-violet-600"
+                    : "border border-violet-300 text-violet-600 hover:bg-violet-50 dark:border-violet-500/40 dark:text-violet-300 dark:hover:bg-violet-500/10"
+                }`}
+              >
+                <Flag size={14} />{" "}
+                {activeMarked
+                  ? isLastQuestion
+                    ? "Unmark"
+                    : "Unmark & Next"
+                  : isLastQuestion
+                    ? "Mark for Review"
+                    : "Mark for Review & Next"}
+              </button>
+              <span className="hidden flex-1 sm:block" />
+              <button
+                type="button"
+                onClick={() => goToQuestion(activeIndex - 1)}
+                disabled={activeIndex === 0}
+                className="inline-flex items-center gap-1 rounded-lg border border-[var(--c-border-light)] px-3.5 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] disabled:opacity-40 dark:border-zinc-800 dark:text-zinc-300"
+              >
+                <ChevronLeft size={14} /> Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => goToQuestion(activeIndex + 1)}
+                disabled={isLastQuestion}
+                className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+                style={{ backgroundColor: accent }}
+              >
+                Save &amp; Next <ChevronRight size={14} />
+              </button>
+            </div>
+            {error && (
+              <p className="mt-2 flex items-center gap-1.5 text-sm text-rose-600"><AlertTriangle size={14} /> {error}</p>
+            )}
+          </section>
+
+          {/* Question palette */}
+          <aside className="order-first shrink-0 rounded-lg border border-[var(--c-border-light)] bg-[var(--c-bg-card)] p-3 dark:border-zinc-800 lg:order-none lg:w-[268px]">
+            <p className="flex items-center justify-between text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-zinc-400">
+              Question Palette
+              <span className="font-mono text-[11px] font-semibold normal-case">{answeredCount + markedAnsweredCount}/{questions.length}</span>
+            </p>
+            <div className="mt-2.5 grid grid-cols-8 gap-1.5 lg:grid-cols-6">
+              {questions.map((q, qi) => {
+                const chip = chipFor(qi);
+                return (
+                  <button
+                    key={q.index}
+                    type="button"
+                    onClick={() => goToQuestion(qi)}
+                    title={`Question ${qi + 1}`}
+                    aria-current={qi === activeIndex ? "true" : undefined}
+                    className={`relative grid h-8 w-full place-items-center rounded-md text-xs font-bold transition-colors ${chip.cls}`}
+                    style={chip.style}
+                  >
+                    {qi + 1}
+                    {chip.isMarked && chip.answered && (
+                      <span
+                        aria-hidden
+                        className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-white dark:ring-zinc-900"
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <ul className="mt-3 space-y-1 text-[11px] text-slate-500 dark:text-zinc-400">
+              <li className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-600" /> Answered — {answeredCount}</li>
+              <li className="flex items-center gap-2">
+                <span className="relative h-2.5 w-2.5 rounded-sm bg-violet-500">
+                  <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-emerald-400 ring-1 ring-white dark:ring-zinc-900" />
+                </span>
+                Answered &amp; marked — {markedAnsweredCount}
+              </li>
+              <li className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-violet-500" /> Marked, not answered — {markedCount}</li>
+              <li className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-rose-500" /> Not answered — {notAnsweredCount}</li>
+              <li className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-slate-300 dark:bg-zinc-600" /> Not visited — {notVisitedCount}</li>
+            </ul>
+            <button
+              type="button"
+              onClick={() => void handleSubmitClick()}
+              disabled={submitting}
+              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+              style={{ backgroundColor: accent }}
+            >
+              {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              {submitting ? "Submitting…" : preview ? "Grade Preview" : isMock ? "Submit Mock Test" : "Submit Assessment"}
+            </button>
+            <p className="mt-1.5 text-center text-[10px] text-slate-400 dark:text-zinc-500">
+              {remaining !== null && remaining > 0
+                ? "The paper submits itself at zero on the clock."
+                : "Time is up — submission is in progress."}
+            </p>
+          </aside>
         </div>
       </div>
     );
@@ -1263,12 +1719,17 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
   return (
     <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-5">
       <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">{isMock ? "Mock Test" : "Online Assessment"}</h3>
+      {preview && (
+        <p className="mt-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+          Preview — nothing is saved, submitted or emailed. This is what the candidate will see.
+        </p>
+      )}
       {assessment.enabled && (
         <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
           {scheduleText ? `${scheduleText} · ` : ""}{assessment.durationMinutes ? `${assessment.durationMinutes} min time limit · ` : ""}Passing threshold {assessment.passScore}%
         </p>
       )}
-      {proctoringWanted && (
+      {preflightWanted && (
         <p className="mt-1.5 text-xs text-slate-400 dark:text-zinc-500">
           Proctored: the camera and microphone stay on, and the exam opens fullscreen, and the system checks for multiple faces, screen sharing, and background noise.
         </p>
@@ -1299,7 +1760,7 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
           {assessment.eligibleToStart && (
             <button
               onClick={() => {
-                if (proctoringWanted) {
+                if (preflightWanted) {
                   setPreflight(true);
                   setProctorReady(false);
                   void media.acquire();
@@ -1313,7 +1774,7 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
               <PlayCircle size={16} />
               {assessment.phase === "lobby" && !isMock
                 ? "Enter Waiting Room"
-                : proctoringWanted
+                : preflightWanted
                   ? "Check camera and start"
                   : isMock
                     ? "Start Mock Test"

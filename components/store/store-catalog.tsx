@@ -1,10 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, PackagePlus, Search, ShoppingCart, Store as StoreIcon, MapPin, Check } from "lucide-react";
+import { Check, PackageOpen, PackagePlus, Search, ShoppingCart } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import { useStoreCart } from "@/components/store/cart-context";
 import { useStoreNav } from "@/components/store/store-nav";
+import {
+  StoreCategoryIcon,
+  StoreChip,
+  StoreEmpty,
+  StoreShell,
+  StoreSkeleton,
+  StockBadge,
+} from "@/components/store/store-shell";
 
 type StoreItemDto = {
   id: string;
@@ -21,6 +29,14 @@ type StoreItemDto = {
 
 type CategoryDto = { value: string; label: string };
 
+const SORTS = [
+  { value: "name", label: "Name A–Z" },
+  { value: "price", label: "Price low → high" },
+  { value: "stock", label: "Most in stock" },
+] as const;
+
+type SortValue = (typeof SORTS)[number]["value"];
+
 export function StoreCatalog() {
   const nav = useStoreNav();
   const { add, count } = useStoreCart();
@@ -30,6 +46,7 @@ export function StoreCatalog() {
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState("all");
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<SortValue>("name");
   const [justAdded, setJustAdded] = useState("");
 
   useEffect(() => {
@@ -65,15 +82,23 @@ export function StoreCatalog() {
     };
   }, [category, search]);
 
+  const sorted = useMemo(() => {
+    const copy = [...items];
+    if (sort === "name") copy.sort((a, b) => a.name.localeCompare(b.name));
+    if (sort === "price") copy.sort((a, b) => Number(a.price ?? 0) - Number(b.price ?? 0));
+    if (sort === "stock") copy.sort((a, b) => Number(b.stock ?? 0) - Number(a.stock ?? 0));
+    return copy;
+  }, [items, sort]);
+
   const grouped = useMemo(() => {
     const map = new Map<string, StoreItemDto[]>();
-    for (const item of items) {
+    for (const item of sorted) {
       const key = item.category || "other";
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(item);
     }
     return Array.from(map.entries());
-  }, [items]);
+  }, [sorted]);
 
   function handleAdd(item: StoreItemDto) {
     add(
@@ -84,6 +109,7 @@ export function StoreCatalog() {
         unit: item.unit,
         price: Number(item.price ?? 0),
         stock: Number(item.stock ?? 0),
+        category: item.category,
       },
       1,
     );
@@ -92,60 +118,81 @@ export function StoreCatalog() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 md:px-8">
-      <header className="neu-card mb-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl p-5">
-        <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-lg bg-indigo-600 text-white">
-            <StoreIcon size={22} />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-slate-900 dark:text-zinc-100">Company Store</h1>
-            <p className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-zinc-400">
-              <MapPin size={13} />
-              {region ? `${region} stock` : "Company-wide stock"}
-            </p>
-          </div>
-        </div>
+    <StoreShell
+      view="catalog"
+      title="Company Store"
+      subtitle={region ? `${region} stock` : "Company-wide stock"}
+      actions={
         <button
           onClick={() => nav("cart")}
-          className="neu-btn neu-btn-primary inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold"
+          className="neu-btn inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold"
         >
-          <ShoppingCart size={16} />
-          Cart{count ? ` (${count})` : ""}
+          <ShoppingCart size={15} />
+          Cart
+          {count ? (
+            <span className="rounded-full bg-indigo-100 px-1.5 text-[11px] font-bold leading-4 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+              {count}
+            </span>
+          ) : null}
         </button>
-      </header>
-
+      }
+    >
+      {/* Search, sort and category filters */}
       <div className="mb-5 flex flex-col gap-3">
-        <div className="neu-inset flex items-center gap-2 rounded-xl px-3 py-2.5">
-          <Search size={16} className="text-slate-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, product number or batch…"
-            className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:text-zinc-100"
-          />
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="neu-inset flex flex-1 items-center gap-2 rounded-xl px-3 py-2.5">
+            <Search size={16} className="text-slate-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name, product number or batch…"
+              className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:text-zinc-100"
+            />
+          </div>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as SortValue)}
+            aria-label="Sort products"
+            className="neu-inset shrink-0 rounded-xl px-3 py-2.5 text-sm text-slate-700 dark:text-zinc-200"
+          >
+            {SORTS.map((s) => (
+              <option key={s.value} value={s.value}>
+                Sort · {s.label}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="flex flex-wrap gap-2">
-          <CategoryChip active={category === "all"} label="All" onClick={() => setCategory("all")} />
+          <StoreChip active={category === "all"} onClick={() => setCategory("all")}>
+            All
+          </StoreChip>
           {categories.map((c) => (
-            <CategoryChip
+            <StoreChip
               key={c.value}
               active={category === c.value}
-              label={c.label}
               onClick={() => setCategory(c.value)}
-            />
+              count={grouped
+                .filter(([key]) => key === c.value)
+                .reduce((sum, [, group]) => sum + group.length, 0)}
+            >
+              {c.label}
+            </StoreChip>
           ))}
         </div>
       </div>
 
       {loading ? (
-        <div className="grid place-items-center py-20 text-slate-400">
-          <Loader2 className="animate-spin" size={26} />
-        </div>
+        <StoreSkeleton rows={6} grid />
       ) : items.length === 0 ? (
-        <div className="neu-card rounded-2xl p-10 text-center text-sm text-slate-500 dark:text-zinc-400">
-          No products are stocked in your region yet.
-        </div>
+        <StoreEmpty
+          icon={PackageOpen}
+          title="Nothing stocked here yet"
+          message={
+            search
+              ? `No products match “${search}”. Try a different name, product number or batch.`
+              : "No products are stocked in your region yet — check back later."
+          }
+        />
       ) : (
         <div className="space-y-6">
           {grouped.map(([key, group]) => (
@@ -167,22 +214,7 @@ export function StoreCatalog() {
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-function CategoryChip({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-        active
-          ? "bg-indigo-600 text-white"
-          : "bg-white text-slate-600 hover:bg-slate-50 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
-      }`}
-    >
-      {label}
-    </button>
+    </StoreShell>
   );
 }
 
@@ -191,38 +223,41 @@ function ItemCard({ item, added, onAdd }: { item: StoreItemDto; added: boolean; 
   const price = Number(item.price ?? 0);
   const out = stock <= 0;
   return (
-    <article className="neu-card flex flex-col rounded-2xl p-4">
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="text-sm font-semibold text-slate-800 dark:text-zinc-100">{item.name}</h3>
-        <span
-          className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold ${
-            out
-              ? "bg-rose-50 text-rose-600"
-              : stock <= 5
-                ? "bg-amber-50 text-amber-700"
-                : "bg-emerald-50 text-emerald-700"
-          }`}
-        >
-          {out ? "Out of stock" : `${stock} ${item.unit}`}
-        </span>
+    <article className="neu-card neu-card-hover flex flex-col rounded-2xl p-4">
+      <div className="flex items-start gap-2.5">
+        <StoreCategoryIcon category={item.category} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="text-sm font-semibold leading-snug text-slate-800 dark:text-zinc-100">
+              {item.name}
+            </h3>
+            <StockBadge stock={stock} unit={item.unit} />
+          </div>
+          <p className="mt-1 font-mono text-[11px] text-slate-400 dark:text-zinc-500">
+            {item.productNumber}
+            {item.batchNumber ? ` · Batch ${item.batchNumber}` : ""}
+          </p>
+        </div>
       </div>
-      <p className="mt-1 font-mono text-[11px] text-slate-400 dark:text-zinc-500">
-        {item.productNumber}
-        {item.batchNumber ? ` · Batch ${item.batchNumber}` : ""}
-      </p>
       {item.description ? (
         <p className="mt-2 line-clamp-2 text-xs text-slate-500 dark:text-zinc-400">{item.description}</p>
-      ) : null}
-      <div className="mt-4 flex items-center justify-between gap-2">
+      ) : (
+        <div className="mt-2 flex-1" />
+      )}
+      <div className="mt-auto flex items-center justify-between gap-2 pt-3.5">
         <span className="text-sm font-semibold text-slate-700 dark:text-zinc-200">
-          {price > 0 ? `₹${price.toFixed(2)} / ${item.unit}` : "No price set"}
+          {price > 0 ? `₹${price.toFixed(2)}` : "No price"}
+          <span className="ml-1 text-[11px] font-normal text-slate-400 dark:text-zinc-500">
+            / {item.unit}
+          </span>
         </span>
         <button
           onClick={onAdd}
           disabled={out}
-          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+          title={out ? "This product is out of stock" : `Add ${item.name} to cart`}
+          className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold transition-all active:scale-95 ${
             out
-              ? "cursor-not-allowed bg-slate-100 text-slate-400"
+              ? "cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-zinc-800 dark:text-zinc-500"
               : added
                 ? "bg-emerald-600 text-white"
                 : "neu-btn neu-btn-primary"

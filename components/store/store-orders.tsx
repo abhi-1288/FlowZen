@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Package, RefreshCw } from "lucide-react";
+import { Package, RefreshCw } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
+import { StoreChip, StoreEmpty, StoreShell } from "@/components/store/store-shell";
 import { StoreOrderCard, type StoreOrderDto } from "@/components/store/order-card";
 
 const FILTERS = [
@@ -11,17 +12,15 @@ const FILTERS = [
   { value: "approved", label: "Approved" },
   { value: "fulfilled", label: "Fulfilled" },
   { value: "closed", label: "Rejected / Cancelled" },
-];
+] as const;
 
 export function StoreOrders() {
   const [orders, setOrders] = useState<StoreOrderDto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
-  const [error, setError] = useState("");
+  const [filter, setFilter] = useState<string>("all");
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError("");
     try {
       const res = await apiFetch<{ orders: StoreOrderDto[] }>(
         "/api/store/orders?scope=my",
@@ -29,8 +28,8 @@ export function StoreOrders() {
         { toast: false },
       );
       setOrders(res.orders ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load orders.");
+    } catch {
+      /* a failed refresh keeps whatever is on screen; toast surfaced by apiFetch */
     } finally {
       setLoading(false);
     }
@@ -47,66 +46,65 @@ export function StoreOrders() {
   });
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 md:px-8">
-      <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-lg bg-indigo-600 text-white">
-            <Package size={21} />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-slate-900 dark:text-zinc-100">My Orders</h1>
-            <p className="text-sm text-slate-500 dark:text-zinc-400">Track what you have requested.</p>
-          </div>
-        </div>
+    <StoreShell
+      view="orders"
+      title="My Orders"
+      subtitle="Track what you have requested."
+      actions={
         <button
           onClick={() => void load()}
-          className="neu-btn inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold"
+          disabled={loading}
+          className="neu-btn inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold disabled:opacity-50"
         >
           <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
           Refresh
         </button>
-      </header>
-
+      }
+    >
       <div className="mb-4 flex flex-wrap gap-2">
         {FILTERS.map((f) => (
-          <button
+          <StoreChip
             key={f.value}
+            active={filter === f.value}
             onClick={() => setFilter(f.value)}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-              filter === f.value
-                ? "bg-indigo-600 text-white"
-                : "bg-white text-slate-600 hover:bg-slate-50 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            }`}
+            count={
+              f.value === "all"
+                ? orders.length
+                : orders.filter((o) =>
+                    f.value === "closed"
+                      ? o.status === "rejected" || o.status === "cancelled"
+                      : o.status === f.value,
+                  ).length
+            }
           >
             {f.label}
-          </button>
+          </StoreChip>
         ))}
       </div>
 
-      {error ? (
-        <p className="mb-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
-      ) : null}
-
       {loading ? (
         <div className="grid place-items-center py-20 text-slate-400">
-          <Loader2 className="animate-spin" size={26} />
+          <RefreshCw className="animate-spin" size={24} />
         </div>
       ) : visible.length === 0 ? (
-        <div className="neu-card grid place-items-center gap-2 rounded-2xl p-12 text-center text-sm text-slate-500">
-          No orders here yet.
-        </div>
+        <StoreEmpty
+          icon={Package}
+          title={
+            filter === "all" ? "No orders yet" : "Nothing in this filter"
+          }
+          message={
+            filter === "all"
+              ? "Everything you request from the store shows up here with its live progress."
+              : "Once an order hits this state it will appear here."
+          }
+        />
       ) : (
         <div className="space-y-3">
           {visible.map((order) => (
-            <StoreOrderCard
-              key={order.id}
-              order={order}
-              canCancel
-              onChanged={() => void load()}
-            />
+            <StoreOrderCard key={order.id} order={order} canCancel onChanged={() => void load()} />
           ))}
         </div>
       )}
-    </div>
+    </StoreShell>
   );
 }
