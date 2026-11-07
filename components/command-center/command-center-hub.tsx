@@ -76,7 +76,7 @@ export function CommandCenterHub() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-4 glass-surface rounded-2xl p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between dark:border-white/10 dark:bg-zinc-900/60">
         <div>
           <h2 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">{title}</h2>
           <p className="mt-0.5 text-sm text-slate-500 dark:text-zinc-400">

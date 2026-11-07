@@ -1,4 +1,4 @@
-﻿import type { AnyRecord } from "../shared";
+import type { AnyRecord } from "../shared";
 import { WfhAssignModal } from "../wfh-assign-modal";
 import { ManageWfhDatesModal } from "../manage-wfh-dates-modal";
 import { WeekendModal } from "../modals/weekend-modal";
@@ -54,7 +54,7 @@ export function WfhAdminSection({
                 Assign WFH Dates
               </button>
               <button onClick={() => { void loadWfh(); setShowManageWfhModal(true); }}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)] transition dark:text-zinc-300 dark:hover:bg-zinc-700" type="button">
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition dark:text-zinc-300 dark:hover:bg-zinc-700" type="button">
                 Manage WFH Dates
                 {wfhDates.length > 0 && <span className="ml-1.5 rounded-full bg-slate-700 px-1.5 py-0.5 text-xs text-white">{wfhDates.length}</span>}
               </button>

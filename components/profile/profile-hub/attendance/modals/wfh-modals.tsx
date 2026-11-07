@@ -60,7 +60,7 @@ export function WfhRequestModal({
 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl ring-1 ring-slate-200">
+      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl ring-1 ring-slate-200">
         <h3 className="text-xl font-bold text-slate-900">Request WFH</h3>
         <p className="mt-1 text-sm text-slate-500">
           Submit a Work From Home request for approval.
@@ -205,7 +205,7 @@ export function WfhRequestsListModal({
               Manage WFH request approvals and view status.
             </p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 hover:bg-[var(--c-bg-muted)] text-slate-400">
+          <button onClick={onClose} className="rounded-lg p-2 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-400">
             <Trash2 size={20} />
           </button>
         </div>
@@ -222,7 +222,7 @@ export function WfhRequestsListModal({
                   <div
                     key={req._id}
                     onClick={() => setSelectedWfh(req)}
-                    className="rounded-xl neu-inset/50 p-4 cursor-pointer hover:border-[var(--c-border-light)] hover:bg-[var(--c-bg-muted)]/50 transition-all active:scale-[0.98]"
+                    className="rounded-xl neu-inset/50 p-4 cursor-pointer hover:border-[var(--c-border-light)] hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]/50 transition-all active:scale-[0.98]"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -256,7 +256,7 @@ export function WfhRequestsListModal({
         <div className="border-t border-[var(--c-border-light)] p-4 flex justify-end">
           <button
             onClick={onClose}
-            className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)] transition"
+            className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition"
           >
             Close
           </button>
@@ -319,7 +319,7 @@ export function WfhDetailsModal({
           </div>
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 h-8 w-8 grid place-items-center rounded-full bg-[var(--c-bg-card)]/10 text-white hover:bg-[var(--c-bg-card)]/20 transition"
+            className="absolute top-4 right-4 h-8 w-8 grid place-items-center rounded-full bg-[var(--c-bg-white dark:bg-zinc-900)]/10 text-white hover:bg-[var(--c-bg-white dark:bg-zinc-900)]/20 transition"
           >
             <LogOut className="rotate-180" size={16} />
           </button>
@@ -344,13 +344,13 @@ export function WfhDetailsModal({
 
           <div className="mt-6 space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="rounded-xl bg-[var(--c-bg-muted)] p-4">
+              <div className="rounded-xl bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] p-4">
                 <p className="text-xs font-bold uppercase text-slate-500">Start Date</p>
                 <p className="mt-1 text-sm font-semibold text-slate-900">
                   {new Date(String(wfh.startDate)).toLocaleDateString()}
                 </p>
               </div>
-              <div className="rounded-xl bg-[var(--c-bg-muted)] p-4">
+              <div className="rounded-xl bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] p-4">
                 <p className="text-xs font-bold uppercase text-slate-500">End Date</p>
                 <p className="mt-1 text-sm font-semibold text-slate-900">
                   {new Date(String(wfh.endDate)).toLocaleDateString()}
@@ -358,14 +358,14 @@ export function WfhDetailsModal({
               </div>
             </div>
 
-            <div className="rounded-xl bg-[var(--c-bg-muted)] p-4">
+            <div className="rounded-xl bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] p-4">
               <p className="text-xs font-bold uppercase text-slate-500">Duration</p>
               <p className="mt-1 text-sm font-semibold text-slate-900">
                 {Number(wfh.duration)} day{Number(wfh.duration) === 1 ? "" : "s"}
               </p>
             </div>
 
-            <div className="rounded-xl bg-[var(--c-bg-muted)] p-4">
+            <div className="rounded-xl bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] p-4">
               <p className="text-xs font-bold uppercase text-slate-500">Reason</p>
               <p className="mt-1 text-sm text-slate-700 leading-relaxed">{String(wfh.reason)}</p>
             </div>

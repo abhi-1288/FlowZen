@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -71,7 +71,7 @@ const WORK_WORDS = [
 type GameProps = { onComplete: (score: number) => void; onClose: () => void };
 
 function formatScore(v: number | undefined | null) {
-  return v == null ? "â€“" : Math.round(Number(v)).toLocaleString("en-IN");
+  return v == null ? "–" : Math.round(Number(v)).toLocaleString("en-IN");
 }
 
 export function GamesTab() {
@@ -126,7 +126,7 @@ export function GamesTab() {
         method: "POST",
         body: JSON.stringify({ game: gameId, score }),
       });
-      notify(res.isNewBest ? `New best: ${formatScore(res.bestScore)} ðŸŽ‰` : `Score recorded (best ${formatScore(res.bestScore)})`);
+      notify(res.isNewBest ? `New best: ${formatScore(res.bestScore)} 🎉` : `Score recorded (best ${formatScore(res.bestScore)})`);
       await load();
     } catch (err) {
       notify(err instanceof Error ? err.message : "Failed to save score.", "error");
@@ -197,7 +197,7 @@ export function GamesTab() {
         description="Quick skill games, friendly competition, and a company leaderboard."
         accent="indigo"
         action={
-          <div className="flex gap-1 rounded-full bg-[var(--c-bg-muted)] p-1">
+          <div className="flex gap-1 rounded-full bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] p-1">
             {(
               [
                 ["play", "Play"],
@@ -259,10 +259,10 @@ export function GamesTab() {
 
       {challengeTarget ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-          <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl">
+          <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl">
             <h3 className="mb-1 text-sm font-semibold text-slate-800">Challenge a teammate</h3>
             <p className="mb-4 text-xs text-slate-500">
-              {catalog.find((g) => g.id === challengeTarget.game)?.name} Â· your best {formatScore(challengeTarget.score)}
+              {catalog.find((g) => g.id === challengeTarget.game)?.name} · your best {formatScore(challengeTarget.score)}
             </p>
             <div className="space-y-3">
               <div>
@@ -290,7 +290,7 @@ export function GamesTab() {
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
-                className="rounded-md border border-slate-300 px-4 py-1.5 text-xs text-slate-600 hover:bg-[var(--c-bg-muted)]"
+                className="rounded-md border border-slate-300 px-4 py-1.5 text-xs text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                 onClick={() => setChallengeTarget(null)}
               >
                 Cancel
@@ -335,7 +335,7 @@ function PlayView({
         </div>
         <div className="neu-card rounded-2xl p-4">
           <p className="text-[10px] uppercase tracking-wider text-slate-400">Overall Rank</p>
-          <p className="mt-1 text-2xl font-bold text-slate-800">{myRankOverall ? `#${myRankOverall}` : "â€“"}</p>
+          <p className="mt-1 text-2xl font-bold text-slate-800">{myRankOverall ? `#${myRankOverall}` : "–"}</p>
         </div>
         <div className="neu-card rounded-2xl p-4">
           <p className="text-[10px] uppercase tracking-wider text-slate-400">Games Played</p>
@@ -360,7 +360,7 @@ function PlayView({
                 <div>
                   <h4 className="text-sm font-semibold text-slate-800">{game.name}</h4>
                   <p className="text-xs text-slate-400">
-                    Best {formatScore(best)} Â· Rank {rank ? `#${rank}` : "â€“"}
+                    Best {formatScore(best)} · Rank {rank ? `#${rank}` : "–"}
                   </p>
                 </div>
               </div>
@@ -398,7 +398,7 @@ function LeaderboardView({ data }: { data: GamesData | null }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-1 rounded-full bg-[var(--c-bg-muted)] p-1 w-fit">
+      <div className="flex flex-wrap gap-1 rounded-full bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] p-1 w-fit">
         <button type="button"
           className={`rounded-full px-3 py-1 text-xs font-medium transition ${gameId === "overall" ? "neu-tab-pressed" : "text-slate-500 hover:text-slate-700 dark:text-zinc-400"}`}
           onClick={() => setGameId("overall")}>
@@ -418,7 +418,7 @@ function LeaderboardView({ data }: { data: GamesData | null }) {
       ) : (
         <div className="space-y-2">
           {rows.map((row, index) => {
-            const medal = index === 0 ? "ðŸ¥‡" : index === 1 ? "ðŸ¥ˆ" : index === 2 ? "ðŸ¥‰" : `#${index + 1}`;
+            const medal = index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `#${index + 1}`;
             const value = gameId === "overall" ? row.total : row.bestScore;
             return (
               <div key={row.user.id} className="flex items-center gap-3 rounded-2xl neu-card px-4 py-3">
@@ -453,7 +453,7 @@ function ChallengesView({ challenges, onRespond }: {
                 <p className="truncate text-sm font-medium text-slate-800">
                   <strong>{c.from.name}</strong> challenged you on <strong>{c.gameName}</strong>
                 </p>
-                <p className="text-xs text-slate-400">Score to beat: {formatScore(c.score)}{c.message ? ` Â· â€œ${c.message}â€` : ""}</p>
+                <p className="text-xs text-slate-400">Score to beat: {formatScore(c.score)}{c.message ? ` · “${c.message}”` : ""}</p>
               </div>
               <div className="flex gap-2">
                 <ActionButton variant="approve" className="px-3" onClick={() => onRespond(c.id, "accepted")}>
@@ -536,7 +536,7 @@ function GameModal({ gameId, catalog, onClose, onComplete }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-      <div className="w-full max-w-lg rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl">
+      <div className="w-full max-w-lg rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300">
@@ -546,13 +546,13 @@ function GameModal({ gameId, catalog, onClose, onComplete }: {
           </div>
           <div className="flex items-center gap-1">
             <button type="button"
-              className="rounded-md p-1.5 text-slate-400 hover:bg-[var(--c-bg-muted)]"
+              className="rounded-md p-1.5 text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
               onClick={() => { scored.current = false; setResetKey((k) => k + 1); }}
               title="Restart">
               <RefreshCw size={16} />
             </button>
             <button type="button"
-              className="rounded-md p-1.5 text-slate-400 hover:bg-[var(--c-bg-muted)]"
+              className="rounded-md p-1.5 text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
               onClick={onClose}
               title="Close">
               <X size={16} />
@@ -565,7 +565,7 @@ function GameModal({ gameId, catalog, onClose, onComplete }: {
   );
 }
 
-// â”€â”€ Reaction Time â”€â”€
+// ── Reaction Time ──
 function ReactionGame({ onComplete, onClose }: GameProps) {
   const [phase, setPhase] = useState<"idle" | "wait" | "go" | "done">("idle");
   const [times, setTimes] = useState<number[]>([]);
@@ -641,9 +641,9 @@ function ReactionGame({ onComplete, onClose }: GameProps) {
   );
 }
 
-// â”€â”€ Memory Match â”€â”€
+// ── Memory Match ──
 function MemoryGame({ onComplete, onClose }: GameProps) {
-  const symbols = ["ðŸŽ¯", "ðŸš€", "â­", "ðŸŽ²", "ðŸ•", "ðŸŽµ"];
+  const symbols = ["🎯", "🚀", "⭐", "🎲", "🍕", "🎵"];
   const [cards, setCards] = useState<{ id: number; sym: string; flipped: boolean; matched: boolean }[]>([]);
   const [moves, setMoves] = useState(0);
   const [locked, setLocked] = useState(false);
@@ -719,7 +719,7 @@ function MemoryGame({ onComplete, onClose }: GameProps) {
   );
 }
 
-// â”€â”€ Pattern Sequence â”€â”€
+// ── Pattern Sequence ──
 const PATTERN_MAX = 30;
 function PatternGame({ onComplete, onClose }: GameProps) {
   const [sequence, setSequence] = useState<number[]>([]);
@@ -788,7 +788,7 @@ function PatternGame({ onComplete, onClose }: GameProps) {
   return (
     <div className="space-y-4">
       <p className="text-xs text-slate-500">
-        Round {sequence.length} Â· {over ? <span className="text-rose-500">Game over</span> : playerTurn ? <span>Repeat the pattern</span> : <span>Watch the pattern</span>}
+        Round {sequence.length} · {over ? <span className="text-rose-500">Game over</span> : playerTurn ? <span>Repeat the pattern</span> : <span>Watch the pattern</span>}
       </p>
       <div className="grid grid-cols-2 gap-2">
         {[0, 1, 2, 3].map((cell) => (
@@ -806,7 +806,7 @@ function PatternGame({ onComplete, onClose }: GameProps) {
   );
 }
 
-// â”€â”€ Typing Speed â”€â”€
+// ── Typing Speed ──
 function TypingGame({ onComplete, onClose }: GameProps) {
   const [timeLeft, setTimeLeft] = useState(30);
   const [word, setWord] = useState("");
@@ -880,7 +880,7 @@ function TypingGame({ onComplete, onClose }: GameProps) {
   );
 }
 
-// â”€â”€ Number Guessing â”€â”€
+// ── Number Guessing ──
 function NumberGame({ onComplete, onClose }: GameProps) {
   const [target] = useState(() => Math.floor(Math.random() * 100) + 1);
   const [guess, setGuess] = useState("");
@@ -903,7 +903,7 @@ function NumberGame({ onComplete, onClose }: GameProps) {
       setHint(`Got it in ${a} guesses!`);
       onComplete(score);
     } else {
-      setHint(g < target ? "Too low ðŸ“‰" : "Too high ðŸ“ˆ");
+      setHint(g < target ? "Too low 📉" : "Too high 📈");
       setGuess("");
     }
   }
@@ -932,7 +932,7 @@ function NumberGame({ onComplete, onClose }: GameProps) {
     </div>
   );
 }
-// â”€â”€ Word Scramble â”€â”€
+// ── Word Scramble ──
 function scrambleWord(word: string) {
   const letters = word.split("");
   let scrambled = word;
@@ -1208,8 +1208,8 @@ function SnakeLaddersGame({ onComplete, onClose }: GameProps) {
                 }`}
               >
                 <span className="absolute left-1 top-0.5 text-[8px] text-slate-400 dark:text-zinc-500">{tile}</span>
-                {hasSnake ? <span className="text-base leading-none" title={`Snake to ${hasSnake}`}>🐍</span> : null}
-                {hasLadder ? <span className="text-base leading-none" title={`Ladder to ${hasLadder}`}>🪜</span> : null}
+                {hasSnake ? <span className="text-base leading-none" title={`Snake to ${hasSnake}`}>??</span> : null}
+                {hasLadder ? <span className="text-base leading-none" title={`Ladder to ${hasLadder}`}>??</span> : null}
                 {position === tile ? (
                   <span className="absolute bottom-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[8px] font-bold text-white shadow">
                     P
@@ -1279,8 +1279,8 @@ function squareToCoords(square: string) {
 }
 
 function pieceSymbol(piece: { type: string; color: string }) {
-  const white: Record<string, string> = { p: "♙", n: "♘", b: "♗", r: "♖", q: "♕", k: "♔" };
-  const black: Record<string, string> = { p: "♟", n: "♞", b: "♝", r: "♜", q: "♛", k: "♚" };
+  const white: Record<string, string> = { p: "?", n: "?", b: "?", r: "?", q: "?", k: "?" };
+  const black: Record<string, string> = { p: "?", n: "?", b: "?", r: "?", q: "?", k: "?" };
   return (piece.color === "w" ? white : black)[piece.type] ?? "";
 }
 

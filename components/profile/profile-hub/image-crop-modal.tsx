@@ -120,7 +120,7 @@ export function ImageCropModal({
         </div>
         <div className="flex justify-end gap-3 border-t border-[var(--c-border-light)] px-6 py-4">
           <button
-            className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm text-slate-700 hover:bg-[var(--c-bg-muted)]"
+            className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
             onClick={onCancel}
             type="button"
           >

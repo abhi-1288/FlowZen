@@ -590,7 +590,7 @@ export function MembersTab({
                 onClick={exportAllToExcel}
                 whileHover={{ y: -1 }}
                 whileTap={{ scale: 0.97 }}
-                className="inline-flex items-center gap-1.5 rounded-lg neu-card px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] hover:text-slate-800 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-800"
+                className="inline-flex items-center gap-1.5 rounded-lg neu-card px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-800 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
                 <Download size={14} />
                 Export Excel
@@ -602,7 +602,7 @@ export function MembersTab({
                 onClick={openIdCodes}
                 whileHover={{ y: -1 }}
                 whileTap={{ scale: 0.97 }}
-                className="inline-flex items-center gap-1.5 rounded-lg neu-card px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] hover:text-slate-800 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-800"
+                className="inline-flex items-center gap-1.5 rounded-lg neu-card px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-800 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
                 <Hash size={14} />
                 Show ID numbers
@@ -621,7 +621,7 @@ export function MembersTab({
             <div className="relative">
               <select
                 id="members-region-filter"
-                className="appearance-none rounded-xl border border-[var(--c-border-light)] bg-[var(--c-bg-card)] py-2 pl-3 pr-8 text-sm font-medium text-slate-700 transition focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-50 dark:text-zinc-200 dark:focus:ring-indigo-600"
+                className="appearance-none rounded-xl border border-[var(--c-border-light)] bg-[var(--c-bg-white dark:bg-zinc-900)] py-2 pl-3 pr-8 text-sm font-medium text-slate-700 transition focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-50 dark:text-zinc-200 dark:focus:ring-indigo-600"
                 // With no explicit pick the server resolves to the viewer's own
                 // region; the owner resolves to the company-wide view, which is
                 // why "All offices" is the "" option for them and absent here.
@@ -642,7 +642,7 @@ export function MembersTab({
               ) : null}
             </div>
           ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--c-bg-muted)] px-3 py-1 text-xs font-medium text-slate-600 dark:text-zinc-300">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-1 text-xs font-medium text-slate-600 dark:text-zinc-300">
               <MapPin size={12} className="text-slate-400 dark:text-zinc-500" />
               {scopedToRegion ? payload?.regionLabel : "All offices"}
             </span>
@@ -697,7 +697,7 @@ export function MembersTab({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.05, duration: 0.3, ease: "easeOut" }}
-            className="flex items-center gap-3 rounded-2xl border border-[var(--c-border-light)] bg-[var(--c-bg-card)] p-4"
+            className="flex items-center gap-3 rounded-2xl border border-[var(--c-border-light)] bg-[var(--c-bg-white dark:bg-zinc-900)] p-4"
           >
             <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${stat.tone}`}>
               <stat.icon size={18} />
@@ -726,13 +726,13 @@ export function MembersTab({
               whileHover={{ y: -3 }}
               whileTap={{ scale: 0.97 }}
               onClick={() => { setModalRole(tile.key); setModalSearchQuery(""); setModalSearchInput(""); }}
-              className="group rounded-2xl border border-[var(--c-border-light)] bg-[var(--c-bg-card)] p-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+              className="group rounded-2xl border border-[var(--c-border-light)] bg-[var(--c-bg-white dark:bg-zinc-900)] p-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
             >
               <div className="flex items-center justify-between gap-2">
                 <span className={`grid h-9 w-9 place-items-center rounded-xl ${tile.meta.chip}`}>
                   <TileIcon size={16} />
                 </span>
-                <span className="rounded-full bg-[var(--c-bg-muted)] px-2 py-0.5 text-[11px] font-bold text-slate-600 dark:text-zinc-300">
+                <span className="rounded-full bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-2 py-0.5 text-[11px] font-bold text-slate-600 dark:text-zinc-300">
                   {tile.count}
                 </span>
               </div>
@@ -746,9 +746,9 @@ export function MembersTab({
       </div>
 
       {members.length === 0 && !membersLoading ? (
-        <div className="mt-5 grid place-items-center rounded-2xl bg-[var(--c-bg-muted)] px-3 py-8 text-center">
+        <div className="mt-5 grid place-items-center rounded-2xl bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-8 text-center">
           <div>
-            <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[var(--c-bg-card)] text-slate-400 dark:text-zinc-500">
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] text-slate-400 dark:text-zinc-500">
               <Users size={22} />
             </div>
             <p className="mt-3 text-sm text-slate-500 dark:text-zinc-400">
@@ -858,7 +858,7 @@ export function MembersTab({
           animate={{ opacity: 1 }}
         >
           <motion.div
-            className="w-full max-w-sm rounded-2xl bg-[var(--c-bg-card)] p-5 shadow-xl"
+            className="w-full max-w-sm rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl"
             initial={{ opacity: 0, scale: 0.94, y: 14 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ type: "spring", stiffness: 320, damping: 26 }}
@@ -884,7 +884,7 @@ export function MembersTab({
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
-                className="rounded-md border border-slate-300 px-4 py-1.5 text-xs text-slate-600 hover:bg-[var(--c-bg-muted)]"
+                className="rounded-md border border-slate-300 px-4 py-1.5 text-xs text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                 onClick={() => setRegionModalMember(null)}
               >
                 Cancel
@@ -910,7 +910,7 @@ export function MembersTab({
           animate={{ opacity: 1 }}
         >
           <motion.div
-            className="w-full max-w-sm rounded-2xl bg-[var(--c-bg-card)] p-5 shadow-xl"
+            className="w-full max-w-sm rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl"
             initial={{ opacity: 0, scale: 0.94, y: 14 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ type: "spring", stiffness: 320, damping: 26 }}
@@ -951,7 +951,7 @@ export function MembersTab({
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
-                className="rounded-md border border-slate-300 px-4 py-1.5 text-xs text-slate-600 hover:bg-[var(--c-bg-muted)]"
+                className="rounded-md border border-slate-300 px-4 py-1.5 text-xs text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                 onClick={() => setEmploymentModalMember(null)}
               >
                 Cancel

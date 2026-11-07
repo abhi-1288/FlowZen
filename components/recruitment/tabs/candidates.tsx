@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ChevronRight, ChevronDown, Briefcase, ChevronLeft, ChevronsLeft, ChevronsRight, Layers } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, Briefcase, ChevronLeft, ChevronsLeft, ChevronsRight, Layers, Users } from "lucide-react";
+import { PageShell } from "@/components/ui/page-shell";
+import { Card } from "@/components/ui/card";
+import { Empty } from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { inputCls } from "@/components/ui/field";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
 import { STAGES, STAGE_LABELS, type Stage } from "@/lib/recruitment-types";
@@ -85,17 +91,16 @@ export function CandidatesTab() {
     domainFilter === NO_DOMAIN ? "No domain chosen" : domainFilter || null;
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-semibold text-slate-900">Candidates</h1>
-      <p className="mt-1 text-sm text-slate-500">
-        {totalCandidates} total{activeDomainLabel ? ` in ${activeDomainLabel}` : ""}
-      </p>
-
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+    <PageShell
+      icon={Users}
+      title="Candidates"
+      subtitle={`${totalCandidates} total${activeDomainLabel ? ` in ${activeDomainLabel}` : ""}`}
+    >
+      <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 max-w-xs">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
-            className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-slate-950"
+            className={`${inputCls} py-1.5 pl-9 text-xs`}
             placeholder="Search candidates..."
             value={search}
             onChange={(e) => debouncedSearch(e.target.value)}
@@ -103,7 +108,7 @@ export function CandidatesTab() {
         </div>
         <select
           suppressHydrationWarning
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none"
+          className={`${inputCls} w-auto py-1.5 text-xs`}
           value={stageFilter}
           onChange={(e) => handleStageChange(e.target.value)}
         >
@@ -113,7 +118,7 @@ export function CandidatesTab() {
         <select
           suppressHydrationWarning
           aria-label="Filter by assessment domain"
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none disabled:opacity-50"
+          className={`${inputCls} w-auto py-1.5 text-xs`}
           value={domainFilter}
           onChange={(e) => handleDomainChange(e.target.value)}
           disabled={assessmentDomains.length === 0 && domainFilter === ""}
@@ -127,21 +132,21 @@ export function CandidatesTab() {
           <button
             suppressHydrationWarning
             onClick={() => { setDomainFilter(""); setStageFilter(""); setSearch(""); setPage(1); }}
-            className="text-xs font-medium text-slate-500 hover:text-slate-800 hover:underline"
+            className="text-xs font-medium text-slate-500 hover:text-slate-800 hover:underline dark:text-zinc-400 dark:hover:text-zinc-200"
           >
-            Clear filters
+            Clear
           </button>
         )}
       </div>
 
       {loading && candidates.length === 0 ? (
-        <div className="mt-6 space-y-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-16 animate-pulse rounded-lg bg-slate-200" />
-          ))}
+        <div className="mt-6">
+          <Skeleton rows={4} />
         </div>
       ) : grouped.length === 0 ? (
-        <div className="mt-16 text-center text-slate-500">No candidates found.</div>
+        <div className="mt-6">
+          <Empty icon={Users} title="No candidates found." message="Try adjusting your filters." />
+        </div>
       ) : (
         <div className="mt-6 space-y-4">
           {grouped.map(([jobTitle, jobCandidates]) => {
@@ -149,7 +154,7 @@ export function CandidatesTab() {
             const job = jobs.find((j) => j.title === jobTitle);
 
             return (
-              <div key={jobTitle} className="rounded-lg border border-slate-200 bg-white">
+              <div key={jobTitle} className="neu-card overflow-hidden rounded-2xl bg-white dark:bg-zinc-900">
                 <button suppressHydrationWarning
                   onClick={() => toggleJob(jobTitle)}
                   className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-slate-50 transition rounded-lg"
@@ -288,6 +293,6 @@ export function CandidatesTab() {
           )}
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

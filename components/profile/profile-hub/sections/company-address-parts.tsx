@@ -69,7 +69,7 @@ export function ModalShell({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="flex max-h-[92vh] w-full max-w-5xl animate-in fade-in-0 zoom-in-95 flex-col overflow-hidden rounded-2xl bg-[var(--c-bg-card)] shadow-modal duration-200 dark:border dark:border-zinc-800 dark:bg-[#000000]"
+        className="flex max-h-[92vh] w-full max-w-5xl animate-in fade-in-0 zoom-in-95 flex-col overflow-hidden rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] shadow-modal duration-200 dark:border dark:border-zinc-800 dark:bg-[#000000]"
       >
         {/* Header */}
         <div className="flex shrink-0 items-start gap-4 border-b border-[var(--c-border-light)] px-6 py-5 dark:border-zinc-800">
@@ -91,7 +91,7 @@ export function ModalShell({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="shrink-0 rounded-lg p-2 text-slate-400 transition-colors hover:bg-[var(--c-bg-muted)] hover:text-slate-700 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+            className="shrink-0 rounded-lg p-2 text-slate-400 transition-colors hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-700 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
           >
             <X size={18} />
           </button>
@@ -102,7 +102,7 @@ export function ModalShell({
 
         {/* Footer */}
         {footer ? (
-          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[var(--c-border-light)] bg-[var(--c-bg-card)] px-6 py-4 dark:border-zinc-800">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[var(--c-border-light)] bg-[var(--c-bg-white dark:bg-zinc-900)] px-6 py-4 dark:border-zinc-800">
             {footer}
           </div>
         ) : null}
@@ -143,7 +143,7 @@ export function TabBar<T extends string>({
             className={`inline-flex items-center gap-2 rounded-t-lg border-b-2 px-4 py-2.5 text-sm font-medium transition-all duration-200 ${
               isActive
                 ? "neu-tab-pressed border-indigo-500 text-indigo-700 dark:text-indigo-300"
-                : "border-transparent text-slate-500 hover:bg-[var(--c-bg-muted)] hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-100"
+                : "border-transparent text-slate-500 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-100"
             }`}
           >
             {Icon ? <Icon size={15} className="shrink-0" /> : null}
@@ -187,7 +187,7 @@ export function Panel({
 }) {
   const tones = {
     default:
-      "border-[var(--c-border-light)] bg-[var(--c-bg-card)] dark:border-zinc-800",
+      "border-[var(--c-border-light)] bg-[var(--c-bg-white dark:bg-zinc-900)] dark:border-zinc-800",
     subtle:
       "border-[var(--c-border-light)] bg-[var(--c-bg)] dark:border-zinc-800 dark:bg-zinc-950/40",
     warning:
@@ -511,7 +511,7 @@ export function ContactEditor({
           <span className="text-caption font-semibold uppercase tracking-wide text-muted">
             Office Contacts
           </span>
-          <span className="rounded-full bg-[var(--c-bg-muted)] px-2 py-0.5 text-[11px] font-semibold text-muted">
+          <span className="rounded-full bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-2 py-0.5 text-[11px] font-semibold text-muted">
             {value.length} of {MAX_CONTACTS}
           </span>
         </div>
@@ -698,7 +698,7 @@ export function EmptyBlock({
   return (
     <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--c-border-light)] px-6 py-12 text-center dark:border-zinc-800">
       {Icon ? (
-        <span className="grid h-11 w-11 place-items-center rounded-xl bg-[var(--c-bg-muted)] text-slate-400 dark:text-zinc-600">
+        <span className="grid h-11 w-11 place-items-center rounded-xl bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-400 dark:text-zinc-600">
           <Icon size={19} />
         </span>
       ) : null}

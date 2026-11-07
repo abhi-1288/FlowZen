@@ -279,7 +279,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
           <div className="flex items-start gap-3">
             {showPreview ? (
               <button
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-[var(--c-border-light)] text-slate-500 hover:bg-[var(--c-bg-muted)]"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-[var(--c-border-light)] text-slate-500 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                 type="button"
                 onClick={() => setShowPreview(false)}
                 aria-label="Back"
@@ -297,7 +297,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
             </div>
           </div>
           <button
-            className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 hover:bg-[var(--c-bg-muted)]"
+            className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
             type="button"
             onClick={onClose}
             aria-label="Close"
@@ -617,7 +617,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
               <button
                 type="button"
                 onClick={handlePreview}
-                className="w-full rounded-lg neu-inset px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
+                className="w-full rounded-lg neu-inset px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
               >
                 {letterContent ? "Edit Letter Content" : "Preview & Edit Letter Content"}
               </button>
@@ -638,7 +638,7 @@ export function DocumentLetterModal({ mode, onClose, onSuccess, showToast, isJun
           ) : (
             <>
               <button
-                className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
+                className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                 type="button"
                 onClick={onClose}
               >

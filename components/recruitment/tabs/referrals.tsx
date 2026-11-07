@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Briefcase, ChevronRight, UserPlus, ChevronLeft, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { PageShell } from "@/components/ui/page-shell";
+import { Empty } from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
 import { STAGE_LABELS, type Stage } from "@/lib/recruitment-types";
@@ -40,47 +43,41 @@ export function ReferralsTab() {
   const visibleJobs = jobs.filter((j) => j.status === "open" || j.status === "closed");
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Referrals</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {selectedJobId
-              ? `${totalReferrals} referral(s)`
-              : `${totalReferrals} total`}
-          </p>
-        </div>
-        {selectedJobId && (
-          <button suppressHydrationWarning
+    <PageShell
+      icon={UserPlus}
+      title="Referrals"
+      subtitle={selectedJobId ? `${totalReferrals} referral(s)` : `${totalReferrals} total`}
+      actions={
+        selectedJobId ? (
+          <button
+            suppressHydrationWarning
             onClick={() => { setSelectedJobId(null); setReferralPage(1); }}
-            className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
           >
             View All
           </button>
-        )}
-      </div>
-
+        ) : undefined
+      }
+    >
       {!selectedJobId ? (
         <>
           {loading && jobs.length === 0 ? (
-            <div className="mt-6 space-y-3">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-20 animate-pulse rounded-lg bg-slate-200" />
-              ))}
+            <div className="mt-6">
+              <Skeleton rows={4} />
             </div>
           ) : visibleJobs.length === 0 ? (
-            <div className="mt-16 text-center text-slate-500">
-              <Briefcase className="mx-auto h-10 w-10 text-slate-300" />
-              <p className="mt-2">No open or closed jobs found.</p>
+            <div className="mt-6">
+              <Empty icon={Briefcase} title="No open or closed jobs found." message="Create a job to start accepting referrals." />
             </div>
           ) : (
             <>
               <div className="mt-6 space-y-3">
                 {visibleJobs.map((job) => (
-                  <button suppressHydrationWarning
+                  <button
+                    suppressHydrationWarning
                     key={job.id}
                     onClick={() => handleSelectJob(job.id)}
-                    className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:shadow-sm"
+                    className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
                   >
                     <div>
                       <div className="flex items-center gap-2">
@@ -124,13 +121,12 @@ export function ReferralsTab() {
               ))}
             </div>
           ) : referrals.length === 0 ? (
-            <div className="mt-16 text-center text-slate-500">
-              <UserPlus className="mx-auto h-10 w-10 text-slate-300" />
-              <p className="mt-2">No referrals for this job yet.</p>
+            <div className="mt-6">
+              <Empty icon={UserPlus} title="No referrals for this job yet." message="Share the referral link to get started." />
             </div>
           ) : (
             <>
-              <div className="mt-6 overflow-hidden rounded-xl border border-slate-200">
+              <div className="mt-6 overflow-hidden neu-card rounded-2xl bg-white dark:bg-zinc-900">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50">
@@ -204,6 +200,6 @@ export function ReferralsTab() {
           )}
         </>
       )}
-    </div>
+    </PageShell>
   );
 }

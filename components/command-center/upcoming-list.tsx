@@ -27,7 +27,7 @@ const CATEGORY_ICONS: Record<UpcomingCategory, React.ComponentType<{ size?: numb
 export function UpcomingList({ sections }: { sections: UpcomingSection[] }) {
   if (sections.length === 0) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-[#000000]">
+      <div className="neu-card rounded-2xl p-5">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Upcoming</h3>
         <p className="mt-3 text-sm text-slate-400 dark:text-zinc-500">Nothing scheduled in the next two weeks.</p>
       </div>
@@ -35,7 +35,7 @@ export function UpcomingList({ sections }: { sections: UpcomingSection[] }) {
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-[#000000]">
+    <div className="neu-card rounded-2xl p-5">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Upcoming</h3>
         <span className="text-xs text-slate-400 dark:text-zinc-500">Next 14 days</span>

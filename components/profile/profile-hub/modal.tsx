@@ -49,7 +49,7 @@ export function Modal({
             </div>
             <button
               onClick={onClose}
-              className="rounded-lg p-1.5 text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-700 transition-colors shrink-0"
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-700 transition-colors shrink-0"
               aria-label="Close"
             >
               <X size={18} />

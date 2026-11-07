@@ -42,7 +42,7 @@ export function ManageWfhDatesModal({
 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl ring-1 ring-slate-200">
+      <div className="w-full max-w-lg rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl ring-1 ring-slate-200">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h3 className="text-xl font-bold text-slate-900">Manage WFH Dates</h3>
@@ -51,7 +51,7 @@ export function ManageWfhDatesModal({
             </p>
           </div>
           {wfhDates.length > 0 && (
-            <span className="rounded-full bg-[var(--c-bg-muted)] px-3 py-1 text-xs font-bold text-slate-600">
+            <span className="rounded-full bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-1 text-xs font-bold text-slate-600">
               {wfhDates.length} date{wfhDates.length !== 1 ? "s" : ""}
             </span>
           )}
@@ -91,7 +91,7 @@ export function ManageWfhDatesModal({
         <div className="mt-6">
           <button
             onClick={onClose}
-            className="w-full rounded-xl border border-[var(--c-border-light)] py-3 text-sm font-semibold text-slate-600 hover:bg-[var(--c-bg-muted)] transition"
+            className="w-full rounded-xl border border-[var(--c-border-light)] py-3 text-sm font-semibold text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition"
             type="button"
           >
             Close
@@ -109,7 +109,7 @@ export function ManageWfhDatesModal({
             }}
           >
             <div
-              className="w-full max-w-md rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl ring-1 ring-slate-200"
+              className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl ring-1 ring-slate-200"
               role="dialog"
               aria-modal="true"
               aria-labelledby="delete-wfh-date-title"
@@ -131,7 +131,7 @@ export function ManageWfhDatesModal({
                       from company-wide WFH dates.
                     </p>
                     {dateToDelete.reason ? (
-                      <p className="mt-3 rounded-lg bg-[var(--c-bg-muted)] px-3 py-2 text-sm text-slate-600">
+                      <p className="mt-3 rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-2 text-sm text-slate-600">
                         {dateToDelete.reason}
                       </p>
                     ) : null}
@@ -139,7 +139,7 @@ export function ManageWfhDatesModal({
                 </div>
                 <button
                   aria-label="Close confirmation"
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-[var(--c-bg-muted)] disabled:opacity-50"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] disabled:opacity-50"
                   disabled={deletingDate}
                   type="button"
                   onClick={() => setDateToDelete(null)}
@@ -150,7 +150,7 @@ export function ManageWfhDatesModal({
 
               <div className="mt-6 flex justify-end gap-3">
                 <button
-                  className="rounded-xl border border-[var(--c-border-light)] px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-[var(--c-bg-muted)] disabled:opacity-50"
+                  className="rounded-xl border border-[var(--c-border-light)] px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] disabled:opacity-50"
                   disabled={deletingDate}
                   type="button"
                   onClick={() => setDateToDelete(null)}

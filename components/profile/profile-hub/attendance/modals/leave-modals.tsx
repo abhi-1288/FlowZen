@@ -80,12 +80,12 @@ export function LeaveModal({
 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl ring-1 ring-slate-200">
+      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl ring-1 ring-slate-200">
         <h3 className="text-xl font-bold text-slate-900">Ask Leave</h3>
         <p className="mt-1 text-sm text-slate-500">
           Submit a paid leave request for HR and admin approval.
         </p>
-        <p className="mt-3 rounded-lg bg-[var(--c-bg-muted)] px-3 py-2 text-xs text-slate-600">
+        <p className="mt-3 rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-2 text-xs text-slate-600">
           Remaining paid leave:{" "}
           <span className="font-semibold text-slate-900">
             {Math.max(0, Number(leavePolicy?.remainingPaidLeaveDays ?? 0))} day{Math.max(0, Number(leavePolicy?.remainingPaidLeaveDays ?? 0)) === 1 ? "" : "s"}
@@ -161,7 +161,7 @@ export function LeaveModal({
               Attachment (Optional)
             </label>
             <div className="flex items-center gap-3">
-              <label className="flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-[var(--c-bg-muted)] text-sm text-slate-500 hover:bg-[var(--c-bg-muted)] transition-colors">
+              <label className="flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-sm text-slate-500 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors">
                 <Camera size={18} />
                 <span>
                   {formData.attachmentUrl
@@ -299,7 +299,7 @@ export function RequestsListModal({
                   <div
                     key={req._id}
                     onClick={() => setSelectedLeave(req)}
-                    className="rounded-xl neu-inset/50 p-4 cursor-pointer hover:border-[var(--c-border-light)] hover:bg-[var(--c-bg-muted)]/50 transition-all active:scale-[0.98]"
+                    className="rounded-xl neu-inset/50 p-4 cursor-pointer hover:border-[var(--c-border-light)] hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]/50 transition-all active:scale-[0.98]"
                   >
                     <div className="flex items-start justify-between">
                       <div>
@@ -407,7 +407,7 @@ export function LeaveDetailsModal({
           </div>
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 h-8 w-8 grid place-items-center rounded-full bg-[var(--c-bg-card)]/10 text-white hover:bg-[var(--c-bg-card)]/20 transition"
+            className="absolute top-4 right-4 h-8 w-8 grid place-items-center rounded-full bg-[var(--c-bg-white dark:bg-zinc-900)]/10 text-white hover:bg-[var(--c-bg-white dark:bg-zinc-900)]/20 transition"
           >
             <LogOut className="rotate-180" size={16} />
           </button>
@@ -430,7 +430,7 @@ export function LeaveDetailsModal({
             </span>
           </div>
 
-          <div className="mt-8 grid grid-cols-2 gap-6 rounded-2xl bg-[var(--c-bg-muted)] p-5">
+          <div className="mt-8 grid grid-cols-2 gap-6 rounded-2xl bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] p-5">
             <div className="space-y-1">
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                 Duration
@@ -476,7 +476,7 @@ export function LeaveDetailsModal({
                     download="attachment"
                     className="absolute inset-0 grid place-items-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
                   >
-                    <div className="rounded-full bg-[var(--c-bg-card)] px-4 py-2 text-xs font-bold text-slate-900 shadow-xl">
+                    <div className="rounded-full bg-[var(--c-bg-white dark:bg-zinc-900)] px-4 py-2 text-xs font-bold text-slate-900 shadow-xl">
                       View Original
                     </div>
                   </a>
@@ -555,7 +555,7 @@ export function LeaveDetailsModal({
           <div className="mt-6">
             <button
               onClick={onClose}
-              className="w-full rounded-2xl border border-[var(--c-border-light)] py-4 text-sm font-bold text-slate-600 hover:bg-[var(--c-bg-muted)] transition"
+              className="w-full rounded-2xl border border-[var(--c-border-light)] py-4 text-sm font-bold text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition"
             >
               Back to List
             </button>
@@ -571,7 +571,7 @@ export function LeaveDetailsModal({
                     /* ignore */
                   }
                 }}
-                className="w-full mt-2 rounded-2xl bg-[var(--c-bg-muted)] py-3 text-sm font-bold text-slate-700 hover:bg-[var(--c-bg-hover)] transition"
+                className="w-full mt-2 rounded-2xl bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] py-3 text-sm font-bold text-slate-700 hover:bg-[var(--c-bg-hover)] transition"
               >
                 View Day Details
               </button>

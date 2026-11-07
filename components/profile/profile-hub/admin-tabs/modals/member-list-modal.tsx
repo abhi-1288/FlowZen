@@ -191,14 +191,14 @@ export function MemberListModal({
                   onClick={exportToExcel}
                   whileHover={{ y: -1 }}
                   whileTap={{ scale: 0.96 }}
-                  className="inline-flex items-center gap-1.5 rounded-lg neu-card px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] hover:text-slate-800 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  className="inline-flex items-center gap-1.5 rounded-lg neu-card px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-800 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-800"
                 >
                   <Download size={14} />
                   Export Excel
                 </motion.button>
                 <button
                   aria-label="Close"
-                  className="inline-flex items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-[var(--c-bg-muted)] hover:text-slate-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                  className="inline-flex items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                   type="button"
                   onClick={onClose}
                 >
@@ -242,7 +242,7 @@ export function MemberListModal({
                     type="button"
                     aria-label="Clear search"
                     onClick={() => onSearchInputChange("")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                   >
                     <X size={13} />
                   </button>
@@ -255,7 +255,7 @@ export function MemberListModal({
               {filteredMembers.length === 0 ? (
                 <div className="grid min-h-[190px] place-items-center text-center">
                   <div>
-                    <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[var(--c-bg-muted)] text-slate-400 dark:text-zinc-500">
+                    <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-400 dark:text-zinc-500">
                       <SearchX size={22} />
                     </div>
                     <p className="mt-3 text-sm font-medium text-slate-600 dark:text-zinc-300">No members match your search.</p>

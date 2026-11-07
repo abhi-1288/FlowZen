@@ -572,7 +572,7 @@ export function DashboardTab({
                     href={String(n.link)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="shrink-0 rounded-lg neu-card p-1.5 text-slate-500 hover:bg-[var(--c-bg-muted)]"
+                    className="shrink-0 rounded-lg neu-card p-1.5 text-slate-500 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                   >
                     <ExternalLink size={14} />
                   </a>
@@ -669,7 +669,7 @@ export function DashboardTab({
                             ) : status === "rejected" ? (
                               <button
                                 type="button"
-                                className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
+                                className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                                 onClick={() => setViewingRejected(req)}
                               >
                                 View Rejection
@@ -746,15 +746,15 @@ export function DashboardTab({
             Company Overview
           </h2>
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{String((insights.hr as any).totalMembers ?? "0")}</p>
               <p className="text-xs text-slate-500">Total Members</p>
             </div>
-            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{String((insights.hr as any).pendingJoins ?? "0")}</p>
               <p className="text-xs text-slate-500">Pending Joins</p>
             </div>
-            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{approvals.length}</p>
               <p className="text-xs text-slate-500">Pending Approvals</p>
             </div>
@@ -799,7 +799,7 @@ export function DashboardTab({
               </h2>
               <div className="space-y-2">
                 {hrOverdueExits.map((m: { name: string; type: string; ms: number; end: Date }) => (
-                  <div key={m.name} className="flex items-center justify-between gap-3 rounded-lg border border-rose-100 bg-[var(--c-bg-card)] px-4 py-3">
+                  <div key={m.name} className="flex items-center justify-between gap-3 rounded-lg border border-rose-100 bg-[var(--c-bg-white dark:bg-zinc-900)] px-4 py-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-slate-900">{m.name}</p>
                       <p className="text-xs text-slate-500 capitalize">{m.type || "—"}</p>
@@ -827,15 +827,15 @@ export function DashboardTab({
             Finance Summary
           </h2>
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-amber-700">{financeCount}</p>
               <p className="text-xs text-slate-500">Pending Actions</p>
             </div>
-            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{checkOutRequestCount}</p>
               <p className="text-xs text-slate-500">Check-out Requests</p>
             </div>
-            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{approvals.length}</p>
               <p className="text-xs text-slate-500">Pending Approvals</p>
             </div>
@@ -850,17 +850,17 @@ export function DashboardTab({
             Company Overview
           </h2>
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">
                 {String((insights?.hr as any)?.totalMembers ?? (insights?.admin as any)?.totalMembers ?? "0")}
               </p>
               <p className="text-xs text-slate-500">Total Members</p>
             </div>
-            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{financeCount}</p>
               <p className="text-xs text-slate-500">Finance Pending</p>
             </div>
-            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{approvals.length}</p>
               <p className="text-xs text-slate-500">Pending Approvals</p>
             </div>
@@ -875,13 +875,13 @@ export function DashboardTab({
             Team Overview
           </h2>
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">
                 {Array.isArray((insights.manager as any).teams) ? (insights.manager as any).teams.length : "0"}
               </p>
               <p className="text-xs text-slate-500">Teams Managed</p>
             </div>
-            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{approvals.length}</p>
               <p className="text-xs text-slate-500">Pending Approvals</p>
             </div>
@@ -896,22 +896,22 @@ export function DashboardTab({
             My Summary
           </h2>
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{pendingApprovalsCount}</p>
               <p className="text-xs text-slate-500">Pending Approvals</p>
             </div>
-            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{unreadCount}</p>
               <p className="text-xs text-slate-500">Unread Notifications</p>
             </div>
-            <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
+            <div className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">
                 {checkedIn ? "✓" : "--"}
               </p>
               <p className="text-xs text-slate-500">Today's Attendance</p>
             </div>
             {profile && Boolean(profile.employmentType) && (
-              <div className="rounded-lg bg-[var(--c-bg-muted)] px-4 py-3 text-center">
+              <div className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 text-center">
                 <p className="text-sm font-bold capitalize text-slate-900">
                   {String(profile.employmentType).replace(/-/g, " ")}
                 </p>
@@ -1010,14 +1010,14 @@ export function DashboardTab({
               </div>
               <div className="rounded-lg neu-inset p-3">
                 <p className="font-medium text-slate-700 mb-2">Submitted Draft</p>
-                <div className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-md bg-[var(--c-bg-card)] p-3 text-xs border border-[var(--c-border-light)] text-slate-600">
+                <div className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-md bg-[var(--c-bg-white dark:bg-zinc-900)] p-3 text-xs border border-[var(--c-border-light)] text-slate-600">
                   {String((viewingRejected.metadata as any)?.letterContent ?? "").trim() || generateFallbackLetter(viewingRejected)}
                 </div>
               </div>
             </div>
             <div className="flex justify-end border-t border-[var(--c-border-light)] px-6 py-4">
               <button
-                className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
+                className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                 type="button"
                 onClick={() => setViewingRejected(null)}
               >
@@ -1072,12 +1072,12 @@ export function DashboardTab({
               <div className="border-b border-[var(--c-border-light)] px-6 py-4">
                 <div className="flex items-center justify-between">
                   <h4 className="text-lg font-semibold text-slate-900">Lost Card Report</h4>
-                  <button type="button" onClick={() => setViewingLostCard(null)} className="rounded-lg p-1 text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-600">
+                  <button type="button" onClick={() => setViewingLostCard(null)} className="rounded-lg p-1 text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-600">
                     &times;
                   </button>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusColors[status] ?? "bg-[var(--c-bg-muted)] text-slate-600"}`}>
+                  <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusColors[status] ?? "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-600"}`}>
                     {status.replace(/-/g, " ")}
                   </span>
                   <span className="rounded bg-[var(--c-bg-hover)] px-1.5 py-0.5 text-[10px] font-medium text-slate-600 capitalize">{reason}</span>
@@ -1145,7 +1145,7 @@ export function DashboardTab({
                     <p className="text-xs font-semibold uppercase text-slate-500">Follow-up Notes</p>
                     <div className="mt-1 space-y-1.5">
                       {followUpNotes.map((fn: any, i: number) => (
-                        <div key={i} className="rounded-lg bg-[var(--c-bg-muted)] px-3 py-2">
+                        <div key={i} className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-2">
                           <p className="text-[10px] font-medium text-slate-700">{fn.addedByName ?? "Unknown"}</p>
                           <p className="text-xs text-slate-600">{fn.note}</p>
                           {fn.addedAt ? <p className="mt-0.5 text-[10px] text-slate-400">{new Date(fn.addedAt).toLocaleString("en-IN")}</p> : null}
@@ -1185,7 +1185,7 @@ export function DashboardTab({
 
               <div className="flex justify-end border-t border-[var(--c-border-light)] px-6 py-4">
                 <button
-                  className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
+                  className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                   type="button"
                   onClick={() => setViewingLostCard(null)}
                 >

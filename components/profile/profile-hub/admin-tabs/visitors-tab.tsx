@@ -366,7 +366,7 @@ export function VisitorsTab({
         {(["pending", "approved", "expired", "rejected", "all"] as const).map((f) => (
           <button
             key={f}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${ passFilter === f ? "bg-amber-500 text-white" : "bg-[var(--c-bg-muted)] text-slate-600 hover:bg-[var(--c-bg-hover)]" }`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${ passFilter === f ? "bg-amber-500 text-white" : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-600 hover:bg-[var(--c-bg-hover)]" }`}
             onClick={() => setPassFilter(f)}
             type="button"
           >
@@ -516,9 +516,9 @@ export function VisitorsTab({
             const statusColor = isPending ? "bg-amber-100 text-amber-700" :
               isApproved ? "bg-emerald-100 text-emerald-700" :
               isActive ? "bg-blue-100 text-blue-700" :
-              isCompleted ? "bg-[var(--c-bg-muted)] text-slate-500" :
+              isCompleted ? "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-500" :
               isRejected ? "bg-rose-100 text-rose-700" :
-              "bg-[var(--c-bg-muted)] text-slate-500";
+              "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-500";
             return (
               <div key={passId} className="rounded-xl neu-inset/50 p-4">
                 <div className="flex items-start justify-between gap-3">

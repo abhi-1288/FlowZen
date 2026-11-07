@@ -39,7 +39,7 @@ export function HolidayModal({
 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl ring-1 ring-slate-200">
+      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl ring-1 ring-slate-200">
         <h3 className="text-xl font-bold text-slate-900">Add Holiday</h3>
         <p className="mt-1 text-sm text-slate-500">
           Create a future holiday for the organization.
@@ -189,7 +189,7 @@ export function EditHolidayModal({
 
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl ring-1 ring-slate-200 relative">
+      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl ring-1 ring-slate-200 relative">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-xl font-bold text-slate-900">Edit Holiday</h3>
@@ -298,7 +298,7 @@ export function EditHolidayModal({
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-[90] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl ring-1 ring-slate-200">
+          <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl ring-1 ring-slate-200">
             <h3 className="text-xl font-bold text-slate-900">Confirm Delete</h3>
             <p className="mt-2 text-sm text-slate-500">
               Delete holiday "{String(holiday.title ?? "")}"? This action cannot
@@ -308,7 +308,7 @@ export function EditHolidayModal({
               <button
                 type="button"
                 onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
+                className="flex-1 rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
               >
                 Cancel
               </button>
@@ -364,7 +364,7 @@ export function AdminLeaveHistoryModal({
             </button>
             <button
               onClick={onClose}
-              className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)] transition"
+              className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition"
             >
               Close
             </button>
@@ -375,7 +375,7 @@ export function AdminLeaveHistoryModal({
           <div className="overflow-x-auto rounded-2xl neu-inset">
             <table className="min-w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-[var(--c-bg-muted)]">
+                <tr className="bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]">
                   <th className="px-3 py-2 border text-left">Title</th>
                   <th className="px-3 py-2 border text-left">From</th>
                   <th className="px-3 py-2 border text-left">To</th>
@@ -396,7 +396,7 @@ export function AdminLeaveHistoryModal({
                   holidays.map((h: any) => (
                     <tr
                       key={h._id}
-                      className="border-b bg-[var(--c-bg-card)] hover:bg-[var(--c-bg-muted)] transition"
+                      className="border-b bg-[var(--c-bg-white dark:bg-zinc-900)] hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition"
                     >
                       <td className="px-3 py-3 border">{h.title}</td>
                       <td className="px-3 py-3 border">

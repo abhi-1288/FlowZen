@@ -10,6 +10,7 @@ import {
 import { useSession } from "next-auth/react";
 import { apiFetch } from "@/lib/client-utils";
 import { useNotificationToast } from "@/lib/toast-context";
+import { inputCls } from "@/components/ui/field";
 import { ItKanbanBoard, ProcurementBoard } from "./it-kanban-board";
 import { ItTicketModal } from "./it-ticket-modal";
 import { NewTicketModal } from "./new-ticket-modal";
@@ -134,7 +135,7 @@ export function ItShell() {
 
   return (
     <div className="min-h-screen bg-[#f7f8fb] text-slate-950 dark:bg-[#1a1a1a] dark:text-zinc-100">
-      <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6 dark:border-zinc-800 dark:bg-[#000000]">
+      <header className="glass-surface border-b px-4 py-4 shadow-sm sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-3">
@@ -159,7 +160,7 @@ export function ItShell() {
                   key={b}
                   className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                     board === b
-                      ? "bg-slate-950 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                      ? "bg-indigo-600 text-white"
                       : "text-slate-600 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-zinc-700"
                   }`}
                   onClick={() => setBoard(b)}
@@ -170,7 +171,7 @@ export function ItShell() {
               ))}
             </div>
             <button
-              className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
               onClick={() => setShowNewTicket(true)}
               type="button"
             >

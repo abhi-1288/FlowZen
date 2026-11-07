@@ -16,7 +16,7 @@ function TabBtn({
 }) {
   return (
     <button
-      className={`rounded-lg border px-4 py-2 text-sm font-medium transition-all duration-200 ${ active ? "neu-tab-pressed border-transparent " : "bg-[var(--c-bg-elevated)] border-[var(--c-border-light)] text-slate-600 hover:bg-[var(--c-bg-muted)]" }`}
+      className={`rounded-lg border px-4 py-2 text-sm font-medium transition-all duration-200 ${ active ? "neu-tab-pressed border-transparent " : "bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] border-[var(--c-border-light)] text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]" }`}
       onClick={onClick}
     >
       {label}

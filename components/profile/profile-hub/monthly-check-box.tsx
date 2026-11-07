@@ -86,7 +86,7 @@ export function MonthlyCheckBox({
                     {item.value} day{item.value === 1 ? "" : "s"}
                   </span>
                 </div>
-                <div className="h-3 overflow-hidden rounded-full bg-[var(--c-bg-muted)]">
+                <div className="h-3 overflow-hidden rounded-full bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]">
                   <div
                     className={`h-full rounded-full ${monthlyCheckColors[item.key] ?? "bg-slate-500"} transition-all`}
                     style={{ width }}
@@ -96,12 +96,12 @@ export function MonthlyCheckBox({
             );
           })}
           {!summary && !loading ? (
-            <p className="rounded-lg bg-[var(--c-bg-muted)] px-3 py-6 text-center text-sm text-slate-500">
+            <p className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-6 text-center text-sm text-slate-500">
               Select a month to view your attendance comparison.
             </p>
           ) : null}
           {loading ? (
-            <p className="rounded-lg bg-[var(--c-bg-muted)] px-3 py-6 text-center text-sm text-slate-500">
+            <p className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-6 text-center text-sm text-slate-500">
               Loading monthly check...
             </p>
           ) : null}
@@ -116,7 +116,7 @@ export function MonthlyCheckBox({
           </div>
           <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
             {summary?.items.map((item) => (
-              <div className="rounded-md bg-[var(--c-bg-card)] px-2 py-2" key={`stat-${item.key}`}>
+              <div className="rounded-md bg-[var(--c-bg-white dark:bg-zinc-900)] px-2 py-2" key={`stat-${item.key}`}>
                 <p className="text-slate-500">{item.label}</p>
                 <p className="font-semibold text-slate-900">{item.value}</p>
               </div>

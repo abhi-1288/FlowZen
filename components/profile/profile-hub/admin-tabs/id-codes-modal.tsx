@@ -132,7 +132,7 @@ export function IdCodesModal({
           </div>
           <button
             aria-label="Close"
-            className="rounded-lg p-1.5 text-slate-500 hover:bg-[var(--c-bg-muted)]"
+            className="rounded-lg p-1.5 text-slate-500 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
             type="button"
             onClick={onClose}
           >
@@ -170,7 +170,7 @@ export function IdCodesModal({
                     className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
                       !activeRegion
                         ? "bg-indigo-100 text-indigo-700"
-                        : "neu-card text-slate-500 hover:bg-[var(--c-bg-muted)]"
+                        : "neu-card text-slate-500 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                     }`}
                   >
                     All
@@ -183,7 +183,7 @@ export function IdCodesModal({
                       className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
                         activeRegion && String(region.region) === activeRegion.region
                           ? "bg-indigo-100 text-indigo-700"
-                          : "neu-card text-slate-500 hover:bg-[var(--c-bg-muted)]"
+                          : "neu-card text-slate-500 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                       }`}
                       title={`${String(region.region)} · ${region.startRange ?? "?"} – ${region.endRange ?? "?"} · ${region.remaining ?? "?"} left`}
                     >
@@ -209,7 +209,7 @@ export function IdCodesModal({
                   <button
                     type="button"
                     onClick={() => { setQuery(""); setWindowSize(WINDOW); }}
-                    className="rounded-lg neu-card px-3 py-2 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
+                    className="rounded-lg neu-card px-3 py-2 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                   >
                     Clear
                   </button>
@@ -286,7 +286,7 @@ export function IdCodesModal({
                   <button
                     type="button"
                     onClick={() => setWindowSize(windowSize + WINDOW)}
-                    className="rounded-full neu-card px-4 py-2 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
+                    className="rounded-full neu-card px-4 py-2 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                   >
                     Show more (+{Math.min(WINDOW, total - windowSize).toLocaleString("en-IN")})
                   </button>

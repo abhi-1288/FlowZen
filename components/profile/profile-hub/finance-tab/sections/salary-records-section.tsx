@@ -27,12 +27,12 @@ function TabBtn({
 }) {
   return (
     <button
-      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all duration-200 ${ active ? "neu-tab-pressed border-transparent " : "bg-[var(--c-bg-elevated)] border-[var(--c-border-light)] text-slate-600 hover:bg-[var(--c-bg-muted)]" }`}
+      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all duration-200 ${ active ? "neu-tab-pressed border-transparent " : "bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] border-[var(--c-border-light)] text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]" }`}
       onClick={onClick}
     >
       {label}
       {count > 0 ? (
-        <span className={`ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none ${ active ? "bg-white/20 text-white" : "bg-[var(--c-bg-muted)] text-slate-600" }`}>
+        <span className={`ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none ${ active ? "bg-white/20 text-white" : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-600" }`}>
           {count}
         </span>
       ) : null}
@@ -106,7 +106,7 @@ export function SalaryRecordsSection({
         </div>
         <a
           href={`/api/finance/export?month=${month}`}
-          className="shrink-0 rounded-lg neu-card px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
+          className="shrink-0 rounded-lg neu-card px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
         >
           Export CSV
         </a>

@@ -3,7 +3,7 @@ import type { AnyRecord } from "../../shared";
 import { isExpiredDeadline, parseDeadline } from "../helpers";
 
 const overlayClass = "fixed inset-0 z-50 grid place-items-center bg-black/40";
-const modalClass = "w-full max-w-lg rounded-2xl bg-[var(--c-bg-elevated)] p-6 shadow-xl";
+const modalClass = "w-full max-w-lg rounded-2xl bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] p-6 shadow-xl";
 
 export function ExpiredBudgetsModal({
   show,

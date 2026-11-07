@@ -1,4 +1,4 @@
-﻿import { Check } from "lucide-react";
+import { Check } from "lucide-react";
 import { formatRole } from "../shared";
 import type { AnyRecord } from "../shared";
 
@@ -41,7 +41,7 @@ export function SetupModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4">
-      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl dark:bg-[#000000]">
+      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl dark:bg-[#000000]">
         {step === "send-otp" ? (
           <>
             <h3 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Verify your email</h3>

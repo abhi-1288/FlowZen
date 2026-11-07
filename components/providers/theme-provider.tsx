@@ -29,6 +29,21 @@ export function applyTheme(preference: ThemePreference) {
   document.documentElement.style.colorScheme = isDark ? "dark" : "light";
 }
 
+export function getGlassPreference(): boolean {
+  try {
+    return localStorage.getItem("flowzen_glass") === "true";
+  } catch {
+    return true;
+  }
+}
+
+export function applyGlass(enabled: boolean) {
+  try {
+    localStorage.setItem("flowzen_glass", String(enabled));
+  } catch {}
+  document.documentElement.classList.toggle("theme-glass", enabled);
+}
+
 function getPersistedColor(): string | null {
   try {
     return localStorage.getItem(LS_KEY);
@@ -50,6 +65,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const preference = getThemePreference();
     applyTheme(preference);
+    applyGlass(getGlassPreference());
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => { if (getThemePreference() === "system") applyTheme("system"); };
     media.addEventListener("change", onChange);

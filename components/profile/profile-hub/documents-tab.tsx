@@ -35,7 +35,7 @@ export function DocumentsTab({
   return (
     <div className="space-y-6">
       {isHrOrAdmin ? (
-        <div className="flex gap-1 rounded-xl bg-[var(--c-bg-muted)] p-1">
+        <div className="flex gap-1 rounded-xl bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] p-1">
           <button
             type="button"
             className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${ subTab === "required" ? "neu-tab-pressed" : "text-slate-500 hover:text-slate-700" }`}
@@ -146,14 +146,14 @@ function ArchivedDocuments() {
               href={doc.fileUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-[var(--c-bg-muted)]"
+              className="rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
             >
               View
             </a>
             <a
               href={doc.fileUrl}
               download={doc.fileName}
-              className="rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-[var(--c-bg-muted)]"
+              className="rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
             >
               Download
             </a>
@@ -273,7 +273,7 @@ function RequiredDocumentsSection({
                       {expanded[i] ? "▾" : "▸"}
                     </button>
                     <span className="flex-1 font-medium text-slate-800">{cat.name}</span>
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${cat.mandatory ? "bg-rose-100 text-rose-700" : "bg-[var(--c-bg-muted)] text-slate-600"}`}>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${cat.mandatory ? "bg-rose-100 text-rose-700" : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-600"}`}>
                       {cat.mandatory ? "Mandatory" : "Optional"}
                     </span>
                     <button
@@ -602,7 +602,7 @@ function DocumentsUploadSection({
             <div key={cat.name} className="rounded-lg neu-card p-4">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-sm font-medium text-slate-800">{cat.name}</span>
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${cat.mandatory ? "bg-rose-100 text-rose-700" : "bg-[var(--c-bg-muted)] text-slate-600"}`}>
+                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${cat.mandatory ? "bg-rose-100 text-rose-700" : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-600"}`}>
                   {cat.mandatory ? "Required" : "Optional"}
                 </span>
                 {(cat.acceptedFileTypes ?? []).length > 0 ? (
@@ -647,7 +647,7 @@ function DocumentsUploadSection({
                       <span className="ml-1">({(doc.fileSize / 1024).toFixed(0)} KB)</span>
                     </div>
                     <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer"
-                      className="rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)] transition"
+                      className="rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition"
                     >
                       View
                     </a>

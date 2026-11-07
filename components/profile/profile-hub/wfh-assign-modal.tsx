@@ -59,7 +59,7 @@ export function WfhAssignModal({
 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl ring-1 ring-slate-200">
+      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl ring-1 ring-slate-200">
         <h3 className="text-xl font-bold text-slate-900">Assign Work From Home</h3>
         <p className="mt-1 text-sm text-slate-500">
           Assign Work From Home (WFH) dates for the company.
@@ -116,7 +116,7 @@ export function WfhAssignModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-xl border border-[var(--c-border-light)] py-3 text-sm font-semibold text-slate-600 hover:bg-[var(--c-bg-muted)] transition"
+              className="flex-1 rounded-xl border border-[var(--c-border-light)] py-3 text-sm font-semibold text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition"
             >
               Cancel
             </button>

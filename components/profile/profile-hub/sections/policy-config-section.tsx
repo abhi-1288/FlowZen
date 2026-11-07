@@ -178,7 +178,7 @@ export function PolicyConfigSection({
             </div>
           </div>
           <button
-            className="mt-3 w-full rounded-lg neu-card px-3 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
+            className="mt-3 w-full rounded-lg neu-card px-3 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
             onClick={() => setActiveModal("notice")}
             type="button"
           >
@@ -201,7 +201,7 @@ export function PolicyConfigSection({
             </div>
           </div>
           <button
-            className="mt-3 w-full rounded-lg neu-card px-3 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
+            className="mt-3 w-full rounded-lg neu-card px-3 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
             onClick={() => setActiveModal("paid-leave")}
             type="button"
           >
@@ -224,7 +224,7 @@ export function PolicyConfigSection({
             </div>
           </div>
           <button
-            className="mt-3 w-full rounded-lg neu-card px-3 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
+            className="mt-3 w-full rounded-lg neu-card px-3 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
             onClick={() => setActiveModal("wfh")}
             type="button"
           >
@@ -244,7 +244,7 @@ export function PolicyConfigSection({
             </div>
           </div>
           <button
-            className="mt-3 w-full rounded-lg neu-card px-3 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
+            className="mt-3 w-full rounded-lg neu-card px-3 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
             onClick={() => setActiveModal("day-hour")}
             type="button"
           >
@@ -270,7 +270,7 @@ export function PolicyConfigSection({
               </div>
             </div>
             <button
-              className="mt-3 w-full rounded-lg neu-card px-3 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
+              className="mt-3 w-full rounded-lg neu-card px-3 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
               onClick={() => setActiveModal("identity")}
               type="button"
             >
@@ -413,7 +413,7 @@ export function PolicyConfigSection({
           />
           <span className="text-sm text-slate-600">hours per day</span>
         </div>
-        <p className="mt-3 rounded-lg bg-[var(--c-bg-muted)] p-3 text-xs text-slate-500">
+        <p className="mt-3 rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] p-3 text-xs text-slate-500">
           Attendance rules: &lt; {Math.floor(minWorkHours / 2)} hrs = absent, &ge; {Math.floor(minWorkHours / 2)} hrs and &lt; {minWorkHours} hrs = half-day, &ge; {minWorkHours} hrs = present
         </p>
       </PolicyModal>
@@ -491,7 +491,7 @@ export function PolicyConfigSection({
           </div>
         </div>
 
-        <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-[var(--c-bg-card)] p-3">
+        <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-[var(--c-bg-white dark:bg-zinc-900)] p-3">
           <p className="text-xs font-semibold uppercase text-slate-500">Preview</p>
           <p className="mt-1 font-mono text-sm font-semibold text-indigo-700">{previewCode}</p>
         </div>
@@ -520,7 +520,7 @@ export function PolicyConfigSection({
           </p>
 
           {identityCodeRegions.length === 0 ? (
-            <p className="rounded-lg bg-[var(--c-bg-muted)] p-3 text-xs text-slate-500">
+            <p className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] p-3 text-xs text-slate-500">
               No region ranges are configured. Codes are assigned from the master range.
               {addressLabels.length > 0 ? ` Offices: ${addressLabels.join(", ")}.` : ""}
             </p>
@@ -575,7 +575,7 @@ export function PolicyConfigSection({
               ))}
               <button
                 type="button"
-                className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
+                className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                 onClick={() =>
                   onIdentityCodeRegionsChange([...identityCodeRegions, { region: "", startRange: null, endRange: null, nextNumber: null, remaining: null }])
                 }
@@ -639,7 +639,7 @@ export function PolicyConfigSection({
             Upload an Excel file with columns: User Name, Email, Flowzen Code, Original Code.
           </p>
 
-          <div className="rounded-lg border border-dashed border-slate-300 bg-[var(--c-bg-card)] p-3">
+          <div className="rounded-lg border border-dashed border-slate-300 bg-[var(--c-bg-white dark:bg-zinc-900)] p-3">
             <input
               type="file"
               accept=".xlsx,.xls,.csv"
@@ -684,7 +684,7 @@ export function PolicyConfigSection({
 
               <div className="max-h-48 overflow-y-auto rounded-lg neu-card">
                 <table className="w-full text-left text-[11px]">
-                  <thead className="sticky top-0 border-b border-[var(--c-border-light)] bg-[var(--c-bg-muted)]">
+                  <thead className="sticky top-0 border-b border-[var(--c-border-light)] bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]">
                     <tr>
                       <th className="px-2 py-1.5 font-medium text-slate-600">Row</th>
                       <th className="px-2 py-1.5 font-medium text-slate-600">Email</th>
@@ -728,7 +728,7 @@ export function PolicyConfigSection({
                   </button>
                 ) : null}
                 <button
-                  className="rounded-lg neu-card px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]"
+                  className="rounded-lg neu-card px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                   type="button"
                   onClick={onBulkPreviewClear}
                 >

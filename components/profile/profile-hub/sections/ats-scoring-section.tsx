@@ -98,7 +98,7 @@ export function AtsScoringSection({ state }: { state: AtsSettingsState }) {
                 <button
                   type="button"
                   onClick={() => setReveal((v) => !v)}
-                  className="rounded-md border border-[var(--c-border-light)] p-2 text-slate-500 hover:bg-[var(--c-bg-muted)] dark:border-zinc-800"
+                  className="rounded-md border border-[var(--c-border-light)] p-2 text-slate-500 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] dark:border-zinc-800"
                   title={reveal ? "Hide" : "Reveal"}
                 >
                   {reveal ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -106,20 +106,20 @@ export function AtsScoringSection({ state }: { state: AtsSettingsState }) {
                 <button
                   type="button"
                   onClick={state.cancelEditingKey}
-                  className="rounded-md border border-[var(--c-border-light)] px-2.5 py-2 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)] dark:border-zinc-800 dark:text-zinc-300"
+                  className="rounded-md border border-[var(--c-border-light)] px-2.5 py-2 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] dark:border-zinc-800 dark:text-zinc-300"
                 >
                   Cancel
                 </button>
               </div>
             ) : (
               <div className="mt-1.5 flex items-center gap-2">
-                <code className="min-w-0 flex-1 truncate rounded-md bg-[var(--c-bg-muted)] px-3 py-2 text-xs text-slate-600 dark:text-zinc-300">
+                <code className="min-w-0 flex-1 truncate rounded-md bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-2 text-xs text-slate-600 dark:text-zinc-300">
                   {state.hasApiKey ? state.maskedApiKey : "No API key set"}
                 </code>
                 <button
                   type="button"
                   onClick={state.startEditingKey}
-                  className="shrink-0 rounded-md border border-[var(--c-border-light)] px-3 py-2 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)] dark:border-zinc-800 dark:text-zinc-300"
+                  className="shrink-0 rounded-md border border-[var(--c-border-light)] px-3 py-2 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] dark:border-zinc-800 dark:text-zinc-300"
                 >
                   {state.hasApiKey ? "Change" : "Add key"}
                 </button>

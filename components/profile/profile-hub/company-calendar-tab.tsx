@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import {
@@ -196,17 +196,17 @@ export function CompanyCalendarTab() {
         </h2>
         <p className="mb-4 text-xs text-slate-500">All departments can subscribe to this calendar.</p>
 
-        {/* ── Month Navigation ── */}
+        {/* -- Month Navigation -- */}
         <div className="mb-8 flex flex-col items-center justify-center gap-4">
           <div className="flex items-center gap-4">
             <ActionButton onClick={prevMonth} variant="secondary" className="h-10 w-12">
               <ChevronLeft size={20} />
             </ActionButton>
             <div className="flex items-center overflow-hidden rounded-xl border border-[var(--c-border-light)] shadow-sm dark:border-zinc-800">
-              <div className="border-r border-[var(--c-border-light)] bg-[var(--c-bg-muted)] px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-600 dark:border-zinc-800 dark:bg-zinc-700 dark:text-zinc-300">
+              <div className="border-r border-[var(--c-border-light)] bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-600 dark:border-zinc-800 dark:bg-zinc-700 dark:text-zinc-300">
                 {MONTHS[month]}
               </div>
-              <div className="bg-[var(--c-bg-card)] px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-900 dark:bg-[#000000] dark:text-zinc-100">
+              <div className="bg-[var(--c-bg-white dark:bg-zinc-900)] px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-900 dark:bg-[#000000] dark:text-zinc-100">
                 {year}
               </div>
             </div>
@@ -216,7 +216,7 @@ export function CompanyCalendarTab() {
           </div>
         </div>
 
-        {/* ── Calendar Grid ── */}
+        {/* -- Calendar Grid -- */}
         <div className="rounded-2xl neu-inset/50 p-4 dark:border-zinc-800 dark:bg-[#000000]">
           <div className="grid grid-cols-7 gap-3">
             {WEEKDAYS.map((wd, i) => (
@@ -247,7 +247,7 @@ export function CompanyCalendarTab() {
                             setSelectedDate(new Date(year, month, day));
                           }
                         }}
-                        className={`relative grid h-10 w-full place-items-center rounded-xl text-xs font-bold sm:h-14 sm:text-sm transition-all ${ day ? primaryType ? `${style?.bg} ${style?.text} ${style?.border} border shadow-sm` : isToday ? "bg-[var(--c-bg-elevated)] text-rose-600 border border-rose-200 shadow-sm dark:bg-zinc-700 dark:border-rose-900" : "neu-card border border-[var(--c-border-light)] text-slate-700 hover:border-slate-300 dark:bg-zinc-700 dark:border-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-600" : "opacity-0" } ${isToday && !primaryType ? "ring-2 ring-inset ring-rose-300" : ""} ${day ? "cursor-pointer" : "cursor-default"}`}
+                        className={`relative grid h-10 w-full place-items-center rounded-xl text-xs font-bold sm:h-14 sm:text-sm transition-all ${ day ? primaryType ? `${style?.bg} ${style?.text} ${style?.border} border shadow-sm` : isToday ? "bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] text-rose-600 border border-rose-200 shadow-sm dark:bg-zinc-700 dark:border-rose-900" : "neu-card border border-[var(--c-border-light)] text-slate-700 hover:border-slate-300 dark:bg-zinc-700 dark:border-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-600" : "opacity-0" } ${isToday && !primaryType ? "ring-2 ring-inset ring-rose-300" : ""} ${day ? "cursor-pointer" : "cursor-default"}`}
                       >
                         {day}
                         {day && hasEvents && (
@@ -269,8 +269,8 @@ export function CompanyCalendarTab() {
           </div>
         </div>
 
-        {/* ── Legend ── */}
-        <div className="mt-6 flex flex-wrap justify-center gap-6 text-xs font-semibold text-slate-600 bg-[var(--c-bg-muted)] py-3 px-6 rounded-full w-fit mx-auto border border-[var(--c-border-light)] dark:bg-[#000000] dark:border-zinc-800 dark:text-zinc-300">
+        {/* -- Legend -- */}
+        <div className="mt-6 flex flex-wrap justify-center gap-6 text-xs font-semibold text-slate-600 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] py-3 px-6 rounded-full w-fit mx-auto border border-[var(--c-border-light)] dark:bg-[#000000] dark:border-zinc-800 dark:text-zinc-300">
           {Object.entries(EVENT_STYLES).filter(([key]) => (groupedEvents[key] ?? []).length > 0).map(([key, s]) => (
             <div key={key} className="flex items-center gap-2">
               <span className={`h-3.5 w-3.5 rounded-full ${s.bg} border ${s.border}`}></span>
@@ -280,7 +280,7 @@ export function CompanyCalendarTab() {
         </div>
       </div>
 
-      {/* ── Summary Cards ── */}
+      {/* -- Summary Cards -- */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {Object.entries(EVENT_STYLES).map(([key, s]) => {
           const count = (groupedEvents[key] ?? []).length;

@@ -299,7 +299,7 @@ export function PersonalInfoSection({
             Delete Profile Image
           </button>
         ) : (
-          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--c-border-light)] px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)] dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700">
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--c-border-light)] px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700">
             <Camera size={13} />
             {uploading ? "Uploading..." : "Upload avatar"}
             <input
@@ -317,7 +317,7 @@ export function PersonalInfoSection({
         )}
         <button
           aria-label="Avatar upload restrictions"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--c-border-light)] text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-600 dark:border-zinc-800 dark:text-zinc-500 dark:hover:bg-zinc-700 dark:hover:text-zinc-400"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--c-border-light)] text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-600 dark:border-zinc-800 dark:text-zinc-500 dark:hover:bg-zinc-700 dark:hover:text-zinc-400"
           title="PNG, JPG, or WEBP only. Max size: 2MB."
           type="button"
         >
@@ -325,7 +325,7 @@ export function PersonalInfoSection({
         </button>
       </div>
       <button
-        className="mt-3 inline-flex items-center gap-1 rounded-md border border-[var(--c-border-light)] px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-[var(--c-bg-muted)] hover:text-slate-700 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+        className="mt-3 inline-flex items-center gap-1 rounded-md border border-[var(--c-border-light)] px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-700 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
         onClick={openModal}
         type="button"
       >
@@ -401,7 +401,7 @@ export function PersonalInfoSection({
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Role History</p>
           <div className="space-y-1.5">
             {(profile.roleHistory as { oldRole: string; newRole: string; changedBy: string; changedAt: string }[]).map((entry, i) => (
-              <div key={i} className="flex items-center gap-2 rounded-md bg-[var(--c-bg-muted)] px-2.5 py-1.5 text-[11px] text-slate-500 dark:bg-zinc-700 dark:text-zinc-400">
+              <div key={i} className="flex items-center gap-2 rounded-md bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-2.5 py-1.5 text-[11px] text-slate-500 dark:bg-zinc-700 dark:text-zinc-400">
                 <span className="font-medium text-slate-700 dark:text-zinc-300">{entry.oldRole}</span>
                 <span className="text-slate-300 dark:text-zinc-600">→</span>
                 <span className="font-medium text-emerald-600">{entry.newRole}</span>
@@ -416,10 +416,10 @@ export function PersonalInfoSection({
       {/* Edit modal */}
       {open && !confirming ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center neu-overlay p-4 pt-8 pb-8 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
-          <div className="w-full max-w-md rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl my-auto dark:bg-[#000000]">
+          <div className="w-full max-w-md rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl my-auto dark:bg-[#000000]">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Edit Personal Info</h2>
-              <button className="rounded-md p-1 text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-600 dark:text-zinc-500 dark:hover:bg-zinc-700 dark:hover:text-zinc-400" onClick={() => setOpen(false)} type="button">
+              <button className="rounded-md p-1 text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-600 dark:text-zinc-500 dark:hover:bg-zinc-700 dark:hover:text-zinc-400" onClick={() => setOpen(false)} type="button">
                 <X size={16} />
               </button>
             </div>
@@ -497,7 +497,7 @@ export function PersonalInfoSection({
                   <option value="AB-">AB-</option>
                 </select>
               </div>
-              <div className={`flex items-center justify-between rounded-lg border p-3 ${editPhone && editEmergencyPhone ? "border-[var(--c-border-light)] dark:border-zinc-800" : "border-[var(--c-border-light)] bg-[var(--c-bg-muted)] dark:border-zinc-800/50 dark:bg-zinc-700"}`}>
+              <div className={`flex items-center justify-between rounded-lg border p-3 ${editPhone && editEmergencyPhone ? "border-[var(--c-border-light)] dark:border-zinc-800" : "border-[var(--c-border-light)] bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] dark:border-zinc-800/50 dark:bg-zinc-700"}`}>
                 <div>
                   <span className={`text-sm font-medium ${editPhone && editEmergencyPhone ? "text-slate-700 dark:text-zinc-300" : "text-slate-400 dark:text-zinc-500"}`}>Mask personal number on ID card</span>
                   <p className="text-xs text-slate-400">
@@ -510,7 +510,7 @@ export function PersonalInfoSection({
                   onClick={() => setEditMaskPhone(!editMaskPhone)}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${editMaskPhone ? "bg-indigo-600" : "bg-slate-300"} ${!editPhone || !editEmergencyPhone ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
                 >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-[var(--c-bg-elevated)] transition-transform ${editMaskPhone ? "translate-x-6" : "translate-x-1"}`} />
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] transition-transform ${editMaskPhone ? "translate-x-6" : "translate-x-1"}`} />
                 </button>
               </div>
               <div className="flex items-center gap-2 pt-2">
@@ -521,7 +521,7 @@ export function PersonalInfoSection({
                   Save
                 </button>
                 <button
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-[var(--c-bg-muted)] dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
                   onClick={() => setOpen(false)}
                   type="button"
                 >
@@ -536,10 +536,10 @@ export function PersonalInfoSection({
       {/* Confirm modal */}
       {open && confirming ? (
         <div className="fixed inset-0 z-[60] flex items-start justify-center neu-overlay p-4 pt-8 pb-8 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) { setConfirming(false); } }}>
-          <div className="w-full max-w-md rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl my-auto dark:bg-[#000000]">
+          <div className="w-full max-w-md rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl my-auto dark:bg-[#000000]">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Is your data correct?</h2>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-zinc-400">Please review before saving.</p>
-            <div className="mt-3 space-y-1.5 rounded-lg bg-[var(--c-bg-muted)] p-3 text-xs dark:bg-zinc-700">
+            <div className="mt-3 space-y-1.5 rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] p-3 text-xs dark:bg-zinc-700">
               <ConfirmRow label="Name" value={editName} />
               <ConfirmRow label="Phone" value={editCountryCode && editPhone ? `${editCountryCode} ${editPhone}` : editPhone || editCountryCode} />
               <ConfirmRow label="Date of Birth" value={editDob} />
@@ -550,7 +550,7 @@ export function PersonalInfoSection({
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <button
-                className="rounded-md border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)] dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                className="rounded-md border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
                 onClick={() => setConfirming(false)}
                 type="button"
               >
@@ -571,10 +571,10 @@ export function PersonalInfoSection({
       {/* Email change modal */}
       {emailModalOpen ? (
         <div className="fixed inset-0 z-[70] flex items-center justify-center neu-overlay p-4" onClick={(e) => { if (e.target === e.currentTarget) closeEmailModal(); }}>
-          <div className="w-full max-w-md rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl dark:bg-[#000000]">
+          <div className="w-full max-w-md rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl dark:bg-[#000000]">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Change Email</h2>
-              <button className="rounded-md p-1 text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-600 dark:text-zinc-500 dark:hover:bg-zinc-700 dark:hover:text-zinc-400" onClick={closeEmailModal} type="button">
+              <button className="rounded-md p-1 text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-600 dark:text-zinc-500 dark:hover:bg-zinc-700 dark:hover:text-zinc-400" onClick={closeEmailModal} type="button">
                 <X size={16} />
               </button>
             </div>
@@ -659,7 +659,7 @@ export function PersonalInfoSection({
 
       {empReqOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-          <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl">
+          <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl">
             <h3 className="mb-1 text-sm font-semibold text-slate-800">Request Employment Type</h3>
             <p className="mb-4 text-xs text-slate-500">Your request will be sent to HR for approval.</p>
             <form className="space-y-3" onSubmit={handleEmploymentRequest}>
@@ -689,7 +689,7 @@ export function PersonalInfoSection({
               <div className="mt-4 flex justify-end gap-2">
                 <button
                   type="button"
-                  className="rounded-md border border-slate-300 px-4 py-1.5 text-xs text-slate-600 hover:bg-[var(--c-bg-muted)]"
+                  className="rounded-md border border-slate-300 px-4 py-1.5 text-xs text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                   onClick={() => setEmpReqOpen(false)}
                 >
                   Cancel

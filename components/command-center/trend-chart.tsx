@@ -73,7 +73,7 @@ export function TrendChart({
   const hoveredCoords = metric && hoverIndex !== null ? lineData(metric.points).coords[hoverIndex] : null;
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-[#000000]">
+    <div className="neu-card rounded-2xl p-5">
       <div className="flex flex-wrap items-center gap-2">
         {tabs.map((tab) => (
           <button

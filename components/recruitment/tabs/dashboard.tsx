@@ -25,6 +25,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
+import { GlassCard } from "@/components/ui/glass-card";
 import { STAGE_LABELS } from "@/lib/recruitment-types";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -154,14 +155,14 @@ function Panel({
   className?: string;
 }) {
   return (
-    <section className={`min-w-0 rounded-2xl border border-lt bg-card p-5 shadow-card-v ${className}`}>
+    <section className={`min-w-0 neu-card rounded-2xl p-5 ${className}`}>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-sm font-semibold text-base">{title}</h2>
-          {description ? <p className="mt-1 text-xs leading-5 text-sec">{description}</p> : null}
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">{title}</h2>
+          {description ? <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">{description}</p> : null}
         </div>
         {count !== undefined ? (
-          <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-sec">{count}</span>
+          <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500 dark:bg-zinc-800 dark:text-zinc-400">{count}</span>
         ) : null}
       </div>
       <div className="mt-4">{children}</div>
@@ -179,12 +180,12 @@ function EmptyState({
   description: string;
 }) {
   return (
-    <div className="flex flex-col items-center rounded-xl border border-dashed border-lt bg-muted/50 px-4 py-7 text-center">
-      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-elevated text-sec shadow-card-v">
+    <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-7 text-center dark:border-zinc-800 dark:bg-zinc-900/50">
+      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 shadow-sm dark:bg-zinc-800 dark:text-zinc-400">
         <Icon size={17} />
       </span>
-      <p className="mt-3 text-sm font-medium text-base">{title}</p>
-      <p className="mt-1 max-w-xs text-xs leading-5 text-sec">{description}</p>
+      <p className="mt-3 text-sm font-medium text-slate-900 dark:text-zinc-100">{title}</p>
+      <p className="mt-1 max-w-xs text-xs leading-5 text-slate-500 dark:text-zinc-400">{description}</p>
     </div>
   );
 }
@@ -193,17 +194,17 @@ function MetricCard({ metric }: { metric: MetricCardData }) {
   return (
     <Link
       href={metric.href}
-      className="group rounded-2xl border border-lt bg-card p-4 shadow-card-v transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-soft dark:hover:border-indigo-800"
+      className="group neu-card rounded-2xl p-4 transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-soft dark:hover:border-indigo-800"
     >
       <div className="flex items-start justify-between gap-3">
         <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${metric.iconClass}`}>
           <metric.icon size={17} />
         </span>
-        <ArrowRight size={15} className="text-dim transition group-hover:translate-x-0.5 group-hover:text-indigo-500" />
+        <ArrowRight size={15} className="text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-indigo-500 dark:text-zinc-500" />
       </div>
-      <p className="mt-4 text-2xl font-bold tracking-tight text-base">{metric.value.toLocaleString("en-IN")}</p>
-      <p className="mt-1 text-xs font-medium text-sec">{metric.label}</p>
-      <p className="mt-2 truncate text-[11px] text-dim">{metric.detail}</p>
+      <p className="mt-4 text-2xl font-bold tracking-tight text-slate-900 dark:text-zinc-100">{metric.value.toLocaleString("en-IN")}</p>
+      <p className="mt-1 text-xs font-medium text-slate-500 dark:text-zinc-400">{metric.label}</p>
+      <p className="mt-2 truncate text-[11px] text-slate-400 dark:text-zinc-500">{metric.detail}</p>
     </Link>
   );
 }
@@ -333,20 +334,20 @@ export function DashboardTab() {
 
   return (
     <div className="space-y-6 p-4 sm:p-6">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="glass-surface mb-6 flex flex-col gap-4 rounded-2xl p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-300">
             Recruitment · {formatToday()}
           </p>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-base sm:text-3xl">
+          <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl dark:text-zinc-100">
             {getGreeting()}, {firstName}
           </h1>
-          <p className="mt-1.5 text-sm text-sec">Here’s the latest across your hiring pipeline.</p>
+          <p className="mt-1.5 text-sm text-slate-500 dark:text-zinc-400">Here’s the latest across your hiring pipeline.</p>
         </div>
         <div className="flex items-center gap-2">
           <Link
             href="/recruitment/jobs"
-            className="inline-flex items-center gap-2 rounded-xl border border-lt bg-card px-3.5 py-2.5 text-sm font-semibold text-base shadow-card-v transition hover:bg-surface-hover"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/40 bg-white/50 px-3.5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm backdrop-blur transition hover:bg-white/70 dark:border-white/10 dark:bg-zinc-900/50 dark:text-zinc-200 dark:hover:bg-zinc-900/70"
           >
             <Briefcase size={16} />
             Manage jobs
@@ -357,12 +358,12 @@ export function DashboardTab() {
             disabled={refreshing}
             title="Refresh dashboard"
             aria-label="Refresh dashboard"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-lt bg-card text-sec shadow-card-v transition hover:bg-surface-hover hover:text-base disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/40 bg-white/50 text-slate-500 shadow-sm backdrop-blur transition hover:bg-white/70 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-zinc-900/50 dark:text-zinc-400 dark:hover:bg-zinc-900/70 dark:hover:text-zinc-200"
           >
             <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
           </button>
         </div>
-      </header>
+      </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-6">
         {metricCards.map((metric) => (

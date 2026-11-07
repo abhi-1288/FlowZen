@@ -126,7 +126,7 @@ export function CalendarTab() {
       <div className="flex items-center justify-between mb-4">
         <button
           onClick={prevMonth}
-          className="rounded-lg p-2 hover:bg-[var(--c-bg-muted)] transition"
+          className="rounded-lg p-2 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition"
         >
           <ChevronLeft size={20} />
         </button>
@@ -135,7 +135,7 @@ export function CalendarTab() {
         </h3>
         <button
           onClick={nextMonth}
-          className="rounded-lg p-2 hover:bg-[var(--c-bg-muted)] transition"
+          className="rounded-lg p-2 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition"
         >
           <ChevronRight size={20} />
         </button>
@@ -167,7 +167,7 @@ export function CalendarTab() {
                   setSelectedDate(getDateForDay(day));
                 }
               }}
-              className={`relative flex flex-col items-center justify-center rounded-xl p-1.5 text-xs font-semibold transition-all cursor-pointer min-h-[44px] ${ today ? "bg-slate-900 text-white shadow-lg ring-2 ring-slate-900" : checkedIn ? "bg-emerald-50 text-emerald-700" : isPast && !isWeekendDay && !status ? "bg-rose-50 text-rose-500" : "text-slate-700 hover:bg-[var(--c-bg-muted)]" }`}
+              className={`relative flex flex-col items-center justify-center rounded-xl p-1.5 text-xs font-semibold transition-all cursor-pointer min-h-[44px] ${ today ? "bg-slate-900 text-white shadow-lg ring-2 ring-slate-900" : checkedIn ? "bg-emerald-50 text-emerald-700" : isPast && !isWeekendDay && !status ? "bg-rose-50 text-rose-500" : "text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]" }`}
             >
               <span className="text-[10px]">{day ?? ""}</span>
               {checkedIn && !today && (

@@ -1,4 +1,5 @@
-﻿import { X } from "lucide-react";
+
+import { X } from "lucide-react";
 import { ActionButton } from "../../shared";
 
 const overlayClass = "fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4";
@@ -37,7 +38,7 @@ export function FireModal({
           </div>
           <button
             aria-label="Close"
-            className="inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 text-slate-500 hover:text-slate-700 hover:bg-[var(--c-bg-muted)] h-10 w-10 dark:text-zinc-400 dark:hover:text-zinc-300 dark:hover:bg-zinc-700"
+            className="inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 text-slate-500 hover:text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] h-10 w-10 dark:text-zinc-400 dark:hover:text-zinc-300 dark:hover:bg-zinc-700"
             type="button"
             onClick={onCancel}
           >
@@ -68,7 +69,7 @@ export function FireModal({
               type="button"
               onClick={onConfirm}
             >
-              {isFiring ? "Removing…" : "Confirm fire"}
+              {isFiring ? "Removing�" : "Confirm fire"}
             </button>
           </div>
         </div>

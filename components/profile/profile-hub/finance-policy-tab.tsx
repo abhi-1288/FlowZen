@@ -139,7 +139,7 @@ export function FinancePolicyTab({
                 <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500 flex items-center gap-1">
                   <Percent size={14} className="text-indigo-500 dark:text-indigo-400" /> Statutory Deductions
                 </h4>
-                <div className="grid grid-cols-3 gap-3 rounded-lg border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-muted)]/50 dark:bg-zinc-800/50 p-3">
+                <div className="grid grid-cols-3 gap-3 rounded-lg border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]/50 dark:bg-zinc-800/50 p-3">
                   <div>
                     <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 mb-1 block">PF (%)</label>
                     <input
@@ -183,7 +183,7 @@ export function FinancePolicyTab({
               </div>
 
               {/* Advance Salary */}
-              <div className="flex items-center justify-between rounded-lg border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-muted)]/50 dark:bg-zinc-800/50 p-3.5">
+              <div className="flex items-center justify-between rounded-lg border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]/50 dark:bg-zinc-800/50 p-3.5">
                 <div>
                   <p className="text-xs font-semibold text-slate-800 dark:text-zinc-200">Advance Salary Requests</p>
                   <p className="text-[10px] text-slate-500 dark:text-zinc-500">Allow employees to request salary advances directly</p>
@@ -207,7 +207,7 @@ export function FinancePolicyTab({
               </div>
 
               {/* Auto Salary Generation */}
-              <div className="flex items-center justify-between rounded-lg border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-muted)]/50 dark:bg-zinc-800/50 p-3.5">
+              <div className="flex items-center justify-between rounded-lg border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]/50 dark:bg-zinc-800/50 p-3.5">
                 <div>
                   <p className="text-xs font-semibold text-slate-800 dark:text-zinc-200">Auto Salary Generation</p>
                   <p className="text-[10px] text-slate-500 dark:text-zinc-500">Automatically generate member salaries on the payroll cycle day</p>
@@ -245,7 +245,7 @@ export function FinancePolicyTab({
                 <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500 flex items-center gap-1">
                   <ShieldCheck size={14} className="text-indigo-500 dark:text-indigo-400" /> Earning Breakdown Percentages (% of Basic)
                 </h4>
-                <div className="grid grid-cols-2 gap-3 rounded-lg border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-muted)]/50 dark:bg-zinc-800/50 p-3">
+                <div className="grid grid-cols-2 gap-3 rounded-lg border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]/50 dark:bg-zinc-800/50 p-3">
                   <div>
                     <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 mb-1 block">House Rent Allowance (%)</label>
                     <input
@@ -386,7 +386,7 @@ export function FinancePolicyTab({
             <div className="rounded-lg bg-indigo-50/50 dark:bg-indigo-950/30 p-3 text-[11px] text-indigo-900 dark:text-indigo-300 flex gap-2">
               <Info size={16} className="shrink-0 text-indigo-600 dark:text-indigo-400 mt-0.5" />
               <div>
-                <span className="font-bold">Formula:</span> Basic Salary is derived as <code className="bg-[var(--c-bg-card)] dark:bg-zinc-800 px-1 py-0.5 rounded font-mono text-[10px] text-indigo-800 dark:text-indigo-300">Gross / (1 + (HRA% + Conveyance% + Medical% + Special%) / 100)</code>. Other components are computed as their percentages of Basic, with Special Allowance taking the balance.
+                <span className="font-bold">Formula:</span> Basic Salary is derived as <code className="bg-[var(--c-bg-white dark:bg-zinc-900)] dark:bg-zinc-800 px-1 py-0.5 rounded font-mono text-[10px] text-indigo-800 dark:text-indigo-300">Gross / (1 + (HRA% + Conveyance% + Medical% + Special%) / 100)</code>. Other components are computed as their percentages of Basic, with Special Allowance taking the balance.
               </div>
             </div>
           </div>

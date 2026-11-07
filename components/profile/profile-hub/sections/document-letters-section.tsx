@@ -1,4 +1,4 @@
-﻿import { SectionHeader } from "../shared";
+import { SectionHeader } from "../shared";
 
 export function DocumentLettersSection({
   onRequestLetter,
@@ -22,7 +22,7 @@ export function DocumentLettersSection({
           Request Document Letter
         </button>
         <button
-          className="rounded-lg neu-card px-5 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)] dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-700"
+          className="rounded-lg neu-card px-5 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-700"
           type="button"
           onClick={onSendResignation}
         >

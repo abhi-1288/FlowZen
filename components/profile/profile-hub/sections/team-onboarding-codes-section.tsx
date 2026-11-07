@@ -1,4 +1,4 @@
-﻿import { Copy, Users } from "lucide-react";
+import { Copy, Users } from "lucide-react";
 import { EmptyState, SectionHeader, type AnyRecord } from "../shared";
 
 export function TeamOnboardingCodesSection({
@@ -31,13 +31,13 @@ export function TeamOnboardingCodesSection({
                   ...(otherCode ? [{ code: otherCode, label: "Others code" }] : []),
                 ].map((item) => (
                   <div className="mb-3 last:mb-0" key={item.code}>
-                    <div className="rounded-lg border border-dashed border-slate-300 bg-[var(--c-bg-muted)] p-3 dark:border-zinc-700 dark:bg-[#161616]">
+                    <div className="rounded-lg border border-dashed border-slate-300 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] p-3 dark:border-zinc-700 dark:bg-[#161616]">
                       <p className="text-xs font-semibold uppercase text-slate-500 dark:text-zinc-400">{item.label}</p>
                       <div className="mt-2 flex items-center justify-between gap-3">
                         <p className="min-w-0 truncate font-mono text-sm font-semibold text-indigo-700 dark:text-indigo-300">{item.code}</p>
                         <button
                           aria-label={`Copy ${teamName} ${item.label}`}
-                          className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--c-border-light)] bg-[var(--c-bg-muted)] text-slate-700 transition hover:bg-[var(--c-bg-hover)] dark:border-zinc-700 dark:bg-[#161616] dark:text-zinc-300 dark:hover:bg-zinc-700"
+                          className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--c-border-light)] bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-700 transition hover:bg-[var(--c-bg-hover)] dark:border-zinc-700 dark:bg-[#161616] dark:text-zinc-300 dark:hover:bg-zinc-700"
                           onClick={() => { navigator.clipboard.writeText(item.code); showToast(`${teamName} ${item.label.toLowerCase()} copied.`); }}
                           title="Copy code"
                           type="button"

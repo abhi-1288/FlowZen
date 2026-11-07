@@ -291,7 +291,7 @@ export function FinanceMembersView({
       <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
         <button
           type="button"
-          className={`rounded-lg border px-3 py-2 text-left transition hover:border-[var(--c-border-light)] hover:bg-[var(--c-bg-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 ${!modalRole ? "border-slate-950 bg-[var(--c-bg-muted)]" : "border-transparent bg-[var(--c-bg-muted)]"}`}
+          className={`rounded-lg border px-3 py-2 text-left transition hover:border-[var(--c-border-light)] hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 ${!modalRole ? "border-slate-950 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]" : "border-transparent bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"}`}
           onClick={() => setModalRole(null)}
         >
           <p className="text-xs font-medium text-slate-500">All</p>
@@ -307,7 +307,7 @@ export function FinanceMembersView({
             <button
               key={cat}
               type="button"
-              className={`rounded-lg border px-3 py-2 text-left transition hover:border-[var(--c-border-light)] hover:bg-[var(--c-bg-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 ${modalRole === cat ? "border-slate-950 bg-[var(--c-bg-muted)]" : "border-transparent bg-[var(--c-bg-muted)]"}`}
+              className={`rounded-lg border px-3 py-2 text-left transition hover:border-[var(--c-border-light)] hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 ${modalRole === cat ? "border-slate-950 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]" : "border-transparent bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"}`}
               onClick={() => { setModalRole(cat); setSearchQuery(""); setSearchInput(""); }}
             >
               <p className="text-xs font-medium text-slate-500">{cat === "senior-security" ? "Senior Security" : cat === "junior-security" ? "Junior Security" : formatRole(cat)}</p>
@@ -347,13 +347,13 @@ export function FinanceMembersView({
       })()}
 
       {!modalRole && membersState.length === 0 && (
-        <p className="mt-5 rounded-lg bg-[var(--c-bg-muted)] px-3 py-6 text-center text-sm text-slate-500">No approved company members yet.</p>
+        <p className="mt-5 rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-6 text-center text-sm text-slate-500">No approved company members yet.</p>
       )}
 
       {/* Main Modal (Attendance or Salary) */}
       {modalType && (
         <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4 backdrop-blur-sm transition-all" onClick={(e) => { if (e.target === e.currentTarget) { setModalType(null); setSelectedMemberId(null); } }}>
-          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl">
             <div className="flex items-start justify-between mb-6">
               <div>
                 <h4 className="text-2xl font-bold text-slate-900">
@@ -365,7 +365,7 @@ export function FinanceMembersView({
                   </p>
                 )}
               </div>
-              <button className="text-slate-400 hover:text-slate-800 bg-[var(--c-bg-muted)] rounded-full p-2" onClick={() => { setModalType(null); setSelectedMemberId(null); }}>
+              <button className="text-slate-400 hover:text-slate-800 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] rounded-full p-2" onClick={() => { setModalType(null); setSelectedMemberId(null); }}>
                 <X size={20} />
               </button>
             </div>
@@ -410,7 +410,7 @@ export function FinanceMembersView({
                 </div>
 
                 {isEditingSalary ? (
-                  <div className="mb-6 bg-[var(--c-bg-card)] p-5 rounded-xl border border-[var(--c-border-light)] shadow-sm">
+                  <div className="mb-6 bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 rounded-xl border border-[var(--c-border-light)] shadow-sm">
                     <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Pay Period</label>
                     <div className="flex flex-wrap gap-2 mb-4">
                       {([
@@ -464,7 +464,7 @@ export function FinanceMembersView({
                     </div>
                   </div>
                 ) : (
-                  <div className="mb-6 bg-[var(--c-bg-card)] p-5 rounded-xl border border-[var(--c-border-light)] shadow-sm">
+                  <div className="mb-6 bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 rounded-xl border border-[var(--c-border-light)] shadow-sm">
                     <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Current Salary</p>
                     <p className="text-3xl font-bold text-slate-900 mt-1">
                       ₹{
@@ -491,17 +491,17 @@ export function FinanceMembersView({
                 <h5 className="font-semibold text-md mb-3 text-slate-800 mt-8">This Month's Salary (Generated)</h5>
                 {data.salary ? (
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="rounded-xl bg-[var(--c-bg-card)] p-5 border border-[var(--c-border-light)] shadow-sm">
+                    <div className="rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 border border-[var(--c-border-light)] shadow-sm">
                       <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Base Salary (Month)</p>
                       <p className="text-2xl font-bold text-slate-900 mt-1">₹{data.salary.baseSalary.toLocaleString("en-IN")}</p>
                     </div>
-                    <div className="rounded-xl bg-[var(--c-bg-card)] p-5 border border-[var(--c-border-light)] shadow-sm">
+                    <div className="rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 border border-[var(--c-border-light)] shadow-sm">
                       <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Net Salary (After deductions)</p>
                       <p className="text-2xl font-bold text-emerald-600 mt-1">₹{data.salary.netSalary.toLocaleString("en-IN")}</p>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-slate-500 text-sm bg-[var(--c-bg-card)] p-4 rounded-lg border border-[var(--c-border-light)]">No salary information generated for this month.</p>
+                  <p className="text-slate-500 text-sm bg-[var(--c-bg-white dark:bg-zinc-900)] p-4 rounded-lg border border-[var(--c-border-light)]">No salary information generated for this month.</p>
                 )}
               </div>
             ) : (
@@ -512,7 +512,7 @@ export function FinanceMembersView({
                     <ChevronLeft size={20} />
                   </ActionButton>
                   <div className="flex items-center overflow-hidden rounded-xl border border-[var(--c-border-light)] shadow-sm">
-                    <div className="bg-[var(--c-bg-muted)] px-8 py-2.5 text-sm font-bold tracking-widest text-slate-700 uppercase">
+                    <div className="bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-8 py-2.5 text-sm font-bold tracking-widest text-slate-700 uppercase">
                       {new Date(attendanceMonth + "-01").toLocaleDateString("en-US", { month: "long", year: "numeric" })}
                     </div>
                   </div>
@@ -563,7 +563,7 @@ export function FinanceMembersView({
                                   key={dayNum}
                                   type="button"
                                   onClick={() => setDayModal(dayData)}
-                                  className={`relative w-full grid place-items-center h-10 sm:h-14 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-sm ${dayData.notJoined ? "bg-[var(--c-bg-muted)] text-slate-400 border border-[var(--c-border-light)] hover:bg-[var(--c-bg-hover)]" : dayData.holiday ? "bg-purple-100 text-purple-700 border border-purple-200 hover:bg-purple-200" : dayData.halfDay ? "bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-200" : today ? dayData.checkIn ? "bg-sky-100 text-sky-700 border border-sky-200 hover:bg-sky-200" : "bg-[var(--c-bg-elevated)] text-rose-600 border border-rose-200 hover:bg-rose-50 ring-2 ring-rose-400" : dayData.checkIn ? "bg-emerald-100 text-emerald-900 border border-emerald-200 hover:bg-emerald-200" : dayData.wfh ? "bg-[var(--color-primary-bg)] text-[var(--color-primary-dark)] border border-[var(--color-primary-bg)] hover:bg-[var(--color-primary-bg)]" : dayData.leave ? "bg-pink-100 text-pink-700 border border-pink-200 hover:bg-pink-200" : dayData.absent ? "bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100" : i === 0 ? "bg-[var(--c-bg-muted)] text-slate-400 border border-[var(--c-border-light)]" : "bg-[var(--c-bg-elevated)] text-slate-600 border border-[var(--c-border-light)] hover:bg-[var(--c-bg-muted)]" }`}
+                                  className={`relative w-full grid place-items-center h-10 sm:h-14 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-sm ${dayData.notJoined ? "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-400 border border-[var(--c-border-light)] hover:bg-[var(--c-bg-hover)]" : dayData.holiday ? "bg-purple-100 text-purple-700 border border-purple-200 hover:bg-purple-200" : dayData.halfDay ? "bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-200" : today ? dayData.checkIn ? "bg-sky-100 text-sky-700 border border-sky-200 hover:bg-sky-200" : "bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] text-rose-600 border border-rose-200 hover:bg-rose-50 ring-2 ring-rose-400" : dayData.checkIn ? "bg-emerald-100 text-emerald-900 border border-emerald-200 hover:bg-emerald-200" : dayData.wfh ? "bg-[var(--color-primary-bg)] text-[var(--color-primary-dark)] border border-[var(--color-primary-bg)] hover:bg-[var(--color-primary-bg)]" : dayData.leave ? "bg-pink-100 text-pink-700 border border-pink-200 hover:bg-pink-200" : dayData.absent ? "bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100" : i === 0 ? "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-400 border border-[var(--c-border-light)]" : "bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] text-slate-600 border border-[var(--c-border-light)] hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]" }`}
                                 >
                                   <div className="flex flex-col items-center leading-tight">
                                     <span className={today && !dayData.checkIn ? "text-rose-600" : ""}>{dayNum}</span>
@@ -583,7 +583,7 @@ export function FinanceMembersView({
                   </div>
                 </div>
 
-                <div className="mt-6 flex flex-wrap justify-center gap-6 text-xs font-semibold text-slate-600 bg-[var(--c-bg-muted)] py-3 px-6 rounded-full w-fit mx-auto border border-[var(--c-border-light)]">
+                <div className="mt-6 flex flex-wrap justify-center gap-6 text-xs font-semibold text-slate-600 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] py-3 px-6 rounded-full w-fit mx-auto border border-[var(--c-border-light)]">
                   <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-emerald-100 border border-emerald-300"></span> Present</div>
                   <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-amber-100 border border-amber-300"></span> Half-Day</div>
                   <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-[var(--color-primary-bg)] border border-[var(--color-primary-light)]"></span> WFH</div>
@@ -600,10 +600,10 @@ export function FinanceMembersView({
       {/* Day detail modal */}
       {dayModal && (
         <div className="fixed inset-0 z-[60] grid place-items-center neu-overlay p-4 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setDayModal(null); }}>
-          <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl">
             <div className="flex items-center justify-between mb-5">
               <h4 className="text-xl font-bold text-slate-900">{new Date(dayModal.date).toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</h4>
-              <button className="text-slate-400 hover:text-slate-800 bg-[var(--c-bg-muted)] rounded-full p-1.5" onClick={() => setDayModal(null)}><X size={20} /></button>
+              <button className="text-slate-400 hover:text-slate-800 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] rounded-full p-1.5" onClick={() => setDayModal(null)}><X size={20} /></button>
             </div>
             <div className="space-y-3 text-sm">
               {dayModal.checkIn ? (
@@ -630,13 +630,13 @@ export function FinanceMembersView({
                 );
               })() : null}
               {!dayModal.checkIn && !dayModal.checkOut && !dayModal.leave && !dayModal.holiday && !dayModal.absent && !dayModal.halfDay && !dayModal.notJoined && !dayModal.wfh ? (
-                <div className="flex justify-between items-center rounded-xl bg-[var(--c-bg-muted)] px-4 py-3 border border-[var(--c-border-light)]">
+                <div className="flex justify-between items-center rounded-xl bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 border border-[var(--c-border-light)]">
                   <span className="font-semibold text-slate-600">Status</span>
                   <span className="font-medium text-slate-500">Weekend / No record</span>
                 </div>
               ) : null}
               {dayModal.notJoined ? (
-                <div className="flex justify-between items-center rounded-xl bg-[var(--c-bg-muted)] px-4 py-3 border border-[var(--c-border-light)]">
+                <div className="flex justify-between items-center rounded-xl bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 border border-[var(--c-border-light)]">
                   <span className="font-semibold text-slate-600">Status</span>
                   <span className="font-medium text-slate-500">Didn't join on that day</span>
                 </div>
@@ -666,7 +666,7 @@ export function FinanceMembersView({
                     </span>
                     <span className={`capitalize font-bold ${dayModal.leaveStatus === "approved" ? "text-amber-600" : "text-[var(--color-primary)]"}`}>{dayModal.leaveStatus}</span>
                   </div>
-                  <div className="mt-2 bg-[var(--c-bg-card)]/50 p-2 rounded-lg">
+                  <div className="mt-2 bg-[var(--c-bg-white dark:bg-zinc-900)]/50 p-2 rounded-lg">
                     <p className="text-sm text-slate-700"><span className="font-semibold">Reason: </span>{dayModal.leaveReason || "No reason provided"}</p>
                   </div>
                 </div>
@@ -685,7 +685,7 @@ export function FinanceMembersView({
                     <span className="font-semibold text-[var(--color-primary-dark)]">Work From Home (Approved)</span>
                     <span className="text-[var(--color-primary)] font-bold">Approved</span>
                   </div>
-                  <div className="mt-2 bg-[var(--c-bg-card)]/50 p-2 rounded-lg">
+                  <div className="mt-2 bg-[var(--c-bg-white dark:bg-zinc-900)]/50 p-2 rounded-lg">
                     <p className="text-sm text-slate-700"><span className="font-semibold">Reason: </span>{dayModal.wfhReason || "No reason provided"}</p>
                     {dayModal.wfhDuration > 0 && (
                       <p className="text-sm text-slate-700 mt-1"><span className="font-semibold">Duration: </span>{dayModal.wfhDuration} day{dayModal.wfhDuration === 1 ? "" : "s"}</p>
@@ -713,7 +713,7 @@ export function FinanceMembersView({
                   return `${roleFiltered.length} member${roleFiltered.length === 1 ? "" : "s"}`;
                 })()}</p>
               </div>
-              <button className="inline-flex items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-[var(--c-bg-muted)] hover:text-slate-700" type="button" onClick={() => { setModalRole(null); setSearchQuery(""); setSearchInput(""); }}>
+              <button className="inline-flex items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-700" type="button" onClick={() => { setModalRole(null); setSearchQuery(""); setSearchInput(""); }}>
                 <X size={18} />
               </button>
             </div>
@@ -777,13 +777,13 @@ export function FinanceMembersView({
 
       {policyModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setPolicyModal(false); }}>
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl">
             <div className="flex items-start justify-between mb-6">
               <div>
                 <h4 className="text-2xl font-bold text-slate-900">Company Policies</h4>
                 <p className="text-sm text-slate-500 mt-1">Set fixed deductions and manage member opt-outs.</p>
               </div>
-              <button className="text-slate-400 hover:text-slate-800 bg-[var(--c-bg-muted)] rounded-full p-2" onClick={() => setPolicyModal(false)}>
+              <button className="text-slate-400 hover:text-slate-800 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] rounded-full p-2" onClick={() => setPolicyModal(false)}>
                 <X size={20} />
               </button>
             </div>
@@ -874,7 +874,7 @@ export function FinanceMembersView({
       {/* Check-Out Request Modal */}
       {checkOutModalRequest ? (
         <div className="fixed inset-0 z-[70] grid place-items-center neu-overlay p-4 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setCheckOutModalRequest(null); }}>
-          <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-lg font-bold text-slate-900">Check-Out Request</h4>
               <ActionButton variant="ghost" className="p-1" onClick={() => setCheckOutModalRequest(null)} aria-label="Close">

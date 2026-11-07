@@ -1,4 +1,4 @@
-﻿import type { ReactNode } from "react";
+import type { ReactNode } from "react";
 
 export function ConfirmActionModal({
   open,
@@ -33,7 +33,7 @@ export function ConfirmActionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4">
-      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl dark:bg-[#000000]">
+      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl dark:bg-[#000000]">
         <h3 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">{title}</h3>
         {description ? (
           <div className="mt-2 text-sm text-slate-600 dark:text-zinc-400">{description}</div>

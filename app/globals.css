@@ -615,8 +615,51 @@ html.dark:not(.theme-neu) .neu-avatar {
 }
 
 /* ============================================
-   Reduced motion
+   Glassmorphism (theme-glass)
    ============================================ */
+.glass-surface {
+  background: #ffffff;
+  border: 1px solid rgb(226 232 240);
+}
+
+.dark .glass-surface {
+  background: #0a0a0a;
+  border: 1px solid rgb(39 39 42);
+}
+
+html.theme-glass .glass-surface {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.12);
+}
+
+html.theme-glass.dark .glass-surface {
+  background: rgba(30, 41, 59, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+html.theme-glass .neu-card {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.12);
+}
+
+html.theme-glass.dark .neu-card {
+  background: rgba(30, 41, 59, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+html.theme-glass body {
+  background: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 50%, #fdf2f8 100%);
+}
+
+html.theme-glass.dark body {
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #1a1a2e 100%);
+}
 @media (prefers-reduced-motion: reduce) {
   .aurora-orb-1,
   .aurora-orb-2,

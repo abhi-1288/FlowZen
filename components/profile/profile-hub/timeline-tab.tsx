@@ -33,7 +33,7 @@ export function TimelineTab({
                 </div>
               </div>
               {when ? (
-                <div className="shrink-0 rounded-lg bg-[var(--c-bg-muted)] px-3 py-2 text-left ring-1 ring-slate-100 sm:text-right">
+                <div className="shrink-0 rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-2 text-left ring-1 ring-slate-100 sm:text-right">
                   <p className="text-sm font-medium text-slate-700">{when.toLocaleDateString()}</p>
                   <p className="text-xs text-slate-400">{when.toLocaleTimeString()}</p>
                 </div>

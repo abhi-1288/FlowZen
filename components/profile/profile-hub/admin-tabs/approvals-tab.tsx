@@ -296,7 +296,7 @@ export function ApprovalsTab({
     <section className="rounded-xl neu-card p-5">
       <SectionHeader title="Pending Approvals" description="Review and manage approval requests" accent="indigo" />
       {visibleGroups.length > 1 ? (
-        <div className="sticky top-0 z-10 -mx-5 mt-5 bg-[var(--c-bg-card)] px-5 pb-2">
+        <div className="sticky top-0 z-10 -mx-5 mt-5 bg-[var(--c-bg-white dark:bg-zinc-900)] px-5 pb-2">
           <div className="flex flex-wrap gap-2">
             {([
               { id: "all" as const, label: "All", count: visibleApprovals.length },
@@ -313,7 +313,7 @@ export function ApprovalsTab({
                 className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
                   effectiveGroup === tab.id
                     ? "bg-indigo-500 text-white"
-                    : "bg-[var(--c-bg-muted)] text-slate-600 hover:bg-[var(--c-bg-hover)]"
+                    : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-600 hover:bg-[var(--c-bg-hover)]"
                 }`}
               >
                 {tab.label} ({tab.count})
@@ -548,7 +548,7 @@ export function ApprovalsTab({
                         ["hourly", "/hr"],
                       ] as [SalaryPeriod, string][]).map(([period, label], idx) => (
                         <button key={period} type="button"
-                          className={`px-2 py-1.5 text-[11px] font-medium transition ${idx === 0 ? "rounded-l-md" : ""} ${idx === 3 ? "rounded-r-md" : ""} ${(approvalSalaryPeriod[requestId] ?? getDefaultSalaryPeriod(request)) === period ? "neu-tab-pressed" : "bg-[var(--c-bg-elevated)] text-slate-600 hover:text-slate-900"}`}
+                          className={`px-2 py-1.5 text-[11px] font-medium transition ${idx === 0 ? "rounded-l-md" : ""} ${idx === 3 ? "rounded-r-md" : ""} ${(approvalSalaryPeriod[requestId] ?? getDefaultSalaryPeriod(request)) === period ? "neu-tab-pressed" : "bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] text-slate-600 hover:text-slate-900"}`}
                           onClick={() => setApprovalSalaryPeriod((a) => ({ ...a, [requestId]: period }))}
                         >{label}</button>
                       ))}
@@ -858,7 +858,7 @@ export function ApprovalsTab({
                 href={`/letter/${letterPreview.id}${letterPreview.draft ? "?draft=1" : ""}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-[var(--c-bg-muted)]"
+                className="inline-flex items-center rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
               >
                 Open in new tab
               </a>

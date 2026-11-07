@@ -607,7 +607,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
       found: "bg-teal-100 text-teal-700",
       "found-after-replacement": "bg-orange-100 text-orange-700",
     };
-    return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${colors[status] ?? "bg-[var(--c-bg-muted)] text-slate-500"}`}>{status.replace("-", " ")}</span>;
+    return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${colors[status] ?? "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-500"}`}>{status.replace("-", " ")}</span>;
   };
 
   const REPLACEMENT_STEPS = [
@@ -851,7 +851,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                         <p className="font-semibold text-slate-900">{String(scanResult.data.visitorName ?? "")}</p>
                         <p className="text-sm text-slate-500">{String(scanResult.data.visitorEmail ?? "")}</p>
                         <div className="mt-1 flex flex-wrap gap-2">
-                          <span className={`rounded px-2 py-0.5 text-[10px] font-medium ${String(scanResult.data.status) === "approved" ? "bg-emerald-100 text-emerald-700" : String(scanResult.data.status) === "pending" ? "bg-amber-100 text-amber-700" : "bg-[var(--c-bg-muted)] text-slate-500"}`}>
+                          <span className={`rounded px-2 py-0.5 text-[10px] font-medium ${String(scanResult.data.status) === "approved" ? "bg-emerald-100 text-emerald-700" : String(scanResult.data.status) === "pending" ? "bg-amber-100 text-amber-700" : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-500"}`}>
                             {String(scanResult.data.status ?? "")}
                           </span>
                           {scanResult.data.visitorCompany ? (
@@ -933,7 +933,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                 />
                 {!cameraReady ? (
                   <div
-                    className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-xl bg-[var(--c-bg-card)]"
+                    className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)]"
                     onClick={cameraStarting ? undefined : handleStartCamera}
                   >
                     <span className="text-sm font-medium text-slate-600">
@@ -987,7 +987,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-semibold text-slate-900">{pass.visitorName}</p>
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${pass.status === "approved" ? "bg-emerald-100 text-emerald-700" : pass.status === "pending" ? "bg-amber-100 text-amber-700" : pass.status === "active" ? "bg-blue-100 text-blue-700" : pass.status === "completed" ? "bg-[var(--c-bg-muted)] text-slate-500" : pass.status === "expired" ? "bg-[var(--c-bg-muted)] text-slate-500" : pass.status === "rejected" ? "bg-rose-100 text-rose-700" : "bg-rose-100 text-rose-700"}`}>
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${pass.status === "approved" ? "bg-emerald-100 text-emerald-700" : pass.status === "pending" ? "bg-amber-100 text-amber-700" : pass.status === "active" ? "bg-blue-100 text-blue-700" : pass.status === "completed" ? "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-500" : pass.status === "expired" ? "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-500" : pass.status === "rejected" ? "bg-rose-100 text-rose-700" : "bg-rose-100 text-rose-700"}`}>
                           {pass.status}
                         </span>
                       </div>
@@ -1067,7 +1067,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
             <div className="flex items-center gap-1">
               <button
                 type="button"
-                className="rounded-lg p-1.5 text-slate-600 hover:bg-[var(--c-bg-muted)] transition-colors"
+                className="rounded-lg p-1.5 text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors"
                 onClick={() => {
                   const d = new Date(logDate + "T00:00:00");
                   d.setDate(d.getDate() - 1);
@@ -1084,7 +1084,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
               />
               <button
                 type="button"
-                className="rounded-lg p-1.5 text-slate-600 hover:bg-[var(--c-bg-muted)] transition-colors"
+                className="rounded-lg p-1.5 text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors"
                 onClick={() => {
                   const d = new Date(logDate + "T00:00:00");
                   d.setDate(d.getDate() + 1);
@@ -1218,7 +1218,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                 };
 
                 return (
-                  <div key={card.id} className={`rounded-xl border p-4 transition-all duration-300 ${highlightedCard === card.id ? "ring-2 ring-emerald-400 bg-emerald-50/50" : card.isEmergency ? "border-red-300 bg-red-50/50" : "border-[var(--c-border-light)] bg-[var(--c-bg-muted)]/50"}`}>
+                  <div key={card.id} className={`rounded-xl border p-4 transition-all duration-300 ${highlightedCard === card.id ? "ring-2 ring-emerald-400 bg-emerald-50/50" : card.isEmergency ? "border-red-300 bg-red-50/50" : "border-[var(--c-border-light)] bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]/50"}`}>
                     {/* Emergency badge */}
                     {card.isEmergency ? (
                       <div className="mb-2 flex items-center gap-1.5">
@@ -1281,7 +1281,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                                 Ticket: {card.juniorCompletedAt ? "Completed" : card.assignedJuniorSecurity ? "In Progress" : "Awaiting Junior"}
                               </span>
                             ) : (
-                              <span className="inline-block rounded-full bg-[var(--c-bg-muted)] px-1.5 py-0.5 text-[9px] font-semibold uppercase text-slate-500">Ticket: Pending</span>
+                              <span className="inline-block rounded-full bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-1.5 py-0.5 text-[9px] font-semibold uppercase text-slate-500">Ticket: Pending</span>
                             )}
                           </div>
                         ) : null}
@@ -1456,7 +1456,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
           {/* Disable Access Popup */}
           {disableAccessPopup.show ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl">
+              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl">
                 <h3 className="mb-3 text-sm font-semibold text-slate-800">Disable Building Access</h3>
                 <p className="mb-3 text-xs text-slate-500">Select zones to disable for the lost card:</p>
                 {(["office-entry", "parking", "cafeteria", "printer", "server-room", "attendance-card"] as const).map((z) => (
@@ -1482,7 +1482,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
           {/* Found Card Popup */}
           {foundPopup.show ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl">
+              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl">
                 <h3 className="mb-3 text-sm font-semibold text-slate-800">Card Found</h3>
                 <p className="mb-3 text-xs text-slate-500">Was a replacement already issued for this card?</p>
                 <div className="flex gap-2">
@@ -1503,7 +1503,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
           {/* Complete Ticket Popup */}
           {completeTicketPopup.show ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl">
+              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl">
                 <h3 className="mb-3 text-sm font-semibold text-slate-800">Complete Ticket</h3>
                 <p className="mb-3 text-xs text-slate-500">Add a follow-up note before completing this ticket:</p>
                 <textarea className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
@@ -1522,7 +1522,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
           {/* Print Card Popup */}
           {printCardPopup.show ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl">
+              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl">
                 <h3 className="mb-4 text-sm font-semibold text-slate-800">Print New Card</h3>
                 <div className="space-y-3">
                   <div>
@@ -1565,7 +1565,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
           {/* Verify Popup */}
           {verifyPopup.show ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl">
+              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl">
                 <h3 className="mb-3 text-sm font-semibold text-slate-800">Verify Lost Card Report</h3>
                 <p className="text-xs text-slate-500">
                   This marks the report as <span className="font-medium text-slate-700">Under Verification</span> and notifies HR that the investigation is in progress.
@@ -1586,7 +1586,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
           {/* Reject Popup */}
           {rejectPopup.show ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl">
+              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl">
                 <h3 className="mb-3 text-sm font-semibold text-slate-800">Reject Report</h3>
                 <p className="mb-3 text-xs text-slate-500">Provide a reason for rejection:</p>
                 <textarea className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
@@ -1653,7 +1653,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
       {/* Set Pass Window Popup */}
       {passWindowPopup ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-          <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl">
+          <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl">
             <h3 className="mb-3 text-sm font-semibold text-slate-800">Set Pass Window</h3>
             <p className="mb-3 text-xs text-slate-500">The guest pass is valid within this window. Leave blank to fall back to interview time ± 15 min.</p>
             <label className="mb-1 block text-xs font-semibold text-slate-600">Valid from</label>

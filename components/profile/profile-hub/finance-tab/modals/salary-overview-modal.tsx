@@ -132,7 +132,7 @@ function SalaryOverviewContent({
     return (
       <div className="mb-3 rounded-lg border border-[var(--c-border-light)] overflow-hidden" key={role}>
         <button
-          className="flex w-full items-center justify-between bg-[var(--c-bg-muted)] px-4 py-3 text-left transition-colors hover:bg-[var(--c-bg-muted)]"
+          className="flex w-full items-center justify-between bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 text-left transition-colors hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
           onClick={() => onToggleRole(role)}
         >
           <div className="flex items-center gap-2">

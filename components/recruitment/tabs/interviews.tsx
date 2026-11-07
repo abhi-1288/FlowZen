@@ -6,6 +6,10 @@ import { Calendar, Briefcase, ChevronDown, ChevronUp, ChevronRight, Clock, Users
 import { useSession } from "next-auth/react";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
+import { PageShell } from "@/components/ui/page-shell";
+import { Empty } from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+import { inputCls } from "@/components/ui/field";
 import { interviewSlug } from "@/lib/interview-slug";
 import type { ATSInterview } from "@/lib/recruitment-types";
 
@@ -365,18 +369,15 @@ export function InterviewsTab() {
   const grouped = useMemo(() => groupInterviews(interviews), [interviews]);
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Interviews</h1>
-          <p className="mt-1 text-sm text-slate-500">{totalInterviews} total</p>
-        </div>
-      </div>
-
-      <div className="mt-4 flex items-center gap-3">
+    <PageShell
+      icon={Calendar}
+      title="Interviews"
+      subtitle={`${totalInterviews} total`}
+    >
+      <div className="flex flex-wrap items-center gap-3">
         <select
           suppressHydrationWarning
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none"
+          className={`${inputCls} w-auto py-1.5 text-xs`}
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >
@@ -390,12 +391,12 @@ export function InterviewsTab() {
       </div>
 
       {isFullAccess && (
-        <div className="mt-4 flex gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 w-fit">
+        <div className="mt-4 flex gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 w-fit dark:border-zinc-800 dark:bg-zinc-900">
           <button
             suppressHydrationWarning
             onClick={() => setAdminTab("scheduled")}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-              adminTab === "scheduled" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+            className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
+              adminTab === "scheduled" ? "bg-indigo-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200"
             }`}
           >
             <span className="flex items-center gap-1.5">
@@ -406,8 +407,8 @@ export function InterviewsTab() {
           <button
             suppressHydrationWarning
             onClick={() => setAdminTab("candidates")}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-              adminTab === "candidates" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+            className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
+              adminTab === "candidates" ? "bg-indigo-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200"
             }`}
           >
             <span className="flex items-center gap-1.5">
@@ -419,18 +420,18 @@ export function InterviewsTab() {
       )}
 
       {loading && interviews.length === 0 ? (
-        <div className="mt-6 space-y-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-20 animate-pulse rounded-lg bg-slate-200" />
-          ))}
+        <div className="mt-6">
+          <Skeleton rows={4} />
         </div>
       ) : interviews.length === 0 ? (
-        <div className="mt-16 text-center text-slate-500">No interviews found.</div>
+        <div className="mt-6">
+          <Empty icon={Calendar} title="No interviews found." message="Schedule an interview to get started." />
+        </div>
       ) : isFullAccess && adminTab === "candidates" ? (
         <CandidatesView grouped={grouped} />
       ) : (
         <GroupedView grouped={grouped} />
       )}
-    </div>
+    </PageShell>
   );
 }

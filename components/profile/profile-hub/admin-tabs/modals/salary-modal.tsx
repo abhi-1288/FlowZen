@@ -2,7 +2,7 @@ import { ActionButton } from "../../shared";
 import { currencySymbol } from "../helpers";
 
 const overlayClass = "fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4";
-const modalClass = "w-full max-w-md rounded-xl bg-[var(--c-bg-elevated)] p-5 shadow-xl";
+const modalClass = "w-full max-w-md rounded-xl bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] p-5 shadow-xl";
 
 export function SalaryModal({
   member,

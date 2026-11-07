@@ -763,11 +763,11 @@ export function MessagesTab({
       <div className="mt-6 grid grid-cols-1 overflow-hidden rounded-xl border border-[var(--c-border-light)] lg:grid-cols-12" style={{ height: "650px" }}>
         
         {/* Left Side Pane (Members / Channels) */}
-        <div className="flex flex-col min-h-0 overflow-hidden border-r border-[var(--c-border-light)] bg-[var(--c-bg-muted)] lg:col-span-3">
+        <div className="flex flex-col min-h-0 overflow-hidden border-r border-[var(--c-border-light)] bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] lg:col-span-3">
           
           {/* Header Action Mode Switchers */}
-          <div className="border-b border-[var(--c-border-light)] bg-[var(--c-bg-card)] p-4">
-            <div className="flex rounded-lg bg-[var(--c-bg-muted)] p-1">
+          <div className="border-b border-[var(--c-border-light)] bg-[var(--c-bg-white dark:bg-zinc-900)] p-4">
+            <div className="flex rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] p-1">
               <button
                 className={`flex-1 rounded-md py-2 text-center text-xs font-semibold transition-all ${ mode === "normal" ? "neu-tab-pressed" : "text-slate-500 hover:text-slate-800" }`}
                 onClick={() => {
@@ -856,7 +856,7 @@ export function MessagesTab({
                       <button
                         key={groupId}
                         onClick={() => setSelectedGroup(group)}
-                        className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition-all ${ isSelected ? "neu-tab-pressed" : "hover:bg-[var(--c-bg-muted)] text-slate-700" }`}
+                        className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition-all ${ isSelected ? "neu-tab-pressed" : "hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-700" }`}
                       >
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700">
                           <Users size={16} />
@@ -918,7 +918,7 @@ export function MessagesTab({
                         setSelectedMember(member);
                       }
                     }}
-                    className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition-all ${ isSelected ? mode === "bulk" || mode === "meeting" ? "bg-[var(--c-bg-muted)] text-slate-900" : "neu-tab-pressed" : "hover:bg-[var(--c-bg-muted)] text-slate-700" }`}
+                    className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition-all ${ isSelected ? mode === "bulk" || mode === "meeting" ? "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-900" : "neu-tab-pressed" : "hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-700" }`}
                   >
                     {/* Avatar Initials / Image */}
                     <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--c-bg-hover)] font-semibold text-slate-700 text-xs">
@@ -996,7 +996,7 @@ export function MessagesTab({
         </div>
 
         {/* Right Side Chat Conversation Area */}
-        <div className="flex flex-col min-h-0 overflow-hidden bg-[var(--c-bg-card)] lg:col-span-9">
+        <div className="flex flex-col min-h-0 overflow-hidden bg-[var(--c-bg-white dark:bg-zinc-900)] lg:col-span-9">
           {mode === "meeting" ? (
             /* Schedule Meeting panel */
             <div className="flex flex-col h-full overflow-y-auto p-6">
@@ -1008,7 +1008,7 @@ export function MessagesTab({
                 Select participants on the left and fill in the meeting details below.
               </p>
 
-              <div className="mt-4 flex flex-wrap gap-1.5 max-h-24 overflow-y-auto border border-[var(--c-border-light)] rounded-lg p-2 bg-[var(--c-bg-muted)]">
+              <div className="mt-4 flex flex-wrap gap-1.5 max-h-24 overflow-y-auto border border-[var(--c-border-light)] rounded-lg p-2 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]">
                 {selectedBulkIds.length === 0 ? (
                   <span className="text-[11px] text-slate-400 italic">No participants selected. Click users on the sidebar to add them.</span>
                 ) : (
@@ -1161,7 +1161,7 @@ export function MessagesTab({
                   Select users on the left pane and write a message below. It will send individual messages to each user.
                 </p>
 
-                <div className="mt-4 flex flex-wrap gap-1.5 max-h-40 overflow-y-auto border border-[var(--c-border-light)] rounded-lg p-2 bg-[var(--c-bg-muted)]">
+                <div className="mt-4 flex flex-wrap gap-1.5 max-h-40 overflow-y-auto border border-[var(--c-border-light)] rounded-lg p-2 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]">
                   {selectedBulkIds.length === 0 ? (
                     <span className="text-[11px] text-slate-400 italic">No users selected. Click users on the sidebar to add them.</span>
                   ) : (
@@ -1213,7 +1213,7 @@ export function MessagesTab({
                 </div>
                 <button
                   onClick={() => setShowInfoModal(true)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-700 transition-colors"
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-700 transition-colors"
                   title="Group info"
                 >
                   <Info size={15} />
@@ -1229,13 +1229,13 @@ export function MessagesTab({
                   <div className="ml-auto flex items-center gap-1">
                     <button
                       onClick={handleCopySelected}
-                      className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold text-slate-600 hover:bg-[var(--c-bg-muted)] transition-colors"
+                      className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors"
                     >
                       <Copy size={12} /> Copy
                     </button>
                     <button
                       onClick={handleForwardSelected}
-                      className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold text-slate-600 hover:bg-[var(--c-bg-muted)] transition-colors"
+                      className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors"
                     >
                       <Forward size={12} /> Forward
                     </button>
@@ -1247,7 +1247,7 @@ export function MessagesTab({
                     </button>
                     <button
                       onClick={exitSelectionMode}
-                      className="ml-1 flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-700 transition-colors"
+                      className="ml-1 flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-700 transition-colors"
                       title="Cancel selection"
                     >
                       <X size={13} />
@@ -1259,7 +1259,7 @@ export function MessagesTab({
               {/* Group Chat Message History */}
               <div
                 ref={chatContainerRef}
-                className="flex-1 overflow-y-auto p-4 space-y-4 bg-[var(--c-bg-muted)]/50 scrollbar-thin"
+                className="flex-1 overflow-y-auto p-4 space-y-4 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]/50 scrollbar-thin"
               >
                 {loadingGroupChat ? (
                   <div className="py-8 text-center text-xs text-slate-400">Loading conversation...</div>
@@ -1304,7 +1304,7 @@ export function MessagesTab({
                             <div className="relative max-w-[70%]">
                               {/* Selection checkbox */}
                               {selectionMode && (
-                                <span className={`absolute -top-2.5 z-20 flex h-5 w-5 items-center justify-center rounded-full border-2 transition-colors ${isMe ? "-right-2" : "-left-2"} ${selectedMessages[msgId] ? "bg-sky-500 border-sky-500 text-white" : "bg-[var(--c-bg-card)] border-slate-300 text-transparent"}`}>
+                                <span className={`absolute -top-2.5 z-20 flex h-5 w-5 items-center justify-center rounded-full border-2 transition-colors ${isMe ? "-right-2" : "-left-2"} ${selectedMessages[msgId] ? "bg-sky-500 border-sky-500 text-white" : "bg-[var(--c-bg-white dark:bg-zinc-900)] border-slate-300 text-transparent"}`}>
                                   <Check size={11} />
                                 </span>
                               )}
@@ -1312,7 +1312,7 @@ export function MessagesTab({
                               {!selectionMode && (
                                 <button
                                   onClick={(e) => openContextMenu(e, msgId, msg)}
-                                  className={`absolute -top-3 ${isMe ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1"} hidden group-hover/msg:flex h-6 w-6 items-center justify-center rounded-full bg-[var(--c-bg-card)] border border-[var(--c-border-light)] text-slate-400 hover:text-slate-700 hover:bg-[var(--c-bg-muted)] shadow-sm transition-colors z-10`}
+                                  className={`absolute -top-3 ${isMe ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1"} hidden group-hover/msg:flex h-6 w-6 items-center justify-center rounded-full bg-[var(--c-bg-white dark:bg-zinc-900)] border border-[var(--c-border-light)] text-slate-400 hover:text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] shadow-sm transition-colors z-10`}
                                   title="More actions"
                                 >
                                   <MoreVertical size={12} />
@@ -1323,7 +1323,7 @@ export function MessagesTab({
                               {contextMenuMsgId === msgId && (
                                 <div
                                   data-context-menu
-                                  className={`absolute top-6 z-50 w-[220px] rounded-xl bg-[var(--c-bg-card)] border border-[var(--c-border-light)] py-1.5 shadow-xl ${isMe ? "right-0" : "left-0"}`}
+                                  className={`absolute top-6 z-50 w-[220px] rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] border border-[var(--c-border-light)] py-1.5 shadow-xl ${isMe ? "right-0" : "left-0"}`}
                                 >
                                   {/* Quick reactions */}
                                   <div className="flex items-center justify-between gap-0.5 px-2 pb-1.5 pt-1">
@@ -1331,7 +1331,7 @@ export function MessagesTab({
                                       <button
                                         key={e}
                                         onClick={() => handleReact(msgId, e)}
-                                        className="flex h-8 w-8 items-center justify-center rounded-lg text-lg transition-transform hover:scale-110 hover:bg-[var(--c-bg-muted)]"
+                                        className="flex h-8 w-8 items-center justify-center rounded-lg text-lg transition-transform hover:scale-110 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                                       >
                                         {e}
                                       </button>
@@ -1339,7 +1339,7 @@ export function MessagesTab({
                                     <div className="relative">
                                       <button
                                         onClick={() => setShowEmojiPickerFor(showEmojiPickerFor === msgId ? null : msgId)}
-                                        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-[var(--c-bg-muted)]"
+                                        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                                         title="More reactions"
                                       >
                                         <SmilePlus size={15} />
@@ -1351,7 +1351,7 @@ export function MessagesTab({
                                               <button
                                                 key={e}
                                                 onClick={() => handleReact(msgId, e)}
-                                                className="flex h-7 w-7 items-center justify-center rounded-md text-sm hover:bg-[var(--c-bg-muted)] transition-colors"
+                                                className="flex h-7 w-7 items-center justify-center rounded-md text-sm hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors"
                                               >
                                                 {e}
                                               </button>
@@ -1364,32 +1364,32 @@ export function MessagesTab({
                                   <div className="border-t border-[var(--c-border-light)]" />
                                   <button
                                     onClick={() => { setMessageInfoMsg(msg); setMessageInfoTab("reactions"); closeContextMenu(); }}
-                                    className="flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-muted)] transition-colors"
+                                    className="flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors"
                                   >
                                     <Info size={12} className="text-slate-400" /> Message info
                                   </button>
                                   <button
                                     onClick={() => { handleReply(msg); closeContextMenu(); }}
-                                    className="flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-muted)] transition-colors"
+                                    className="flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors"
                                   >
                                     <Reply size={12} className="text-slate-400" /> Reply
                                   </button>
                                   <button
                                     onClick={() => handleCopyMessage(msg)}
-                                    className="flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-muted)] transition-colors"
+                                    className="flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors"
                                   >
                                     <Copy size={12} className="text-slate-400" /> Copy
                                   </button>
                                   <button
                                     onClick={() => handleForwardMessage()}
-                                    className="flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-muted)] transition-colors"
+                                    className="flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors"
                                   >
                                     <Forward size={12} className="text-slate-400" /> Forward
                                   </button>
                                   <div className="my-1 border-t border-[var(--c-border-light)]" />
                                   <button
                                     onClick={() => enterSelectionMode(msgId, msg)}
-                                    className="flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-muted)] transition-colors"
+                                    className="flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors"
                                   >
                                     <SquareCheck size={12} className="text-slate-400" /> Select
                                   </button>
@@ -1407,7 +1407,7 @@ export function MessagesTab({
                                 </div>
                               )}
 
-                              <div className={`rounded-xl px-4 py-2.5 text-[11px] ${ isMe ? "neu-tab-pressed rounded-tr-none" : "bg-[var(--c-bg-elevated)] border-[var(--c-border-light)] text-slate-800 rounded-tl-none" } ${selectionMode && selectedMessages[msgId] ? "ring-2 ring-sky-400" : ""}`}>
+                              <div className={`rounded-xl px-4 py-2.5 text-[11px] ${ isMe ? "neu-tab-pressed rounded-tr-none" : "bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] border-[var(--c-border-light)] text-slate-800 rounded-tl-none" } ${selectionMode && selectedMessages[msgId] ? "ring-2 ring-sky-400" : ""}`}>
                                 {!isMe && (
                                   <div className="flex items-center gap-1.5 mb-1">
                                     <div className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--c-bg-hover)] text-[7px] font-bold text-slate-600 overflow-hidden">
@@ -1423,7 +1423,7 @@ export function MessagesTab({
 
                                 {/* Quoted reply preview */}
                                 {replyToData && (
-                                  <div className={`mb-2 rounded-lg px-2.5 py-1.5 text-[9px] ${isMe ? "bg-white/10 text-white/60" : "bg-[var(--c-bg-muted)] text-slate-500"}`}>
+                                  <div className={`mb-2 rounded-lg px-2.5 py-1.5 text-[9px] ${isMe ? "bg-white/10 text-white/60" : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-500"}`}>
                                     <p className="font-semibold truncate opacity-70">{String(replyToData.sender?.name ?? "Unknown")}</p>
                                     <p className="truncate opacity-60">{String(replyToData.message ?? "")}</p>
                                   </div>
@@ -1436,7 +1436,7 @@ export function MessagesTab({
                                   const att = (msg as any).attachment as any;
                                   if (att.isExpired) {
                                     return (
-                                      <div className={`mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-[10px] ${isMe ? "bg-white/10 text-white/50" : "bg-[var(--c-bg-muted)] text-slate-400"}`}>
+                                      <div className={`mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-[10px] ${isMe ? "bg-white/10 text-white/50" : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-400"}`}>
                                         <Paperclip size={12} />
                                         <span className="italic">Attachment expired</span>
                                       </div>
@@ -1459,8 +1459,8 @@ export function MessagesTab({
                                     );
                                   }
                                   return (
-                                    <a href={att.url} download={att.name} target="_blank" rel="noopener noreferrer" className={`mt-2 flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors ${isMe ? "bg-white/10 hover:bg-white/15" : "bg-[var(--c-bg-muted)] hover:bg-[var(--c-bg-hover)]"}`}>
-                                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isMe ? "bg-white/10" : "bg-[var(--c-bg-card)]"}`}>
+                                    <a href={att.url} download={att.name} target="_blank" rel="noopener noreferrer" className={`mt-2 flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors ${isMe ? "bg-white/10 hover:bg-white/15" : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:bg-[var(--c-bg-hover)]"}`}>
+                                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isMe ? "bg-white/10" : "bg-[var(--c-bg-white dark:bg-zinc-900)]"}`}>
                                         <Download size={16} className={isMe ? "text-white/70" : "text-slate-500"} />
                                       </div>
                                       <div className="min-w-0 flex-1">
@@ -1490,7 +1490,7 @@ export function MessagesTab({
                                           key={em}
                                           onClick={() => handleReact(msgId, em)}
                                           title={`Reacted by ${data.names.length > 0 ? data.names.join(", ") : `${data.count.length} user(s)`}`}
-                                          className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium transition-colors ${ data.hasMe ? isMe ? "bg-white/20 text-white" : "bg-sky-100 text-sky-700" : isMe ? "bg-white/10 text-white/70" : "bg-[var(--c-bg-muted)] text-slate-600" } hover:opacity-80`}
+                                          className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium transition-colors ${ data.hasMe ? isMe ? "bg-white/20 text-white" : "bg-sky-100 text-sky-700" : isMe ? "bg-white/10 text-white/70" : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-600" } hover:opacity-80`}
                                         >
                                           {em} {data.count.length}
                                         </button>
@@ -1529,7 +1529,7 @@ export function MessagesTab({
               {/* Group Chat Send Input */}
               <div className="border-t border-[var(--c-border-light)] p-4">
                 {pendingUpload && (
-                  <div className="mb-2 rounded-lg border border-[var(--c-border-light)] bg-[var(--c-bg-muted)] px-3 py-2">
+                  <div className="mb-2 rounded-lg border border-[var(--c-border-light)] bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-2">
                     <div className="flex items-center gap-2">
                       <Paperclip size={12} className="shrink-0 text-slate-400" />
                       <span className="truncate text-[10px] text-slate-600">{pendingUpload.file.name}</span>
@@ -1572,7 +1572,7 @@ export function MessagesTab({
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={!!pendingUpload}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 hover:bg-[var(--c-bg-muted)] transition-colors disabled:opacity-40"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors disabled:opacity-40"
                     title="Attach file"
                   >
                     <Paperclip size={16} />
@@ -1626,7 +1626,7 @@ export function MessagesTab({
                 </div>
                 <button
                   onClick={() => setShowInfoModal(true)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-700 transition-colors"
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-700 transition-colors"
                   title="User info"
                 >
                   <Info size={15} />
@@ -1642,13 +1642,13 @@ export function MessagesTab({
                   <div className="ml-auto flex items-center gap-1">
                     <button
                       onClick={handleCopySelected}
-                      className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold text-slate-600 hover:bg-[var(--c-bg-muted)] transition-colors"
+                      className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors"
                     >
                       <Copy size={12} /> Copy
                     </button>
                     <button
                       onClick={handleForwardSelected}
-                      className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold text-slate-600 hover:bg-[var(--c-bg-muted)] transition-colors"
+                      className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors"
                     >
                       <Forward size={12} /> Forward
                     </button>
@@ -1660,7 +1660,7 @@ export function MessagesTab({
                     </button>
                     <button
                       onClick={exitSelectionMode}
-                      className="ml-1 flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-700 transition-colors"
+                      className="ml-1 flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-700 transition-colors"
                       title="Cancel selection"
                     >
                       <X size={13} />
@@ -1672,7 +1672,7 @@ export function MessagesTab({
               {/* Chat Message History Scroll */}
               <div
                 ref={chatContainerRef}
-                className="flex-1 overflow-y-auto p-4 space-y-4 bg-[var(--c-bg-muted)]/50 scrollbar-thin"
+                className="flex-1 overflow-y-auto p-4 space-y-4 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]/50 scrollbar-thin"
               >
                 {loadingChat ? (
                   <div className="py-8 text-center text-xs text-slate-400">Loading conversation history...</div>
@@ -1712,7 +1712,7 @@ export function MessagesTab({
                             <div className="relative max-w-[70%]">
                               {/* Selection checkbox */}
                               {selectionMode && (
-                                <span className={`absolute -top-2.5 z-20 flex h-5 w-5 items-center justify-center rounded-full border-2 transition-colors ${isMe ? "-right-2" : "-left-2"} ${selectedMessages[msgId] ? "bg-sky-500 border-sky-500 text-white" : "bg-[var(--c-bg-card)] border-slate-300 text-transparent"}`}>
+                                <span className={`absolute -top-2.5 z-20 flex h-5 w-5 items-center justify-center rounded-full border-2 transition-colors ${isMe ? "-right-2" : "-left-2"} ${selectedMessages[msgId] ? "bg-sky-500 border-sky-500 text-white" : "bg-[var(--c-bg-white dark:bg-zinc-900)] border-slate-300 text-transparent"}`}>
                                   <Check size={11} />
                                 </span>
                               )}
@@ -1720,7 +1720,7 @@ export function MessagesTab({
                               {!selectionMode && (
                                 <button
                                   onClick={(e) => openContextMenu(e, msgId, msg)}
-                                  className={`absolute -top-3 ${isMe ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1"} hidden group-hover/msg:flex h-6 w-6 items-center justify-center rounded-full bg-[var(--c-bg-card)] border border-[var(--c-border-light)] text-slate-400 hover:text-slate-700 hover:bg-[var(--c-bg-muted)] shadow-sm transition-colors z-10`}
+                                  className={`absolute -top-3 ${isMe ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1"} hidden group-hover/msg:flex h-6 w-6 items-center justify-center rounded-full bg-[var(--c-bg-white dark:bg-zinc-900)] border border-[var(--c-border-light)] text-slate-400 hover:text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] shadow-sm transition-colors z-10`}
                                   title="More actions"
                                 >
                                   <MoreVertical size={12} />
@@ -1731,7 +1731,7 @@ export function MessagesTab({
                               {contextMenuMsgId === msgId && (
                                 <div
                                   data-context-menu
-                                  className={`absolute top-6 z-50 w-[220px] rounded-xl bg-[var(--c-bg-card)] border border-[var(--c-border-light)] py-1.5 shadow-xl ${isMe ? "right-0" : "left-0"}`}
+                                  className={`absolute top-6 z-50 w-[220px] rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] border border-[var(--c-border-light)] py-1.5 shadow-xl ${isMe ? "right-0" : "left-0"}`}
                                 >
                                   {/* Quick reactions */}
                                   <div className="flex items-center justify-between gap-0.5 px-2 pb-1.5 pt-1">
@@ -1739,7 +1739,7 @@ export function MessagesTab({
                                       <button
                                         key={e}
                                         onClick={() => handleReact(msgId, e)}
-                                        className="flex h-8 w-8 items-center justify-center rounded-lg text-lg transition-transform hover:scale-110 hover:bg-[var(--c-bg-muted)]"
+                                        className="flex h-8 w-8 items-center justify-center rounded-lg text-lg transition-transform hover:scale-110 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                                       >
                                         {e}
                                       </button>
@@ -1747,7 +1747,7 @@ export function MessagesTab({
                                     <div className="relative">
                                       <button
                                         onClick={() => setShowEmojiPickerFor(showEmojiPickerFor === msgId ? null : msgId)}
-                                        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-[var(--c-bg-muted)]"
+                                        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                                         title="More reactions"
                                       >
                                         <SmilePlus size={15} />
@@ -1759,7 +1759,7 @@ export function MessagesTab({
                                               <button
                                                 key={e}
                                                 onClick={() => handleReact(msgId, e)}
-                                                className="flex h-7 w-7 items-center justify-center rounded-md text-sm hover:bg-[var(--c-bg-muted)] transition-colors"
+                                                className="flex h-7 w-7 items-center justify-center rounded-md text-sm hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors"
                                               >
                                                 {e}
                                               </button>
@@ -1772,32 +1772,32 @@ export function MessagesTab({
                                   <div className="border-t border-[var(--c-border-light)]" />
                                   <button
                                     onClick={() => { setMessageInfoMsg(msg); setMessageInfoTab("reactions"); closeContextMenu(); }}
-                                    className="flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-muted)] transition-colors"
+                                    className="flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors"
                                   >
                                     <Info size={12} className="text-slate-400" /> Message info
                                   </button>
                                   <button
                                     onClick={() => { handleReply(msg); closeContextMenu(); }}
-                                    className="flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-muted)] transition-colors"
+                                    className="flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors"
                                   >
                                     <Reply size={12} className="text-slate-400" /> Reply
                                   </button>
                                   <button
                                     onClick={() => handleCopyMessage(msg)}
-                                    className="flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-muted)] transition-colors"
+                                    className="flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors"
                                   >
                                     <Copy size={12} className="text-slate-400" /> Copy
                                   </button>
                                   <button
                                     onClick={() => handleForwardMessage()}
-                                    className="flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-muted)] transition-colors"
+                                    className="flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors"
                                   >
                                     <Forward size={12} className="text-slate-400" /> Forward
                                   </button>
                                   <div className="my-1 border-t border-[var(--c-border-light)]" />
                                   <button
                                     onClick={() => enterSelectionMode(msgId, msg)}
-                                    className="flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-muted)] transition-colors"
+                                    className="flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors"
                                   >
                                     <SquareCheck size={12} className="text-slate-400" /> Select
                                   </button>
@@ -1816,11 +1816,11 @@ export function MessagesTab({
                               )}
 
                               <div
-                                className={`rounded-xl px-4 py-2.5 text-[11px] ${ isMe ? "neu-tab-pressed rounded-tr-none" : "bg-[var(--c-bg-elevated)] border-[var(--c-border-light)] text-slate-800 rounded-tl-none" } ${selectionMode && selectedMessages[msgId] ? "ring-2 ring-sky-400" : ""}`}
+                                className={`rounded-xl px-4 py-2.5 text-[11px] ${ isMe ? "neu-tab-pressed rounded-tr-none" : "bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] border-[var(--c-border-light)] text-slate-800 rounded-tl-none" } ${selectionMode && selectedMessages[msgId] ? "ring-2 ring-sky-400" : ""}`}
                               >
                                 {/* Quoted reply preview */}
                                 {replyToData && (
-                                  <div className={`mb-2 rounded-lg px-2.5 py-1.5 text-[9px] ${isMe ? "bg-white/10 text-white/60" : "bg-[var(--c-bg-muted)] text-slate-500"}`}>
+                                  <div className={`mb-2 rounded-lg px-2.5 py-1.5 text-[9px] ${isMe ? "bg-white/10 text-white/60" : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-500"}`}>
                                     <p className="font-semibold truncate opacity-70">{String(replyToData.sender?.name ?? "Unknown")}</p>
                                     <p className="truncate opacity-60">{String(replyToData.message ?? "")}</p>
                                   </div>
@@ -1833,7 +1833,7 @@ export function MessagesTab({
                                   const att = (msg as any).attachment as any;
                                   if (att.isExpired) {
                                     return (
-                                      <div className={`mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-[10px] ${isMe ? "bg-white/10 text-white/50" : "bg-[var(--c-bg-muted)] text-slate-400"}`}>
+                                      <div className={`mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-[10px] ${isMe ? "bg-white/10 text-white/50" : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-400"}`}>
                                         <Paperclip size={12} />
                                         <span className="italic">Attachment expired</span>
                                       </div>
@@ -1856,8 +1856,8 @@ export function MessagesTab({
                                     );
                                   }
                                   return (
-                                    <a href={att.url} download={att.name} target="_blank" rel="noopener noreferrer" className={`mt-2 flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors ${isMe ? "bg-white/10 hover:bg-white/15" : "bg-[var(--c-bg-muted)] hover:bg-[var(--c-bg-hover)]"}`}>
-                                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isMe ? "bg-white/10" : "bg-[var(--c-bg-card)]"}`}>
+                                    <a href={att.url} download={att.name} target="_blank" rel="noopener noreferrer" className={`mt-2 flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors ${isMe ? "bg-white/10 hover:bg-white/15" : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:bg-[var(--c-bg-hover)]"}`}>
+                                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isMe ? "bg-white/10" : "bg-[var(--c-bg-white dark:bg-zinc-900)]"}`}>
                                         <Download size={16} className={isMe ? "text-white/70" : "text-slate-500"} />
                                       </div>
                                       <div className="min-w-0 flex-1">
@@ -1887,7 +1887,7 @@ export function MessagesTab({
                                           key={em}
                                           onClick={() => handleReact(msgId, em)}
                                           title={`Reacted by ${data.names.length > 0 ? data.names.join(", ") : `${data.count.length} user(s)`}`}
-                                          className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium transition-colors ${ data.hasMe ? isMe ? "bg-white/20 text-white" : "bg-sky-100 text-sky-700" : isMe ? "bg-white/10 text-white/70" : "bg-[var(--c-bg-muted)] text-slate-600" } hover:opacity-80`}
+                                          className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium transition-colors ${ data.hasMe ? isMe ? "bg-white/20 text-white" : "bg-sky-100 text-sky-700" : isMe ? "bg-white/10 text-white/70" : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-600" } hover:opacity-80`}
                                         >
                                           {em} {data.count.length}
                                         </button>
@@ -1924,7 +1924,7 @@ export function MessagesTab({
               {/* Chat Send Input Box */}
               <div className="border-t border-[var(--c-border-light)] p-4">
                 {pendingUpload && (
-                  <div className="mb-2 rounded-lg border border-[var(--c-border-light)] bg-[var(--c-bg-muted)] px-3 py-2">
+                  <div className="mb-2 rounded-lg border border-[var(--c-border-light)] bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-2">
                     <div className="flex items-center gap-2">
                       <Paperclip size={12} className="shrink-0 text-slate-400" />
                       <span className="truncate text-[10px] text-slate-600">{pendingUpload.file.name}</span>
@@ -1967,7 +1967,7 @@ export function MessagesTab({
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={!!pendingUpload}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 hover:bg-[var(--c-bg-muted)] transition-colors disabled:opacity-40"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors disabled:opacity-40"
                     title="Attach file"
                   >
                     <Paperclip size={16} />
@@ -1992,8 +1992,8 @@ export function MessagesTab({
             </div>
           ) : (
             /* Blank state */
-            <div className="flex flex-col h-full items-center justify-center p-8 text-center bg-[var(--c-bg-muted)]/20">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--c-bg-muted)] text-slate-400 shadow-inner">
+            <div className="flex flex-col h-full items-center justify-center p-8 text-center bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]/20">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-400 shadow-inner">
                 <Send size={24} />
               </div>
               <h4 className="mt-4 text-xs font-bold text-slate-800">Your Chat Board</h4>
@@ -2007,12 +2007,12 @@ export function MessagesTab({
           {showInfoModal && selectedMember && (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay" onClick={() => setShowInfoModal(false)}>
               <div
-                className="relative w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl"
+                className="relative w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
                   onClick={() => setShowInfoModal(false)}
-                  className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-700"
+                  className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-700"
                 >
                   <X size={15} />
                 </button>
@@ -2098,12 +2098,12 @@ export function MessagesTab({
           {showInfoModal && selectedGroup && (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay" onClick={() => setShowInfoModal(false)}>
               <div
-                className="relative w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl max-h-[80vh] overflow-y-auto"
+                className="relative w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl max-h-[80vh] overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
                   onClick={() => setShowInfoModal(false)}
-                  className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-700"
+                  className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-700"
                 >
                   <X size={15} />
                 </button>
@@ -2124,7 +2124,7 @@ export function MessagesTab({
                   <p className="text-[10px] font-semibold uppercase text-slate-400 mb-3">Members</p>
                   <div className="space-y-2">
                     {((selectedGroup.members as AnyRecord[]) ?? []).map((member: AnyRecord) => (
-                      <div key={String(member.id ?? "")} className="flex items-center gap-3 rounded-lg p-2 hover:bg-[var(--c-bg-muted)]">
+                      <div key={String(member.id ?? "")} className="flex items-center gap-3 rounded-lg p-2 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]">
                         <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--c-bg-hover)] text-[10px] font-semibold text-slate-700 overflow-hidden">
                           {member.avatarUrl ? (
                             <img src={String(member.avatarUrl)} alt="" className="h-full w-full object-cover" />
@@ -2158,12 +2158,12 @@ export function MessagesTab({
           {messageInfoMsg && (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay" onClick={() => setMessageInfoMsg(null)}>
               <div
-                className="relative w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl max-h-[80vh] overflow-y-auto"
+                className="relative w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl max-h-[80vh] overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
                   onClick={() => setMessageInfoMsg(null)}
-                  className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-700"
+                  className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-700"
                 >
                   <X size={15} />
                 </button>
@@ -2175,7 +2175,7 @@ export function MessagesTab({
                   const infoSender = String((messageInfoMsg as any).sender?._id ?? (messageInfoMsg as any).sender ?? "");
                   const isOwnMessage = infoSender === currentUserId;
                   return (
-                    <div className="flex gap-1 mb-4 bg-[var(--c-bg-muted)] rounded-lg p-0.5">
+                    <div className="flex gap-1 mb-4 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] rounded-lg p-0.5">
                       <button
                         onClick={() => setMessageInfoTab("reactions")}
                         className={`flex-1 rounded-md px-3 py-1.5 text-[10px] font-semibold transition-colors ${ messageInfoTab === "reactions" || !isOwnMessage ? "neu-tab-pressed" : "text-slate-500 hover:text-slate-700" }`}
@@ -2220,7 +2220,7 @@ export function MessagesTab({
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {group.users.map((u) => (
-                              <span key={u.id} className="inline-flex items-center gap-1 rounded-full bg-[var(--c-bg-muted)] px-2 py-0.5 text-[9px] font-medium text-slate-700">
+                              <span key={u.id} className="inline-flex items-center gap-1 rounded-full bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-2 py-0.5 text-[9px] font-medium text-slate-700">
                                 {u.name}
                               </span>
                             ))}
@@ -2268,7 +2268,7 @@ export function MessagesTab({
                         <p className="text-[11px] text-slate-400 text-center py-6 italic">No members</p>
                       ) : (
                         allUsers.map((u) => (
-                          <div key={u.id} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-[var(--c-bg-muted)]">
+                          <div key={u.id} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]">
                             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--c-bg-hover)] text-[9px] font-bold text-slate-600 overflow-hidden">
                               {getInitials(u.name)}
                             </div>
@@ -2280,7 +2280,7 @@ export function MessagesTab({
                                 Seen{u.readAt ? ` ${new Date(u.readAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}
                               </span>
                             ) : (
-                              <span className="shrink-0 inline-flex items-center rounded-full bg-[var(--c-bg-muted)] px-2 py-0.5 text-[8px] font-semibold text-slate-500">
+                              <span className="shrink-0 inline-flex items-center rounded-full bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-2 py-0.5 text-[8px] font-semibold text-slate-500">
                                 Not seen yet
                               </span>
                             )}
@@ -2298,13 +2298,13 @@ export function MessagesTab({
           {deleteConfirm && (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay" onClick={() => { if (!deleting) setDeleteConfirm(null); }}>
               <div
-                className="relative w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl"
+                className="relative w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
                   onClick={() => setDeleteConfirm(null)}
                   disabled={deleting}
-                  className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-700 disabled:opacity-50"
+                  className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-700 disabled:opacity-50"
                 >
                   <X size={15} />
                 </button>
@@ -2327,7 +2327,7 @@ export function MessagesTab({
                   <button
                     onClick={() => setDeleteConfirm(null)}
                     disabled={deleting}
-                    className="rounded-full px-4 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-[var(--c-bg-muted)] transition-colors disabled:opacity-50"
+                    className="rounded-full px-4 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors disabled:opacity-50"
                   >
                     Cancel
                   </button>
@@ -2347,12 +2347,12 @@ export function MessagesTab({
           {showForwardModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay" onClick={() => setShowForwardModal(false)}>
               <div
-                className="relative w-full max-w-sm rounded-xl bg-[var(--c-bg-card)] p-5 shadow-xl max-h-[80vh] overflow-hidden"
+                className="relative w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl max-h-[80vh] overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
                   onClick={() => setShowForwardModal(false)}
-                  className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-700"
+                  className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-700"
                 >
                   <X size={15} />
                 </button>
@@ -2378,7 +2378,7 @@ export function MessagesTab({
                           setShowForwardModal(false);
                           handleSendForward(member);
                         }}
-                        className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${ forwardTarget && String(forwardTarget.id ?? forwardTarget._id) === String(member.id ?? member._id) ? "bg-sky-50" : "hover:bg-[var(--c-bg-muted)]" }`}
+                        className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${ forwardTarget && String(forwardTarget.id ?? forwardTarget._id) === String(member.id ?? member._id) ? "bg-sky-50" : "hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]" }`}
                       >
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--c-bg-hover)] text-[10px] font-bold text-slate-600 overflow-hidden">
                           {(member as any).avatarUrl ? (

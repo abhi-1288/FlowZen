@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { apiFetch } from "@/lib/client-utils";
 
 export function RangeExhaustionModal({
@@ -59,7 +59,7 @@ export function RangeExhaustionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4">
-      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-card)] p-6 shadow-xl dark:bg-[#000000]">
+      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl dark:bg-[#000000]">
         <h3 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Increase Identity Code Range</h3>
         <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
           Your identity code range is {currentEndRange != null && currentNextNumber != null && (currentEndRange - currentNextNumber) <= 0 ? "exhausted" : "running low"}.
@@ -86,28 +86,28 @@ export function RangeExhaustionModal({
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
-              className="rounded-full neu-card px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-[var(--c-bg-muted)] dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-700"
+              className="rounded-full neu-card px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-700"
               onClick={() => handleQuickIncrease(100)}
             >
               +100
             </button>
             <button
               type="button"
-              className="rounded-full neu-card px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-[var(--c-bg-muted)] dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-700"
+              className="rounded-full neu-card px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-700"
               onClick={() => handleQuickIncrease(500)}
             >
               +500
             </button>
             <button
               type="button"
-              className="rounded-full neu-card px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-[var(--c-bg-muted)] dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-700"
+              className="rounded-full neu-card px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-700"
               onClick={() => handleQuickIncrease(1000)}
             >
               +1000
             </button>
             <button
               type="button"
-              className="rounded-full neu-card px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-[var(--c-bg-muted)] dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-700"
+              className="rounded-full neu-card px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-700"
               onClick={() => handleQuickIncrease(5000)}
             >
               +5000

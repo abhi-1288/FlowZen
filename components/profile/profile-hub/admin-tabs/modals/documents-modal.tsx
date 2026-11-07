@@ -2,7 +2,7 @@ import { ActionButton } from "../../shared";
 import type { DocModalData } from "../types";
 
 const overlayClass = "fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4";
-const modalClass = "w-full max-w-lg rounded-xl bg-[var(--c-bg-elevated)] p-5 shadow-xl";
+const modalClass = "w-full max-w-lg rounded-xl bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] p-5 shadow-xl";
 
 export function DocumentsModal({
   member,
@@ -39,7 +39,7 @@ export function DocumentsModal({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium text-slate-800">{cat.name}</span>
-                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${cat.mandatory ? "bg-rose-100 text-rose-700" : "bg-[var(--c-bg-muted)] text-slate-600"}`}>
+                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${cat.mandatory ? "bg-rose-100 text-rose-700" : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-600"}`}>
                             {cat.mandatory ? "Required" : "Optional"}
                           </span>
                         </div>

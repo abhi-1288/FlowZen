@@ -168,7 +168,7 @@ export function AuditTab() {
         action={
           <button
             aria-label="Refresh audit log"
-            className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--c-border-light)] bg-[var(--c-bg-muted)] text-slate-600 transition hover:bg-[var(--c-bg-hover)] dark:border-zinc-700 dark:bg-[#161616] dark:text-zinc-300 dark:hover:bg-zinc-700"
+            className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--c-border-light)] bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-600 transition hover:bg-[var(--c-bg-hover)] dark:border-zinc-700 dark:bg-[#161616] dark:text-zinc-300 dark:hover:bg-zinc-700"
             onClick={() => setRefreshKey((current) => current + 1)}
             title="Refresh"
             type="button"
@@ -210,7 +210,7 @@ export function AuditTab() {
               className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                 category === ""
                   ? "bg-indigo-600 text-white"
-                  : "bg-[var(--c-bg-muted)] text-slate-600 hover:bg-[var(--c-bg-hover)] dark:text-zinc-300"
+                  : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-600 hover:bg-[var(--c-bg-hover)] dark:text-zinc-300"
               }`}
               onClick={() => selectCategory("")}
               type="button"
@@ -222,7 +222,7 @@ export function AuditTab() {
                 className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                   category === cat.prefix
                     ? "bg-indigo-600 text-white"
-                    : "bg-[var(--c-bg-muted)] text-slate-600 hover:bg-[var(--c-bg-hover)] dark:text-zinc-300"
+                    : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-600 hover:bg-[var(--c-bg-hover)] dark:text-zinc-300"
                 }`}
                 key={cat.prefix}
                 onClick={() => selectCategory(cat.prefix)}
@@ -361,10 +361,10 @@ export function AuditTab() {
                         ) : null}
                         {hasDiff ? (
                           <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                            <span className="rounded-md bg-[var(--c-bg-muted)] px-2 py-1 font-mono text-slate-500 dark:text-zinc-400">
+                            <span className="rounded-md bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-2 py-1 font-mono text-slate-500 dark:text-zinc-400">
                               From: {scalar(item.from)}
                             </span>
-                            <span className="rounded-md bg-[var(--c-bg-muted)] px-2 py-1 font-mono text-slate-500 dark:text-zinc-400">
+                            <span className="rounded-md bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-2 py-1 font-mono text-slate-500 dark:text-zinc-400">
                               To: {scalar(item.to)}
                             </span>
                           </div>

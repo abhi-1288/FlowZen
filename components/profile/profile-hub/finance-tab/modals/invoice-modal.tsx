@@ -3,7 +3,7 @@ import { ActionButton } from "../../shared";
 import type { InvoiceForm } from "../types";
 
 const overlayClass = "fixed inset-0 z-[100] grid place-items-center bg-black/40";
-const modalClass = "w-full max-w-lg rounded-2xl bg-[var(--c-bg-elevated)] p-6 shadow-xl";
+const modalClass = "w-full max-w-lg rounded-2xl bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] p-6 shadow-xl";
 
 export function InvoiceModal({
   show,

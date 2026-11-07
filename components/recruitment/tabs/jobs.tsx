@@ -4,6 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Search, Eye, Pencil, Globe, Share2, Check, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { PageShell, type PageNavItem } from "@/components/ui/page-shell";
+import { Card } from "@/components/ui/card";
+import { Empty } from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { inputCls } from "@/components/ui/field";
+import { Briefcase } from "lucide-react";
+import { Modal } from "@/components/ui/modal";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
 import type { JobStatus } from "@/lib/recruitment-types";
@@ -66,17 +74,16 @@ export function JobsTab() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-zinc-100">Job Openings</h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">{mounted ? totalJobs : "\u00A0"} jobs</p>
-        </div>
-        {canCreateJobs ? (
-          <button suppressHydrationWarning
+    <PageShell
+      icon={Briefcase}
+      title="Job Openings"
+      subtitle={`${mounted ? totalJobs : "\u00A0"} jobs`}
+      actions={
+        canCreateJobs ? (
+          <button
+            suppressHydrationWarning
             onClick={() => setModal({ type: "create-job" })}
-            className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
           >
             + New Job
           </button>
@@ -84,17 +91,17 @@ export function JobsTab() {
           <p className="max-w-xs text-right text-xs text-slate-400 dark:text-zinc-500">
             Requisitions are raised by your main office.
           </p>
-        )}
-      </div>
-
+        )
+      }
+    >
       <section>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100">Published</h2>
           <div className="flex items-center gap-3">
             <div className="relative max-w-xs flex-1">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
               <input
-                className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-slate-950 dark:border-zinc-800"
+                className={`${inputCls} py-1.5 pl-9 text-xs`}
                 placeholder="Search jobs..."
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
@@ -102,7 +109,7 @@ export function JobsTab() {
             </div>
             <select
               suppressHydrationWarning
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none dark:border-zinc-800"
+              className={`${inputCls} w-auto py-1.5 text-xs`}
               value={statusFilter}
               onChange={(e) => handleStatusChange(e.target.value)}
             >
@@ -115,31 +122,29 @@ export function JobsTab() {
         </div>
 
         {mounted && loading && jobs.length === 0 ? (
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-40 animate-pulse rounded-xl bg-slate-200 dark:bg-zinc-700" />
-            ))}
+          <div className="mt-4">
+            <Skeleton grid rows={6} />
           </div>
         ) : mounted && jobs.length === 0 ? (
-          <div className="mt-8 text-center">
-            <p className="text-slate-500 dark:text-zinc-400">No published jobs found.</p>
+          <div className="mt-6">
+            <Empty icon={Briefcase} title="No published jobs found." message="Create a new job to get started." />
           </div>
         ) : mounted ? (
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {jobs.map((job) => (
-              <div key={job.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-zinc-800 dark:bg-[#000000]">
+              <Card key={job.id} className="p-5 transition hover:shadow-md">
                 <div className="flex items-start justify-between">
                   <div className="min-w-0 flex-1">
                     <h3 className="truncate text-base font-semibold text-slate-900 dark:text-zinc-100">{job.title}</h3>
                     <p className="text-sm text-slate-500 dark:text-zinc-400">{job.department}</p>
                   </div>
-                  <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    job.status === "open" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" :
-                    job.status === "draft" ? "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400" :
-                    "bg-slate-100 text-slate-600 dark:bg-zinc-700 dark:text-zinc-400"
-                  }`}>
+                  <Badge
+                    variant={
+                      job.status === "open" ? "emerald" : job.status === "draft" ? "amber" : "slate"
+                    }
+                  >
                     {job.status}
-                  </span>
+                  </Badge>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-zinc-400">
                   <span>{job.location || "Remote"}</span>
@@ -229,7 +234,7 @@ export function JobsTab() {
                     </button>}
                   </div>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         ) : null}
@@ -255,7 +260,7 @@ export function JobsTab() {
       {/* Create / edit form, shared with the job detail page. */}
       <JobModal />
       <DeleteJobModal />
-    </div>
+    </PageShell>
   );
 }
 
@@ -270,37 +275,39 @@ function DeleteJobModal() {
     }))
   );
   const deletingJob = modal?.type === "delete-job" ? jobs.find((j) => j.id === modal.jobId) : null;
-  if (modal?.type !== "delete-job") return null;
-
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/35 px-4">
-      <div className="w-full max-w-sm rounded-lg bg-white shadow-soft dark:bg-[#000000]">
-        <div className="p-5">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100">Delete Job</h2>
-          <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
-            Delete &ldquo;{deletingJob?.title ?? "this job"}&rdquo;? This will permanently delete the job and all associated candidates, interviews, offers, and uploaded resumes.
-          </p>
-          <div className="mt-5 flex justify-end gap-2">
-            <button suppressHydrationWarning
-              onClick={() => setModal(null)}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
-            >
-              Cancel
-            </button>
-            <button suppressHydrationWarning
-              onClick={() => {
-                if (saving || !deletingJob) return;
-                void deleteJob(deletingJob.id);
-                setModal(null);
-              }}
-              disabled={saving || !deletingJob}
-              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {saving ? "Deleting…" : "Delete"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <Modal
+      open={modal?.type === "delete-job"}
+      onClose={() => setModal(null)}
+      title="Delete Job"
+      maxWidth="max-w-sm"
+      footer={
+        <>
+          <button
+            suppressHydrationWarning
+            onClick={() => setModal(null)}
+            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+          >
+            Cancel
+          </button>
+          <button
+            suppressHydrationWarning
+            onClick={() => {
+              if (saving || !deletingJob) return;
+              void deleteJob(deletingJob.id);
+              setModal(null);
+            }}
+            disabled={saving || !deletingJob}
+            className="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {saving ? "Deleting…" : "Delete"}
+          </button>
+        </>
+      }
+    >
+      <p className="text-sm text-slate-600 dark:text-zinc-400">
+        Delete &ldquo;{deletingJob?.title ?? "this job"}&rdquo;? This will permanently delete the job and all associated candidates, interviews, offers, and uploaded resumes.
+      </p>
+    </Modal>
   );
 }

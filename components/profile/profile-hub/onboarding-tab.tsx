@@ -532,7 +532,7 @@ export function OnboardingTab({
                 disabled={Boolean(insights?.pendingQuit) || replacementHrCandidates.length === 0} type="button" onClick={() => setHrQuitModal(true)}>
                 {pendingQuitText("Request Quit Company")}
               </button>
-              {insights?.pendingQuit ? <button className="mt-2 w-full rounded-lg neu-card px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]" type="button" onClick={() => setCancelQuitModal(true)}>Cancel Request</button> : null}
+              {insights?.pendingQuit ? <button className="mt-2 w-full rounded-lg neu-card px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]" type="button" onClick={() => setCancelQuitModal(true)}>Cancel Request</button> : null}
               {replacementHrCandidates.length === 0 ? <p className="mt-2 text-xs text-amber-700">Another approved HR is required before you can quit.</p> : null}
             </section>
           </>
@@ -568,7 +568,7 @@ export function OnboardingTab({
                   disabled={Boolean(insights?.pendingQuit)} onClick={requestManagerQuit}>
                   {pendingQuitText("Request Quit Company")}
                 </button>
-                {insights?.pendingQuit ? <button className="w-full rounded-lg neu-card px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]" onClick={() => setCancelQuitModal(true)} type="button">Cancel Request</button> : null}
+                {insights?.pendingQuit ? <button className="w-full rounded-lg neu-card px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]" onClick={() => setCancelQuitModal(true)} type="button">Cancel Request</button> : null}
               </div>
             </section>
           </>
@@ -608,7 +608,7 @@ export function OnboardingTab({
                 {itCodesLoading ? (
                   <p className="text-sm text-slate-500">Loading joining codes...</p>
                 ) : itCodes.length === 0 ? (
-                  <p className="rounded-lg bg-[var(--c-bg-muted)] px-3 py-4 text-sm text-slate-500">No joining codes yet. Generate one above to invite IT Administration staff.</p>
+                  <p className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-4 text-sm text-slate-500">No joining codes yet. Generate one above to invite IT Administration staff.</p>
                 ) : (
                   itCodes.map((item: AnyRecord) => {
                     const cid = String(item.id ?? "");
@@ -620,7 +620,7 @@ export function OnboardingTab({
                     const isRevoked = String(item.status ?? "") === "revoked";
                     const remaining = isExpired || isRevoked ? 0 : Math.max(0, maxUses - usedCount);
                     return (
-                      <div key={cid} className={`rounded-lg border p-4 ${isExpired || isRevoked ? "border-slate-200 bg-slate-50 opacity-70" : "border-dashed border-slate-300 bg-[var(--c-bg-muted)]"}`}>
+                      <div key={cid} className={`rounded-lg border p-4 ${isExpired || isRevoked ? "border-slate-200 bg-slate-50 opacity-70" : "border-dashed border-slate-300 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"}`}>
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div className="min-w-0">
                             <p className="font-mono text-sm font-semibold text-indigo-700">{codeVal}</p>
@@ -714,7 +714,7 @@ export function OnboardingTab({
                 ) : (
                   <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">Team creation limit reached ({createdTeamsCount}/{teamLimit}).</p>
                 )}
-                <p className="rounded-lg bg-[var(--c-bg-muted)] px-3 py-2 text-sm text-slate-600">
+                <p className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-2 text-sm text-slate-600">
                   {role === "human-resource" ? "HR" : role === "admin" ? "Admins" : "Managers"} can create up to {teamLimit} teams. Created: {createdTeamsCount}/{teamLimit} &middot; Total managed: {managerTeams.length}
                 </p>
                 {managerTeams.length > 0 ? (
@@ -722,7 +722,7 @@ export function OnboardingTab({
                     <p className="mb-2 text-xs font-semibold uppercase text-slate-500">My Teams</p>
                     <div className="space-y-1">
                       {managerTeams.map((t) => (
-                        <div key={String(t.id)} className="flex items-center justify-between rounded-lg bg-[var(--c-bg-muted)] px-3 py-2 text-sm">
+                        <div key={String(t.id)} className="flex items-center justify-between rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-2 text-sm">
                           <span className="font-medium text-slate-900">{String(t.name ?? "")}</span>
                           <span className="text-xs text-slate-500">{Number(t.employeeCount ?? 0)} employees</span>
                         </div>
@@ -734,7 +734,7 @@ export function OnboardingTab({
                   disabled={Boolean(insights?.pendingQuit)} onClick={() => setRoleQuitModal(true)} type="button">
                   {pendingQuitText("Request Quit Company")}
                 </button>
-                {insights?.pendingQuit ? <button className="w-full rounded-lg neu-card px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]" onClick={() => setCancelQuitModal(true)} type="button">Cancel Request</button> : null}
+                {insights?.pendingQuit ? <button className="w-full rounded-lg neu-card px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]" onClick={() => setCancelQuitModal(true)} type="button">Cancel Request</button> : null}
               </div>
             </section>
 
@@ -760,12 +760,12 @@ export function OnboardingTab({
                           ...(otherCode ? [{ code: otherCode, label: "Others code" }] : []),
                         ].map((item) => (
                           <div className="mb-3 last:mb-0" key={item.code}>
-                            <div className="rounded-lg border border-dashed border-slate-300 bg-[var(--c-bg-muted)] p-3">
+                            <div className="rounded-lg border border-dashed border-slate-300 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] p-3">
                               <p className="text-xs font-semibold uppercase text-slate-500">{item.label}</p>
                               <div className="mt-2 flex items-center justify-between gap-3">
                                 <p className="min-w-0 truncate font-mono text-sm font-semibold text-indigo-700">{item.code}</p>
                                 <button aria-label={`Copy ${teamName} ${item.label}`}
-                                  className="grid h-9 w-9 place-items-center rounded-lg neu-card text-slate-700 hover:bg-[var(--c-bg-muted)]"
+                                  className="grid h-9 w-9 place-items-center rounded-lg neu-card text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                                   onClick={() => { navigator.clipboard.writeText(item.code); showToast(`${teamName} ${item.label.toLowerCase()} copied.`); }} title="Copy code" type="button">
                                   <Users size={20} />
                                 </button>
@@ -799,7 +799,7 @@ export function OnboardingTab({
                       const tid = String(t.id ?? "");
                       const checked = teamTransferTeamIds.includes(tid);
                       return (
-                        <label key={tid} className="flex cursor-pointer items-center gap-3 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm hover:bg-[var(--c-bg-muted)]">
+                        <label key={tid} className="flex cursor-pointer items-center gap-3 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]">
                           <input type="checkbox" className="size-4 accent-slate-900" checked={checked} onChange={() => setTeamTransferTeamIds((prev) => checked ? prev.filter((id) => id !== tid) : [...prev, tid])} />
                           <div className="min-w-0 flex-1">
                             <p className="font-medium text-slate-900">{String(t.name ?? "Team")}</p>
@@ -838,13 +838,13 @@ export function OnboardingTab({
                 {(role === "admin" ? transferTeams : managerTeams).length > 0 ? (
                   (role === "admin" ? transferTeams : managerTeams).map((t) => (
                     <button key={String(t.id)} type="button" onClick={() => setTeamModal(t)}
-                      className="flex w-full items-center justify-between rounded-lg bg-[var(--c-bg-muted)] px-3 py-2 text-left text-sm hover:bg-[var(--c-bg-muted)]">
+                      className="flex w-full items-center justify-between rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-2 text-left text-sm hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]">
                       <span>{String(t.name)}</span>
                       <span className="font-medium">{Number(t.employeeCount ?? 0)} employees</span>
                     </button>
                   ))
                 ) : (
-                  <p className="rounded-lg bg-[var(--c-bg-muted)] px-3 py-2 text-sm text-slate-500">No teams yet.</p>
+                  <p className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-2 text-sm text-slate-500">No teams yet.</p>
                 )}
               </div>
             </section>
@@ -894,7 +894,7 @@ export function OnboardingTab({
                   disabled={Boolean(insights?.pendingQuit)} onClick={requestManagerQuit}>
                   {pendingQuitText("Request Quit Company")}
                 </button>
-                {insights?.pendingQuit ? <button className="w-full rounded-lg neu-card px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]" onClick={() => setCancelQuitModal(true)} type="button">Cancel Request</button> : null}
+                {insights?.pendingQuit ? <button className="w-full rounded-lg neu-card px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]" onClick={() => setCancelQuitModal(true)} type="button">Cancel Request</button> : null}
               </div>
             </section>
             {teamJoinStatus !== "approved" ? (

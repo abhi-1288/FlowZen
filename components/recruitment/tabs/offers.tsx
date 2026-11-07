@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, ExternalLink, ChevronRight, ChevronDown, PenSquare, Send, ChevronLeft, ChevronsLeft, ChevronsRight, Undo2 } from "lucide-react";
+import { FileText, ExternalLink, ChevronRight, ChevronDown, PenSquare, Send, ChevronLeft, ChevronsLeft, ChevronsRight, Undo2, FileSignature } from "lucide-react";
+import { PageShell } from "@/components/ui/page-shell";
+import { Empty } from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+import { inputCls } from "@/components/ui/field";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
 import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
@@ -55,14 +59,15 @@ export function OffersTab() {
   };
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-semibold text-slate-900">Offers</h1>
-      <p className="mt-1 text-sm text-slate-500">{totalOffers} offers across {grouped.length} jobs</p>
-
-      <div className="mt-4 flex items-center gap-3">
+    <PageShell
+      icon={FileSignature}
+      title="Offers"
+      subtitle={`${totalOffers} offers across ${grouped.length} jobs`}
+    >
+      <div className="flex items-center gap-3">
         <select
           suppressHydrationWarning
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none"
+          className={`${inputCls} w-auto py-1.5 text-xs`}
           value={statusFilter}
           onChange={(e) => handleStatusChange(e.target.value)}
         >
@@ -75,13 +80,13 @@ export function OffersTab() {
       </div>
 
       {loading && offers.length === 0 ? (
-        <div className="mt-6 space-y-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-16 animate-pulse rounded-lg bg-slate-200" />
-          ))}
+        <div className="mt-6">
+          <Skeleton rows={4} />
         </div>
       ) : grouped.length === 0 ? (
-        <div className="mt-16 text-center text-slate-500">No offers found.</div>
+        <div className="mt-6">
+          <Empty icon={FileSignature} title="No offers found." message="Generate an offer to get started." />
+        </div>
       ) : (
         <div className="mt-6 space-y-4">
           {grouped.map(([jobTitle, jobOffers]) => {
@@ -90,7 +95,7 @@ export function OffersTab() {
             const draftCount = jobOffers.filter((o) => o.status === "draft").length;
 
             return (
-              <div key={jobTitle} className="rounded-lg border border-slate-200 bg-white">
+              <div key={jobTitle} className="neu-card overflow-hidden rounded-2xl bg-white dark:bg-zinc-900">
                 <button suppressHydrationWarning
                   onClick={() => toggleJob(jobTitle)}
                   className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-slate-50 transition rounded-lg"
@@ -249,6 +254,6 @@ export function OffersTab() {
         </div>
       )}
       <EditOfferModal />
-    </div>
+    </PageShell>
   );
 }

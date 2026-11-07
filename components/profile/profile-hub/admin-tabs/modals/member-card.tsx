@@ -82,7 +82,7 @@ export function MemberCard({
   }
 
   const chipClass =
-    "inline-flex items-center gap-1.5 rounded-full bg-[var(--c-bg-muted)] px-3 py-1 text-xs font-medium text-slate-700 dark:text-zinc-300";
+    "inline-flex items-center gap-1.5 rounded-full bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-1 text-xs font-medium text-slate-700 dark:text-zinc-300";
   const chipIcon = "shrink-0 text-slate-400 dark:text-zinc-500";
 
   return (

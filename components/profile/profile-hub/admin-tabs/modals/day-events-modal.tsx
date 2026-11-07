@@ -30,13 +30,13 @@ export function DayEventsModal({
 }) {
   return (
     <div className="fixed inset-0 z-[100] grid place-items-center neu-overlay p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-[var(--c-bg-card)] p-5 shadow-xl ring-1 ring-slate-200">
+      <div className="w-full max-w-lg rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl ring-1 ring-slate-200">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-sm font-semibold flex items-center gap-2">
             <Calendar size={18} className="text-indigo-600" />
             {date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
           </h3>
-          <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-700">
+          <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-700">
             <X size={16} />
           </button>
         </div>

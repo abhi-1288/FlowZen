@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/client-utils";
@@ -165,7 +165,7 @@ export function CompanyThemeSection({
           <button
             type="button"
             onClick={() => setSelected(currentColor)}
-            className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-semibold text-slate-600 transition-all hover:bg-[var(--c-bg-muted)] dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+            className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm font-semibold text-slate-600 transition-all hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
           >
             Reset Color
           </button>

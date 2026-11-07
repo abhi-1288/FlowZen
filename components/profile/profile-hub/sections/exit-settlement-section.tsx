@@ -188,7 +188,7 @@ export function ExitSettlementSection({
       </div>
 
       {Object.keys(noticeRule).length > 0 ? (
-        <div className="mt-4 rounded-lg bg-[var(--c-bg-muted)] p-3">
+        <div className="mt-4 rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] p-3">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase text-slate-500">
             <ShieldCheck size={14} className="text-slate-500" />
             Notice rule

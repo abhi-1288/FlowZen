@@ -87,7 +87,7 @@ export function CareersTab({ identityCode }: { identityCode?: string }) {
               {job.requiredSkills.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {job.requiredSkills.map((skill) => (
-                    <span key={skill} className="rounded-md bg-[var(--c-bg-muted)] px-2 py-0.5 text-xs font-medium text-slate-600">{skill}</span>
+                    <span key={skill} className="rounded-md bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-2 py-0.5 text-xs font-medium text-slate-600">{skill}</span>
                   ))}
                 </div>
               )}
@@ -103,7 +103,7 @@ export function CareersTab({ identityCode }: { identityCode?: string }) {
                 <a
                   href={jobUrl(job)}
                   target="_blank"
-                  className="inline-flex items-center gap-1 rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-muted)]"
+                  className="inline-flex items-center gap-1 rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
                 >
                   <Eye size={14} /> View
                 </a>

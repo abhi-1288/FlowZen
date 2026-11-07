@@ -121,7 +121,7 @@ export function CompanyAddressSection({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="rounded-lg neu-card px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] hover:text-slate-800 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-800"
+          className="rounded-lg neu-card px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-800 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-300 dark:hover:bg-zinc-800"
         >
           Edit
         </button>
@@ -796,7 +796,7 @@ function OfficeCard({
     .join(", ");
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-[var(--c-border-light)] bg-[var(--c-bg-card)] dark:border-zinc-800">
+    <section className="overflow-hidden rounded-2xl border border-[var(--c-border-light)] bg-[var(--c-bg-white dark:bg-zinc-900)] dark:border-zinc-800">
       {onBack ? (
         <div className="border-b border-[var(--c-border-light)] bg-[var(--c-bg)] px-5 py-2.5 dark:border-zinc-800 dark:bg-zinc-950/40">
           <button
@@ -990,7 +990,7 @@ function PipelineAccessRow({
           }
           className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-medium transition-colors ${
             canDelegate
-              ? "border border-[var(--c-border-light)] text-slate-700 hover:bg-[var(--c-bg-muted)] dark:border-zinc-700 dark:text-zinc-200"
+              ? "border border-[var(--c-border-light)] text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] dark:border-zinc-700 dark:text-zinc-200"
               : "cursor-default border border-dashed text-slate-400 dark:text-zinc-500"
           }`}
         >
@@ -1043,7 +1043,7 @@ function PipelineAccessRow({
             type="button"
             disabled={saving}
             onClick={onSave}
-            className="mt-2 rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
+            className="mt-2 rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
           >
             {saving ? "Saving..." : "Save Pipeline Access"}
           </button>

@@ -154,7 +154,7 @@ export function PoliciesSection({
                 </button>
               </div>
             ) : (
-              <span className={`rounded-lg px-3 py-1.5 text-xs font-medium ${policyData.advanceSalaryEnabled ? "bg-emerald-50 text-emerald-700" : "bg-[var(--c-bg-muted)] text-slate-500"}`}>
+              <span className={`rounded-lg px-3 py-1.5 text-xs font-medium ${policyData.advanceSalaryEnabled ? "bg-emerald-50 text-emerald-700" : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-500"}`}>
                 {policyData.advanceSalaryEnabled ? "Enabled" : "Disabled"}
               </span>
             )}
@@ -184,7 +184,7 @@ export function PoliciesSection({
                 />
               </button>
             ) : (
-              <span className={`rounded-lg px-3 py-1.5 text-xs font-medium ${policyData.autoSalaryEnabled ? "bg-emerald-50 text-emerald-700" : "bg-[var(--c-bg-muted)] text-slate-500"}`}>
+              <span className={`rounded-lg px-3 py-1.5 text-xs font-medium ${policyData.autoSalaryEnabled ? "bg-emerald-50 text-emerald-700" : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-500"}`}>
                 {policyData.autoSalaryEnabled ? "Enabled" : "Disabled"}
               </span>
             )}

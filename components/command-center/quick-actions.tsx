@@ -6,7 +6,7 @@ export function QuickActions({ actions }: { actions: QuickAction[] }) {
   if (actions.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-[#000000]">
+    <div className="neu-card rounded-2xl p-5">
       <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Quick Actions</h3>
       <div className="mt-4 grid grid-cols-2 gap-2.5">
         {actions.map((action) => (

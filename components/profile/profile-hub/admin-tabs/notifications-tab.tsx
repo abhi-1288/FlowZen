@@ -80,7 +80,7 @@ export function NotificationsTab({
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">{group}</p>
                 <div className="space-y-3">
                   {items.map((item) => (
-                    <div className={`rounded-xl p-4 ${item.readAt ? "neu-inset/50 bg-[var(--c-bg-muted)] text-slate-500" : "border-emerald-200 neu-card "}`} key={String(item.id)}>
+                    <div className={`rounded-xl p-4 ${item.readAt ? "neu-inset/50 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-500" : "border-emerald-200 neu-card "}`} key={String(item.id)}>
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div className="flex gap-3">
                           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-700"><Bell size={18} /></div>
@@ -92,7 +92,7 @@ export function NotificationsTab({
                         </div>
                         <div className="flex shrink-0 gap-2 sm:flex-col">
                           {item.link ? (
-                            <a href={String(item.link)} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-[var(--c-border-light)] px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-muted)]" target="_blank" rel="noopener noreferrer">
+                            <a href={String(item.link)} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-[var(--c-border-light)] px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]" target="_blank" rel="noopener noreferrer">
                               <ExternalLink size={14} /> View
                             </a>
                           ) : null}

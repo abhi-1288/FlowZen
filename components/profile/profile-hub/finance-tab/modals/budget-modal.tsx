@@ -4,7 +4,7 @@ import type { AnyRecord } from "../../shared";
 import type { BudgetForm } from "../types";
 
 const overlayClass = "fixed inset-0 z-50 grid place-items-center bg-black/40";
-const modalClass = "w-full max-w-lg rounded-2xl bg-[var(--c-bg-elevated)] p-6 shadow-xl";
+const modalClass = "w-full max-w-lg rounded-2xl bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] p-6 shadow-xl";
 
 export function BudgetModal({
   show,
@@ -36,7 +36,7 @@ export function BudgetModal({
       <div className={modalClass}>
         <h4 className="text-lg font-semibold">{editingBudgetId ? "Edit Budget" : "Allocate Budget"}</h4>
         <form className="mt-4 grid gap-3" onSubmit={onSubmit}>
-          {region ? <p className="rounded-lg bg-[var(--c-bg-muted)] px-3 py-2 text-sm text-[var(--c-text-muted)]">Region: <span className="font-medium text-[var(--c-text)]">{region}</span> (your regional budget)</p> : null}
+          {region ? <p className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-2 text-sm text-[var(--c-text-muted)]">Region: <span className="font-medium text-[var(--c-text)]">{region}</span> (your regional budget)</p> : null}
           <select className="rounded-lg border border-[var(--c-border-light)] px-3 py-2" required value={budgetForm.boardId} onChange={(e) => onFormChange({ ...budgetForm, boardId: e.target.value })}>
             <option value="">Select project</option>
             {boards.map((board) => (

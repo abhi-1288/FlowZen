@@ -25,7 +25,7 @@ const SEVERITY_STYLES: Record<
 export function AttentionList({ items }: { items: AttentionItem[] }) {
   if (items.length === 0) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-[#000000]">
+      <div className="neu-card rounded-2xl p-5">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Needs Attention</h3>
         <p className="mt-3 text-sm text-slate-400 dark:text-zinc-500">All clear — nothing needs your attention right now.</p>
       </div>
@@ -33,7 +33,7 @@ export function AttentionList({ items }: { items: AttentionItem[] }) {
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-[#000000]">
+    <div className="neu-card rounded-2xl p-5">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Needs Attention</h3>
         <span className="text-xs text-slate-400 dark:text-zinc-500">{items.length} open</span>

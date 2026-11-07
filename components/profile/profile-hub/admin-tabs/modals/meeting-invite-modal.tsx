@@ -61,7 +61,7 @@ export function MeetingInviteModal({
       <div className="w-full max-w-lg rounded-xl neu-card" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-[var(--c-border-light)] px-5 py-3">
           <h4 className="text-sm font-semibold text-slate-900">Schedule Meeting</h4>
-          <button onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-[var(--c-bg-muted)] hover:text-slate-700">
+          <button onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-700">
             <X size={18} />
           </button>
         </div>
@@ -69,7 +69,7 @@ export function MeetingInviteModal({
         <div className="space-y-4 p-5">
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">With</label>
-            <p className="rounded-md bg-[var(--c-bg-muted)] px-3 py-1.5 text-xs font-medium text-slate-800">
+            <p className="rounded-md bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-1.5 text-xs font-medium text-slate-800">
               {String(member.name ?? "")} ({String(member.email ?? "")})
             </p>
           </div>
@@ -137,7 +137,7 @@ export function MeetingInviteModal({
         <div className="flex items-center justify-end gap-3 border-t border-[var(--c-border-light)] px-5 py-3">
           <button
             onClick={onClose}
-            className="rounded-md border border-[var(--c-border-light)] px-4 py-1.5 text-xs font-semibold text-slate-600 hover:bg-[var(--c-bg-muted)]"
+            className="rounded-md border border-[var(--c-border-light)] px-4 py-1.5 text-xs font-semibold text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
           >
             Cancel
           </button>
