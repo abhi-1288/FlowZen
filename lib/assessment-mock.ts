@@ -317,10 +317,10 @@ export type ResolvedMockWindow = {
   /**
    * Latest instant a candidate may press Start.
    *
-   * `closesAt - duration`, so that every attempt finishes inside the window HR
-   * set. Without this a candidate starting a minute before `closesAt` would sit
-   * a full-length paper long after the window shut, which is not what "closes
-   * at" means to anyone reading it.
+   * `closesAt - duration`, floored at `opensAt`, so that attempts started in a
+   * roomy window finish inside it while a window whose length equals the
+   * duration stays startable for its whole length instead of collapsing to a
+   * single instant.
    */
   lastEntryAt: number | null;
   durationMs: number | null;
@@ -362,7 +362,13 @@ export function resolveMockWindow(
     return { ...empty, phase: "unusable", opensAt, closesAt };
   }
 
-  const lastEntryAt = closesAt - durationMs;
+  // Floor at opensAt: a window whose length equals the duration would otherwise
+  // put lastEntryAt exactly on opensAt, so "open" lasts a single instant and
+  // every moment of the window HR configured resolves to "entry-closed" — the
+  // mock could never be started. With the floor such a window is startable for
+  // its whole length; a paper begun near the close still gets its full duration
+  // because the attempt deadline is start-relative, not window-relative.
+  const lastEntryAt = Math.max(opensAt, closesAt - durationMs);
   let phase: MockWindowPhase;
   if (nowMs < opensAt) phase = "scheduled";
   else if (nowMs >= closesAt) phase = "expired";

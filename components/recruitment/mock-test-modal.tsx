@@ -45,6 +45,21 @@ type CandidateRow = {
   rows: AttemptRow[];
 };
 
+type InviteFailure = {
+  candidateId: string;
+  name: string;
+  email: string;
+  reason: "attempts-exhausted" | "missing-portal-token" | "send-error";
+  detail?: string;
+};
+
+/** Green = mail went out, amber = nothing to send / nothing eligible, red = sends failed. */
+type Notice = {
+  level: "success" | "warn" | "error";
+  text: string;
+  failures?: InviteFailure[];
+};
+
 type Payload = {
   mockTest: {
     enabled: boolean;
@@ -144,6 +159,18 @@ const inputCls =
   "mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
 const cardCls = "rounded-lg border border-slate-200 p-4 dark:border-zinc-800";
 
+const NOTICE_CLS: Record<Notice["level"], string> = {
+  success: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300",
+  warn: "bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300",
+  error: "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300",
+};
+
+const INVITE_FAILURE_COPY: Record<InviteFailure["reason"], string> = {
+  "attempts-exhausted": "has used all attempts",
+  "missing-portal-token": "could not get a portal access link",
+  "send-error": "email could not be sent",
+};
+
 export function MockTestModal({ jobId, onClose, totalQuestions }: Props) {
   const { showSuccessToast } = useNotificationToast();
   const [data, setData] = useState<Payload | null>(null);
@@ -151,7 +178,7 @@ export function MockTestModal({ jobId, onClose, totalQuestions }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState<Notice | null>(null);
   const [resetting, setResetting] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
@@ -220,26 +247,36 @@ export function MockTestModal({ jobId, onClose, totalQuestions }: Props) {
    * time while typing. The server recomputes all of it and is the only thing
    * that decides whether a candidate may start.
    */
-  const preview = useMemo<{ phase: string; lastEntry: string | null; minutes: number | null } | null>(() => {
+  const preview = useMemo<{ phase: string; lastEntry: string | null; minutes: number | null; noBuffer: boolean } | null>(() => {
     if (!form) return null;
     const opensMs = toLocalMs(form.opensAt);
     const closesMs = toLocalMs(form.closesAt);
     const minutes = Number(form.durationMinutes);
-    if (!effectiveEnabled) return { phase: "disabled", lastEntry: null, minutes: null };
+    if (!effectiveEnabled) return { phase: "disabled", lastEntry: null, minutes: null, noBuffer: false };
     if (!opensMs || !closesMs || closesMs <= opensMs) {
-      return { phase: "unusable", lastEntry: null, minutes: null };
+      return { phase: "unusable", lastEntry: null, minutes: null, noBuffer: false };
     }
     if (!Number.isFinite(minutes) || minutes <= 0) {
-      return { phase: "unusable", lastEntry: null, minutes: null };
+      return { phase: "unusable", lastEntry: null, minutes: null, noBuffer: false };
     }
     if (closesMs - opensMs < minutes * 60_000) {
-      return { phase: "unusable", lastEntry: null, minutes: null };
+      return { phase: "unusable", lastEntry: null, minutes: null, noBuffer: false };
     }
-    const lastEntry = closesMs - minutes * 60_000;
+    // Same floor as resolveMockWindow, so HR's mirror agrees with the server:
+    // a window whose length equals the duration stays startable for its whole
+    // length rather than collapsing to a single startable instant.
+    const lastEntry = Math.max(opensMs, closesMs - minutes * 60_000);
     const now = mountedAtMs;
     const phase =
       now < opensMs ? "scheduled" : now >= closesMs ? "expired" : now > lastEntry ? "entry-closed" : "open";
-    return { phase, lastEntry: new Date(lastEntry).toISOString(), minutes };
+    return {
+      phase,
+      lastEntry: new Date(lastEntry).toISOString(),
+      minutes,
+      // True when the floor engaged: the window is only as long as one paper,
+      // so there is no genuine start window inside it.
+      noBuffer: lastEntry <= opensMs,
+    };
   }, [form, mountedAtMs, effectiveEnabled]);
 
   const sampleSize = useMemo(() => {
@@ -255,7 +292,7 @@ export function MockTestModal({ jobId, onClose, totalQuestions }: Props) {
     if (!form) return;
     setSaving(true);
     setError("");
-    setNotice("");
+    setNotice(null);
     try {
       const res = await fetch(`/api/recruitment/jobs/${jobId}/assessment/mock-test`, {
         method: "POST",
@@ -301,7 +338,10 @@ export function MockTestModal({ jobId, onClose, totalQuestions }: Props) {
         setError(json.error || "Could not reset the attempt.");
         return;
       }
-      setNotice(`Cleared the mock attempt for ${json.candidate?.firstName ?? "the candidate"}.`);
+      setNotice({
+        level: "success",
+        text: `Cleared the mock attempt for ${json.candidate?.firstName ?? "the candidate"}. They will be included in the next email run.`,
+      });
       setConfirmReset(null);
       await load();
     } catch {
@@ -319,7 +359,7 @@ export function MockTestModal({ jobId, onClose, totalQuestions }: Props) {
   async function sendInvites() {
     setInviting(true);
     setError("");
-    setNotice("");
+    setNotice(null);
     try {
       const res = await fetch(`/api/recruitment/jobs/${jobId}/assessment/mock-test/invite`, { method: "POST" });
       const json = await res.json().catch(() => ({}));
@@ -329,16 +369,39 @@ export function MockTestModal({ jobId, onClose, totalQuestions }: Props) {
       }
       const emailed: number = json.emailed ?? 0;
       const eligible: number = json.eligible ?? 0;
-      const failed: number = json.candidatesSkipped ?? 0;
-      setNotice(
-        emailed > 0
-          ? `Invitation emailed to ${emailed} of ${eligible} candidate${eligible === 1 ? "" : "s"}.${
-              failed ? ` ${failed} could not be reached.` : ""
-            }`
-          : eligible === 0
-            ? "Every eligible candidate has already been invited."
-            : `No invitations went out${failed ? ` — ${failed} failed.` : "."}`
-      );
+      const staged: number = json.candidatesStaged ?? data?.cohort.eligible ?? 0;
+      const failures: InviteFailure[] = Array.isArray(json.failures) ? json.failures : [];
+      const failed = failures.length || (json.candidatesSkipped ?? 0);
+
+      if (emailed > 0) {
+        setNotice({
+          level: failures.length ? "error" : "success",
+          text: `Invitation emailed to ${emailed} of ${eligible} candidate${eligible === 1 ? "" : "s"}.${
+            failures.length ? ` ${failures.length} candidate${failures.length === 1 ? "" : "s"} failed — see below.` : ""
+          }`,
+          failures: failures.length ? failures : undefined,
+        });
+      } else if (eligible === 0 && staged === 0) {
+        // Nothing to send and no one was even eligible by stage: the pipeline
+        // itself is the problem, not the invite latch.
+        setNotice({
+          level: "warn",
+          text: `No candidate is in the Screening or Assessment stage right now. Move the candidates you want practising into one of those stages and send again.`,
+        });
+      } else if (eligible === 0) {
+        setNotice({
+          level: "warn",
+          text: "Every eligible candidate has already been invited to this window.",
+        });
+      } else if (failed > 0) {
+        setNotice({
+          level: "error",
+          text: `No invitations went out — ${failed} candidate${failed === 1 ? "" : "s"} could not be emailed.`,
+          failures,
+        });
+      } else {
+        setNotice({ level: "warn", text: "No invitations went out." });
+      }
       await load();
     } catch {
       setError("Could not send the invitations.");
@@ -382,7 +445,22 @@ export function MockTestModal({ jobId, onClose, totalQuestions }: Props) {
         ) : (
           <div className="max-h-[70vh] space-y-5 overflow-y-auto p-5">
             {error && <p className="rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">{error}</p>}
-            {notice && <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">{notice}</p>}
+            {notice && (
+              <div className={`rounded-md px-3 py-2 text-sm ${NOTICE_CLS[notice.level]}`}>
+                <p>{notice.text}</p>
+                {notice.failures && notice.failures.length > 0 && (
+                  <ul className="mt-2 divide-y divide-rose-200/60 dark:divide-rose-500/20">
+                    {notice.failures.map((f) => (
+                      <li key={f.candidateId} className="py-1.5">
+                        <span className="font-medium">{f.name}</span>{" "}
+                        <span className="opacity-80">({f.email})</span> {INVITE_FAILURE_COPY[f.reason] ?? "was skipped"}
+                        {f.detail && <span className="mt-0.5 block text-xs opacity-80">{f.detail}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
 
             {!poolReady && (
               <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
@@ -490,6 +568,11 @@ export function MockTestModal({ jobId, onClose, totalQuestions }: Props) {
                   {preview?.phase === "unusable" && (
                     <p className="mt-2 text-xs text-rose-600 dark:text-rose-400">
                       The window is shorter than the time limit, so nobody could finish before it closes.
+                    </p>
+                  )}
+                  {preview?.noBuffer && (
+                    <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                      No start window: this range is only as long as one paper. A candidate may start any time the mock is open and still needs the full {preview.minutes} min — consider a later close time.
                     </p>
                   )}
                 </div>
@@ -607,8 +690,8 @@ export function MockTestModal({ jobId, onClose, totalQuestions }: Props) {
                     <span className={labelCls}>Who has taken it</span>
                     <span className="text-xs text-slate-500 dark:text-zinc-400">
                       {data?.cohort.attempted ?? 0} of {data?.cohort.eligible ?? 0} eligible
-                      {data?.mockTest.lastInvitedAt
-                        ? ` · emailed ${formatMoment(data.mockTest.lastInvitedAt)}`
+                      {data?.cohort.invited
+                        ? ` · emailed${data?.mockTest.lastInvitedAt ? ` ${formatMoment(data.mockTest.lastInvitedAt)}` : ""}`
                         : " · not emailed yet"}
                     </span>
                   </div>

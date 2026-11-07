@@ -74,6 +74,8 @@ type Props = {
     maxAttempts?: number;
     attemptsUsed?: number;
     attemptNumber?: number | null;
+    /** Mock-only: the raw window resolution behind the coarse `phase`. */
+    mockWindowPhase?: "scheduled" | "open" | "entry-closed" | "expired" | "unusable" | "disabled" | null;
     result?: {
       attemptNumber: number | null;
       score: number | null;
@@ -529,6 +531,37 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
     return () => window.clearInterval(timer);
   }, []);
 
+  // A payload fetched before the window opened stays frozen at "closed" —
+  // eligibility is stamped on the server at fetch time, not recomputed here.
+  // When the local clock crosses the lobby-open instant (the mock's window open
+  // targets the same field), refetch once so the phase — and with it the Start
+  // button — catches up without the candidate reloading the page. Guarded by
+  // the target instant: a refetch that still lands on "closed" must not loop.
+  const lobbyRefetchRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (preview || started || submitted || assessment.phase !== "closed") return;
+    if (lobbyOpensAtMs === null || now < lobbyOpensAtMs) return;
+    if (lobbyRefetchRef.current === lobbyOpensAtMs) return;
+    lobbyRefetchRef.current = lobbyOpensAtMs;
+    onRefresh();
+  }, [preview, started, submitted, assessment.phase, now, lobbyOpensAtMs, onRefresh]);
+
+  // ── Why the Start button is off ────────────────────────────────────────────
+  // `eligibleToStart` is false for several unrelated reasons — window not open,
+  // stage not eligible, attempts used up, or an attempt already sitting. The
+  // pre-exam view must say which, instead of collapsing every case into the
+  // old catch-all "you have used all your attempts" copy.
+  const stageEligible = ["screening", "assessment"].includes(assessment.stage);
+  /** A mock attempt open and unsubmitted: the candidate is mid-paper. */
+  const mockResumable = isMock && Boolean(assessment.submittable) && !submitted;
+  const mockExhausted =
+    isMock &&
+    !mockResumable &&
+    assessment.attemptsUsed != null &&
+    assessment.maxAttempts != null &&
+    assessment.attemptsUsed >= assessment.maxAttempts;
+  const awaitingStage = !stageEligible && !mockExhausted;
+
   // Exam clock. Derived on every render from the absolute deadline against the
   // local ticker, rather than held in state and decremented by an effect: a
   // backgrounded tab that throttles its timers can neither freeze the display
@@ -619,8 +652,9 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
       try {
         const stored = localStorage.getItem(cacheKey);
         if (stored) {
-          const { q, a, m } = JSON.parse(stored);
-          if (Array.isArray(q) && q.length > 0) {
+          const { q, a, m, attempt } = JSON.parse(stored);
+          const sameAttempt = attempt == null || assessment.attemptNumber == null || attempt === assessment.attemptNumber;
+          if (Array.isArray(q) && q.length > 0 && sameAttempt) {
             setQuestions(q);
             if (a && typeof a === "object") setAnswers(a);
             if (Array.isArray(m))
@@ -665,8 +699,9 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
     try {
       const stored = localStorage.getItem(cacheKey);
       if (stored) {
-        const { q, a, m } = JSON.parse(stored);
-        if (Array.isArray(q) && q.length > 0) {
+        const { q, a, m, attempt } = JSON.parse(stored);
+        const sameAttempt = attempt == null || assessment.attemptNumber == null || attempt === assessment.attemptNumber;
+        if (Array.isArray(q) && q.length > 0 && sameAttempt) {
           setQuestions(q);
           setStarted(true);
           if (a && typeof a === "object") setAnswers(a);
@@ -790,7 +825,13 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
       if (data.slotStart) setSelectedSlot(data.slotStart);
       onRefresh();
       try {
-        localStorage.setItem(cacheKey, JSON.stringify({ q: data.questions || [], e: data.endsAt }));
+        localStorage.setItem(cacheKey, JSON.stringify({
+          q: data.questions || [],
+          e: data.endsAt,
+          // One cached paper belongs to exactly one attempt; the restore
+          // readers check this so a retake never replays the earlier paper.
+          attempt: (data as any).attemptNumber ?? null,
+        }));
       } catch {}
       return true;
     } catch (e: any) {
@@ -1064,6 +1105,31 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
   }
 
   function closedMessage() {
+    // The mock has no waiting room to enter — its window simply opens and
+    // closes — so the copy describes the window itself. In particular
+    // "entry-closed" (the last possible start has passed) must get its own
+    // truthful wording rather than "The waiting room is open.".
+    if (isMock) {
+      if (assessment.mockWindowPhase === "entry-closed") {
+        return (
+          <span>
+            The last time to start this mock test has passed{assessment.lastEntryAt ? ` — it had to start by ${fmtDay(assessment.lastEntryAt)} at ${fmtClock(assessment.lastEntryAt)}` : ""}. Please contact the hiring team if you think this is a mistake.
+          </span>
+        );
+      }
+      if (assessment.mockWindowPhase === "unusable") {
+        return <span>This mock test is not available right now. Please contact the hiring team.</span>;
+      }
+      if (untilLobbyMs > 0) {
+        return (
+          <span>
+            The mock test opens in {renderCountdown(assessment.lobbyOpensAt ? new Date(assessment.lobbyOpensAt).getTime() : now + untilLobbyMs)}
+            {scheduleText ? ` · mock test on ${scheduleText}` : ""}.
+          </span>
+        );
+      }
+      return <span>The mock test is open.</span>;
+    }
     if (untilLobbyMs <= 0) return "The waiting room is open.";
     return (
       <span>
@@ -1748,16 +1814,30 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
       ) : (
         <>
           {isClosed && <p className="mt-3 text-sm text-slate-500 dark:text-zinc-400">{closedMessage()}</p>}
-          {isMock && !assessment.eligibleToStart && !isClosed && !isExpired && assessment.attemptsUsed != null && assessment.maxAttempts != null && (
+          {/* Why the start button is off — one silver block per server state. */}
+          {mockExhausted && !isClosed && (
             <p className="mt-3 text-sm text-slate-500 dark:text-zinc-400">
-              You have used all {assessment.maxAttempts} attempt{assessment.maxAttempts > 1 ? "s" : ""} for this mock test. Contact the hiring team if you need another.
+              You have used {assessment.attemptsUsed} of {assessment.maxAttempts} attempt{(assessment.maxAttempts ?? 0) > 1 ? "s" : ""} for this mock test
+              {assessment.submittedAt ? `, most recently on ${fmtDay(assessment.submittedAt)} at ${fmtClock(assessment.submittedAt)}` : ""}. Contact the hiring team if you need another.
+            </p>
+          )}
+          {/* A real attempt is on the clock: offer an immediate way back into it. */}
+          {mockResumable && (
+            <p className="mt-3 text-sm text-slate-500 dark:text-zinc-400">
+              Attempt {assessment.attemptNumber ?? 1} of {assessment.maxAttempts ?? 1} is still running
+              {examEndsAtMs ? " — " : ""}{examEndsAtMs ? renderCountdown(examEndsAtMs) : null}{assessment.endsAt ? " left on the clock." : "."} Press resume to go back in.
+            </p>
+          )}
+          {awaitingStage && !submitted && (
+            <p className="mt-3 text-sm text-slate-500 dark:text-zinc-400">
+              The {isMock ? "mock test" : "assessment"} unlocks once your application reaches the Screening stage.
             </p>
           )}
           {hasDomains && !submitted && <div className="mt-4">{renderDomainPicker()}</div>}
           {assessment.windowMode === "uniform" && assessment.slots.length > 0 && !submitted && (
             <div className="mt-4">{renderSlotPicker()}</div>
           )}
-          {assessment.eligibleToStart && (
+          {(assessment.eligibleToStart || mockResumable) && (
             <button
               onClick={() => {
                 if (preflightWanted) {
@@ -1777,7 +1857,9 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
                 : preflightWanted
                   ? "Check camera and start"
                   : isMock
-                    ? "Start Mock Test"
+                    ? mockResumable && !assessment.eligibleToStart
+                      ? "Resume Mock Test"
+                      : "Start Mock Test"
                     : "Start Assessment"}
             </button>
           )}

@@ -35,6 +35,27 @@ const LOOKAHEAD_MS = 24 * 60 * 60 * 1000;
  */
 type InviteKind = "manual" | "auto";
 
+/**
+ * Why one candidate did not get the invite email. Exhausted attempts are
+ * expected on the auto run (crons keep re-inviting until the window closes, the
+ * candidate already used theirs), so it is recorded but not treated as a
+ * failure by HR's blast, which does not skip those candidates.
+ */
+export type MockInviteFailureReason = "attempts-exhausted" | "missing-portal-token" | "send-error";
+
+export type MockInviteFailure = {
+  candidateId: string;
+  name: string;
+  email: string;
+  reason: MockInviteFailureReason;
+  /** SMTP / token error message, truncated — the why behind `send-error`. */
+  detail?: string;
+};
+
+// HR reads this list back in the modal, so keep it readable on screen even for a
+// job with a very large cohort: everything past this just counts as skipped.
+const FAILURE_LIMIT = 50;
+
 type InviteOutcome =
   | { status: "unavailable"; reason: "not-configured" | "window" }
   | {
@@ -44,6 +65,8 @@ type InviteOutcome =
       /** Candidates still waiting for an invitation when this run started. */
       eligible: number;
       invitedAt: Date | null;
+      /** Per-candidate failures — skipped candidates that were NOT expected. */
+      failures: MockInviteFailure[];
     };
 
 /**
@@ -95,7 +118,7 @@ async function inviteCandidatesForJob(job: any, nowMs: number, kind: InviteKind)
 
   const eligible = candidates.length;
   if (eligible === 0) {
-    return { status: "done", emailed: 0, candidatesSkipped: 0, eligible, invitedAt: config.lastInvitedAt };
+    return { status: "done", emailed: 0, candidatesSkipped: 0, eligible, invitedAt: config.lastInvitedAt, failures: [] };
   }
 
   const origin = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
@@ -105,18 +128,36 @@ async function inviteCandidatesForJob(job: any, nowMs: number, kind: InviteKind)
 
   let emailed = 0;
   let candidatesSkipped = 0;
+  const failures: MockInviteFailure[] = [];
 
-  const handleOne = async (candidate: any): Promise<{ emailed: number; skipped: number }> => {
+  const describe = (candidate: any) =>
+    `${candidate.firstName ?? ""} ${candidate.lastName ?? ""}`.trim() || String(candidate.email ?? candidate._id);
+
+  const handleOne = async (
+    candidate: any
+  ): Promise<{ emailed: number; skipped: number; failure?: MockInviteFailure }> => {
     try {
       const used = ((candidate as any).mockTest?.attempts || []).filter((a: any) => a?.submittedAt).length;
       if (kind === "auto" && used >= config.maxAttempts) {
-        return { emailed: 0, skipped: 1 };
+        return {
+          emailed: 0,
+          skipped: 1,
+          failure: failures.length < FAILURE_LIMIT
+            ? { candidateId: String(candidate._id), name: describe(candidate), email: candidate.email ?? "", reason: "attempts-exhausted" }
+            : undefined,
+        };
       }
 
       const token = await resolveCandidatePortalToken(String(candidate._id));
       const portalLink = token ? buildPortalLink(origin, token) : undefined;
       if (!portalLink) {
-        return { emailed: 0, skipped: 1 };
+        return {
+          emailed: 0,
+          skipped: 1,
+          failure: failures.length < FAILURE_LIMIT
+            ? { candidateId: String(candidate._id), name: describe(candidate), email: candidate.email ?? "", reason: "missing-portal-token" }
+            : undefined,
+        };
       }
       const mockLink = `${portalLink}&test=true&mode=mock`;
 
@@ -141,7 +182,20 @@ async function inviteCandidatesForJob(job: any, nowMs: number, kind: InviteKind)
       return { emailed: 1, skipped: 0 };
     } catch (err) {
       console.error(`Mock test email failed for ${candidate._id}:`, err);
-      return { emailed: 0, skipped: 1 };
+      return {
+        emailed: 0,
+        skipped: 1,
+        failure:
+          failures.length < FAILURE_LIMIT
+            ? {
+                candidateId: String(candidate._id),
+                name: describe(candidate),
+                email: candidate.email ?? "",
+                reason: "send-error",
+                detail: (err instanceof Error ? err.message : String(err) || "Unknown error").slice(0, 200),
+              }
+            : undefined,
+      };
     }
   };
 
@@ -152,6 +206,7 @@ async function inviteCandidatesForJob(job: any, nowMs: number, kind: InviteKind)
     for (const r of results) {
       emailed += r.emailed;
       candidatesSkipped += r.skipped;
+      if (r.failure) failures.push(r.failure);
     }
   }
 
@@ -163,7 +218,7 @@ async function inviteCandidatesForJob(job: any, nowMs: number, kind: InviteKind)
     await ATSAssessment.updateOne({ job: job._id }, { $set: { "mockTest.lastInvitedAt": invitedAt } });
   }
 
-  return { status: "done", emailed, candidatesSkipped, eligible, invitedAt };
+  return { status: "done", emailed, candidatesSkipped, eligible, invitedAt, failures };
 }
 
 /**

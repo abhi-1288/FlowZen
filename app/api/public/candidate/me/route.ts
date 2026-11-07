@@ -333,6 +333,11 @@ export async function GET(request: Request) {
         slots: [],
         eligibleToStart: !active && stageOk && sitting.window.phase === "open" && sitting.remainingStarts > 0,
         submittable: active,
+        // The underlying window resolution, before it is collapsed into the
+        // panel's coarse phase. "entry-closed" in particular must survive the
+        // mapping — a window with no startable slack left is not the same state
+        // as "not yet open", and the panel words them differently.
+        mockWindowPhase: sitting.window.phase,
         resultRelease: sitting.config.resultRelease,
         // The score is withheld entirely until its release rule is met, rather
         // than sent to the client and hidden in the UI. Nothing in this payload

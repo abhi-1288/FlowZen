@@ -4,7 +4,8 @@ import { jsonError, requireUserId } from "@/lib/api";
 import { ATSJob } from "@/models/ATSJob";
 import { User } from "@/models/User";
 import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
-import { sendMockTestInvitationsForJob } from "@/lib/assessment-mock-emails";
+import { sendMockTestInvitationsForJob, MOCK_ELIGIBLE_STAGES } from "@/lib/assessment-mock-emails";
+import { ATSCandidate } from "@/models/ATSCandidate";
 
 /**
  * On-demand invitation blast for one job's mock test.
@@ -49,11 +50,21 @@ export async function POST(request: Request, { params }: Params) {
     );
   }
 
+  // Staged candidates regardless of the invite latch. The modal needs this
+  // alongside `eligible` (which counts only un-latched candidates) to tell
+  // "nobody in Screening/Assessment" apart from "everyone already invited".
+  const staged = await ATSCandidate.countDocuments({
+    job: id,
+    stage: { $in: MOCK_ELIGIBLE_STAGES },
+  });
+
   return NextResponse.json({
     ok: true,
     emailed: outcome.emailed,
     candidatesSkipped: outcome.candidatesSkipped,
+    candidatesStaged: staged,
     eligible: outcome.eligible,
+    failures: outcome.failures,
     invitedAt: outcome.invitedAt ? outcome.invitedAt.toISOString() : null,
   });
 }
