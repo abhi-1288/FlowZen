@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
 import { jsonError, requireUserId } from "@/lib/api";
 import { ATSJob } from "@/models/ATSJob";
+import { Company } from "@/models/Company";
 import { ATSAssessment } from "@/models/ATSAssessment";
 import { User } from "@/models/User";
 import { pickDomain } from "@/lib/assessment";
@@ -18,6 +19,8 @@ import { resolveMockTestConfig } from "@/lib/assessment-mock";
 import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
 import { resolveProctoringConfig, DEFAULT_PROCTORING } from "@/lib/assessment-proctoring";
 import { buildPreviewSamplePaper } from "@/lib/assessment-preview-sample";
+import { isQuestionLanguage } from "@/lib/question-languages";
+import { resolveTranslateModelConfig, translateQuestionContent } from "@/lib/question-translate";
 
 /**
  * HR preview of the candidate test experience.
@@ -91,7 +94,7 @@ async function load(request: Request, { params }: Params) {
   // questions so they know exactly what candidates will see once a paper exists.
   const assessment = await ATSAssessment.findOne({ job: id, company: user.company }).lean();
 
-  return { jobId: id, job, assessment };
+  return { jobId: id, job, assessment, companyId: user.company };
 }
 
 /** Total questions available right now: the general bank plus every domain's. Null assessment means none. */
@@ -340,5 +343,35 @@ export async function GET(request: Request, { params }: Params) {
     // and log the stack server-side.
     console.error("[assessment/preview] GET failed:", err);
     return jsonError(err?.message || "Preview failed.", 500);
+  }
+}
+
+export async function POST(request: Request, { params }: Params) {
+  const loaded = await load(request, { params });
+  if (loaded instanceof NextResponse) return loaded;
+
+  const body = await request.json().catch(() => ({}));
+  const language = String(body?.language ?? "").trim();
+  if (!isQuestionLanguage(language)) return jsonError("Unsupported language.", 400);
+
+  const text = String(body?.text ?? "");
+  if (!text || text.length > 1000) return jsonError("Question text is missing or too long.", 400);
+
+  const rawOptions = Array.isArray(body?.options) ? body.options : [];
+  if (rawOptions.length > 20) return jsonError("Too many options.", 400);
+  const options = rawOptions.map((o: unknown) => String(o ?? ""));
+  if (options.some((o: string) => o.length > 500)) return jsonError("An option is too long.", 400);
+
+  const company = await Company.findById(loaded.companyId)
+    .select("atsProvider atsModelApiKey atsModelName atsBaseUrl")
+    .lean();
+  const config = resolveTranslateModelConfig(company);
+
+  try {
+    const translated = await translateQuestionContent({ language, text, options, config });
+    return NextResponse.json(translated);
+  } catch (err: any) {
+    console.error("[preview translate] failed:", err?.message || err);
+    return jsonError(err?.message || "Translation is unavailable right now. Please try again.", 500);
   }
 }

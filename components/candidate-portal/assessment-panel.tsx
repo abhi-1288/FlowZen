@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { PlayCircle, Clock, Send, CheckCircle, XCircle, Layers, AlertTriangle, Download, Loader2, ChevronLeft, ChevronRight, Eraser, Flag } from "lucide-react";
+import { PlayCircle, Clock, Send, CheckCircle, XCircle, Layers, AlertTriangle, Download, Loader2, ChevronLeft, ChevronRight, ChevronDown, Eraser, Flag } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { formatMarks, formatNegativeMarking, negativeMarkingShort } from "@/lib/assessment-negative-marking";
 import { MediaDevicesProvider, useMediaDevices } from "@/components/recruitment/interview-room/media-devices";
@@ -11,6 +11,7 @@ import { ProctoringBanner } from "@/components/candidate-portal/proctoring-banne
 import { SelfieTile } from "@/components/candidate-portal/selfie-tile";
 import { ExtensionRequest } from "@/components/candidate-portal/extension-request";
 import { useProctoring } from "@/components/candidate-portal/use-proctoring";
+import { QUESTION_TRANSLATION_LANGUAGES, isQuestionLanguage, questionLanguageNative, type QuestionLanguageCode } from "@/lib/question-languages";
 import { useMicLevel } from "@/components/candidate-portal/use-mic-level";
 
 type Question = { index: number; text: string; options: string[]; type?: "mcq" | "essay"; marks?: number; required?: boolean };
@@ -404,6 +405,22 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
   // palette with statuses, and review flags. All array-index (display order)
   // keyed; the flags travel in the localStorage cache so a resume keeps them.
   const [currentQ, setCurrentQ] = useState(0);
+  // Per-question translation (candidate's own language). Stored per device only;
+  // the server never sees the choice and the paper/grading are untouched.
+  const [translateLang, setTranslateLang] = useState<QuestionLanguageCode | "">(() => {
+    if (typeof window === "undefined") return "";
+    try {
+      const v = window.localStorage.getItem("flowzen-qtranslate-lang");
+      return isQuestionLanguage(v) ? v : "";
+    } catch {
+      return "";
+    }
+  });
+  const [translateVisible, setTranslateVisible] = useState<Set<number>>(new Set());
+  const [translated, setTranslated] = useState<Record<number, { text: string; options: string[] }>>({});
+  const [translating, setTranslating] = useState<Set<number>>(new Set());
+  const [translateError, setTranslateError] = useState<Record<number, string>>({});
+  const [langPickerOpen, setLangPickerOpen] = useState(false);
   const [marked, setMarked] = useState<Set<number>>(new Set());
   const [visited, setVisited] = useState<Set<number>>(new Set());
   const [submitted, setSubmitted] = useState(Boolean(assessment.submittedAt));
@@ -412,6 +429,9 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
   const [selectedDomain, setSelectedDomain] = useState(handedOff.domain || assessment.domain || "");
   const [selectedSlot, setSelectedSlot] = useState<string | null>(handedOff.slot || assessment.slotStart || null);
   const [inLobby, setInLobby] = useState(false);
+  // Palette body collapses on phones so the question is not pushed below the
+  // fold; on sm+ the body is always open and this flag has no visual effect.
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [downloading, setDownloading] = useState(false);
   // Proctoring: `preflight` gates the start behind the device check, and
@@ -436,6 +456,11 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
   // True while this run is on flagged sample questions (empty bank fallback).
   const [previewSample, setPreviewSample] = useState(false);
   const autoSubmittedRef = useRef(false);
+  useEffect(() => {
+    setTranslateVisible(new Set());
+    setTranslated({});
+    setTranslateError({});
+  }, [questions]);
   const autoSubmitRef = useRef<() => void>(() => {});
   const autoStartRef = useRef(false);
   const lobbyFetchRef = useRef(false);
@@ -1278,8 +1303,8 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
         ? "The answer key is published for the real assessment."
         : "For the real assessment the answer key stays hidden until HR publishes it.";
     return (
-      <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-5">
-        <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">
+      <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-3 sm:p-5">
+        <h3 className="text-base font-semibold text-slate-900 sm:text-lg dark:text-zinc-100">
           {isMock ? "Mock Test Preview Complete" : "Assessment Preview Complete"}
         </h3>
         <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">
@@ -1332,8 +1357,8 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
           ? ` Attempt ${assessment.result?.attemptNumber ?? assessment.attemptNumber ?? "—"} of ${assessment.maxAttempts} completed.`
           : "";
       return (
-        <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-5">
-          <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">Mock Test Complete</h3>
+        <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-3 sm:p-5">
+          <h3 className="text-base font-semibold text-slate-900 sm:text-lg dark:text-zinc-100">Mock Test Complete</h3>
           <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">
             Your practice paper has been submitted.{attemptsText} This practice run does not affect your application.
           </p>
@@ -1374,8 +1399,8 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
 
     const published = Boolean(assessment.resultPublished);
     return (
-      <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-5">
-        <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">Online Assessment</h3>
+      <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-3 sm:p-5">
+        <h3 className="text-base font-semibold text-slate-900 sm:text-lg dark:text-zinc-100">Online Assessment</h3>
         {!published ? (
           <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">
             Your assessment has been submitted and is under review. Results will be shared once evaluated.
@@ -1440,6 +1465,72 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
     };
     const activeIndex = currentQ < questions.length ? currentQ : 0;
     const activeQ = questions[activeIndex];
+    const shownQuestion =
+      activeQ && translateVisible.has(activeQ.index) && translated[activeQ.index]
+        ? translated[activeQ.index]
+        : null;
+
+    const onTranslateChip = () => {
+      if (!activeQ) return;
+      if (!translateLang) {
+        setLangPickerOpen(true);
+        return;
+      }
+      if (translating.has(activeQ.index)) return;
+      if (translated[activeQ.index]) {
+        setTranslateVisible((prev) => {
+          const n = new Set(prev);
+          if (n.has(activeQ.index)) n.delete(activeQ.index);
+          else n.add(activeQ.index);
+          return n;
+        });
+      } else {
+        void translateCurrent();
+      }
+    };
+
+    const translateCurrent = async (nextLang?: QuestionLanguageCode) => {
+      if (!activeQ) return;
+      const lang = nextLang || translateLang;
+      if (!lang) return;
+      setTranslating((prev) => new Set(prev).add(activeQ.index));
+      setTranslateError((prev) => {
+        const n = { ...prev };
+        delete n[activeQ.index];
+        return n;
+      });
+      try {
+        const url = preview
+          ? `/api/recruitment/jobs/${previewJobId}/assessment/preview`
+          : `/api/public/candidate/me/assessment/translate?token=${encodeURIComponent(token)}`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ language: lang, text: activeQ.text, options: activeQ.options }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || "Translation is unavailable right now.");
+        setTranslated((prev) => ({ ...prev, [activeQ.index]: { text: data.text, options: data.options } }));
+        setTranslateVisible((prev) => new Set(prev).add(activeQ.index));
+      } catch (e: any) {
+        setTranslateError((prev) => ({ ...prev, [activeQ.index]: e?.message || "Translation is unavailable right now." }));
+      } finally {
+        setTranslating((prev) => {
+          const n = new Set(prev);
+          n.delete(activeQ.index);
+          return n;
+        });
+      }
+    };
+
+    const chooseLanguage = (code: QuestionLanguageCode) => {
+      setTranslateLang(code);
+      try {
+        window.localStorage.setItem("flowzen-qtranslate-lang", code);
+      } catch {}
+      setLangPickerOpen(false);
+      void translateCurrent(code);
+    };
     const activeMarked = marked.has(activeIndex);
     const isLastQuestion = activeIndex === questions.length - 1;
     const chipFor = (qi: number) => {
@@ -1469,7 +1560,7 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
     const notVisitedCount = questions.length - answeredCount - markedAnsweredCount - markedCount - notAnsweredCount;
 
     return (
-      <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-5">
+      <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-3 sm:p-5">
         {preview && previewSample && (
           <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
             <AlertTriangle size={13} className="mt-0.5 shrink-0" />
@@ -1495,9 +1586,9 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
             tone={accent}
           />
         )}
-        <div className={`${preview ? "" : "sticky top-[53px] z-10"} -mx-5 -mt-5 flex flex-wrap items-center justify-between gap-2 rounded-t-xl border-b border-[var(--c-border-light)] bg-[var(--c-bg-card)] px-5 py-3 dark:border-zinc-800`}>
+        <div className={`${preview ? "" : "sticky top-[53px] z-10"} -mx-3 -mt-3 flex flex-wrap items-center justify-between gap-2 rounded-t-xl border-b border-[var(--c-border-light)] bg-[var(--c-bg-card)] px-3 py-3 sm:-mx-5 sm:-mt-5 sm:px-5 dark:border-zinc-800`}>
           <div>
-            <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">{isMock ? "Mock Test" : "Online Assessment"}</h3>
+            <h3 className="text-base font-semibold text-slate-900 sm:text-lg dark:text-zinc-100">{isMock ? "Mock Test" : "Online Assessment"}</h3>
             {assessment.domain && (
               <p className="mt-0.5 text-xs text-slate-400">
                 <Layers size={11} className="mr-1 inline" /> {assessment.domain}
@@ -1515,13 +1606,13 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
               />
             )}
             {remaining !== null && remaining > 0 && (
-              <span className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-mono font-bold ${remaining < 60 ? "bg-rose-50 text-rose-700 animate-pulse dark:bg-rose-500/15 dark:text-rose-300" : "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"}`}>
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-mono font-bold sm:text-base ${remaining < 60 ? "bg-rose-50 text-rose-700 animate-pulse dark:bg-rose-500/15 dark:text-rose-300" : "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"}`}>
                 <Clock size={14} /> {formatTime(remaining)}
               </span>
             )}
           </div>
         </div>
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-400 dark:text-zinc-500">
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400 dark:text-zinc-500">
           <span>Passing threshold: {assessment.passScore}%</span>
           {assessment.negativeMarking > 0 && <span>Negative marking: -{negativeMarkingShort(assessment.negativeMarking, assessment.negativeMarkingLabel)} per wrong answer</span>}
           {proctoring.active && <span>Proctored — camera on, Microphone on, Screen sharing</span>}
@@ -1561,36 +1652,63 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
               aria-live="polite"
             >
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-dashed border-slate-200 pb-3 dark:border-zinc-700">
-                <p className="text-sm font-bold text-slate-900 dark:text-zinc-100">
+                <p className="text-base font-bold text-slate-900 dark:text-zinc-100">
                   Question {activeIndex + 1}
-                  <span className="ml-1 font-normal text-slate-400 dark:text-zinc-500">of {questions.length}</span>
+                  <span className="ml-1 text-sm font-normal text-slate-400 dark:text-zinc-500">of {questions.length}</span>
                 </p>
                 <div className="flex shrink-0 items-center gap-1.5">
-                  <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
+                  <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
                     +{activeQ.marks || 1}
                   </span>
                   {assessment.negativeMarking > 0 && (
-                    <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-600 dark:bg-rose-500/15 dark:text-rose-300">
+                    <span className="rounded-md bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-600 dark:bg-rose-500/15 dark:text-rose-300">
                       -{negativeMarkingShort(assessment.negativeMarking, assessment.negativeMarkingLabel)}
                     </span>
                   )}
                   {activeQ.required ? (
-                    <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-600 dark:bg-amber-500/15 dark:text-amber-300">Required</span>
+                    <span className="rounded-md bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:bg-amber-500/15 dark:text-amber-300">Required</span>
                   ) : (
-                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500 dark:bg-zinc-800 dark:text-zinc-400">Optional</span>
+                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-zinc-800 dark:text-zinc-400">Optional</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={onTranslateChip}
+                    disabled={translating.has(activeQ.index)}
+                    className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+                  >
+                    {translating.has(activeQ.index)
+                      ? "Translating…"
+                      : translateVisible.has(activeQ.index)
+                        ? "Show original"
+                        : translateLang
+                          ? `Translate to ${questionLanguageNative(translateLang)}`
+                          : "Translate"}
+                  </button>
+                  {translateLang && (
+                    <button
+                      type="button"
+                      onClick={() => setLangPickerOpen(true)}
+                      className="rounded-md px-1.5 py-0.5 text-[10px] text-slate-400 hover:text-slate-600 dark:text-zinc-500"
+                      title="Change language"
+                    >
+                      language
+                    </button>
                   )}
                   {activeMarked && (
-                    <span className="rounded-md bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">
+                    <span className="rounded-md bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">
                       Marked for review
                     </span>
                   )}
                 </div>
               </div>
 
-              <p className="mt-3 text-sm leading-relaxed text-slate-900 dark:text-zinc-100">
-                {activeQ.text}
+              <p className="mt-3 text-base leading-relaxed text-slate-900 sm:mt-4 sm:text-lg dark:text-zinc-100">
+                {shownQuestion ? shownQuestion.text : activeQ.text}
                 {activeQ.required && <span className="ml-1 text-rose-500">*</span>}
               </p>
+              {translateError[activeQ.index] && (
+                <p className="mt-1 text-xs text-rose-600 dark:text-rose-400">{translateError[activeQ.index]}</p>
+              )}
 
               {activeQ.type === "essay" ? (
                 <textarea
@@ -1598,11 +1716,11 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
                   value={answers[activeQ.index]?.textAnswer ?? ""}
                   onChange={(e) => setTextAnswer(activeQ.index, e.target.value)}
                   placeholder="Type your answer here..."
-                  className="mt-3 w-full rounded-lg border border-slate-100 px-3 py-2 text-sm outline-none focus:ring-2 dark:border-zinc-800 dark:bg-zinc-900"
+                  className="mt-3 min-h-[140px] w-full rounded-lg border border-slate-100 px-3 py-2 text-sm outline-none focus:ring-2 sm:mt-4 sm:min-h-[180px] sm:text-base dark:border-zinc-800 dark:bg-zinc-900"
                 />
               ) : (
-                <div className="mt-3 space-y-2">
-                  {activeQ.options.map((opt, oi) => {
+                <div className="mt-3 space-y-2 sm:mt-4 sm:space-y-2.5">
+                  {(shownQuestion ? shownQuestion.options : activeQ.options).map((opt, oi) => {
                     const selected = answers[activeQ.index]?.selectedOption === oi;
                     return (
                       <button
@@ -1610,7 +1728,7 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
                         type="button"
                         aria-pressed={selected}
                         onClick={() => setAnswer(activeQ.index, oi)}
-                        className={`flex w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                        className={`flex w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors sm:px-4 sm:py-3 ${
                           selected
                             ? ""
                             : "border-slate-100 hover:bg-[var(--c-bg-muted)] dark:border-zinc-800"
@@ -1619,7 +1737,7 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
                       >
                         <span
                           aria-hidden
-                          className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border text-xs font-bold transition-colors ${
+                          className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border text-xs font-bold transition-colors sm:h-8 sm:w-8 sm:text-sm ${
                             selected
                               ? "border-transparent text-white"
                               : "border-slate-300 text-slate-500 dark:border-zinc-600 dark:text-zinc-400"
@@ -1628,7 +1746,7 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
                         >
                           {String.fromCharCode(65 + oi)}
                         </span>
-                        <span className="text-sm text-slate-700 dark:text-zinc-300">{opt}</span>
+                        <span className="text-sm leading-relaxed text-slate-700 sm:text-base dark:text-zinc-300">{opt}</span>
                       </button>
                     );
                   })}
@@ -1637,13 +1755,45 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
             </div>
 
             {/* Exam action row */}
-            <div className="mt-3 flex flex-wrap items-center gap-2">
+            {langPickerOpen && (
+              <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/40 px-4" onClick={() => setLangPickerOpen(false)}>
+                <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl dark:bg-zinc-900" onClick={(e) => e.stopPropagation()}>
+                  <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">Translate questions to</h3>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">Pick the language. You can change it any time during the paper.</p>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    {QUESTION_TRANSLATION_LANGUAGES.map((l) => (
+                      <button
+                        key={l.code}
+                        type="button"
+                        onClick={() => chooseLanguage(l.code)}
+                        className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                          translateLang === l.code
+                            ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+                            : "border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                        }`}
+                      >
+                        <span className="block font-medium">{l.native}</span>
+                        <span className="block text-xs text-slate-400 dark:text-zinc-500">{l.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLangPickerOpen(false)}
+                    className="mt-4 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-zinc-700 dark:text-zinc-300"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-4">
               <button
                 type="button"
                 onClick={clearCurrentResponse}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] dark:border-zinc-800 dark:text-zinc-300"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] sm:px-4 sm:py-2.5 sm:text-sm dark:border-zinc-800 dark:text-zinc-300"
               >
-                <Eraser size={14} /> Clear Response
+                <Eraser size={16} /> Clear Response
               </button>
               <button
                 type="button"
@@ -1651,13 +1801,13 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
                   toggleMarkCurrent();
                   if (activeIndex < questions.length - 1) goToQuestion(activeIndex + 1);
                 }}
-                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors sm:px-4 sm:py-2.5 sm:text-sm ${
                   activeMarked
                     ? "bg-violet-500 text-white hover:bg-violet-600"
                     : "border border-violet-300 text-violet-600 hover:bg-violet-50 dark:border-violet-500/40 dark:text-violet-300 dark:hover:bg-violet-500/10"
                 }`}
               >
-                <Flag size={14} />{" "}
+                <Flag size={16} />{" "}
                 {activeMarked
                   ? isLastQuestion
                     ? "Unmark"
@@ -1666,24 +1816,27 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
                     ? "Mark for Review"
                     : "Mark for Review & Next"}
               </button>
-              <span className="hidden flex-1 sm:block" />
-              <button
-                type="button"
-                onClick={() => goToQuestion(activeIndex - 1)}
-                disabled={activeIndex === 0}
-                className="inline-flex items-center gap-1 rounded-lg border border-[var(--c-border-light)] px-3.5 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] disabled:opacity-40 dark:border-zinc-800 dark:text-zinc-300"
-              >
-                <ChevronLeft size={14} /> Previous
-              </button>
-              <button
-                type="button"
-                onClick={() => goToQuestion(activeIndex + 1)}
-                disabled={isLastQuestion}
-                className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
-                style={{ backgroundColor: accent }}
-              >
-                Save &amp; Next <ChevronRight size={14} />
-              </button>
+              {/* Previous and Save & Next travel as one pair, so a narrow
+                  screen wraps above them as a block and never splits them. */}
+              <span className="ml-auto flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => goToQuestion(activeIndex - 1)}
+                  disabled={activeIndex === 0}
+                  className="inline-flex items-center gap-1 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-[var(--c-bg-muted)] disabled:opacity-40 sm:px-4 sm:py-2.5 sm:text-sm dark:border-zinc-800 dark:text-zinc-300"
+                >
+                  <ChevronLeft size={16} /> Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goToQuestion(activeIndex + 1)}
+                  disabled={isLastQuestion}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40 sm:px-5 sm:py-2.5 sm:text-sm"
+                  style={{ backgroundColor: accent }}
+                >
+                  Save &amp; Next <ChevronRight size={16} />
+                </button>
+              </span>
             </div>
             {error && (
               <p className="mt-2 flex items-center gap-1.5 text-sm text-rose-600"><AlertTriangle size={14} /> {error}</p>
@@ -1691,52 +1844,66 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
           </section>
 
           {/* Question palette */}
-          <aside className="order-first shrink-0 rounded-lg border border-[var(--c-border-light)] bg-[var(--c-bg-card)] p-3 dark:border-zinc-800 lg:order-none lg:w-[268px]">
-            <p className="flex items-center justify-between text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-zinc-400">
-              Question Palette
+          <aside className="order-first shrink-0 rounded-lg border border-[var(--c-border-light)] bg-[var(--c-bg-card)] p-3 dark:border-zinc-800 lg:order-none lg:w-[272px] xl:w-[300px]">
+            {/* Header row always visible; the body collapses on phones only. */}
+            <div className="flex items-center justify-between gap-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-zinc-400">
+              <button
+                type="button"
+                onClick={() => setPaletteOpen((v) => !v)}
+                aria-expanded={paletteOpen}
+                className="flex items-center gap-1 lg:hidden"
+              >
+                <ChevronDown size={14} className={`transition-transform ${paletteOpen ? "rotate-180" : ""}`} /> Palette
+              </button>
+              <span className="hidden lg:block">Question Palette</span>
               <span className="font-mono text-[11px] font-semibold normal-case">{answeredCount + markedAnsweredCount}/{questions.length}</span>
-            </p>
-            <div className="mt-2.5 grid grid-cols-8 gap-1.5 lg:grid-cols-6">
-              {questions.map((q, qi) => {
-                const chip = chipFor(qi);
-                return (
-                  <button
-                    key={q.index}
-                    type="button"
-                    onClick={() => goToQuestion(qi)}
-                    title={`Question ${qi + 1}`}
-                    aria-current={qi === activeIndex ? "true" : undefined}
-                    className={`relative grid h-8 w-full place-items-center rounded-md text-xs font-bold transition-colors ${chip.cls}`}
-                    style={chip.style}
-                  >
-                    {qi + 1}
-                    {chip.isMarked && chip.answered && (
-                      <span
-                        aria-hidden
-                        className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-white dark:ring-zinc-900"
-                      />
-                    )}
-                  </button>
-                );
-              })}
             </div>
-            <ul className="mt-3 space-y-1 text-[11px] text-slate-500 dark:text-zinc-400">
-              <li className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-600" /> Answered — {answeredCount}</li>
-              <li className="flex items-center gap-2">
-                <span className="relative h-2.5 w-2.5 rounded-sm bg-violet-500">
-                  <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-emerald-400 ring-1 ring-white dark:ring-zinc-900" />
-                </span>
-                Answered &amp; marked — {markedAnsweredCount}
-              </li>
-              <li className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-violet-500" /> Marked, not answered — {markedCount}</li>
-              <li className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-rose-500" /> Not answered — {notAnsweredCount}</li>
-              <li className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-slate-300 dark:bg-zinc-600" /> Not visited — {notVisitedCount}</li>
-            </ul>
+            <div className={paletteOpen ? "block lg:block" : "hidden lg:block"}>
+              {/* Auto-fill chips keep a tap-friendly ~36px cell at any width,
+                  instead of the fixed 8/6 column grids that squeezed on phones. */}
+              <div className="mt-2.5 grid grid-cols-[repeat(auto-fill,minmax(2.25rem,1fr))] gap-1.5">
+                {questions.map((q, qi) => {
+                  const chip = chipFor(qi);
+                  return (
+                    <button
+                      key={q.index}
+                      type="button"
+                      onClick={() => goToQuestion(qi)}
+                      title={`Question ${qi + 1}`}
+                      aria-current={qi === activeIndex ? "true" : undefined}
+                      className={`relative grid h-8 w-full place-items-center rounded-md text-xs font-bold transition-colors sm:h-9 sm:text-sm ${chip.cls}`}
+                      style={chip.style}
+                    >
+                      {qi + 1}
+                      {chip.isMarked && chip.answered && (
+                        <span
+                          aria-hidden
+                          className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-white dark:ring-zinc-900"
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Two columns on phones halve the legend's vertical footprint. */}
+              <ul className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-slate-500 sm:grid-cols-1 dark:text-zinc-400">
+                <li className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-600" /> Answered — {answeredCount}</li>
+                <li className="flex items-center gap-2">
+                  <span className="relative h-2.5 w-2.5 rounded-sm bg-violet-500">
+                    <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-emerald-400 ring-1 ring-white dark:ring-zinc-900" />
+                  </span>
+                  Answered &amp; marked — {markedAnsweredCount}
+                </li>
+                <li className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-violet-500" /> Marked, not answered — {markedCount}</li>
+                <li className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-rose-500" /> Not answered — {notAnsweredCount}</li>
+                <li className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-slate-300 dark:bg-zinc-600" /> Not visited — {notVisitedCount}</li>
+              </ul>
+            </div>
             <button
               type="button"
               onClick={() => void handleSubmitClick()}
               disabled={submitting}
-              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 sm:py-3"
               style={{ backgroundColor: accent }}
             >
               {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
@@ -1756,7 +1923,7 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
   // 3. Preflight: the device check a proctored sitting must pass first.
   if (preflight && !submitted) {
     return (
-      <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-5">
+      <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-3 sm:p-5">
         <ProctoringPreflight
           stream={media.stream}
           micDb={preflightMic.db}
@@ -1783,8 +1950,8 @@ function AssessmentPanelInner({ token, assessment, accent, companyName, onRefres
 
   // 4. Pre-exam view: closed, waiting room, or expired
   return (
-    <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-5">
-      <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">{isMock ? "Mock Test" : "Online Assessment"}</h3>
+    <div className="rounded-xl border border-[var(--c-border-light)] dark:border-zinc-800 bg-[var(--c-bg-card)] p-3 sm:p-5">
+      <h3 className="text-base font-semibold text-slate-900 sm:text-lg dark:text-zinc-100">{isMock ? "Mock Test" : "Online Assessment"}</h3>
       {preview && (
         <p className="mt-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
           Preview — nothing is saved, submitted or emailed. This is what the candidate will see.
