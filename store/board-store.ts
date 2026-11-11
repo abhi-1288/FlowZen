@@ -8,9 +8,13 @@ type ModalState =
   | { type: "task"; columnId: string; taskId?: string }
   | { type: "column" }
   | { type: "board" }
-  | { type: "board-edit" }
+  | { type: "board-edit"; boardId?: string }
+  | { type: "board-delete"; boardId: string }
   | { type: "assign" }
-  | { type: "invite" }
+  | { type: "task-settings" }
+  | { type: "invite"; boardId?: string }
+  | { type: "task-delete"; columnId: string; taskId: string }
+  | { type: "task-members"; columnId: string; taskId: string }
   | null;
 
 type BoardStore = {
@@ -27,7 +31,8 @@ type BoardStore = {
   fetchBoards: (silent?: boolean) => Promise<void>;
   fetchBoard: (boardId: string, silent?: boolean) => Promise<void>;
   createBoard: (title: string, description?: string) => Promise<Board>;
-  updateBoard: (boardId: string, updates: Partial<Pick<Board, "title" | "description" | "attachments">>) => Promise<void>;
+  updateBoard: (boardId: string, updates: Partial<Pick<Board, "title" | "description" | "attachments" | "pinned">>) => Promise<void>;
+  updateTaskSettings: (boardId: string, mode: NonNullable<Board["employeeTaskCreation"]>) => Promise<void>;
   deleteBoard: (boardId: string) => Promise<void>;
   inviteUser: (boardId: string, email: string, role: string) => Promise<void>;
   assignMember: (boardId: string, memberId?: string, leadId?: string, teamId?: string) => Promise<void>;
@@ -39,6 +44,7 @@ type BoardStore = {
   reorderColumns: (boardId: string, columns: Column[]) => Promise<void>;
   createTask: (boardId: string, payload: TaskInput) => Promise<void>;
   updateTask: (boardId: string, taskId: string, payload: Partial<TaskInput>) => Promise<void>;
+  reviewTask: (boardId: string, taskId: string, status: "approved" | "rejected") => Promise<void>;
   deleteTask: (boardId: string, taskId: string) => Promise<void>;
   addComment: (boardId: string, taskId: string, body: string) => Promise<void>;
   addAttachment: (boardId: string, taskId: string, name: string, url: string, id?: string) => Promise<void>;
@@ -54,6 +60,7 @@ export type TaskInput = {
   description: string;
   dueDate: string | null;
   priority: Priority;
+  pinned?: boolean;
   assignees?: string[];
   subTasks?: { id: string; title: string; done: boolean }[];
 };
@@ -121,6 +128,16 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
       activeBoard: state.activeBoard?.id === board.id ? board : state.activeBoard
     }));
   },
+  updateTaskSettings: async (boardId, mode) => {
+    const { board } = await apiFetch<{ board: Board }>(`/api/boards/${boardId}/task-settings`, {
+      method: "PATCH",
+      body: JSON.stringify({ employeeTaskCreation: mode })
+    });
+    set((state) => ({
+      boards: state.boards.map((item) => (item.id === board.id ? board : item)),
+      activeBoard: state.activeBoard?.id === board.id ? board : state.activeBoard
+    }));
+  },
   deleteBoard: async (boardId) => {
     await apiFetch<{ ok: true }>(`/api/boards/${boardId}`, { method: "DELETE" });
     set((state) => ({
@@ -133,21 +150,30 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
       method: "POST",
       body: JSON.stringify({ email, role })
     });
-    set({ activeBoard: board });
+    set((state) => ({
+      boards: state.boards.map((item) => (item.id === board.id ? board : item)),
+      activeBoard: state.activeBoard?.id === board.id ? board : state.activeBoard
+    }));
   },
   assignMember: async (boardId, memberId, leadId, teamId) => {
     const { board } = await apiFetch<{ board: Board }>(`/api/boards/${boardId}/assign`, {
       method: "PATCH",
       body: JSON.stringify({ memberId, leadId, teamId })
     });
-    set({ activeBoard: board });
+    set((state) => ({
+      boards: state.boards.map((item) => (item.id === board.id ? board : item)),
+      activeBoard: state.activeBoard?.id === board.id ? board : state.activeBoard
+    }));
   },
   unassignTeam: async (boardId, teamId) => {
     const { board } = await apiFetch<{ board: Board }>(`/api/boards/${boardId}/assign`, {
       method: "DELETE",
       body: JSON.stringify({ teamId })
     });
-    set({ activeBoard: board });
+    set((state) => ({
+      boards: state.boards.map((item) => (item.id === board.id ? board : item)),
+      activeBoard: state.activeBoard?.id === board.id ? board : state.activeBoard
+    }));
   },
   removeMember: async (boardId, memberId) => {
     const { board, removedSelf } = await apiFetch<{ board: Board; removedSelf?: boolean }>(`/api/boards/${boardId}/invite`, {
@@ -163,7 +189,10 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
       }));
       return;
     }
-    set({ activeBoard: board });
+    set((state) => ({
+      boards: state.boards.map((item) => (item.id === board.id ? board : item)),
+      activeBoard: state.activeBoard?.id === board.id ? board : state.activeBoard
+    }));
   },
   createColumn: async (boardId, title) => {
     const { column } = await apiFetch<{ column: Column }>(`/api/boards/${boardId}/columns`, {
@@ -209,6 +238,13 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
     const { task } = await apiFetch<{ task: Task }>(`/api/boards/${boardId}/tasks`, {
       method: "PATCH",
       body: JSON.stringify({ id: taskId, ...payload })
+    });
+    set((state) => ({ tasks: state.tasks.map((item) => (item.id === task.id ? task : item)) }));
+  },
+  reviewTask: async (boardId, taskId, status) => {
+    const { task } = await apiFetch<{ task: Task }>(`/api/boards/${boardId}/tasks`, {
+      method: "PATCH",
+      body: JSON.stringify({ id: taskId, approvalStatus: status })
     });
     set((state) => ({ tasks: state.tasks.map((item) => (item.id === task.id ? task : item)) }));
   },

@@ -817,7 +817,7 @@ export function AttendanceTab({
         )}
         {showDeleteHolidayConfirm && holidayToDelete && (
           <div className="fixed inset-0 z-[90] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl ring-1 ring-slate-200">
+            <div className="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-xl ring-1 ring-slate-200">
               <h3 className="text-xl font-bold text-slate-900">
                 Confirm Delete
               </h3>
@@ -867,7 +867,7 @@ export function AttendanceTab({
         )}
         {rejectingId && (
           <div className="fixed inset-0 z-[70] grid place-items-center neu-overlay p-4 backdrop-blur-md">
-            <div className="w-full max-w-md animate-in zoom-in-95 fade-in duration-200 rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl ring-1 ring-slate-200">
+            <div className="w-full max-w-md animate-in zoom-in-95 fade-in duration-200 rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-xl ring-1 ring-slate-200">
               <h3 className="text-xl font-bold text-slate-900">
                 Reject Request
               </h3>
@@ -942,7 +942,7 @@ export function AttendanceTab({
         )}
         {wfhRejectingId && (
           <div className="fixed inset-0 z-[70] grid place-items-center neu-overlay p-4 backdrop-blur-md">
-            <div className="w-full max-w-md animate-in zoom-in-95 fade-in duration-200 rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl ring-1 ring-slate-200">
+            <div className="w-full max-w-md animate-in zoom-in-95 fade-in duration-200 rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-xl ring-1 ring-slate-200">
               <h3 className="text-xl font-bold text-slate-900">
                 Reject WFH Request
               </h3>
@@ -990,7 +990,7 @@ export function AttendanceTab({
               <div className="border-r border-[var(--c-border-light)] bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
                 {monthNames[month]}
               </div>
-              <div className="bg-[var(--c-bg-white dark:bg-zinc-900)] px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-900 dark:bg-black dark:text-zinc-100">
+              <div className="bg-white dark:bg-zinc-900 px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-900 dark:bg-black dark:text-zinc-100">
                 {year}
               </div>
             </div>

@@ -6,6 +6,7 @@ import { Team } from "@/models/Team";
 import { User } from "@/models/User";
 import { Notification } from "@/models/Notification";
 import { findAccessibleBoard } from "@/lib/board-access";
+import { canManageBoardTasks } from "@/lib/task-permissions";
 import { isObjectId, jsonError, requireUserId, serializeDocs } from "@/lib/api";
 import { emitToBoard, emitToUser } from "@/lib/socket-emit";
 
@@ -41,7 +42,12 @@ export async function PATCH(request: Request, { params }: Params) {
   }
 
   const isOwner = String(board.owner) === userId;
+  const isReviewer = canManageBoardTasks(board, userId, String(caller.role));
   const isTaskTakenByOthers = task.takenBy && String(task.takenBy) !== userId;
+
+  if (task.approvalStatus === "pending" && !isReviewer) {
+    return jsonError("This task is waiting for approval and cannot be moved yet.", 403);
+  }
 
   // Lock logic: If taken by others, only the owner or the person who took it can move it.
   if (isTaskTakenByOthers && !isOwner) {

@@ -42,7 +42,7 @@ export function ManageWfhDatesModal({
 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl ring-1 ring-slate-200">
+      <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-xl ring-1 ring-slate-200">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h3 className="text-xl font-bold text-slate-900">Manage WFH Dates</h3>
@@ -109,7 +109,7 @@ export function ManageWfhDatesModal({
             }}
           >
             <div
-              className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl ring-1 ring-slate-200"
+              className="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-xl ring-1 ring-slate-200"
               role="dialog"
               aria-modal="true"
               aria-labelledby="delete-wfh-date-title"

@@ -259,7 +259,7 @@ export function GamesTab() {
 
       {challengeTarget ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-          <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl">
+          <div className="w-full max-w-sm rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl">
             <h3 className="mb-1 text-sm font-semibold text-slate-800">Challenge a teammate</h3>
             <p className="mb-4 text-xs text-slate-500">
               {catalog.find((g) => g.id === challengeTarget.game)?.name} · your best {formatScore(challengeTarget.score)}
@@ -536,7 +536,7 @@ function GameModal({ gameId, catalog, onClose, onComplete }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-      <div className="w-full max-w-lg rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl">
+      <div className="w-full max-w-lg rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300">

@@ -28,7 +28,7 @@ export function HrQuitModal({
             <h4 className="text-lg font-semibold">Quit company (HR)</h4>
             <p className="mt-1 text-sm text-slate-500">Select replacement HR before submitting quit request.</p>
           </div>
-          <button aria-label="Close" className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]" type="button" onClick={onClose}><X size={18} /></button>
+          <button aria-label="Close" className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-50 dark:bg-zinc-800/60" type="button" onClick={onClose}><X size={18} /></button>
         </div>
         <div className="mt-4">
           <label className="text-xs font-semibold uppercase text-slate-500">Replacement HR</label>
@@ -80,7 +80,7 @@ export function RoleQuitModal({
             <h4 className="text-lg font-semibold">Quit company ({formatRole(role, isSeniorSecurity)})</h4>
             <p className="mt-1 text-sm text-slate-500">Assign another approved {formatRole(role, isSeniorSecurity)} before quitting.</p>
           </div>
-          <button aria-label="Close" className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]" type="button" onClick={onClose}><X size={18} /></button>
+          <button aria-label="Close" className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-50 dark:bg-zinc-800/60" type="button" onClick={onClose}><X size={18} /></button>
         </div>
         <div className="mt-4">
           <label className="text-xs font-semibold uppercase text-slate-500">Replacement</label>
@@ -127,7 +127,7 @@ export function CancelQuitModal({
             <h4 className="text-lg font-semibold">Cancel quit request</h4>
             <p className="mt-1 text-sm text-slate-500">Tell the approver why you are cancelling this request.</p>
           </div>
-          <button aria-label="Close" className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]" type="button" onClick={onClose}><X size={18} /></button>
+          <button aria-label="Close" className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-50 dark:bg-zinc-800/60" type="button" onClick={onClose}><X size={18} /></button>
         </div>
         <textarea className="mt-4 min-h-28 w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm" placeholder="Reason for cancelling quit request" value={reason} onChange={(event) => onReasonChange(event.target.value)} />
         <div className="mt-5 flex justify-end gap-2">
@@ -165,7 +165,7 @@ export function CancelJoinModal({
             <h4 className="text-lg font-semibold">Cancel join request</h4>
             <p className="mt-1 text-sm text-slate-500">Type CANCEL to confirm you want to remove this pending join request.</p>
           </div>
-          <button aria-label="Close" className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]" type="button" onClick={onClose}><X size={18} /></button>
+          <button aria-label="Close" className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-50 dark:bg-zinc-800/60" type="button" onClick={onClose}><X size={18} /></button>
         </div>
         <input className="mt-4 w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm uppercase" placeholder="Type CANCEL" value={confirmText} onChange={(event) => onTextChange(event.target.value)} />
         <div className="mt-5 flex justify-end gap-2">
@@ -181,14 +181,14 @@ export function CancelJoinModal({
 
 export function TeamEmployeesModal({
   team,
-  selfId,
+  canDelete,
   onClose,
   onKick,
   onDeleteTeam,
   showToast,
 }: {
   team: AnyRecord | null;
-  selfId: string;
+  canDelete: boolean;
   onClose: () => void;
   onKick: (teamId: string, employeeId: string, employeeName: string, teamName: string) => void;
   onDeleteTeam: (teamId: string, teamName: string) => void;
@@ -201,11 +201,11 @@ export function TeamEmployeesModal({
     typeof window !== "undefined" ? `${window.location.origin}/join?code=${code}` : code;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4">
-      <div className="w-full max-w-2xl rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl">
+      <div className="w-full max-w-2xl rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">{String(team.name)} employees</h3>
           <div className="flex items-center gap-2">
-            {String(team.managerId ?? "") === selfId ? (
+            {canDelete ? (
               <button className="rounded-lg border border-rose-200 px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50" onClick={() => onDeleteTeam(String(team.id), String(team.name ?? "Team"))} type="button">Delete Team</button>
             ) : null}
             <button className="rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-sm" onClick={onClose}>Close</button>
@@ -215,12 +215,12 @@ export function TeamEmployeesModal({
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {joinCode && (
               <div>
-                <div className="rounded-lg border border-dashed border-slate-300 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] p-3">
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 dark:bg-zinc-800/60 p-3">
                   <p className="text-xs font-semibold uppercase text-slate-500">Team code</p>
                   <div className="mt-1.5 flex items-center justify-between gap-2">
                     <p className="min-w-0 truncate font-mono text-sm font-semibold text-indigo-700">{joinCode}</p>
                     <button type="button" title="Copy code"
-                      className="shrink-0 grid h-7 w-7 place-items-center rounded neu-card text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
+                      className="shrink-0 grid h-7 w-7 place-items-center rounded neu-card text-slate-600 hover:bg-slate-50 dark:bg-zinc-800/60"
                       onClick={() => { navigator.clipboard.writeText(joinCode); showToast("Team code copied."); }}>
                       <Clipboard size={14} />
                     </button>
@@ -235,12 +235,12 @@ export function TeamEmployeesModal({
             )}
             {otherJoinCode && (
               <div>
-                <div className="rounded-lg border border-dashed border-slate-300 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] p-3">
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 dark:bg-zinc-800/60 p-3">
                   <p className="text-xs font-semibold uppercase text-slate-500">Others code</p>
                   <div className="mt-1.5 flex items-center justify-between gap-2">
                     <p className="min-w-0 truncate font-mono text-sm font-semibold text-indigo-700">{otherJoinCode}</p>
                     <button type="button" title="Copy code"
-                      className="shrink-0 grid h-7 w-7 place-items-center rounded neu-card text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
+                      className="shrink-0 grid h-7 w-7 place-items-center rounded neu-card text-slate-600 hover:bg-slate-50 dark:bg-zinc-800/60"
                       onClick={() => { navigator.clipboard.writeText(otherJoinCode); showToast("Others code copied."); }}>
                       <Clipboard size={14} />
                     </button>
@@ -291,7 +291,7 @@ export function KickModal({
   if (!data) return null;
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center neu-overlay p-4">
-      <div className="w-full max-w-xl rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl">
+      <div className="w-full max-w-xl rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-xl">
         <h3 className="text-xl font-semibold text-slate-900">Kick employee {data.employeeName}?</h3>
         <p className="mt-2 text-sm text-slate-600">This action cannot be undone.<br />Type <span className="font-semibold text-rose-600">KICK</span> to confirm.</p>
         <input className="mt-4 w-full rounded-lg border border-slate-300 px-3 py-2.5" placeholder="Type KICK" value={confirmText} onChange={(event) => onTextChange(event.target.value)} />
@@ -320,7 +320,7 @@ export function DeleteTeamModal({
   if (!data) return null;
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center neu-overlay p-4">
-      <div className="w-full max-w-xl rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl">
+      <div className="w-full max-w-xl rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-xl">
         <h3 className="text-xl font-semibold text-slate-900">Delete team {data.teamName}?</h3>
         <p className="mt-2 text-sm text-slate-600">All employees will be removed from this team immediately.<br />Type <span className="font-semibold text-rose-600">DELETE</span> to confirm.</p>
         <input className="mt-4 w-full rounded-lg border border-slate-300 px-3 py-2.5" placeholder="Type DELETE" value={confirmText} onChange={(event) => onTextChange(event.target.value)} />
@@ -404,7 +404,7 @@ export function CompanyIconSection({
           ) : (
             <>
               {uploading ? <span className="text-sm text-slate-500">Uploading...</span> : (
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]">
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:bg-zinc-800/60">
                   <Camera size={16} /> Upload icon
                   <input accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) onCropDone(file as unknown as Blob); e.target.value = ""; }} type="file" />
                 </label>
@@ -510,7 +510,7 @@ export function CompanyIconSection({
                   type="button"
                   disabled={contacts.length >= 5}
                   onClick={() => onContactsChange([...contacts, { name: "", phone: "", email: "", isPrimary: contacts.length === 0 }])}
-                  className="inline-flex items-center gap-1 rounded-lg border border-[var(--c-border-light)] px-2 py-1 text-xs font-medium text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-1 rounded-lg border border-[var(--c-border-light)] px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:bg-zinc-800/60 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Plus size={12} /> Add Contact
                 </button>
@@ -633,7 +633,7 @@ export function DeleteConfirmModal({
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 grid place-items-center neu-overlay">
-      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl">
+      <div className="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-xl">
         <h4 className="text-lg font-semibold">{title}</h4>
         <p className="mt-2 text-sm text-slate-600">{description}</p>
         <div className="mt-5 flex justify-end gap-3">

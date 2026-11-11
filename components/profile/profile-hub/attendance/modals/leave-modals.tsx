@@ -80,7 +80,7 @@ export function LeaveModal({
 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl ring-1 ring-slate-200">
+      <div className="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-xl ring-1 ring-slate-200">
         <h3 className="text-xl font-bold text-slate-900">Ask Leave</h3>
         <p className="mt-1 text-sm text-slate-500">
           Submit a paid leave request for HR and admin approval.
@@ -407,7 +407,7 @@ export function LeaveDetailsModal({
           </div>
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 h-8 w-8 grid place-items-center rounded-full bg-[var(--c-bg-white dark:bg-zinc-900)]/10 text-white hover:bg-[var(--c-bg-white dark:bg-zinc-900)]/20 transition"
+            className="absolute top-4 right-4 h-8 w-8 grid place-items-center rounded-full bg-white/10 dark:bg-zinc-900/10 text-white hover:bg-white/20 dark:bg-zinc-900/20 transition"
           >
             <LogOut className="rotate-180" size={16} />
           </button>
@@ -476,7 +476,7 @@ export function LeaveDetailsModal({
                     download="attachment"
                     className="absolute inset-0 grid place-items-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
                   >
-                    <div className="rounded-full bg-[var(--c-bg-white dark:bg-zinc-900)] px-4 py-2 text-xs font-bold text-slate-900 shadow-xl">
+                    <div className="rounded-full bg-white dark:bg-zinc-900 px-4 py-2 text-xs font-bold text-slate-900 shadow-xl">
                       View Original
                     </div>
                   </a>

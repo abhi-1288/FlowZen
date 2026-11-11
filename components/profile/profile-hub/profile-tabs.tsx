@@ -291,7 +291,7 @@ export function ProfileTab({
               </p>
             </div>
             <div className="flex gap-2">
-              <button className="rounded-lg border border-amber-200 bg-[var(--c-bg-white dark:bg-zinc-900)] px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-100"
+              <button className="rounded-lg border border-amber-200 bg-white dark:bg-zinc-900 px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-100"
                 onClick={() => setup.setSetupBannerDismissed(true)} type="button">Dismiss</button>
               <button className="rounded-lg bg-amber-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-800"
                 onClick={setup.openSetupModal} type="button">Complete setup</button>
@@ -466,7 +466,7 @@ export function ProfileTab({
 
       {showLostCardModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-          <div className="w-full max-w-lg rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl" style={{ maxHeight: "90vh", overflowY: "auto" }}>
+          <div className="w-full max-w-lg rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl" style={{ maxHeight: "90vh", overflowY: "auto" }}>
             <h3 className="mb-3 text-sm font-semibold text-slate-900">Report Lost / Damaged ID Card</h3>
             <form onSubmit={handleReportLostCard} className="space-y-3">
               <div>

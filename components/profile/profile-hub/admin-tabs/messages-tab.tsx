@@ -766,7 +766,7 @@ export function MessagesTab({
         <div className="flex flex-col min-h-0 overflow-hidden border-r border-[var(--c-border-light)] bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] lg:col-span-3">
           
           {/* Header Action Mode Switchers */}
-          <div className="border-b border-[var(--c-border-light)] bg-[var(--c-bg-white dark:bg-zinc-900)] p-4">
+          <div className="border-b border-[var(--c-border-light)] bg-white dark:bg-zinc-900 p-4">
             <div className="flex rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] p-1">
               <button
                 className={`flex-1 rounded-md py-2 text-center text-xs font-semibold transition-all ${ mode === "normal" ? "neu-tab-pressed" : "text-slate-500 hover:text-slate-800" }`}
@@ -996,7 +996,7 @@ export function MessagesTab({
         </div>
 
         {/* Right Side Chat Conversation Area */}
-        <div className="flex flex-col min-h-0 overflow-hidden bg-[var(--c-bg-white dark:bg-zinc-900)] lg:col-span-9">
+        <div className="flex flex-col min-h-0 overflow-hidden bg-white dark:bg-zinc-900 lg:col-span-9">
           {mode === "meeting" ? (
             /* Schedule Meeting panel */
             <div className="flex flex-col h-full overflow-y-auto p-6">
@@ -1304,7 +1304,7 @@ export function MessagesTab({
                             <div className="relative max-w-[70%]">
                               {/* Selection checkbox */}
                               {selectionMode && (
-                                <span className={`absolute -top-2.5 z-20 flex h-5 w-5 items-center justify-center rounded-full border-2 transition-colors ${isMe ? "-right-2" : "-left-2"} ${selectedMessages[msgId] ? "bg-sky-500 border-sky-500 text-white" : "bg-[var(--c-bg-white dark:bg-zinc-900)] border-slate-300 text-transparent"}`}>
+                                <span className={`absolute -top-2.5 z-20 flex h-5 w-5 items-center justify-center rounded-full border-2 transition-colors ${isMe ? "-right-2" : "-left-2"} ${selectedMessages[msgId] ? "bg-sky-500 border-sky-500 text-white" : "bg-white dark:bg-zinc-900 border-slate-300 text-transparent"}`}>
                                   <Check size={11} />
                                 </span>
                               )}
@@ -1312,7 +1312,7 @@ export function MessagesTab({
                               {!selectionMode && (
                                 <button
                                   onClick={(e) => openContextMenu(e, msgId, msg)}
-                                  className={`absolute -top-3 ${isMe ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1"} hidden group-hover/msg:flex h-6 w-6 items-center justify-center rounded-full bg-[var(--c-bg-white dark:bg-zinc-900)] border border-[var(--c-border-light)] text-slate-400 hover:text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] shadow-sm transition-colors z-10`}
+                                  className={`absolute -top-3 ${isMe ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1"} hidden group-hover/msg:flex h-6 w-6 items-center justify-center rounded-full bg-white dark:bg-zinc-900 border border-[var(--c-border-light)] text-slate-400 hover:text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] shadow-sm transition-colors z-10`}
                                   title="More actions"
                                 >
                                   <MoreVertical size={12} />
@@ -1323,7 +1323,7 @@ export function MessagesTab({
                               {contextMenuMsgId === msgId && (
                                 <div
                                   data-context-menu
-                                  className={`absolute top-6 z-50 w-[220px] rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] border border-[var(--c-border-light)] py-1.5 shadow-xl ${isMe ? "right-0" : "left-0"}`}
+                                  className={`absolute top-6 z-50 w-[220px] rounded-xl bg-white dark:bg-zinc-900 border border-[var(--c-border-light)] py-1.5 shadow-xl ${isMe ? "right-0" : "left-0"}`}
                                 >
                                   {/* Quick reactions */}
                                   <div className="flex items-center justify-between gap-0.5 px-2 pb-1.5 pt-1">
@@ -1460,7 +1460,7 @@ export function MessagesTab({
                                   }
                                   return (
                                     <a href={att.url} download={att.name} target="_blank" rel="noopener noreferrer" className={`mt-2 flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors ${isMe ? "bg-white/10 hover:bg-white/15" : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:bg-[var(--c-bg-hover)]"}`}>
-                                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isMe ? "bg-white/10" : "bg-[var(--c-bg-white dark:bg-zinc-900)]"}`}>
+                                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isMe ? "bg-white/10" : "bg-white dark:bg-zinc-900"}`}>
                                         <Download size={16} className={isMe ? "text-white/70" : "text-slate-500"} />
                                       </div>
                                       <div className="min-w-0 flex-1">
@@ -1712,7 +1712,7 @@ export function MessagesTab({
                             <div className="relative max-w-[70%]">
                               {/* Selection checkbox */}
                               {selectionMode && (
-                                <span className={`absolute -top-2.5 z-20 flex h-5 w-5 items-center justify-center rounded-full border-2 transition-colors ${isMe ? "-right-2" : "-left-2"} ${selectedMessages[msgId] ? "bg-sky-500 border-sky-500 text-white" : "bg-[var(--c-bg-white dark:bg-zinc-900)] border-slate-300 text-transparent"}`}>
+                                <span className={`absolute -top-2.5 z-20 flex h-5 w-5 items-center justify-center rounded-full border-2 transition-colors ${isMe ? "-right-2" : "-left-2"} ${selectedMessages[msgId] ? "bg-sky-500 border-sky-500 text-white" : "bg-white dark:bg-zinc-900 border-slate-300 text-transparent"}`}>
                                   <Check size={11} />
                                 </span>
                               )}
@@ -1720,7 +1720,7 @@ export function MessagesTab({
                               {!selectionMode && (
                                 <button
                                   onClick={(e) => openContextMenu(e, msgId, msg)}
-                                  className={`absolute -top-3 ${isMe ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1"} hidden group-hover/msg:flex h-6 w-6 items-center justify-center rounded-full bg-[var(--c-bg-white dark:bg-zinc-900)] border border-[var(--c-border-light)] text-slate-400 hover:text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] shadow-sm transition-colors z-10`}
+                                  className={`absolute -top-3 ${isMe ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1"} hidden group-hover/msg:flex h-6 w-6 items-center justify-center rounded-full bg-white dark:bg-zinc-900 border border-[var(--c-border-light)] text-slate-400 hover:text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] shadow-sm transition-colors z-10`}
                                   title="More actions"
                                 >
                                   <MoreVertical size={12} />
@@ -1731,7 +1731,7 @@ export function MessagesTab({
                               {contextMenuMsgId === msgId && (
                                 <div
                                   data-context-menu
-                                  className={`absolute top-6 z-50 w-[220px] rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] border border-[var(--c-border-light)] py-1.5 shadow-xl ${isMe ? "right-0" : "left-0"}`}
+                                  className={`absolute top-6 z-50 w-[220px] rounded-xl bg-white dark:bg-zinc-900 border border-[var(--c-border-light)] py-1.5 shadow-xl ${isMe ? "right-0" : "left-0"}`}
                                 >
                                   {/* Quick reactions */}
                                   <div className="flex items-center justify-between gap-0.5 px-2 pb-1.5 pt-1">
@@ -1857,7 +1857,7 @@ export function MessagesTab({
                                   }
                                   return (
                                     <a href={att.url} download={att.name} target="_blank" rel="noopener noreferrer" className={`mt-2 flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors ${isMe ? "bg-white/10 hover:bg-white/15" : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:bg-[var(--c-bg-hover)]"}`}>
-                                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isMe ? "bg-white/10" : "bg-[var(--c-bg-white dark:bg-zinc-900)]"}`}>
+                                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isMe ? "bg-white/10" : "bg-white dark:bg-zinc-900"}`}>
                                         <Download size={16} className={isMe ? "text-white/70" : "text-slate-500"} />
                                       </div>
                                       <div className="min-w-0 flex-1">
@@ -2007,7 +2007,7 @@ export function MessagesTab({
           {showInfoModal && selectedMember && (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay" onClick={() => setShowInfoModal(false)}>
               <div
-                className="relative w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl"
+                className="relative w-full max-w-sm rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
@@ -2098,7 +2098,7 @@ export function MessagesTab({
           {showInfoModal && selectedGroup && (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay" onClick={() => setShowInfoModal(false)}>
               <div
-                className="relative w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl max-h-[80vh] overflow-y-auto"
+                className="relative w-full max-w-sm rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl max-h-[80vh] overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
@@ -2158,7 +2158,7 @@ export function MessagesTab({
           {messageInfoMsg && (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay" onClick={() => setMessageInfoMsg(null)}>
               <div
-                className="relative w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl max-h-[80vh] overflow-y-auto"
+                className="relative w-full max-w-sm rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl max-h-[80vh] overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
@@ -2298,7 +2298,7 @@ export function MessagesTab({
           {deleteConfirm && (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay" onClick={() => { if (!deleting) setDeleteConfirm(null); }}>
               <div
-                className="relative w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl"
+                className="relative w-full max-w-sm rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
@@ -2347,7 +2347,7 @@ export function MessagesTab({
           {showForwardModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay" onClick={() => setShowForwardModal(false)}>
               <div
-                className="relative w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl max-h-[80vh] overflow-hidden"
+                className="relative w-full max-w-sm rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl max-h-[80vh] overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button

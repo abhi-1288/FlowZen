@@ -69,7 +69,7 @@ export function ModalShell({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="flex max-h-[92vh] w-full max-w-5xl animate-in fade-in-0 zoom-in-95 flex-col overflow-hidden rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] shadow-modal duration-200 dark:border dark:border-zinc-800 dark:bg-[#000000]"
+        className="flex max-h-[92vh] w-full max-w-5xl animate-in fade-in-0 zoom-in-95 flex-col overflow-hidden rounded-2xl bg-white dark:bg-zinc-900 shadow-modal duration-200 dark:border dark:border-zinc-800 dark:bg-[#000000]"
       >
         {/* Header */}
         <div className="flex shrink-0 items-start gap-4 border-b border-[var(--c-border-light)] px-6 py-5 dark:border-zinc-800">
@@ -102,7 +102,7 @@ export function ModalShell({
 
         {/* Footer */}
         {footer ? (
-          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[var(--c-border-light)] bg-[var(--c-bg-white dark:bg-zinc-900)] px-6 py-4 dark:border-zinc-800">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[var(--c-border-light)] bg-white dark:bg-zinc-900 px-6 py-4 dark:border-zinc-800">
             {footer}
           </div>
         ) : null}
@@ -187,7 +187,7 @@ export function Panel({
 }) {
   const tones = {
     default:
-      "border-[var(--c-border-light)] bg-[var(--c-bg-white dark:bg-zinc-900)] dark:border-zinc-800",
+      "border-[var(--c-border-light)] bg-white dark:bg-zinc-900 dark:border-zinc-800",
     subtle:
       "border-[var(--c-border-light)] bg-[var(--c-bg)] dark:border-zinc-800 dark:bg-zinc-950/40",
     warning:

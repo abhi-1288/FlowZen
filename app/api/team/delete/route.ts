@@ -26,7 +26,14 @@ export async function POST(request: Request) {
   const [manager, team] = await Promise.all([User.findById(userId), Team.findById(teamId)]);
   if (!manager) return jsonError("Manager not found.", 404);
   if (!team) return jsonError("Team not found.", 404);
-  if (String(team.manager) !== userId) return jsonError("Forbidden", 403);
+
+  const company = await Company.findById(team.company).select("owner");
+  const isTeamManager = String(team.manager) === userId;
+  const isCompanyAdmin =
+    String(manager.role ?? "") === "admin" &&
+    String(manager.company ?? "") === String(team.company ?? "");
+  const isCompanyOwner = String(company?.owner ?? "") === userId;
+  if (!isTeamManager && !isCompanyAdmin && !isCompanyOwner) return jsonError("Forbidden", 403);
 
   const employees = await User.find({ _id: { $in: team.employees } }).select("_id");
   await User.updateMany(
@@ -42,7 +49,6 @@ export async function POST(request: Request) {
 
   await Team.deleteOne({ _id: team._id });
 
-  const company = await Company.findById(team.company).select("owner");
   const targets = new Set<string>(employees.map((emp) => String(emp._id)));
   if (company?.owner) targets.add(String(company.owner));
 

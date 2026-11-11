@@ -909,7 +909,7 @@ export function ProfileHub() {
       }}
     >
     <main className="min-h-screen bg-[var(--c-bg)] text-[var(--c-text)] dark:bg-[#1a1a1a]">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-[var(--c-bg-white dark:bg-zinc-900)] shadow-[10px_0_24px_-14px_rgba(151,163,184,0.65)] lg:flex dark:bg-[#000000] dark:border-r dark:border-zinc-800">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-white dark:bg-zinc-900 shadow-[10px_0_24px_-14px_rgba(151,163,184,0.65)] lg:flex dark:bg-[#000000] dark:border-r dark:border-zinc-800">
         <div className="shrink-0 p-4">
           <div className="flex items-center gap-2.5">
             <div className="relative h-8 w-8 overflow-hidden rounded-lg neu-avatar">
@@ -1147,12 +1147,12 @@ export function ProfileHub() {
 
       <section className="lg:pl-64">
         {/* ── Header ── */}
-        <div className="bg-[var(--c-bg-white dark:bg-zinc-900)] px-6 py-5 shadow-[0_1px_0_0_rgba(23,32,51,0.07)] sm:px-8 dark:bg-[#000000] dark:border-b dark:border-zinc-800">
+        <div className="bg-white dark:bg-zinc-900 px-6 py-5 shadow-[0_1px_0_0_rgba(23,32,51,0.07)] sm:px-8 dark:bg-[#000000] dark:border-b dark:border-zinc-800">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="relative shrink-0">
                 <AvatarBadge avatarUrl={avatarUrl} name={displayName} size="lg" />
-                <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[var(--c-bg-white dark:bg-zinc-900)] dark:border-[#0a0a0a] bg-emerald-400" />
+                <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white dark:border-[#0a0a0a] bg-emerald-400" />
               </div>
               <div>
                 <h1 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-zinc-100">

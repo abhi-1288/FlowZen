@@ -14,6 +14,12 @@ const BoardSchema = new Schema(
     title: { type: String, required: true, trim: true, maxlength: 120 },
     description: { type: String, default: "", maxlength: 2000 },
     owner: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    pinned: { type: Boolean, default: false },
+    employeeTaskCreation: {
+      type: String,
+      enum: ["approval", "allowed", "blocked"],
+      default: "approval"
+    },
     members: [
       {
         user: { type: Schema.Types.ObjectId, ref: "User", required: true },

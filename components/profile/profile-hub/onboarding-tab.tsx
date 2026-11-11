@@ -44,6 +44,13 @@ export function OnboardingTab({
   const managerTeams = Array.isArray(managerInsight?.teams) ? (managerInsight.teams as AnyRecord[]) : [];
   const adminTeams = Array.isArray((insights?.admin as AnyRecord | undefined)?.teams) ? ((insights?.admin as AnyRecord).teams as AnyRecord[]) : [];
   const transferTeams = role === "admin" ? adminTeams : managerTeams;
+  const isCompanyOwner = Boolean((session?.user as any)?.isCompanyOwner);
+  const canDeleteTeam = (candidate: AnyRecord | null) => {
+    if (!candidate) return false;
+    const teamId = String(candidate.id ?? "");
+    const isMine = managerTeams.some((managed) => String(managed.id ?? "") === teamId);
+    return role === "admin" || isCompanyOwner || isMine || String(candidate.managerId ?? "") === selfId;
+  };
   const companyMembers = Array.isArray(insights?.companyMembers) ? (insights.companyMembers as AnyRecord[]) : [];
   const replacementHrCandidates = companyMembers.filter((member) => {
     const id = String(member.id ?? "");
@@ -858,7 +865,7 @@ export function OnboardingTab({
         )
       ) : null}
 
-      <TeamEmployeesModal team={teamModal} selfId={selfId} onClose={() => setTeamModal(null)}
+      <TeamEmployeesModal team={teamModal} canDelete={canDeleteTeam(teamModal)} onClose={() => setTeamModal(null)}
         onKick={(tid, eid, ename, tname) => setKickModal({ teamId: tid, employeeId: eid, employeeName: ename, teamName: tname })}
         onDeleteTeam={(tid, tname) => setDeleteTeamModal({ teamId: tid, teamName: tname })}
         showToast={showToast} />

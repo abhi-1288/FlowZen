@@ -44,6 +44,16 @@ const TaskSchema = new Schema(
     dueDate: { type: Date, default: null },
     priority: { type: String, enum: ["low", "medium", "high"], default: "medium" },
     order: { type: Number, required: true, default: 0 },
+    pinned: { type: Boolean, default: false },
+    approvalStatus: {
+      type: String,
+      enum: ["approved", "pending", "rejected"],
+      default: "approved",
+      index: true
+    },
+    createdBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    reviewedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    reviewedAt: { type: Date, default: null },
     assignees: [{ type: Schema.Types.ObjectId, ref: "User" }],
     takenBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     takenByName: { type: String, default: "" },

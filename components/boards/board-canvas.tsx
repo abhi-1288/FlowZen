@@ -13,11 +13,14 @@ import {
   type DragEndEvent,
   type DragStartEvent
 } from "@dnd-kit/core";
-import { CalendarDays, GitBranch, MoreHorizontal, Plus, UserPlus } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { CalendarDays, GitBranch, MoreHorizontal, Plus, Settings2, UserPlus } from "lucide-react";
 import { useBoardStore, reorder } from "@/store/board-store";
 import { ColumnPanel } from "@/components/boards/column-panel";
 import { TaskCard } from "@/components/boards/task-card";
+import {
+  canCreateTaskOnBoard,
+  canManageBoardTasks
+} from "@/lib/task-permissions";
 import type { Column, Task } from "@/lib/types";
 
 type DragData =
@@ -25,7 +28,6 @@ type DragData =
   | { type: "task"; taskId: string; columnId: string };
 
 export function BoardCanvas({ boardId }: { boardId: string }) {
-  const router = useRouter();
   const { data: session } = useSession();
   const activeBoard = useBoardStore((state) => state.activeBoard);
   const columns = useBoardStore((state) => state.columns);
@@ -38,8 +40,6 @@ export function BoardCanvas({ boardId }: { boardId: string }) {
   const [activeColumn, setActiveColumn] = useState<Column | null>(null);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [showBoardMenu, setShowBoardMenu] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const currentMember = activeBoard?.members?.find((member: any) => {
     const memberUser = member.user as any;
     const memberId = typeof memberUser === "string" ? memberUser : memberUser?.id || memberUser?._id;
@@ -47,6 +47,17 @@ export function BoardCanvas({ boardId }: { boardId: string }) {
   }) as any;
   const isOwner = Boolean(session?.user?.id && activeBoard?.owner === session.user.id);
   const isAdminOwner = isOwner && session?.user?.role === "admin";
+  const canReviewTasks = canManageBoardTasks(
+    activeBoard,
+    session?.user?.id,
+    session?.user?.role
+  );
+  const canCreateTasks = canCreateTaskOnBoard(
+    activeBoard,
+    session?.user?.id,
+    session?.user?.role
+  );
+  const canManageTaskSettings = canReviewTasks;
   const canAssignProject = Boolean(currentMember) && !isOwner;
   const memberStatus = isOwner
     ? "self"
@@ -98,16 +109,6 @@ export function BoardCanvas({ boardId }: { boardId: string }) {
     }
   }
 
-  async function deleteCurrentBoard() {
-    if (deleteConfirmText !== "DELETE") return;
-    await useBoardStore.getState().deleteBoard(boardId);
-    setShowDeleteModal(false);
-    setDeleteConfirmText("");
-    const remainingBoards = useBoardStore.getState().boards;
-    if (remainingBoards.length > 0) router.push(`/board/${remainingBoards[0].id}`);
-    else router.push("/board");
-  }
-
   return (
     <section className="flex h-screen flex-col">
       <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6 dark:border-zinc-800 dark:bg-[#000000]">
@@ -141,6 +142,16 @@ export function BoardCanvas({ boardId }: { boardId: string }) {
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {canManageTaskSettings ? (
+              <button
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                onClick={() => setModal({ type: "task-settings" })}
+                type="button"
+              >
+                <Settings2 size={16} />
+                Task rules
+              </button>
+            ) : null}
             {isOwner ? (
               <>
                 {isAdminOwner ? (
@@ -194,7 +205,7 @@ export function BoardCanvas({ boardId }: { boardId: string }) {
                         className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-rose-600 hover:bg-rose-50"
                         onClick={() => {
                           setShowBoardMenu(false);
-                          setShowDeleteModal(true);
+                          setModal({ type: "board-delete", boardId });
                         }}
                         type="button"
                       >
@@ -238,9 +249,17 @@ export function BoardCanvas({ boardId }: { boardId: string }) {
             <ColumnPanel
               boardId={boardId}
               canEdit={isOwner}
+              canCreate={canCreateTasks}
+              canReview={canReviewTasks}
               column={column}
               key={column.id}
-              tasks={tasks.filter((task) => task.column === column.id).sort((a, b) => a.order - b.order)}
+              tasks={tasks
+                .filter((task) => task.column === column.id)
+                .sort(
+                  (a, b) =>
+                    Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) ||
+                    a.order - b.order
+                )}
             />
           ))}
           {isOwner ? (
@@ -254,7 +273,7 @@ export function BoardCanvas({ boardId }: { boardId: string }) {
           ) : null}
         </div>
         <DragOverlay>
-          {activeTask ? <TaskCard task={activeTask} overlay canEdit={isOwner} /> : null}
+          {activeTask ? <TaskCard task={activeTask} overlay canEdit={isOwner} canReview={canReviewTasks} /> : null}
           {activeColumn ? (
             <div className="w-72 rounded-lg border border-slate-200 bg-slate-100 p-3 shadow-soft">
               <div className="font-semibold text-slate-800">{activeColumn.title}</div>
@@ -262,44 +281,6 @@ export function BoardCanvas({ boardId }: { boardId: string }) {
           ) : null}
         </DragOverlay>
       </DndContext>
-      {showDeleteModal ? (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-slate-900">Delete board?</h3>
-            <p className="mt-2 text-sm text-slate-600">
-              This action cannot be undone.
-              <br />
-              Type <span className="font-semibold text-rose-600">DELETE</span> to confirm.
-            </p>
-            <input
-              className="mt-4 w-full rounded-lg border border-slate-200 px-3 py-2.5"
-              placeholder="Type DELETE"
-              value={deleteConfirmText}
-              onChange={(event) => setDeleteConfirmText(event.target.value)}
-            />
-            <div className="mt-5 flex justify-end gap-3">
-              <button
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
-                onClick={() => {
-                  setShowDeleteModal(false);
-                  setDeleteConfirmText("");
-                }}
-                type="button"
-              >
-                Cancel
-              </button>
-              <button
-                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={deleteConfirmText !== "DELETE"}
-                onClick={() => void deleteCurrentBoard()}
-                type="button"
-              >
-                Delete board
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </section>
   );
 }

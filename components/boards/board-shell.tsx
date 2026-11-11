@@ -8,7 +8,19 @@ import Image from "next/image";
 import { LogOut, Plus, Search } from "lucide-react";
 import { useBoardStore } from "@/store/board-store";
 import { BoardCanvas } from "@/components/boards/board-canvas";
-import { AssignModal, BoardModal, BoardEditModal, ColumnModal, InviteModal, TaskModal } from "@/components/boards/modals";
+import { BoardListItem } from "@/components/boards/board-list-item";
+import {
+  AssignModal,
+  BoardModal,
+  BoardDeleteModal,
+  BoardEditModal,
+  ColumnModal,
+  InviteModal,
+  TaskDeleteModal,
+  TaskMembersModal,
+  TaskModal,
+  TaskSettingsModal,
+} from "@/components/boards/modals";
 import { apiFetch } from "@/lib/client-utils";
 import { useNotificationToast } from "@/lib/toast-context";
 
@@ -26,7 +38,7 @@ export function BoardShell({ boardId }: { boardId?: string }) {
   const modal = useBoardStore((state) => state.modal);
   const fetchBoards = useBoardStore((state) => state.fetchBoards);
   const fetchBoard = useBoardStore((state) => state.fetchBoard);
-  const createBoard = useBoardStore((state) => state.createBoard);
+  const updateBoard = useBoardStore((state) => state.updateBoard);
   const setModal = useBoardStore((state) => state.setModal);
   const setTasks = useBoardStore((state) => state.setTasks);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
@@ -60,8 +72,12 @@ export function BoardShell({ boardId }: { boardId?: string }) {
       if (filter === "invited") return !isOwner && !isAssignedMember;
       return true;
     });
-    if (!query) return roleFiltered;
-    return roleFiltered.filter((board) => board.title.toLowerCase().includes(query));
+    const queryFiltered = !query
+      ? roleFiltered
+      : roleFiltered.filter((board) => board.title.toLowerCase().includes(query));
+    return [...queryFiltered].sort(
+      (a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned))
+    );
   }, [boards, filter, boardSearchQuery, session?.user?.id]);
 
   useEffect(() => {
@@ -175,9 +191,8 @@ export function BoardShell({ boardId }: { boardId?: string }) {
     }
   }, [boardId, boards, router]);
 
-  async function quickCreateBoard() {
-    const board = await createBoard("New board");
-    router.push(`/board/${board.id}`);
+  function quickCreateBoard() {
+    setModal({ type: "board" });
   }
 
   const FilterBtn = ({ type, label }: { type: typeof filter; label: string }) => (
@@ -238,9 +253,6 @@ export function BoardShell({ boardId }: { boardId?: string }) {
               <Search size={16} />
             </button>
           </div>
-          <Link className="mt-3 block rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-center text-sm font-medium text-indigo-700 hover:bg-indigo-100" href="/profile/command-center">
-            Command Centre
-          </Link>
           <Link className="mt-3 block rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-950" href="/profile">
             Profile center{unreadNotifications ? ` (${unreadNotifications})` : ""}
           </Link>
@@ -271,15 +283,19 @@ export function BoardShell({ boardId }: { boardId?: string }) {
               ))
             ) : (
               filteredBoards.map((board) => (
-                <button
-                  className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition ${board.id === boardId ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
-                    }`}
+                <BoardListItem
+                  active={board.id === boardId}
+                  board={board}
+                  canManage={board.owner === session?.user?.id}
                   key={board.id}
-                  onClick={() => router.push(`/board/${board.id}`)}
-                  type="button"
-                >
-                  {board.title}
-                </button>
+                  onDelete={() => setModal({ type: "board-delete", boardId: board.id })}
+                  onEdit={() => setModal({ type: "board-edit", boardId: board.id })}
+                  onMembers={() => setModal({ type: "invite", boardId: board.id })}
+                  onSelect={() => router.push(`/board/${board.id}`)}
+                  onTogglePin={() => {
+                    void updateBoard(board.id, { pinned: !board.pinned }).catch(() => {});
+                  }}
+                />
               ))
             )}
           </div>
@@ -363,11 +379,15 @@ export function BoardShell({ boardId }: { boardId?: string }) {
       </main>
 
       {modal?.type === "board" ? <BoardModal /> : null}
-      {modal?.type === "board-edit" ? <BoardEditModal /> : null}
+      {modal?.type === "board-edit" ? <BoardEditModal boardId={modal.boardId} /> : null}
+      {modal?.type === "board-delete" ? <BoardDeleteModal boardId={modal.boardId} /> : null}
       {modal?.type === "column" ? <ColumnModal boardId={boardId ?? ""} /> : null}
       {modal?.type === "assign" ? <AssignModal boardId={boardId ?? ""} /> : null}
-      {modal?.type === "invite" ? <InviteModal boardId={boardId ?? ""} /> : null}
+      {modal?.type === "task-settings" ? <TaskSettingsModal /> : null}
+      {modal?.type === "invite" ? <InviteModal boardId={modal.boardId ?? boardId ?? ""} /> : null}
       {modal?.type === "task" ? <TaskModal boardId={boardId ?? ""} columnId={modal.columnId} taskId={modal.taskId} /> : null}
+      {modal?.type === "task-delete" ? <TaskDeleteModal boardId={boardId ?? ""} taskId={modal.taskId} /> : null}
+      {modal?.type === "task-members" ? <TaskMembersModal taskId={modal.taskId} /> : null}
     </div>
   );
 }

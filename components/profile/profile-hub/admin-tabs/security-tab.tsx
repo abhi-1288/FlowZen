@@ -933,7 +933,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
                 />
                 {!cameraReady ? (
                   <div
-                    className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)]"
+                    className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-xl bg-white dark:bg-zinc-900"
                     onClick={cameraStarting ? undefined : handleStartCamera}
                   >
                     <span className="text-sm font-medium text-slate-600">
@@ -1456,7 +1456,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
           {/* Disable Access Popup */}
           {disableAccessPopup.show ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl">
+              <div className="w-full max-w-sm rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl">
                 <h3 className="mb-3 text-sm font-semibold text-slate-800">Disable Building Access</h3>
                 <p className="mb-3 text-xs text-slate-500">Select zones to disable for the lost card:</p>
                 {(["office-entry", "parking", "cafeteria", "printer", "server-room", "attendance-card"] as const).map((z) => (
@@ -1482,7 +1482,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
           {/* Found Card Popup */}
           {foundPopup.show ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl">
+              <div className="w-full max-w-sm rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl">
                 <h3 className="mb-3 text-sm font-semibold text-slate-800">Card Found</h3>
                 <p className="mb-3 text-xs text-slate-500">Was a replacement already issued for this card?</p>
                 <div className="flex gap-2">
@@ -1503,7 +1503,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
           {/* Complete Ticket Popup */}
           {completeTicketPopup.show ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl">
+              <div className="w-full max-w-sm rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl">
                 <h3 className="mb-3 text-sm font-semibold text-slate-800">Complete Ticket</h3>
                 <p className="mb-3 text-xs text-slate-500">Add a follow-up note before completing this ticket:</p>
                 <textarea className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
@@ -1522,7 +1522,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
           {/* Print Card Popup */}
           {printCardPopup.show ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl">
+              <div className="w-full max-w-sm rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl">
                 <h3 className="mb-4 text-sm font-semibold text-slate-800">Print New Card</h3>
                 <div className="space-y-3">
                   <div>
@@ -1565,7 +1565,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
           {/* Verify Popup */}
           {verifyPopup.show ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl">
+              <div className="w-full max-w-sm rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl">
                 <h3 className="mb-3 text-sm font-semibold text-slate-800">Verify Lost Card Report</h3>
                 <p className="text-xs text-slate-500">
                   This marks the report as <span className="font-medium text-slate-700">Under Verification</span> and notifies HR that the investigation is in progress.
@@ -1586,7 +1586,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
           {/* Reject Popup */}
           {rejectPopup.show ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-              <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl">
+              <div className="w-full max-w-sm rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl">
                 <h3 className="mb-3 text-sm font-semibold text-slate-800">Reject Report</h3>
                 <p className="mb-3 text-xs text-slate-500">Provide a reason for rejection:</p>
                 <textarea className="neu-inset w-full rounded-md px-3 py-1.5 text-xs"
@@ -1653,7 +1653,7 @@ export function SecurityTab({ company, showToast }: { company: AnyRecord | null;
       {/* Set Pass Window Popup */}
       {passWindowPopup ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-          <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl">
+          <div className="w-full max-w-sm rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl">
             <h3 className="mb-3 text-sm font-semibold text-slate-800">Set Pass Window</h3>
             <p className="mb-3 text-xs text-slate-500">The guest pass is valid within this window. Leave blank to fall back to interview time ± 15 min.</p>
             <label className="mb-1 block text-xs font-semibold text-slate-600">Valid from</label>

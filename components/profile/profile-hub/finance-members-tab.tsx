@@ -353,7 +353,7 @@ export function FinanceMembersView({
       {/* Main Modal (Attendance or Salary) */}
       {modalType && (
         <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4 backdrop-blur-sm transition-all" onClick={(e) => { if (e.target === e.currentTarget) { setModalType(null); setSelectedMemberId(null); } }}>
-          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-xl">
             <div className="flex items-start justify-between mb-6">
               <div>
                 <h4 className="text-2xl font-bold text-slate-900">
@@ -410,7 +410,7 @@ export function FinanceMembersView({
                 </div>
 
                 {isEditingSalary ? (
-                  <div className="mb-6 bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 rounded-xl border border-[var(--c-border-light)] shadow-sm">
+                  <div className="mb-6 bg-white dark:bg-zinc-900 p-5 rounded-xl border border-[var(--c-border-light)] shadow-sm">
                     <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Pay Period</label>
                     <div className="flex flex-wrap gap-2 mb-4">
                       {([
@@ -464,7 +464,7 @@ export function FinanceMembersView({
                     </div>
                   </div>
                 ) : (
-                  <div className="mb-6 bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 rounded-xl border border-[var(--c-border-light)] shadow-sm">
+                  <div className="mb-6 bg-white dark:bg-zinc-900 p-5 rounded-xl border border-[var(--c-border-light)] shadow-sm">
                     <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Current Salary</p>
                     <p className="text-3xl font-bold text-slate-900 mt-1">
                       ₹{
@@ -491,17 +491,17 @@ export function FinanceMembersView({
                 <h5 className="font-semibold text-md mb-3 text-slate-800 mt-8">This Month's Salary (Generated)</h5>
                 {data.salary ? (
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 border border-[var(--c-border-light)] shadow-sm">
+                    <div className="rounded-xl bg-white dark:bg-zinc-900 p-5 border border-[var(--c-border-light)] shadow-sm">
                       <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Base Salary (Month)</p>
                       <p className="text-2xl font-bold text-slate-900 mt-1">₹{data.salary.baseSalary.toLocaleString("en-IN")}</p>
                     </div>
-                    <div className="rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 border border-[var(--c-border-light)] shadow-sm">
+                    <div className="rounded-xl bg-white dark:bg-zinc-900 p-5 border border-[var(--c-border-light)] shadow-sm">
                       <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Net Salary (After deductions)</p>
                       <p className="text-2xl font-bold text-emerald-600 mt-1">₹{data.salary.netSalary.toLocaleString("en-IN")}</p>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-slate-500 text-sm bg-[var(--c-bg-white dark:bg-zinc-900)] p-4 rounded-lg border border-[var(--c-border-light)]">No salary information generated for this month.</p>
+                  <p className="text-slate-500 text-sm bg-white dark:bg-zinc-900 p-4 rounded-lg border border-[var(--c-border-light)]">No salary information generated for this month.</p>
                 )}
               </div>
             ) : (
@@ -600,7 +600,7 @@ export function FinanceMembersView({
       {/* Day detail modal */}
       {dayModal && (
         <div className="fixed inset-0 z-[60] grid place-items-center neu-overlay p-4 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setDayModal(null); }}>
-          <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-xl">
             <div className="flex items-center justify-between mb-5">
               <h4 className="text-xl font-bold text-slate-900">{new Date(dayModal.date).toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</h4>
               <button className="text-slate-400 hover:text-slate-800 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] rounded-full p-1.5" onClick={() => setDayModal(null)}><X size={20} /></button>
@@ -666,7 +666,7 @@ export function FinanceMembersView({
                     </span>
                     <span className={`capitalize font-bold ${dayModal.leaveStatus === "approved" ? "text-amber-600" : "text-[var(--color-primary)]"}`}>{dayModal.leaveStatus}</span>
                   </div>
-                  <div className="mt-2 bg-[var(--c-bg-white dark:bg-zinc-900)]/50 p-2 rounded-lg">
+                  <div className="mt-2 bg-white/50 dark:bg-zinc-900/50 p-2 rounded-lg">
                     <p className="text-sm text-slate-700"><span className="font-semibold">Reason: </span>{dayModal.leaveReason || "No reason provided"}</p>
                   </div>
                 </div>
@@ -685,7 +685,7 @@ export function FinanceMembersView({
                     <span className="font-semibold text-[var(--color-primary-dark)]">Work From Home (Approved)</span>
                     <span className="text-[var(--color-primary)] font-bold">Approved</span>
                   </div>
-                  <div className="mt-2 bg-[var(--c-bg-white dark:bg-zinc-900)]/50 p-2 rounded-lg">
+                  <div className="mt-2 bg-white/50 dark:bg-zinc-900/50 p-2 rounded-lg">
                     <p className="text-sm text-slate-700"><span className="font-semibold">Reason: </span>{dayModal.wfhReason || "No reason provided"}</p>
                     {dayModal.wfhDuration > 0 && (
                       <p className="text-sm text-slate-700 mt-1"><span className="font-semibold">Duration: </span>{dayModal.wfhDuration} day{dayModal.wfhDuration === 1 ? "" : "s"}</p>
@@ -777,7 +777,7 @@ export function FinanceMembersView({
 
       {policyModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setPolicyModal(false); }}>
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-xl">
             <div className="flex items-start justify-between mb-6">
               <div>
                 <h4 className="text-2xl font-bold text-slate-900">Company Policies</h4>
@@ -874,7 +874,7 @@ export function FinanceMembersView({
       {/* Check-Out Request Modal */}
       {checkOutModalRequest ? (
         <div className="fixed inset-0 z-[70] grid place-items-center neu-overlay p-4 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setCheckOutModalRequest(null); }}>
-          <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-lg font-bold text-slate-900">Check-Out Request</h4>
               <ActionButton variant="ghost" className="p-1" onClick={() => setCheckOutModalRequest(null)} aria-label="Close">

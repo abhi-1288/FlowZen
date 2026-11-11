@@ -13,8 +13,6 @@ type Params = { params: Promise<{ id: string }> };
 function boardRoleFromUserRole(role: string) {
   if (role === "project-manager") return "manager";
   if (role === "qa-tester") return "tester";
-  if (role === "finance") return "finance";
-  if (role === "human-resource") return "hr";
   if (role === "other") return "others";
   return ["admin", "employee", "others"].includes(role) ? role : "employee";
 }
@@ -25,6 +23,26 @@ function userSummary(user: any) {
     name: user.name,
     email: user.email,
     role: user.role,
+  };
+}
+
+function teamSummary(team: any) {
+  const approvedEmployees = (team.employees ?? []).filter((e: any) => e.teamStatus === "approved");
+  const managerValue = team.manager;
+  const managerDoc = managerValue && typeof managerValue === "object" && "name" in managerValue ? managerValue : null;
+  return {
+    id: String(team._id),
+    name: team.name,
+    managerId: managerDoc ? String(managerDoc._id ?? "") : String(managerValue ?? ""),
+    managerName: managerDoc?.name ?? "",
+    employeeCount: approvedEmployees.length,
+    employeeIds: approvedEmployees.map((e: any) => String(e._id)),
+    employees: approvedEmployees.map((e: any) => ({
+      id: String(e._id),
+      name: e.name,
+      email: e.email,
+      role: e.role,
+    })),
   };
 }
 
@@ -43,7 +61,15 @@ export async function GET(_request: Request, { params }: Params) {
   if (!caller) return jsonError("User not found.", 404);
 
   const isOwner = String(board.owner) === userId;
-  const _callerMember = (board.members as any[]).find((member) => String(member.user) === userId);
+  const members = board.members as any[];
+  const callerMember = members.find((member) => String(member.user) === userId);
+
+  // A team only becomes assignable once its manager is already on the board.
+  // This keeps the team list scoped to the roles that have actually been assigned.
+  const assignedLeadIds = members
+    .filter((member) => ["manager", "tester"].includes(String(member.role)))
+    .map((member) => String(member.user))
+    .filter((memberId) => memberId && memberId !== String(board.owner));
 
   if (isOwner && caller.role === "admin" && caller.company) {
     const [managers, testers, finance, hr] = await Promise.all([
@@ -53,7 +79,12 @@ export async function GET(_request: Request, { params }: Params) {
       User.find({ company: caller.company, companyStatus: "approved", role: "human-resource" }).sort({ name: 1 }),
     ]);
 
-    const teams = await Team.find({ company: caller.company }).populate("employees", "name email role teamStatus").sort({ name: 1 });
+    const teams = assignedLeadIds.length
+      ? await Team.find({ company: caller.company, manager: { $in: assignedLeadIds } })
+          .populate("manager", "name")
+          .populate("employees", "name email role teamStatus")
+          .sort({ name: 1 })
+      : [];
 
     return NextResponse.json({
       managers: managers.map(userSummary),
@@ -61,47 +92,23 @@ export async function GET(_request: Request, { params }: Params) {
       finance: finance.map(userSummary),
       hr: hr.map(userSummary),
       employees: [],
-      teams: teams.map((team: any) => {
-        const approvedEmployees = (team.employees ?? []).filter((e: any) => e.teamStatus === "approved");
-        return {
-          id: String(team._id),
-          name: team.name,
-          employeeCount: approvedEmployees.length,
-          employeeIds: approvedEmployees.map((e: any) => String(e._id)),
-          employees: approvedEmployees.map((e: any) => ({
-            id: String(e._id),
-            name: e.name,
-            email: e.email,
-            role: e.role,
-          })),
-        };
-      }),
+      teams: teams.map(teamSummary),
     });
   }
 
-  const teams = caller.company
-    ? await Team.find({ company: caller.company }).populate("employees", "name email role teamStatus").sort({ name: 1 })
+  const callerCanLead = ["manager", "tester"].includes(String(callerMember?.role));
+  const teams = caller.company && callerCanLead
+    ? await Team.find({ company: caller.company, manager: userId })
+        .populate("manager", "name")
+        .populate("employees", "name email role teamStatus")
+        .sort({ name: 1 })
     : [];
 
   return NextResponse.json({
     managers: [],
     testers: [],
     employees: [],
-    teams: teams.map((team: any) => {
-      const approvedEmployees = (team.employees ?? []).filter((e: any) => e.teamStatus === "approved");
-      return {
-        id: String(team._id),
-        name: team.name,
-        employeeCount: approvedEmployees.length,
-        employeeIds: approvedEmployees.map((e: any) => String(e._id)),
-        employees: approvedEmployees.map((e: any) => ({
-          id: String(e._id),
-          name: e.name,
-          email: e.email,
-          role: e.role,
-        })),
-      };
-    }),
+    teams: teams.map(teamSummary),
   });
 }
 
@@ -135,8 +142,23 @@ export async function PATCH(request: Request, { params }: Params) {
 
   if (teamId) {
     if (!isObjectId(teamId)) return jsonError("Invalid team id.");
-    const team = await Team.findOne({ _id: teamId, manager: userId }).populate("employees");
-    if (!team) return jsonError("Team not found or you are not its manager.", 404);
+    if (!caller.company) return jsonError("No company assigned.", 400);
+
+    const team = await Team.findOne({ _id: teamId, company: caller.company }).populate("employees");
+    if (!team) return jsonError("Team not found.", 404);
+
+    const teamManagerId = String(team.manager ?? "");
+    const teamManagerIsOnBoard = members.some(
+      (member) =>
+        String(member.user) === teamManagerId &&
+        ["manager", "tester"].includes(String(member.role))
+    );
+    if (!teamManagerIsOnBoard) {
+      return jsonError("Assign this team's manager to the board before assigning the team.", 400);
+    }
+    if (!isAdminOwner && teamManagerId !== userId) {
+      return jsonError("You can only assign teams you manage.", 403);
+    }
 
     const newlyAssigned: string[] = [];
     for (const emp of team.employees as any[]) {
@@ -148,10 +170,10 @@ export async function PATCH(request: Request, { params }: Params) {
         members.push({
           user: emp._id,
           role: boardRoleFromUserRole(String(emp.role)),
-          assignedTo: userId,
+          assignedTo: teamManagerId,
         });
       } else {
-        member.assignedTo = userId;
+        member.assignedTo = teamManagerId;
       }
       newlyAssigned.push(String(emp._id));
     }
@@ -252,15 +274,24 @@ export async function DELETE(request: Request, { params }: Params) {
   ]);
   if (!board) return jsonError("Board not found.", 404);
   if (!caller) return jsonError("User not found.", 404);
+  if (!caller.company) return jsonError("No company assigned.", 400);
 
-  const team = await Team.findOne({ _id: teamId, manager: userId }).populate("employees");
-  if (!team) return jsonError("Team not found or you are not its manager.", 404);
+  const isOwner = String(board.owner) === userId;
+  const isAdminOwner = isOwner && caller.role === "admin";
+  const team = await Team.findOne({ _id: teamId, company: caller.company }).populate("employees");
+  if (!team) return jsonError("Team not found.", 404);
+
+  const teamManagerId = String(team.manager ?? "");
+  if (!isAdminOwner && teamManagerId !== userId) {
+    return jsonError("You can only unassign teams you manage.", 403);
+  }
 
   const employeeIds = new Set((team.employees as any[]).map((e) => String(e._id)));
+  const assigneeIds = new Set([teamManagerId, userId].filter(Boolean));
   const removedIds: string[] = [];
   board.members = (board.members as any[]).filter((m) => {
     const mId = String(m.user);
-    if (employeeIds.has(mId) && String(m.assignedTo) === userId) {
+    if (employeeIds.has(mId) && assigneeIds.has(String(m.assignedTo))) {
       removedIds.push(mId);
       return false;
     }

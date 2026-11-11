@@ -386,7 +386,7 @@ export function FinancePolicyTab({
             <div className="rounded-lg bg-indigo-50/50 dark:bg-indigo-950/30 p-3 text-[11px] text-indigo-900 dark:text-indigo-300 flex gap-2">
               <Info size={16} className="shrink-0 text-indigo-600 dark:text-indigo-400 mt-0.5" />
               <div>
-                <span className="font-bold">Formula:</span> Basic Salary is derived as <code className="bg-[var(--c-bg-white dark:bg-zinc-900)] dark:bg-zinc-800 px-1 py-0.5 rounded font-mono text-[10px] text-indigo-800 dark:text-indigo-300">Gross / (1 + (HRA% + Conveyance% + Medical% + Special%) / 100)</code>. Other components are computed as their percentages of Basic, with Special Allowance taking the balance.
+                <span className="font-bold">Formula:</span> Basic Salary is derived as <code className="bg-white dark:bg-zinc-900 dark:bg-zinc-800 px-1 py-0.5 rounded font-mono text-[10px] text-indigo-800 dark:text-indigo-300">Gross / (1 + (HRA% + Conveyance% + Medical% + Special%) / 100)</code>. Other components are computed as their percentages of Basic, with Special Allowance taking the balance.
               </div>
             </div>
           </div>

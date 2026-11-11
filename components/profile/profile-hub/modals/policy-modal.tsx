@@ -39,7 +39,7 @@ export function PolicyModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4">
-      <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl dark:bg-[#000000]">
+      <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-xl dark:bg-[#000000]">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">{title}</h3>
