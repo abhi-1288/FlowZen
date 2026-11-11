@@ -53,7 +53,7 @@ export function WeekendModal({
       >
         Manage Weekend
         {weekendDates.length > 0 && (
-          <span className="ml-1.5 rounded-full bg-[var(--c-bg-white dark:bg-zinc-900)]/20 px-1.5 py-0.5 text-xs text-white">{weekendDates.length}</span>
+          <span className="ml-1.5 rounded-full bg-white/20 dark:bg-zinc-900/20 px-1.5 py-0.5 text-xs text-white">{weekendDates.length}</span>
         )}
       </button>
 
@@ -137,7 +137,7 @@ export function WeekendModal({
                 className="fixed inset-0 z-[60] flex items-center justify-center neu-overlay p-4"
                 onClick={(e) => { if (e.target === e.currentTarget) setShowDateConfirm(false); }}
               >
-                <div className="w-full max-w-sm rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl dark:bg-[#000000]">
+                <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-xl dark:bg-[#000000]">
                   <h4 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">{confirmDateIsWeekend ? "Remove weekend" : "Set as weekend"}</h4>
                   <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">{confirmDateIsWeekend ? `Remove weekend for ${weekendMonth}-${String(confirmDateDay).padStart(2, "0")}?` : `Set ${weekendMonth}-${String(confirmDateDay).padStart(2, "0")} as a weekend?`}</p>
                   <div className="mt-5 flex justify-end gap-3">

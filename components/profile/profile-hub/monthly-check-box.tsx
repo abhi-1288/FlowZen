@@ -116,7 +116,7 @@ export function MonthlyCheckBox({
           </div>
           <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
             {summary?.items.map((item) => (
-              <div className="rounded-md bg-[var(--c-bg-white dark:bg-zinc-900)] px-2 py-2" key={`stat-${item.key}`}>
+              <div className="rounded-md bg-white dark:bg-zinc-900 px-2 py-2" key={`stat-${item.key}`}>
                 <p className="text-slate-500">{item.label}</p>
                 <p className="font-semibold text-slate-900">{item.value}</p>
               </div>

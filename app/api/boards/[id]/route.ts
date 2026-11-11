@@ -63,6 +63,7 @@ export async function PATCH(request: Request, { params }: Params) {
   const updates: Record<string, any> = {};
   if (body.title !== undefined) updates.title = String(body.title).trim();
   if (body.description !== undefined) updates.description = String(body.description).trim();
+  if (body.pinned !== undefined) updates.pinned = Boolean(body.pinned);
   if (body.attachments !== undefined && Array.isArray(body.attachments)) {
     updates.attachments = body.attachments.map((a: any) => ({
       id: String(a.id || ""),

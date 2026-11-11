@@ -23,6 +23,8 @@ type AssignCandidate = {
 type AssignTeam = {
   id: string;
   name: string;
+  managerId?: string;
+  managerName?: string;
   employeeCount: number;
   employeeIds: string[];
   employees: AssignCandidate[];
@@ -69,7 +71,10 @@ export function AssignModal({ boardId }: { boardId: string }) {
   const [openTeamId, setOpenTeamId] = useState("");
   const currentMember = members.find((member) => memberUserId(member) === session?.user?.id);
   const isAdminOwner = Boolean(session?.user?.role === "admin" && activeBoard?.owner === session.user.id);
-  const canAssignTeam = isAdminOwner || ["manager", "tester"].includes(currentMember?.role ?? "");
+  const memberSignature = members
+    .map((member) => `${memberUserId(member)}:${member.role}`)
+    .sort()
+    .join(",");
 
   useEffect(() => {
     async function loadCandidates() {
@@ -78,7 +83,7 @@ export function AssignModal({ boardId }: { boardId: string }) {
     }
 
     void loadCandidates();
-  }, [boardId]);
+  }, [boardId, memberSignature]);
 
   useEffect(() => {
     if (memberId) return;
@@ -114,7 +119,7 @@ export function AssignModal({ boardId }: { boardId: string }) {
     { title: "Q-A testers", items: candidates.testers, type: "user" as const },
     { title: "Finance", items: candidates.finance, type: "user" as const },
     { title: "HR", items: candidates.hr, type: "user" as const },
-    { title: "My Teams", items: candidates.teams, type: "team" as const },
+    { title: isAdminOwner ? "Assigned teams" : "My Teams", items: candidates.teams, type: "team" as const },
     { title: "Employees", items: candidates.employees, type: "user" as const },
   ].filter((section) => Array.isArray(section.items) && section.items.length > 0);
 
@@ -127,85 +132,72 @@ export function AssignModal({ boardId }: { boardId: string }) {
               <p className="text-sm font-semibold text-slate-800">{section.title}</p>
               <div className="mt-2 space-y-2">
                 {section.items.map((item: any) => {
-                  const isAssigned = section.type === "user" 
-                    ? boardMemberIds.has(item.id)
-                    : (item.employeeIds?.length > 0 && item.employeeIds.every((id: string) => boardMemberIds.has(id)));
-                  
-                  const isAssignedToMe = section.type === "user"
-                    ? assignedToMeIds.has(item.id)
-                    : (item.employeeIds?.length > 0 && item.employeeIds.every((id: string) => assignedToMeIds.has(id)));
+                  const isTeam = section.type === "team";
+                  const teamManagerId = isTeam ? String(item.managerId ?? "") : "";
+                  const canManageTeam = isTeam && (isAdminOwner || teamManagerId === session?.user?.id);
+                  const isAssigned = isTeam
+                    ? (item.employeeIds?.length > 0 && item.employeeIds.every((id: string) => boardMemberIds.has(id)))
+                    : boardMemberIds.has(item.id);
+                  const isAssignedToMe = isTeam ? false : assignedToMeIds.has(item.id);
+                  const canRemove = isTeam ? canManageTeam : isAssignedToMe || isAdminOwner;
 
                   return (
                     <div className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-sm" key={item.id}>
                       <div className="min-w-0">
                         <p className="font-medium text-slate-900">{item.name}</p>
                         <p className="truncate text-xs text-slate-500">
-                          {section.type === "team" ? `${item.employeeCount} approved employees` : item.email}
+                          {isTeam
+                            ? `${item.employeeCount} approved employee${item.employeeCount === 1 ? "" : "s"}${item.managerName ? ` · ${item.managerName}` : ""}`
+                            : item.email}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        {isAssignedToMe ? (
-                          <>
-                            {section.type === "team" ? (
-                              <button
-                                className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-100"
-                                onClick={() => void unassignTeam(boardId, item.id)}
-                                type="button"
-                              >
-                                Unassign Team
-                              </button>
-                            ) : (
-                              <>
-                                <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">Assigned</span>
-                                <button
-                                  className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-100"
-                                  onClick={() => void removeMember(boardId, item.id)}
-                                  type="button"
-                                >
-                                  Remove
-                                </button>
-                              </>
-                            )}
-                          </>
-                        ) : isAssigned ? (
+                        {isAssigned ? (
                           <>
                             <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">Assigned</span>
-                            {isAdminOwner && (
+                            {canRemove ? (
                               <button
                                 className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-100"
-                                onClick={() => void removeMember(boardId, item.id)}
+                                onClick={() => (isTeam ? void unassignTeam(boardId, item.id) : void removeMember(boardId, item.id))}
                                 type="button"
                               >
-                                Remove
+                                {isTeam ? "Unassign Team" : "Remove"}
                               </button>
-                            )}
+                            ) : null}
                           </>
                         ) : (
                           <div className="flex items-center gap-2">
                             <button
                               className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
                               onClick={() => {
-                                if (section.type === "team") setOpenTeamId(openTeamId === item.id ? "" : item.id);
+                                if (isTeam) setOpenTeamId(openTeamId === item.id ? "" : item.id);
                                 else void assignCandidate(item.id, isAdminOwner ? "" : session?.user?.id ?? "");
                               }}
                               type="button"
                             >
-                              {section.type === "team" ? (
+                              {isTeam ? (
                                 <span className="inline-flex items-center gap-1">
                                   {openTeamId === item.id ? "Hide members" : "View members"}
                                   {openTeamId === item.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                                 </span>
                               ) : "Assign"}
                             </button>
-                            {section.type === "team" ? (
-                              <button
-                                className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
-                                onClick={() => canAssignTeam ? void assignTeam(item.id) : undefined}
-                                type="button"
-                                disabled={!canAssignTeam}
-                              >
-                                Assign Team
-                              </button>
+                            {isTeam ? (
+                              canManageTeam ? (
+                                <button
+                                  className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+                                  onClick={() => void assignTeam(item.id)}
+                                  type="button"
+                                  disabled={item.employeeCount === 0}
+                                  title={item.employeeCount === 0 ? "This team has no approved employees yet." : undefined}
+                                >
+                                  Assign Team
+                                </button>
+                              ) : (
+                                <span className="text-xs text-slate-500">
+                                  {item.managerName ? `Managed by ${item.managerName}` : "Managed by another member"}
+                                </span>
+                              )
                             ) : null}
                           </div>
                         )}
@@ -216,6 +208,8 @@ export function AssignModal({ boardId }: { boardId: string }) {
               </div>
               {section.type === "team" && section.items.map((item: any) => {
                 const isOpenTeam = openTeamId === item.id;
+                const teamManagerId = String(item.managerId ?? "");
+                const canManageTeam = isAdminOwner || teamManagerId === session?.user?.id;
                 return isOpenTeam ? (
                   <div key={`${item.id}-members`} className="border-t border-slate-200 bg-slate-50 px-4 py-3">
                     <div className="mb-3 flex items-center justify-between gap-3 text-sm text-slate-700">
@@ -243,9 +237,9 @@ export function AssignModal({ boardId }: { boardId: string }) {
                               ) : (
                                 <button
                                   className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
-                                  onClick={() => canAssignTeam ? void assignCandidate(teamMember.id, session?.user?.id ?? "") : undefined}
+                                  onClick={() => canManageTeam ? void assignCandidate(teamMember.id, teamManagerId) : undefined}
                                   type="button"
-                                  disabled={!canAssignTeam}
+                                  disabled={!canManageTeam}
                                 >
                                   <span className="inline-flex items-center gap-1">
                                     Assign

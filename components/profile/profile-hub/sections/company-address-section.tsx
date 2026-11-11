@@ -796,7 +796,7 @@ function OfficeCard({
     .join(", ");
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-[var(--c-border-light)] bg-[var(--c-bg-white dark:bg-zinc-900)] dark:border-zinc-800">
+    <section className="overflow-hidden rounded-2xl border border-[var(--c-border-light)] bg-white dark:bg-zinc-900 dark:border-zinc-800">
       {onBack ? (
         <div className="border-b border-[var(--c-border-light)] bg-[var(--c-bg)] px-5 py-2.5 dark:border-zinc-800 dark:bg-zinc-950/40">
           <button

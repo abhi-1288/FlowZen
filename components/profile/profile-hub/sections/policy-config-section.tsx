@@ -491,7 +491,7 @@ export function PolicyConfigSection({
           </div>
         </div>
 
-        <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-[var(--c-bg-white dark:bg-zinc-900)] p-3">
+        <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-white dark:bg-zinc-900 p-3">
           <p className="text-xs font-semibold uppercase text-slate-500">Preview</p>
           <p className="mt-1 font-mono text-sm font-semibold text-indigo-700">{previewCode}</p>
         </div>
@@ -639,7 +639,7 @@ export function PolicyConfigSection({
             Upload an Excel file with columns: User Name, Email, Flowzen Code, Original Code.
           </p>
 
-          <div className="rounded-lg border border-dashed border-slate-300 bg-[var(--c-bg-white dark:bg-zinc-900)] p-3">
+          <div className="rounded-lg border border-dashed border-slate-300 bg-white dark:bg-zinc-900 p-3">
             <input
               type="file"
               accept=".xlsx,.xls,.csv"

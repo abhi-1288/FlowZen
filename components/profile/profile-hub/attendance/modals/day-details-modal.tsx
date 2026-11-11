@@ -59,7 +59,7 @@ export function DayDetailsModal({
 
   return (
     <div className="fixed inset-0 z-[100] grid place-items-center neu-overlay p-4 backdrop-blur-md">
-      <div className="w-full max-w-lg rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 text-slate-900 shadow-xl ring-1 ring-slate-200 dark:bg-black dark:text-zinc-100 dark:ring-zinc-700">
+      <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-zinc-900 p-6 text-slate-900 shadow-xl ring-1 ring-slate-200 dark:bg-black dark:text-zinc-100 dark:ring-zinc-700">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-bold">{date.toLocaleDateString()}</h3>
           <button onClick={onClose} className="text-sm text-slate-500 hover:text-slate-800 font-medium dark:text-zinc-400 dark:hover:text-zinc-100">

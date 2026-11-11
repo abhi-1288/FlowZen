@@ -49,6 +49,8 @@ export type Board = {
   title: string;
   description: string;
   owner: string;
+  pinned?: boolean;
+  employeeTaskCreation?: "approval" | "allowed" | "blocked";
   members: { user: string; assignedTo?: string | null; role: Role }[];
   attachments: { id: string; name: string; url: string }[];
   createdAt: string;
@@ -73,6 +75,11 @@ export type Task = {
   dueDate: string | null;
   priority: Priority;
   order: number;
+  pinned?: boolean;
+  approvalStatus?: "approved" | "pending" | "rejected";
+  createdBy?: string | null;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
   assignees: string[];
   takenBy?: string | null;
   takenByName?: string;

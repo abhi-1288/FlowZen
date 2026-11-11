@@ -8,7 +8,21 @@ import { TaskCard } from "@/components/boards/task-card";
 import type { Column, Task } from "@/lib/types";
 import { cn } from "@/lib/client-utils";
 
-export function ColumnPanel({ boardId, column, tasks, canEdit }: { boardId: string; column: Column; tasks: Task[]; canEdit: boolean }) {
+export function ColumnPanel({
+  boardId,
+  column,
+  tasks,
+  canEdit,
+  canCreate,
+  canReview,
+}: {
+  boardId: string;
+  column: Column;
+  tasks: Task[];
+  canEdit: boolean;
+  canCreate: boolean;
+  canReview: boolean;
+}) {
   const { setModal, deleteColumn } = useBoardStore();
   const isExpiredColumn = column.title.toLowerCase() === "expired-due";
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
@@ -67,12 +81,26 @@ export function ColumnPanel({ boardId, column, tasks, canEdit }: { boardId: stri
 
       <div className="task-scrollbar min-h-24 flex-1 space-y-3 overflow-y-auto px-3 pb-3">
         {tasks.map((task) => (
-          <TaskCard key={task.id} task={task} canEdit={canEdit} />
+          <TaskCard key={task.id} task={task} canEdit={canEdit} canReview={canReview} />
         ))}
         {tasks.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-4 text-center text-sm text-slate-500 dark:border-zinc-700 dark:bg-zinc-700/70 dark:text-zinc-400">
-            Drop tasks here
-          </div>
+          canCreate ? (
+            <button
+              className="flex w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-slate-300 bg-white/70 p-4 text-center text-slate-500 transition hover:border-slate-400 hover:bg-white hover:text-slate-800 dark:border-zinc-700 dark:bg-zinc-700/70 dark:text-zinc-400 dark:hover:bg-zinc-700"
+              onClick={() => setModal({ type: "task", columnId: column.id })}
+              type="button"
+            >
+              <span className="inline-flex items-center gap-2 text-sm font-medium">
+                <Plus size={16} />
+                Create new task
+              </span>
+              <span className="text-xs text-slate-400 dark:text-zinc-500">or drop a task here</span>
+            </button>
+          ) : (
+            <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-4 text-center text-sm text-slate-500 dark:border-zinc-700 dark:bg-zinc-700/70 dark:text-zinc-400">
+              Drop tasks here
+            </div>
+          )
         ) : null}
       </div>
 
@@ -81,7 +109,7 @@ export function ColumnPanel({ boardId, column, tasks, canEdit }: { boardId: stri
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-center text-xs font-medium text-amber-700">
             Auto-managed by due date
           </p>
-        ) : canEdit ? (
+        ) : canCreate ? (
           <button
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm hover:text-slate-950"
             onClick={() => setModal({ type: "task", columnId: column.id })}

@@ -36,7 +36,7 @@ export function EventListModal({
 
   return (
     <div className="fixed inset-0 z-[100] grid place-items-center neu-overlay p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl ring-1 ring-slate-200">
+      <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-zinc-900 p-5 shadow-xl ring-1 ring-slate-200">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-sm font-semibold flex items-center gap-2">
             <span className={`rounded-lg ${style.bg} p-1.5 ${style.text}`}>

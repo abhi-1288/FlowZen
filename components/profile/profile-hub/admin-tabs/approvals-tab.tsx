@@ -296,7 +296,7 @@ export function ApprovalsTab({
     <section className="rounded-xl neu-card p-5">
       <SectionHeader title="Pending Approvals" description="Review and manage approval requests" accent="indigo" />
       {visibleGroups.length > 1 ? (
-        <div className="sticky top-0 z-10 -mx-5 mt-5 bg-[var(--c-bg-white dark:bg-zinc-900)] px-5 pb-2">
+        <div className="sticky top-0 z-10 -mx-5 mt-5 bg-white dark:bg-zinc-900 px-5 pb-2">
           <div className="flex flex-wrap gap-2">
             {([
               { id: "all" as const, label: "All", count: visibleApprovals.length },

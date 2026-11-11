@@ -416,7 +416,7 @@ export function PersonalInfoSection({
       {/* Edit modal */}
       {open && !confirming ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center neu-overlay p-4 pt-8 pb-8 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
-          <div className="w-full max-w-md rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl my-auto dark:bg-[#000000]">
+          <div className="w-full max-w-md rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl my-auto dark:bg-[#000000]">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Edit Personal Info</h2>
               <button className="rounded-md p-1 text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-600 dark:text-zinc-500 dark:hover:bg-zinc-700 dark:hover:text-zinc-400" onClick={() => setOpen(false)} type="button">
@@ -536,7 +536,7 @@ export function PersonalInfoSection({
       {/* Confirm modal */}
       {open && confirming ? (
         <div className="fixed inset-0 z-[60] flex items-start justify-center neu-overlay p-4 pt-8 pb-8 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) { setConfirming(false); } }}>
-          <div className="w-full max-w-md rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl my-auto dark:bg-[#000000]">
+          <div className="w-full max-w-md rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl my-auto dark:bg-[#000000]">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Is your data correct?</h2>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-zinc-400">Please review before saving.</p>
             <div className="mt-3 space-y-1.5 rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] p-3 text-xs dark:bg-zinc-700">
@@ -571,7 +571,7 @@ export function PersonalInfoSection({
       {/* Email change modal */}
       {emailModalOpen ? (
         <div className="fixed inset-0 z-[70] flex items-center justify-center neu-overlay p-4" onClick={(e) => { if (e.target === e.currentTarget) closeEmailModal(); }}>
-          <div className="w-full max-w-md rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl dark:bg-[#000000]">
+          <div className="w-full max-w-md rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl dark:bg-[#000000]">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Change Email</h2>
               <button className="rounded-md p-1 text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-600 dark:text-zinc-500 dark:hover:bg-zinc-700 dark:hover:text-zinc-400" onClick={closeEmailModal} type="button">
@@ -659,7 +659,7 @@ export function PersonalInfoSection({
 
       {empReqOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay px-3">
-          <div className="w-full max-w-sm rounded-xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-5 shadow-xl">
+          <div className="w-full max-w-sm rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl">
             <h3 className="mb-1 text-sm font-semibold text-slate-800">Request Employment Type</h3>
             <p className="mb-4 text-xs text-slate-500">Your request will be sent to HR for approval.</p>
             <form className="space-y-3" onSubmit={handleEmploymentRequest}>

@@ -39,7 +39,7 @@ export function HolidayModal({
 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl ring-1 ring-slate-200">
+      <div className="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-xl ring-1 ring-slate-200">
         <h3 className="text-xl font-bold text-slate-900">Add Holiday</h3>
         <p className="mt-1 text-sm text-slate-500">
           Create a future holiday for the organization.
@@ -189,7 +189,7 @@ export function EditHolidayModal({
 
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl ring-1 ring-slate-200 relative">
+      <div className="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-xl ring-1 ring-slate-200 relative">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-xl font-bold text-slate-900">Edit Holiday</h3>
@@ -298,7 +298,7 @@ export function EditHolidayModal({
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-[90] grid place-items-center neu-overlay p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl ring-1 ring-slate-200">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-xl ring-1 ring-slate-200">
             <h3 className="text-xl font-bold text-slate-900">Confirm Delete</h3>
             <p className="mt-2 text-sm text-slate-500">
               Delete holiday "{String(holiday.title ?? "")}"? This action cannot
@@ -396,7 +396,7 @@ export function AdminLeaveHistoryModal({
                   holidays.map((h: any) => (
                     <tr
                       key={h._id}
-                      className="border-b bg-[var(--c-bg-white dark:bg-zinc-900)] hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition"
+                      className="border-b bg-white dark:bg-zinc-900 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition"
                     >
                       <td className="px-3 py-3 border">{h.title}</td>
                       <td className="px-3 py-3 border">

@@ -799,7 +799,7 @@ export function DashboardTab({
               </h2>
               <div className="space-y-2">
                 {hrOverdueExits.map((m: { name: string; type: string; ms: number; end: Date }) => (
-                  <div key={m.name} className="flex items-center justify-between gap-3 rounded-lg border border-rose-100 bg-[var(--c-bg-white dark:bg-zinc-900)] px-4 py-3">
+                  <div key={m.name} className="flex items-center justify-between gap-3 rounded-lg border border-rose-100 bg-white dark:bg-zinc-900 px-4 py-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-slate-900">{m.name}</p>
                       <p className="text-xs text-slate-500 capitalize">{m.type || "—"}</p>
@@ -1010,7 +1010,7 @@ export function DashboardTab({
               </div>
               <div className="rounded-lg neu-inset p-3">
                 <p className="font-medium text-slate-700 mb-2">Submitted Draft</p>
-                <div className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-md bg-[var(--c-bg-white dark:bg-zinc-900)] p-3 text-xs border border-[var(--c-border-light)] text-slate-600">
+                <div className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-md bg-white dark:bg-zinc-900 p-3 text-xs border border-[var(--c-border-light)] text-slate-600">
                   {String((viewingRejected.metadata as any)?.letterContent ?? "").trim() || generateFallbackLetter(viewingRejected)}
                 </div>
               </div>

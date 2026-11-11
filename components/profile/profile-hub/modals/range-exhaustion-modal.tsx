@@ -59,7 +59,7 @@ export function RangeExhaustionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4">
-      <div className="w-full max-w-md rounded-2xl bg-[var(--c-bg-white dark:bg-zinc-900)] p-6 shadow-xl dark:bg-[#000000]">
+      <div className="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-xl dark:bg-[#000000]">
         <h3 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">Increase Identity Code Range</h3>
         <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
           Your identity code range is {currentEndRange != null && currentNextNumber != null && (currentEndRange - currentNextNumber) <= 0 ? "exhausted" : "running low"}.

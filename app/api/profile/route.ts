@@ -244,6 +244,7 @@ export async function GET() {
       teams: teams.map((team) => ({
         id: team._id.toString(),
         name: team.name,
+        managerId: String(team.manager ?? ""),
         createdBy: user.name,
         createdByRole: ({ "human-resource": "Human Resource", "project-manager": "Project Manager", "qa-tester": "Q-A Tester", finance: "Finance", employee: "Employee", admin: "Admin", others: "Others" } as Record<string, string>)[String(user.role ?? "")] ?? String(user.role ?? ""),
         joinCode: team.joinCode,

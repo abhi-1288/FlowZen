@@ -206,7 +206,7 @@ export function CompanyCalendarTab() {
               <div className="border-r border-[var(--c-border-light)] bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-600 dark:border-zinc-800 dark:bg-zinc-700 dark:text-zinc-300">
                 {MONTHS[month]}
               </div>
-              <div className="bg-[var(--c-bg-white dark:bg-zinc-900)] px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-900 dark:bg-[#000000] dark:text-zinc-100">
+              <div className="bg-white dark:bg-zinc-900 px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-900 dark:bg-[#000000] dark:text-zinc-100">
                 {year}
               </div>
             </div>
