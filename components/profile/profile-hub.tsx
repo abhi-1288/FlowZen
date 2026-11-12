@@ -50,6 +50,7 @@ import { FinancePolicyTab } from "./profile-hub/finance-policy-tab";
 import { HrPolicyTab } from "./profile-hub/hr-policy-tab";
 import { ItTicketsView } from "@/components/it/it-tickets-view";
 import { FeatureDelegationWorkspace } from "@/components/feature-delegation/workspace";
+import { CompactionsTab, TeamCompactionsTab, ReceivedTeamCompactionsTab } from "./profile-hub/compactions-tab";
 import { CommandCenterHub } from "@/components/command-center/command-center-hub";
 import { AnyRecord, AvatarBadge, formatRoleWithCustom } from "./profile-hub/shared";
 import {
@@ -86,6 +87,10 @@ type ProfileHubCache = {
   lostCardReportedCount: number;
   messagesCount: number;
   auditCount: number;
+  compactionActionCount: number;
+  teamCompactionActionCount: number;
+  receivedReportActionCount: number;
+  totalUpdatesCount: number;
   fetchedAt: number;
 };
 
@@ -114,9 +119,12 @@ export type Tab =
   | "hr-policy"
   | "it"
   | "store"
-  | "feature-delegation";
+  | "feature-delegation"
+  | "compactions"
+  | "team-compactions"
+  | "received-team-compactions";
 
-const VALID_TABS = new Set<string>(["dashboard", "command-center", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers", "calendar", "visitors", "security", "games", "finance-policy", "hr-policy", "it", "store", "feature-delegation"]);
+const VALID_TABS = new Set<string>(["dashboard", "command-center", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers", "calendar", "visitors", "security", "games", "finance-policy", "hr-policy", "it", "store", "feature-delegation", "compactions", "team-compactions", "received-team-compactions"]);
 
 const LEADER_DASH_ROLES = new Set<string>([
   "admin",
@@ -274,6 +282,10 @@ export function ProfileHub() {
   const [lostCardReportedCount, setLostCardReportedCount] = useState(0);
   const [messagesCount, setMessagesCount] = useState(0);
   const [auditCount, setAuditCount] = useState(0);
+  const [compactionActionCount, setCompactionActionCount] = useState(0);
+  const [teamCompactionActionCount, setTeamCompactionActionCount] = useState(0);
+  const [receivedReportActionCount, setReceivedReportActionCount] = useState(0);
+  const [totalUpdatesCount, setTotalUpdatesCount] = useState(0);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
@@ -298,6 +310,10 @@ export function ProfileHub() {
     setLostCardReportedCount(profileHubCache.lostCardReportedCount);
     setMessagesCount(profileHubCache.messagesCount ?? 0);
     setAuditCount(profileHubCache.auditCount ?? 0);
+    setCompactionActionCount(profileHubCache.compactionActionCount ?? 0);
+    setTeamCompactionActionCount(profileHubCache.teamCompactionActionCount ?? 0);
+    setReceivedReportActionCount(profileHubCache.receivedReportActionCount ?? 0);
+    setTotalUpdatesCount(profileHubCache.totalUpdatesCount ?? 0);
     setLoading(false);
   }, [session?.user?.id]);
 
@@ -324,6 +340,34 @@ export function ProfileHub() {
   const hasCompany = Boolean(
     profile?.company && profile?.companyStatus === "approved",
   );
+
+  useEffect(() => {
+    if (!hasCompany || !session?.user?.id) return;
+    let mounted = true;
+    const loadCount = (url: string, field: "actionRequired" | "available") =>
+      apiFetch<{ counts?: { actionRequired?: number; available?: number } }>(url, undefined, { toast: false })
+        .then((result) => Number(result.counts?.[field] ?? 0))
+        // Some scopes are intentionally unavailable to a given role. That
+        // must not hide counts from the scopes the user can access.
+        .catch(() => 0);
+    void Promise.all([
+        loadCount("/api/compactions?scope=mine&limit=1", "actionRequired"),
+        loadCount("/api/team-compactions?scope=owned&limit=1", "actionRequired"),
+        loadCount("/api/compactions?scope=received&limit=1", "available"),
+        loadCount("/api/team-compactions?scope=received&limit=1", "available"),
+      ])
+        .then(([mine, owned, employeeReceived, teamReceived]) => {
+          if (!mounted) return;
+          const total = mine + owned + employeeReceived + teamReceived;
+          setCompactionActionCount(mine);
+          setTeamCompactionActionCount(owned);
+          setReceivedReportActionCount(employeeReceived + teamReceived);
+          setTotalUpdatesCount(total);
+        });
+    return () => {
+      mounted = false;
+    };
+  }, [hasCompany, session?.user?.id]);
   const actorIsSeniorSecurity = role === "security" && Boolean((session?.user as any)?.isSeniorSecurity);
   const actorRegionLabel = String(profile?.regionLabel ?? "").trim();
   const companyOwnerId = company?.owner ? String(company.owner) : "";
@@ -379,6 +423,9 @@ export function ProfileHub() {
     ...(canViewCompanyTabs ? (["approvals"] as Tab[]) : []),
     "notifications",
     ...(canViewCompanyTabs ? (["attendance"] as Tab[]) : []),
+    "compactions",
+    ...(canViewCompanyTabs ? (["team-compactions"] as Tab[]) : []),
+    ...(canViewCompanyTabs ? (["received-team-compactions"] as Tab[]) : []),
     ...(canViewCompanyTabs ? (["calendar"] as Tab[]) : []),
     ...(canViewGamesTab ? (["games"] as Tab[]) : []),
     ...(canViewCompanyTabs ? (["it"] as Tab[]) : []),
@@ -609,6 +656,10 @@ export function ProfileHub() {
         lostCardReportedCount: nextLostCardReportedCount,
         messagesCount: nextMessagesCount,
         auditCount: nextAuditCount,
+        compactionActionCount: compactionActionCount,
+        teamCompactionActionCount: teamCompactionActionCount,
+        receivedReportActionCount: receivedReportActionCount,
+        totalUpdatesCount: totalUpdatesCount,
         fetchedAt: Date.now(),
       };
     } finally {
@@ -1077,6 +1128,36 @@ export function ProfileHub() {
               onClick={() => setTab("approvals")}
             />
           ) : null}
+          <div className="neu-divider my-2" />
+          <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Continuity</p>
+          <NavButton
+            active={tab === "compactions"}
+            icon={<CheckSquare size={16} />}
+            label={`All Updates${totalUpdatesCount ? ` (${totalUpdatesCount})` : ""}`}
+            onClick={() => setTab("compactions")}
+          />
+          <NavButton
+            active={tab === "compactions"}
+            icon={<CheckSquare size={16} />}
+            label={`Compactions${compactionActionCount ? ` (${compactionActionCount})` : ""}`}
+            onClick={() => setTab("compactions")}
+          />
+          {canViewCompanyTabs ? (
+            <NavButton
+              active={tab === "team-compactions"}
+              icon={<ClipboardList size={16} />}
+              label={`Team Compactions${teamCompactionActionCount ? ` (${teamCompactionActionCount})` : ""}`}
+              onClick={() => setTab("team-compactions")}
+            />
+          ) : null}
+          {canViewCompanyTabs ? (
+            <NavButton
+              active={tab === "received-team-compactions"}
+              icon={<Users size={16} />}
+              label={`Received Reports${receivedReportActionCount ? ` (${receivedReportActionCount})` : ""}`}
+              onClick={() => setTab("received-team-compactions")}
+            />
+          ) : null}
           {canViewCompanyTabs ? (
             <NavButton
               active={tab === "messages"}
@@ -1137,6 +1218,13 @@ export function ProfileHub() {
           />
           <Link
             className="mt-3 flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 dark:text-zinc-500 dark:hover:bg-zinc-700 dark:hover:text-zinc-400"
+            href="/boards"
+          >
+            <ChevronRight size={13} className="-ml-0.5" />
+            Boards workspace
+          </Link>
+          <Link
+            className="mt-1 flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 dark:text-zinc-500 dark:hover:bg-zinc-700 dark:hover:text-zinc-400"
             href="/board"
           >
             <ChevronRight size={13} className="-ml-0.5" />
@@ -1250,9 +1338,17 @@ export function ProfileHub() {
                                     ? "Finance Policy"
 : item === "hr-policy"
                                     ? "HR Policy"
-                                    : item === "command-center"
-                                      ? "Command Centre"
-                                      : item.charAt(0).toUpperCase() + item.slice(1);
+                                    : item === "feature-delegation"
+                                      ? "Feature Delegation"
+                                      : item === "team-compactions"
+                                        ? `Team Compactions${teamCompactionActionCount ? ` (${teamCompactionActionCount})` : ""}`
+                                        : item === "received-team-compactions"
+                                          ? `Received Reports${receivedReportActionCount ? ` (${receivedReportActionCount})` : ""}`
+                                          : item === "compactions"
+                                            ? `Compactions${compactionActionCount ? ` (${compactionActionCount})` : ""}`
+                                          : item === "command-center"
+                                            ? "Command Centre"
+                                            : item.charAt(0).toUpperCase() + item.slice(1);
 
               return (
                 <button
@@ -1456,6 +1552,18 @@ export function ProfileHub() {
 
                 {tab === "attendance" && canViewCompanyTabs ? (
                   <AttendanceTab profile={profile} showToast={showToast} />
+                ) : null}
+
+                {tab === "compactions" ? (
+                  <CompactionsTab />
+                ) : null}
+
+                {tab === "team-compactions" && canViewCompanyTabs ? (
+                  <TeamCompactionsTab />
+                ) : null}
+
+                {tab === "received-team-compactions" && canViewCompanyTabs ? (
+                  <ReceivedTeamCompactionsTab />
                 ) : null}
 
                 {tab === "calendar" && canViewCompanyTabs ? (

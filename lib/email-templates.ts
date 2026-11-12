@@ -1,6 +1,6 @@
 // ── Shared helpers ──────────────────────────────────────────
 
-function baseEmailLayout(content: string, options: { title?: string; companyName?: string; companyLogo?: string } = {}): string {
+export function baseEmailLayout(content: string, options: { title?: string; companyName?: string; companyLogo?: string } = {}): string {
   const brand = options.companyName || "FlowZen";
   const year = new Date().getFullYear();
 
@@ -43,7 +43,7 @@ function baseEmailLayout(content: string, options: { title?: string; companyName
 </html>`;
 }
 
-function emailButton(link: string, text: string): string {
+export function emailButton(link: string, text: string): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto;">
     <tr>
       <td align="center" style="background:#10b981;border-radius:8px;">
@@ -983,6 +983,186 @@ export function visitorPassIdCardContent({
   return {
     subject: `Your Temporary ID Card – ${companyName}`,
     text: `Your temporary visitor pass for ${companyName} has been approved.\n\nPass ID: ${pass.identityCode}\nName: ${pass.visitorName}\nRegion: ${region}\nValid From: ${validFromStr}\nValid Until: ${validUntilStr}\nHost: ${hostName}\n\nPlease present this Pass ID or QR code at the security gate upon arrival.\n\n${companyName} Security Team`,
+    html,
+  };
+}
+
+// ── Task compaction (EOD / EOW) ──────────────────────────────
+
+type CompactionEmailContent = {
+  completedWork: string[];
+  partialWork: string[];
+  pendingWork: string[];
+  blockers: string[];
+  decisions?: string;
+  handoverNotes?: string;
+  risks?: string;
+  nextActions?: string;
+  additionalNotes?: string;
+};
+
+function emailList(title: string, items: string[], tone: "green" | "amber" | "slate" | "red"): string {
+  if (!items.length) return "";
+  const palette = {
+    green: { bg: "#f0fdf4", border: "#bbf7d0", label: "#166534" },
+    amber: { bg: "#fffbeb", border: "#fde68a", label: "#92400e" },
+    slate: { bg: "#f8fafc", border: "#e2e8f0", label: "#475569" },
+    red: { bg: "#fef2f2", border: "#fecaca", label: "#991b1b" },
+  }[tone];
+  return `<div style="margin:0 0 16px;padding:14px 16px;background:${palette.bg};border:1px solid ${palette.border};border-radius:8px;">
+    <p style="margin:0 0 8px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:${palette.label};">${title}</p>
+    <ul style="margin:0;padding-left:18px;font-size:14px;color:#334155;line-height:1.7;">
+      ${items.map((item) => `<li>${item}</li>`).join("")}
+    </ul>
+  </div>`;
+}
+
+function emailBlock(title: string, body?: string): string {
+  if (!body || !String(body).trim()) return "";
+  return `<div style="margin:0 0 16px;">
+    <p style="margin:0 0 6px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;">${title}</p>
+    <p style="margin:0;font-size:14px;color:#334155;white-space:pre-wrap;">${body}</p>
+  </div>`;
+}
+
+export function employeeCompactionEmailContent({
+  employeeName,
+  employeeCode,
+  teamName,
+  type,
+  periodLabel,
+  summary,
+  content,
+  link,
+  company,
+}: {
+  employeeName: string;
+  employeeCode?: string;
+  teamName?: string;
+  type: "EOD" | "EOW";
+  periodLabel: string;
+  summary?: string;
+  content: CompactionEmailContent;
+  link: string;
+  company?: { name?: string; icon?: string };
+}): { subject: string; text: string; html: string } {
+  const title = `${type} compaction — ${employeeName}`;
+  const html = baseEmailLayout(`
+    <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#1e293b;">${type} Compaction</h2>
+    <p style="margin:0 0 20px;font-size:14px;color:#64748b;">${periodLabel}</p>
+
+    <table role="presentation" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:4px 16px;width:100%;margin:0 0 20px;">
+      <tr><td style="padding:10px 0;font-size:14px;color:#334155;"><strong>Employee:</strong> ${employeeName}${employeeCode ? ` (${employeeCode})` : ""}</td></tr>
+      ${teamName ? `<tr><td style="padding:10px 0;border-top:1px solid #e2e8f0;font-size:14px;color:#334155;"><strong>Team:</strong> ${teamName}</td></tr>` : ""}
+      <tr><td style="padding:10px 0;border-top:1px solid #e2e8f0;font-size:14px;color:#334155;"><strong>Period:</strong> ${periodLabel}</td></tr>
+    </table>
+
+    ${emailBlock("Summary", summary)}
+    ${emailList("Completed", content.completedWork, "green")}
+    ${emailList("Partially completed", content.partialWork, "amber")}
+    ${emailList("Pending", content.pendingWork, "slate")}
+    ${emailList("Blockers", content.blockers, "red")}
+    ${emailBlock("Decisions", content.decisions)}
+    ${emailBlock("Handover notes", content.handoverNotes)}
+    ${emailBlock("Risks", content.risks)}
+    ${emailBlock("Next actions", content.nextActions)}
+    ${emailBlock("Additional notes", content.additionalNotes)}
+
+    ${emailButton(link, "Review compaction")}
+    <p style="margin:0;font-size:12px;color:#94a3b8;">Open this link to review, comment, or request a correction in FlowZen.</p>
+  `, { title, companyName: company?.name, companyLogo: company?.icon });
+
+  const lines = [
+    `${type} Compaction — ${employeeName}`,
+    periodLabel,
+    summary ? `\nSummary: ${summary}` : "",
+    content.completedWork.length ? `\nCompleted:\n${content.completedWork.map((item) => `- ${item}`).join("\n")}` : "",
+    content.partialWork.length ? `\nPartially completed:\n${content.partialWork.map((item) => `- ${item}`).join("\n")}` : "",
+    content.pendingWork.length ? `\nPending:\n${content.pendingWork.map((item) => `- ${item}`).join("\n")}` : "",
+    content.blockers.length ? `\nBlockers:\n${content.blockers.map((item) => `- ${item}`).join("\n")}` : "",
+    content.nextActions ? `\nNext actions: ${content.nextActions}` : "",
+    `\nReview: ${link}`,
+  ];
+  return { subject: title, text: lines.filter(Boolean).join("\n"), html };
+}
+
+export function teamCompactionEmailContent({
+  teamName,
+  teamOwnerName,
+  periodLabel,
+  overallSummary,
+  completed,
+  partial,
+  pending,
+  blocked,
+  missingReports,
+  pendingHandovers,
+  adminSupportRequired,
+  link,
+  company,
+}: {
+  teamName: string;
+  teamOwnerName: string;
+  periodLabel: string;
+  overallSummary?: string;
+  completed: number;
+  partial: number;
+  pending: number;
+  blocked: number;
+  missingReports: string[];
+  pendingHandovers?: number;
+  adminSupportRequired?: string;
+  link: string;
+  company?: { name?: string; icon?: string };
+}): { subject: string; text: string; html: string } {
+  const subject = `Team compaction — ${teamName} (${periodLabel})`;
+  const stat = (label: string, value: number, color: string) => `
+    <td width="24%" style="padding:0 4px;">
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center;">
+        <p style="margin:0 0 2px;font-size:22px;font-weight:700;color:${color};">${value}</p>
+        <p style="margin:0;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">${label}</p>
+      </div>
+    </td>`;
+
+  const html = baseEmailLayout(`
+    <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#1e293b;">Team Compaction</h2>
+    <p style="margin:0 0 20px;font-size:14px;color:#64748b;">${teamName} · ${periodLabel}</p>
+
+    <p style="margin:0 0 16px;font-size:14px;color:#334155;">Team Owner <strong>${teamOwnerName}</strong> submitted the consolidated team report.</p>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
+      <tr>
+        ${stat("Completed", completed, "#059669")}
+        ${stat("Partial", partial, "#d97706")}
+        ${stat("Pending", pending, "#475569")}
+        ${stat("Blocked", blocked, "#dc2626")}
+      </tr>
+    </table>
+
+    ${emailBlock("Overall summary", overallSummary)}
+    ${emailList("Missing reports", missingReports, "amber")}
+    ${pendingHandovers ? emailBlock("Pending handovers", String(pendingHandovers)) : ""}
+    ${emailBlock("Admin support required", adminSupportRequired)}
+
+    ${emailButton(link, "Open team report")}
+    <p style="margin:0;font-size:12px;color:#94a3b8;">Open this link to review the consolidated report and its source employee compactions.</p>
+  `, { title: subject, companyName: company?.name, companyLogo: company?.icon });
+
+  return {
+    subject,
+    text: [
+      `Team compaction — ${teamName}`,
+      periodLabel,
+      `Team Owner: ${teamOwnerName}`,
+      `Completed: ${completed}`,
+      `Partial: ${partial}`,
+      `Pending: ${pending}`,
+      `Blocked: ${blocked}`,
+      missingReports.length ? `Missing reports: ${missingReports.join(", ")}` : "",
+      overallSummary ? `\nSummary: ${overallSummary}` : "",
+      adminSupportRequired ? `\nAdmin support required: ${adminSupportRequired}` : "",
+      `\nOpen report: ${link}`,
+    ].filter(Boolean).join("\n"),
     html,
   };
 }
