@@ -282,7 +282,7 @@ export function AssignModal({ boardId }: { boardId: string }) {
                   type="button"
                 >
                   <span>
-                    <span className="block text-sm font-semibold capitalize text-slate-900">{lead.role}</span>
+                    <span className="block text-sm font-semibold text-slate-900">{leadUser.name || leadUser.email}</span>
                     <span className="block text-sm text-slate-500">{leadUser.email}</span>
                   </span>
                   <span className="flex items-center gap-2">
@@ -317,7 +317,6 @@ export function AssignModal({ boardId }: { boardId: string }) {
                             <div className="flex gap-2">
                               <span className="w-5 shrink-0 text-slate-400">{index + 1}.</span>
                               <span>
-                                <span className="font-medium capitalize">{member.role}: </span>
                                 {user.email}
                               </span>
                             </div>

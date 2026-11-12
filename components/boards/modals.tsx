@@ -468,6 +468,12 @@ export function TaskModal({ boardId, columnId, taskId }: { boardId: string; colu
     !task && requiresTaskApproval(activeBoard, currentUserId, session?.user?.role)
   );
   const isPending = task?.approvalStatus === "pending";
+  const assignedNames = (task?.assignees ?? [])
+    .map((id) => {
+      const member = (activeBoard?.members ?? []).find((item) => memberUserId(item as BoardMemberView) === id);
+      return member ? memberLabel(member as BoardMemberView).name : null;
+    })
+    .filter((name): name is string => Boolean(name));
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -639,10 +645,16 @@ export function TaskModal({ boardId, columnId, taskId }: { boardId: string; colu
 
         {task ? (
           <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-            {(task.takenByName || task.takenLeadName || task.takenTeamName) && (
+            {(task.takenByName || task.takenLeadName || task.takenTeamName || assignedNames.length) && (
               <div className="border-b border-slate-200 pb-3">
                 <p className="text-sm font-semibold text-slate-800">Assignment Details</p>
                 <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {assignedNames.length ? (
+                    <div className="flex flex-col rounded-lg border border-slate-200 bg-white p-2 sm:col-span-2">
+                      <span className="text-[10px] font-bold uppercase text-slate-400">Assigned to</span>
+                      <span className="text-sm font-medium text-slate-900">{assignedNames.join(", ")}</span>
+                    </div>
+                  ) : null}
                   {task.takenByName && (
                     <div className="flex flex-col rounded-lg border border-slate-200 bg-white p-2">
                       <span className="text-[10px] font-bold uppercase text-slate-400">Assigned Employee</span>

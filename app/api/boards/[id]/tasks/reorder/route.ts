@@ -9,6 +9,7 @@ import { findAccessibleBoard } from "@/lib/board-access";
 import { canManageBoardTasks } from "@/lib/task-permissions";
 import { isObjectId, jsonError, requireUserId, serializeDocs } from "@/lib/api";
 import { emitToBoard, emitToUser } from "@/lib/socket-emit";
+import { BoardTodo } from "@/models/BoardTodo";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -109,6 +110,41 @@ export async function PATCH(request: Request, { params }: Params) {
       $push: { activity: { user: userId, action: isDoneColumn ? "completed" : "move", detail: activityDetail } }
     }
   );
+
+  // Link legacy Kanban work into the continuity workspace as soon as someone
+  // takes it out of Todo. The Task remains authoritative; this shadow record
+  // gives EOD/EOW and My Todos a shared tracking representation.
+  if (movedAcrossColumns && !isMovingToTodo) {
+    await BoardTodo.findOneAndUpdate(
+      { task: task._id, sourceType: "board_task" },
+      {
+        $set: {
+          company: (task as any).company ?? (caller as any).company ?? null,
+          board: task.board,
+          carryForwardKey: `board-task:${String(task._id)}`,
+          title: task.title,
+          description: task.description ?? "",
+          assigneeId: caller._id,
+          originalOwnerId: (task as any).owner ?? task.createdBy ?? caller._id,
+          originalAssignedDate: task.createdAt ?? new Date(),
+          currentWorkingDate: new Date(),
+          dueDate: task.dueDate ?? null,
+          priority: task.priority,
+          status: isDoneColumn ? "completed" : "in_progress",
+          progress: isDoneColumn ? 100 : 0,
+          remainingWork: isDoneColumn ? "" : "Continue the active board task.",
+          nextAction: isDoneColumn ? "" : `Continue ${task.title}`,
+          updatedBy: userId,
+        },
+        $setOnInsert: {
+          task: task._id,
+          sourceType: "board_task",
+          createdBy: userId,
+        },
+      },
+      { upsert: true },
+    );
+  }
 
   if (isDoneColumn) {
     await Notification.create({

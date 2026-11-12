@@ -3,6 +3,9 @@ import { Schema, model, models, type InferSchemaType } from "mongoose";
 const CompanySchema = new Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 120 },
+    // IANA timezone used to decide which calendar day/week a compaction belongs
+    // to. Existing companies fall back to India Standard Time.
+    timeZone: { type: String, default: "Asia/Kolkata", trim: true, maxlength: 60 },
     slug: { type: String, unique: true, sparse: true, lowercase: true, trim: true, maxlength: 40, index: true },
     owner: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     joinCode: { type: String, required: true, unique: true, index: true },
