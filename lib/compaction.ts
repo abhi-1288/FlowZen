@@ -219,6 +219,8 @@ export function categoryForTodo(todo: {
   const status = String(todo.status ?? "");
   if (isFinishedStatus(status)) return "completed";
   if (status === "blocked") return "blocked";
+  if (status === "decision_pending") return "decision";
+  if (status === "risk_flagged") return "risk";
   if (status === "partially_completed") return "partial";
   const progress = Number(todo.progress ?? 0);
   if (progress > 0 && progress < 100) return "partial";
@@ -344,12 +346,16 @@ export type CompactionRollup = {
   partial: CompactionTodoSnapshot[];
   pending: CompactionTodoSnapshot[];
   blocked: CompactionTodoSnapshot[];
+  decision: CompactionTodoSnapshot[];
+  risk: CompactionTodoSnapshot[];
   metrics: {
     total: number;
     completed: number;
     partial: number;
     pending: number;
     blocked: number;
+    decision: number;
+    risk: number;
   };
   hasWork: boolean;
 };
@@ -359,17 +365,23 @@ export function rollupSnapshots(snapshots: CompactionTodoSnapshot[]): Compaction
   const partial = snapshots.filter((item) => item.category === "partial");
   const pending = snapshots.filter((item) => item.category === "pending");
   const blocked = snapshots.filter((item) => item.category === "blocked");
+  const decision = snapshots.filter((item) => item.category === "decision");
+  const risk = snapshots.filter((item) => item.category === "risk");
   return {
     completed,
     partial,
     pending,
     blocked,
+    decision,
+    risk,
     metrics: {
       total: snapshots.length,
       completed: completed.length,
       partial: partial.length,
       pending: pending.length,
       blocked: blocked.length,
+      decision: decision.length,
+      risk: risk.length,
     },
     // A compaction with no todo content must never be persisted/delivered.
     hasWork: snapshots.length > 0,
@@ -384,6 +396,16 @@ export function contentFromSnapshots(snapshots: CompactionTodoSnapshot[]): Compa
     if (item.remainingWork) return `${base} — ${item.remainingWork}`;
     return base;
   };
+  const decisionLine = (item: CompactionTodoSnapshot) => {
+    const base = line(item);
+    const extras = [item.waitingOn ? `waiting on ${item.waitingOn}` : "", item.assistanceRequired ? `needs ${item.assistanceRequired}` : "", item.nextAction ? `next: ${item.nextAction}` : ""].filter(Boolean).join("; ");
+    return extras ? `${base} — ${extras}` : base;
+  };
+  const riskLine = (item: CompactionTodoSnapshot) => {
+    const base = line(item);
+    const extras = [item.remainingWork && item.remainingWork !== "" ? "" : "", item.nextAction ? `mitigation: ${item.nextAction}` : "", item.blockerNotes ? `note: ${item.blockerNotes}` : ""].filter(Boolean).join("; ");
+    return extras ? `${base} — ${extras}` : base;
+  };
   return {
     completedWork: rollup.completed.map(line),
     partialWork: rollup.partial.map(line),
@@ -391,9 +413,9 @@ export function contentFromSnapshots(snapshots: CompactionTodoSnapshot[]): Compa
     blockers: rollup.blocked.map((item) =>
       item.waitingOn ? `${line(item)} — waiting on ${item.waitingOn}` : line(item),
     ),
-    decisions: "",
+    decisions: rollup.decision.map(decisionLine).join("\n"),
     handoverNotes: "",
-    risks: "",
+    risks: rollup.risk.map(riskLine).join("\n"),
     nextActions: snapshots
       .map((item) => item.nextAction)
       .filter(Boolean)

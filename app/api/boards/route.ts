@@ -5,7 +5,7 @@ import { Column } from "@/models/Column";
 import { User } from "@/models/User";
 import { requireUserId, serializeDocs, serializeDoc, jsonError } from "@/lib/api";
 
-const DEFAULT_COLUMNS = ["Todo", "In Progress", "Done", "Expired-due"];
+const DEFAULT_COLUMNS = ["Todo", "Taken", "In Progress", "Blocked", "Decision & Dependency", "Risks", "Done", "Expired-due"];
 
 export async function GET() {
   const userId = await requireUserId();

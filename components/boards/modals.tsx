@@ -844,6 +844,12 @@ export function TaskSettingsModal() {
       title: "Employees cannot create tasks",
       description:
         "Only managers, testers, HR, finance and admins can create tasks. Employees and others cannot add new tasks."
+    },
+    {
+      value: "admin_only",
+      title: "Only admins can create tasks",
+      description:
+        "Only admins can create tasks. Employees and others cannot add new tasks."
     }
   ];
 

@@ -52,7 +52,7 @@ export async function GET(_request: Request, { params }: Params) {
   const isEmployee = String(compaction.employee) === userId;
   const isOwner = String(compaction.teamOwner) === userId;
   if (!isEmployee && !isOwner) {
-    if (!(await userIsCompanyAdmin(userId, String(compaction.company)))) {
+    if (!(await userIsCompanyAdmin(userId, String(compaction.company?._id ?? compaction.company)))) {
       return jsonError("Compaction not found.", 404);
     }
   }

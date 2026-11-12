@@ -1218,7 +1218,7 @@ export function ProfileHub() {
           />
           <Link
             className="mt-3 flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 dark:text-zinc-500 dark:hover:bg-zinc-700 dark:hover:text-zinc-400"
-            href="/boards"
+            href="/board/workspace"
           >
             <ChevronRight size={13} className="-ml-0.5" />
             Boards workspace

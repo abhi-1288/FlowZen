@@ -64,6 +64,8 @@ const TaskCompactionSchema = new Schema(
     teamOwnerName: { type: String, default: "", trim: true, maxlength: 120 },
     board: { type: Schema.Types.ObjectId, ref: "Board", default: null, index: true },
     boardName: { type: String, default: "", trim: true, maxlength: 160 },
+    boardDescription: { type: String, default: "", trim: true, maxlength: 2000 },
+    boardCreatedAt: { type: Date, default: null },
     department: { type: String, default: "", trim: true, maxlength: 120 },
     project: { type: String, default: "", trim: true, maxlength: 160 },
     reportingDate: { type: Date, required: true, index: true },

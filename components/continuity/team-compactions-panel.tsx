@@ -111,6 +111,7 @@ export function TeamCompactionsPanel({
     adminSupportRequired: "",
   });
   const [reviewBody, setReviewBody] = useState("");
+  const [profile, setProfile] = useState<any>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -135,6 +136,9 @@ export function TeamCompactionsPanel({
 
   useEffect(() => {
     void load();
+    void apiFetch<{ user: any }>("/api/profile", undefined, { toast: false })
+      .then((result) => setProfile(result.user ?? null))
+      .catch(() => setProfile(null));
   }, [load]);
 
   const openDetail = useCallback(async (id: string) => {
@@ -519,6 +523,25 @@ function TeamDetailBody({
         ) : null}
       </div>
 
+      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Report details</p>
+        <div className="mt-1.5 space-y-1 text-sm text-slate-800 dark:text-zinc-200">
+          {compaction.company?.name || compaction.company?.icon ? (
+            <p className="flex items-center gap-2">
+              {compaction.company?.icon ? (
+                <img src={String(compaction.company.icon)} alt="" className="h-5 w-5 rounded object-cover" />
+              ) : null}
+              <span><span className="font-semibold">Company:</span> {String(compaction.company?.name ?? "—")}</span>
+            </p>
+          ) : null}
+          <p><span className="font-semibold">Prepared by:</span> {String(compaction.teamOwner?.name ?? "—")}{compaction.teamOwner?.role ? ` · ${String(compaction.teamOwner.role)}` : ""}</p>
+          <p><span className="font-semibold">Team:</span> {String(compaction.team?.name ?? compaction.teamName ?? "—")}</p>
+          {overview.reportingPeriodStart && overview.reportingPeriodEnd ? (
+            <p className="text-xs text-slate-500 dark:text-zinc-400">Period: {formatDate(overview.reportingPeriodStart)} – {formatDate(overview.reportingPeriodEnd)}</p>
+          ) : null}
+        </div>
+      </div>
+
       {detail.permissions.canEdit || detail.permissions.canSubmit ? (
         <div className="flex flex-wrap items-center gap-2">
           {detail.permissions.canEdit ? (
@@ -646,6 +669,46 @@ function TeamDetailBody({
                     {source.sourceSummary || "No summary provided."}
                   </p>
                 )}
+                {Array.isArray(source?.sourceContent?.completedWork) && source.sourceContent.completedWork.length ? (
+                  <div className="mt-2 rounded-lg bg-emerald-50/60 p-2 dark:bg-emerald-950/20">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Completed</p>
+                    <ul className="mt-1 space-y-0.5 text-[11px] text-slate-700 dark:text-zinc-200">
+                      {source.sourceContent.completedWork.map((item: any, i: number) => (
+                        <li key={i}>{String(item)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {Array.isArray(source?.sourceContent?.partialWork) && source.sourceContent.partialWork.length ? (
+                  <div className="mt-2 rounded-lg bg-amber-50/60 p-2 dark:bg-amber-950/20">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Partially completed</p>
+                    <ul className="mt-1 space-y-0.5 text-[11px] text-slate-700 dark:text-zinc-200">
+                      {source.sourceContent.partialWork.map((item: any, i: number) => (
+                        <li key={i}>{String(item)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {Array.isArray(source?.sourceContent?.pendingWork) && source.sourceContent.pendingWork.length ? (
+                  <div className="mt-2 rounded-lg bg-slate-50 p-2 dark:bg-zinc-900">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400">Pending</p>
+                    <ul className="mt-1 space-y-0.5 text-[11px] text-slate-700 dark:text-zinc-200">
+                      {source.sourceContent.pendingWork.map((item: any, i: number) => (
+                        <li key={i}>{String(item)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {Array.isArray(source?.sourceContent?.blockers) && source.sourceContent.blockers.length ? (
+                  <div className="mt-2 rounded-lg bg-rose-50/60 p-2 dark:bg-rose-950/20">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-300">Blockers</p>
+                    <ul className="mt-1 space-y-0.5 text-[11px] text-slate-700 dark:text-zinc-200">
+                      {source.sourceContent.blockers.map((item: any, i: number) => (
+                        <li key={i}>{String(item)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
                 {source.todos?.length ? (
                   <div className="mt-2 rounded-lg bg-slate-50 p-2 dark:bg-zinc-900">
                     <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Todos ({source.todos.length})</p>

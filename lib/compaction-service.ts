@@ -71,6 +71,33 @@ function appUrl(path: string): string {
   return `${String(base).replace(/\/$/, "")}${path}`;
 }
 
+/**
+ * Report-header context for an employee compaction. The snapshot fields are
+ * written at generation time; older documents only store `boardName`, so we
+ * fall back to reading the live board when it is still attached. The name
+ * and description shown in the report are the ones from generation where
+ * available, keeping the delivered report immutable.
+ */
+async function resolveBoardReportHeader(compaction: AnyDoc) {
+  const boardId = compaction?.board ? String(compaction.board) : "";
+  let title = String(compaction?.boardName ?? "");
+  let description = String(compaction?.boardDescription ?? "");
+  let createdAt: Date | null = compaction?.boardCreatedAt
+    ? new Date(compaction.boardCreatedAt)
+    : null;
+
+  if ((!title || !createdAt || !description) && boardId) {
+    const board = (await Board.findById(boardId).select("title description createdAt")) as AnyDoc | null;
+    if (board) {
+      if (!title) title = String(board.title ?? "");
+      if (!description) description = String(board.description ?? "");
+      if (!createdAt && board.createdAt) createdAt = new Date(board.createdAt);
+    }
+  }
+
+  return { title, description, createdAt };
+}
+
 function uniqueIds(values: unknown[]): string[] {
   const set = new Set<string>();
   for (const value of values) {
@@ -197,7 +224,7 @@ export async function userCanReviewCompaction(
   compaction: AnyDoc,
 ): Promise<{ ok: boolean; isAdmin: boolean }> {
   const isTeamOwner = String(compaction.teamOwner ?? "") === String(userId);
-  const isAdmin = await userIsCompanyAdmin(userId, String(compaction.company ?? ""));
+  const isAdmin = await userIsCompanyAdmin(userId, String(compaction.company?._id ?? compaction.company ?? ""));
   return { ok: isTeamOwner || isAdmin, isAdmin };
 }
 
@@ -235,10 +262,23 @@ async function syncTakenBoardTasksToContinuity(input: {
 
   await Promise.all(tasks.map(async (task) => {
     const columnTitle = String(task.column?.title ?? "").toLowerCase();
-    const isDone = columnTitle === "done" || columnTitle === "expired-due" || String(task.taskStatus) === "completed";
+    const mappedStatus =
+      columnTitle === "done" || columnTitle === "expired-due" || String(task.taskStatus) === "completed"
+        ? "completed"
+        : columnTitle === "blocked"
+          ? "blocked"
+          : columnTitle === "decision & dependency"
+            ? "decision_pending"
+            : columnTitle === "risks"
+              ? "risk_flagged"
+              : columnTitle === "taken"
+                ? "taken"
+                : columnTitle === "todo"
+                  ? "not_started"
+                  : "in_progress";
+    const isCompleted = mappedStatus === "completed";
     const wasUpdatedInPeriod = task.updatedAt >= input.range.start && task.updatedAt <= input.range.end;
-    if (isDone && !wasUpdatedInPeriod) return;
-    const isCompleted = columnTitle === "done" || String(task.taskStatus) === "completed";
+    if (isCompleted && !wasUpdatedInPeriod) return;
     await BoardTodo.findOneAndUpdate(
       { task: task._id, sourceType: "board_task" },
       {
@@ -254,7 +294,7 @@ async function syncTakenBoardTasksToContinuity(input: {
           currentWorkingDate: isCompleted ? (task.updatedAt ?? input.range.start) : input.range.start,
           dueDate: task.dueDate ?? null,
           priority: ["low", "medium", "high"].includes(String(task.priority)) ? task.priority : "medium",
-          status: isCompleted ? "completed" : "in_progress",
+          status: mappedStatus,
           progress: isCompleted ? 100 : 0,
           remainingWork: isCompleted ? "" : "Continue the active board task.",
           nextAction: isCompleted ? "" : `Continue ${String(task.title ?? "this task")}`,
@@ -331,7 +371,7 @@ export async function generateEmployeeCompactionDraft(input: {
     selectedBoard = (await Board.findOne({
       _id: input.boardId,
       $or: [{ owner: input.employeeId }, { "members.user": input.employeeId }],
-    }).select("_id title")) as AnyDoc | null;
+    }).select("_id title description createdAt")) as AnyDoc | null;
     if (!selectedBoard) return { compaction: null, created: false, reason: "board_not_accessible" };
   }
   const reportingDate = input.reportingDate ?? new Date();
@@ -424,6 +464,8 @@ export async function generateEmployeeCompactionDraft(input: {
     teamOwnerName: String(context.teamOwner?.name ?? ""),
     board: selectedBoard?._id ?? null,
     boardName: String(selectedBoard?.title ?? ""),
+    boardDescription: String(selectedBoard?.description ?? ""),
+    boardCreatedAt: selectedBoard?.createdAt ?? null,
     department: String(context.user.regionLabel ?? ""),
     reportingDate: range.start,
     reportingDateKey: periodKey,
@@ -708,16 +750,21 @@ export async function submitEmployeeCompaction(input: {
   const companyDoc = context?.company
     ? { name: String(context.company.name ?? ""), icon: String(context.company.icon ?? "") }
     : undefined;
+  const boardHeader = await resolveBoardReportHeader(compaction);
   const email = employeeCompactionEmailContent({
     employeeName: String(compaction.employeeName ?? context?.name ?? ""),
     employeeCode: String(compaction.employeeCode ?? context?.code ?? ""),
     teamName: String(compaction.teamName ?? ""),
+    teamOwnerName: String(compaction.teamOwnerName ?? context?.teamOwner?.name ?? ""),
     type: String(compaction.compactionType) as CompactionType,
     periodLabel: label,
     summary: String(compaction.summary ?? ""),
     content,
     link: appUrl(link),
     company: companyDoc,
+    boardName: boardHeader.title,
+    boardDescription: boardHeader.description,
+    boardCreatedAt: boardHeader.createdAt,
   });
 
   let teamOwner = compaction.teamOwner
@@ -1475,10 +1522,12 @@ export async function retryCompactionDelivery(input: {
   const timeZone = employeeContext?.timeZone ?? resolveTimeZone(null);
   const label = periodLabel(String(compaction.compactionType) as CompactionType, compaction.reportingDate as Date, timeZone);
   const content = (compaction.content?.toObject?.() ?? compaction.content ?? emptyCompactionContent()) as CompactionContent;
+  const boardHeader = await resolveBoardReportHeader(compaction);
   const email = employeeCompactionEmailContent({
     employeeName: String(compaction.employeeName ?? ""),
     employeeCode: String(compaction.employeeCode ?? ""),
     teamName: String(compaction.teamName ?? ""),
+    teamOwnerName: String(compaction.teamOwnerName ?? employeeContext?.teamOwner?.name ?? ""),
     type: String(compaction.compactionType) as CompactionType,
     periodLabel: label,
     summary: String(compaction.summary ?? ""),
@@ -1487,6 +1536,9 @@ export async function retryCompactionDelivery(input: {
     company: employeeContext?.company
       ? { name: String(employeeContext.company.name ?? ""), icon: String(employeeContext.company.icon ?? "") }
       : undefined,
+    boardName: boardHeader.title,
+    boardDescription: boardHeader.description,
+    boardCreatedAt: boardHeader.createdAt,
   });
 
   const ownerId = String(recipient._id);

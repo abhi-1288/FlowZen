@@ -17,7 +17,7 @@ async function canViewSources(userId: string, teamCompactionId: string): Promise
   const compaction = await TeamCompaction.findById(teamCompactionId).select("teamOwner company");
   if (!compaction) return false;
   if (String(compaction.teamOwner) === userId) return true;
-  if (await userIsCompanyAdmin(userId, String(compaction.company))) return true;
+  if (await userIsCompanyAdmin(userId, String(compaction.company?._id ?? compaction.company))) return true;
   if (await CompactionDelivery.exists({ teamCompaction: teamCompactionId, recipient: userId })) return true;
   return Boolean(
     await TeamCompactionSource.exists({ teamCompaction: teamCompactionId, employee: userId }),

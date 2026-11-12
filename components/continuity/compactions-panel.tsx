@@ -12,9 +12,11 @@ import {
   RotateCcw,
   Send,
   ShieldCheck,
+  Trash2,
 } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import { useNotificationToast } from "@/lib/toast-context";
+import { ConfirmDialog } from "@/components/recruitment/confirm-dialog";
 import {
   EMPLOYEE_COMPACTION_STATUSES,
   EMPLOYEE_EDITABLE_STATUSES,
@@ -47,7 +49,7 @@ type CompactionDetail = {
   todos: Record<string, any>[];
   deliveries: DeliveryRecord[];
   revisions: Record<string, any>[];
-  permissions: { canEdit: boolean; canReview: boolean; canRetryDelivery: boolean };
+  permissions: { canEdit: boolean; canReview: boolean; canRetryDelivery: boolean; canDelete?: boolean };
 };
 
 type DeliveryRecord = {
@@ -152,6 +154,9 @@ export function CompactionsPanel({
   const [draftReason, setDraftReason] = useState("");
   const [reviewBody, setReviewBody] = useState("");
   const [expanded, setExpanded] = useState<string | null>(focusId || null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [rawLists, setRawLists] = useState<Record<string, string>>({});
+  const [profile, setProfile] = useState<any>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -185,6 +190,9 @@ export function CompactionsPanel({
 
   useEffect(() => {
     void load();
+    void apiFetch<{ user: any }>("/api/profile", undefined, { toast: false })
+      .then((result) => setProfile(result.user ?? null))
+      .catch(() => setProfile(null));
   }, [load]);
 
   useEffect(() => {
@@ -280,10 +288,14 @@ export function CompactionsPanel({
     if (!detail) return;
     setBusy(true);
     try {
+      const contentToSend = { ...draftContent };
+      CONTENT_SECTIONS.filter((s) => s.list).forEach((s) => {
+        (contentToSend as Record<string, unknown>)[s.key] = newlineList(rawLists[s.key] ?? "");
+      });
       await apiFetch(`/api/compactions/${detail.compaction.id}`, {
         method: "PATCH",
         body: JSON.stringify({
-          content: draftContent,
+          content: contentToSend,
           summary: draftSummary,
           reasonForContinuing: draftReason,
           changeReason,
@@ -303,10 +315,14 @@ export function CompactionsPanel({
     if (!detail) return;
     setBusy(true);
     try {
+      const contentToSend = { ...draftContent };
+      CONTENT_SECTIONS.filter((s) => s.list).forEach((s) => {
+        (contentToSend as Record<string, unknown>)[s.key] = newlineList(rawLists[s.key] ?? "");
+      });
       await apiFetch(`/api/compactions/${detail.compaction.id}/submit`, {
         method: "POST",
         body: JSON.stringify({
-          content: draftContent,
+          content: contentToSend,
           summary: draftSummary,
           reasonForContinuing: draftReason,
         }),
@@ -355,6 +371,25 @@ export function CompactionsPanel({
       await openDetail(detail.compaction.id);
     } catch {
       // handled
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteDetail() {
+    if (!detail) return;
+    setBusy(true);
+    try {
+      await apiFetch(`/api/compactions/${detail.compaction.id}`, { method: "DELETE" });
+      showSuccessToast("Report deleted. You can generate a fresh one.");
+      setConfirmDelete(false);
+      setDetail(null);
+      setExpanded(null);
+      setEditing(false);
+      await load();
+      await loadEod();
+    } catch {
+      // apiFetch showed the failure.
     } finally {
       setBusy(false);
     }
@@ -556,11 +591,21 @@ export function CompactionsPanel({
                         reviewBody={reviewBody}
                         busy={busy}
                         isEditable={isEditable}
+                        canDelete={Boolean(detail.permissions?.canDelete)}
+                        rawLists={rawLists}
+                        setRawLists={setRawLists}
+                        onDelete={() => setConfirmDelete(true)}
                         onEdit={() => {
                           setEditing(true);
-                          setDraftContent(normalizeContent(detail.compaction.content));
+                          const c = normalizeContent(detail.compaction.content);
+                          setDraftContent(c);
                           setDraftSummary(String(detail.compaction.summary ?? ""));
                           setDraftReason(String(detail.compaction.reasonForContinuing ?? ""));
+                          const rl: Record<string, string> = {};
+                          CONTENT_SECTIONS.filter((s) => s.list).forEach((s) => {
+                            rl[s.key] = (c[s.key] as string[]).join("\n");
+                          });
+                          setRawLists(rl);
                         }}
                         onCancel={() => setEditing(false)}
                         onSave={() => void saveDetail("Employee edited draft")}
@@ -618,6 +663,15 @@ export function CompactionsPanel({
         </div>
       </Modal>
 
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete this report?"
+        description="This removes the report and its snapshots permanently. It has not been sent, so nothing is delivered. Your board tasks and todos are kept. This cannot be undone."
+        confirmLabel="Delete report"
+        onConfirm={() => void deleteDetail()}
+        onCancel={() => setConfirmDelete(false)}
+      />
+
     </div>
   );
 }
@@ -631,6 +685,10 @@ function CompactionDetailBody({
   reviewBody,
   busy,
   isEditable,
+  canDelete,
+  rawLists,
+  setRawLists,
+  onDelete,
   onEdit,
   onCancel,
   onSave,
@@ -650,6 +708,10 @@ function CompactionDetailBody({
   reviewBody: string;
   busy: boolean;
   isEditable: boolean;
+  canDelete: boolean;
+  rawLists: Record<string, string>;
+  setRawLists: (value: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)) => void;
+  onDelete: () => void;
   onEdit: () => void;
   onCancel: () => void;
   onSave: () => void;
@@ -690,6 +752,23 @@ function CompactionDetailBody({
         ) : null}
       </div>
 
+      {compaction.boardName || compaction.teamName || compaction.teamOwnerName ? (
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Work report</p>
+          <div className="mt-1.5 space-y-1 text-sm text-slate-800 dark:text-zinc-200">
+            {compaction.boardName ? <p><span className="font-semibold">Board:</span> {compaction.boardName}</p> : null}
+            {compaction.boardDescription ? (
+              <p className="text-xs text-slate-500 dark:text-zinc-400">{compaction.boardDescription}</p>
+            ) : null}
+            {compaction.boardCreatedAt ? (
+              <p className="text-xs text-slate-500 dark:text-zinc-400">Board created: {formatDate(compaction.boardCreatedAt)}</p>
+            ) : null}
+            <p><span className="font-semibold text-slate-700 dark:text-zinc-300">Team Owner:</span> {compaction.teamOwnerName || "—"}</p>
+            <p><span className="font-semibold text-slate-700 dark:text-zinc-300">Team:</span> {compaction.teamName || "—"}</p>
+          </div>
+        </div>
+      ) : null}
+
       {detail.permissions.canEdit && isEditable ? (
         <div className="flex flex-wrap items-center gap-2">
           {editing ? (
@@ -702,13 +781,26 @@ function CompactionDetailBody({
               </button>
             </>
           ) : (
-            <button className={btnSecondary} onClick={onEdit} type="button">
-              Edit draft
-            </button>
+            <>
+              {canDelete ? (
+                <button
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 transition hover:border-rose-300 hover:bg-rose-50 dark:border-rose-900 dark:text-rose-400 dark:hover:border-rose-800 dark:hover:bg-rose-950/40"
+                  disabled={busy}
+                  onClick={onDelete}
+                  title="Delete this report. It has not been sent yet."
+                  type="button"
+                >
+                  <Trash2 size={13} /> Delete
+                </button>
+              ) : null}
+              <button className={btnSecondary} onClick={onEdit} type="button">
+                Edit draft
+              </button>
+              <button className={btnPrimary} disabled={busy} onClick={onSubmit} type="button">
+                <Send size={13} /> Confirm & send to Team Owner
+              </button>
+            </>
           )}
-          <button className={btnPrimary} disabled={busy} onClick={onSubmit} type="button">
-            <Send size={13} /> Confirm & send to Team Owner
-          </button>
         </div>
       ) : null}
 
@@ -756,9 +848,9 @@ function CompactionDetailBody({
                 <textarea
                   className={inputClass + " mt-2 min-h-[80px] text-xs"}
                   onChange={(event) =>
-                    section.list ? updateList(section.key, event.target.value) : setDraftContent({ ...draftContent, [section.key]: event.target.value })
+                    section.list ? setRawLists((prev) => ({ ...prev, [section.key]: event.target.value })) : setDraftContent({ ...draftContent, [section.key]: event.target.value })
                   }
-                  value={section.list ? newlineList(value).join("\n") : String(value ?? "")}
+                  value={section.list ? (rawLists[section.key] ?? "") : String(value ?? "")}
                 />
               ) : section.list ? (
                 newlineList(value).length ? (
@@ -806,6 +898,13 @@ function CompactionDetailBody({
             ))}
           </div>
         </div>
+      ) : null}
+
+      {compaction.employeeName || compaction.teamName ? (
+        <p className="border-t border-slate-100 pt-3 text-right text-sm font-semibold text-slate-800 dark:border-zinc-800 dark:text-zinc-200">
+          {compaction.employeeName}
+          {compaction.teamName ? ` · ${compaction.teamName}` : ""}
+        </p>
       ) : null}
 
       <div>

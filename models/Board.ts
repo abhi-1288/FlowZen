@@ -17,7 +17,7 @@ const BoardSchema = new Schema(
     pinned: { type: Boolean, default: false },
     employeeTaskCreation: {
       type: String,
-      enum: ["approval", "allowed", "blocked"],
+      enum: ["approval", "allowed", "blocked", "admin_only"],
       default: "approval"
     },
     members: [

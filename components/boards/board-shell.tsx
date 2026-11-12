@@ -253,7 +253,7 @@ export function BoardShell({ boardId }: { boardId?: string }) {
               <Search size={16} />
             </button>
           </div>
-          <Link className="mt-3 block rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-950" href="/boards">
+          <Link className="mt-3 block rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-950" href="/board/workspace">
             Continuity workspace
           </Link>
           <Link className="mt-2 block rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-950" href="/profile">

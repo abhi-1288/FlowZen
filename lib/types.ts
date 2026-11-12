@@ -50,7 +50,7 @@ export type Board = {
   description: string;
   owner: string;
   pinned?: boolean;
-  employeeTaskCreation?: "approval" | "allowed" | "blocked";
+  employeeTaskCreation?: "approval" | "allowed" | "blocked" | "admin_only";
   members: { user: string; assignedTo?: string | null; role: Role }[];
   attachments: { id: string; name: string; url: string }[];
   createdAt: string;
