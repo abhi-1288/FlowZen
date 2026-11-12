@@ -27,7 +27,7 @@ const CompactionRevisionSchema = new Schema(
     changeReason: { type: String, default: "", maxlength: 4000 },
     action: {
       type: String,
-      enum: ["edited", "correction_requested", "resubmitted", "reviewed"],
+      enum: ["edited", "correction_requested", "resubmitted", "reviewed", "comment", "sources_updated"],
       default: "edited",
     },
   },

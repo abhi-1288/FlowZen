@@ -28,6 +28,9 @@ export const BOARD_TODO_STATUSES = [
   "pending_review",
   "approved",
   "reopened",
+  "taken",
+  "decision_pending",
+  "risk_flagged",
 ] as const;
 
 export type BoardTodoStatus = (typeof BOARD_TODO_STATUSES)[number];
@@ -44,6 +47,9 @@ export const BOARD_TODO_STATUS_LABELS: Record<BoardTodoStatus, string> = {
   pending_review: "Pending Review",
   approved: "Approved",
   reopened: "Reopened",
+  taken: "Taken",
+  decision_pending: "Decision & Dependency",
+  risk_flagged: "Risk Flagged",
 };
 
 export const ACTIVE_TODO_STATUSES: BoardTodoStatus[] = [
@@ -56,6 +62,9 @@ export const ACTIVE_TODO_STATUSES: BoardTodoStatus[] = [
   "delegated",
   "pending_review",
   "reopened",
+  "taken",
+  "decision_pending",
+  "risk_flagged",
 ];
 
 export const FINISHED_TODO_STATUSES: BoardTodoStatus[] = ["completed", "approved"];
@@ -110,6 +119,18 @@ export const EMPLOYEE_EDITABLE_STATUSES: EmployeeCompactionStatus[] = [
   "delivery_failed",
 ];
 
+/**
+ * Statuses in which an employee compaction may be deleted outright. Only a
+ * report that has never been delivered may be removed; anything the Team
+ * Owner has already received keeps its history.
+ */
+export const EMPLOYEE_DELETABLE_STATUSES: EmployeeCompactionStatus[] = [
+  "pending_generation",
+  "draft_ready",
+  "draft",
+  "awaiting_confirmation",
+];
+
 export const TEAM_COMPACTION_STATUSES = [
   "draft",
   "awaiting_team_owner_confirmation",
@@ -160,6 +181,8 @@ export const COMPACTION_CATEGORIES = [
   "partial",
   "pending",
   "blocked",
+  "decision",
+  "risk",
 ] as const;
 
 export type CompactionCategory = (typeof COMPACTION_CATEGORIES)[number];

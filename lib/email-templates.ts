@@ -989,6 +989,22 @@ export function visitorPassIdCardContent({
 
 // ── Task compaction (EOD / EOW) ──────────────────────────────
 
+function escapeHtmlText(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function compactionHeaderDate(value: Date | string | null | undefined): string {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(date);
+}
+
 type CompactionEmailContent = {
   completedWork: string[];
   partialWork: string[];
@@ -1029,31 +1045,50 @@ export function employeeCompactionEmailContent({
   employeeName,
   employeeCode,
   teamName,
+  teamOwnerName,
   type,
   periodLabel,
   summary,
   content,
   link,
   company,
+  boardName,
+  boardDescription,
+  boardCreatedAt,
 }: {
   employeeName: string;
   employeeCode?: string;
   teamName?: string;
+  teamOwnerName?: string;
   type: "EOD" | "EOW";
   periodLabel: string;
   summary?: string;
   content: CompactionEmailContent;
   link: string;
   company?: { name?: string; icon?: string };
+  boardName?: string;
+  boardDescription?: string;
+  boardCreatedAt?: Date | string | null;
 }): { subject: string; text: string; html: string } {
   const title = `${type} compaction — ${employeeName}`;
+  const boardCreatedLabel = compactionHeaderDate(boardCreatedAt);
+  const boardSection = boardName
+    ? `<tr><td style="padding:10px 0;border-top:1px solid #e2e8f0;font-size:14px;color:#334155;"><strong>Board:</strong> ${escapeHtmlText(boardName)}</td></tr>
+       ${boardDescription ? `<tr><td style="padding:2px 0 10px;font-size:13px;color:#64748b;">${escapeHtmlText(boardDescription)}</td></tr>` : ""}
+       ${boardCreatedLabel ? `<tr><td style="padding:10px 0;border-top:1px solid #e2e8f0;font-size:14px;color:#334155;"><strong>Board created:</strong> ${boardCreatedLabel}</td></tr>` : ""}`
+    : "";
+  const signature = teamName
+    ? `<p style="margin:24px 0 0;font-size:14px;font-weight:600;color:#1e293b;">${escapeHtmlText(employeeName)} &middot; ${escapeHtmlText(teamName)}</p>`
+    : `<p style="margin:24px 0 0;font-size:14px;font-weight:600;color:#1e293b;">${escapeHtmlText(employeeName)}</p>`;
   const html = baseEmailLayout(`
     <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#1e293b;">${type} Compaction</h2>
     <p style="margin:0 0 20px;font-size:14px;color:#64748b;">${periodLabel}</p>
 
     <table role="presentation" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:4px 16px;width:100%;margin:0 0 20px;">
-      <tr><td style="padding:10px 0;font-size:14px;color:#334155;"><strong>Employee:</strong> ${employeeName}${employeeCode ? ` (${employeeCode})` : ""}</td></tr>
-      ${teamName ? `<tr><td style="padding:10px 0;border-top:1px solid #e2e8f0;font-size:14px;color:#334155;"><strong>Team:</strong> ${teamName}</td></tr>` : ""}
+      <tr><td style="padding:10px 0;font-size:14px;color:#334155;"><strong>Employee:</strong> ${escapeHtmlText(employeeName)}${employeeCode ? ` (${escapeHtmlText(employeeCode)})` : ""}</td></tr>
+      ${boardSection}
+      ${teamOwnerName ? `<tr><td style="padding:10px 0;border-top:1px solid #e2e8f0;font-size:14px;color:#334155;"><strong>Team Owner:</strong> ${escapeHtmlText(teamOwnerName)}</td></tr>` : ""}
+      ${teamName ? `<tr><td style="padding:10px 0;border-top:1px solid #e2e8f0;font-size:14px;color:#334155;"><strong>Team:</strong> ${escapeHtmlText(teamName)}</td></tr>` : ""}
       <tr><td style="padding:10px 0;border-top:1px solid #e2e8f0;font-size:14px;color:#334155;"><strong>Period:</strong> ${periodLabel}</td></tr>
     </table>
 
@@ -1070,11 +1105,16 @@ export function employeeCompactionEmailContent({
 
     ${emailButton(link, "Review compaction")}
     <p style="margin:0;font-size:12px;color:#94a3b8;">Open this link to review, comment, or request a correction in FlowZen.</p>
+    ${signature}
   `, { title, companyName: company?.name, companyLogo: company?.icon });
 
   const lines = [
     `${type} Compaction — ${employeeName}`,
     periodLabel,
+    boardName ? `\nBoard: ${boardName}${boardDescription ? ` — ${boardDescription}` : ""}` : "",
+    boardCreatedLabel ? `Board created: ${boardCreatedLabel}` : "",
+    teamOwnerName ? `\nTeam Owner: ${teamOwnerName}` : "",
+    teamName ? `\nTeam: ${teamName}` : "",
     summary ? `\nSummary: ${summary}` : "",
     content.completedWork.length ? `\nCompleted:\n${content.completedWork.map((item) => `- ${item}`).join("\n")}` : "",
     content.partialWork.length ? `\nPartially completed:\n${content.partialWork.map((item) => `- ${item}`).join("\n")}` : "",
@@ -1082,6 +1122,7 @@ export function employeeCompactionEmailContent({
     content.blockers.length ? `\nBlockers:\n${content.blockers.map((item) => `- ${item}`).join("\n")}` : "",
     content.nextActions ? `\nNext actions: ${content.nextActions}` : "",
     `\nReview: ${link}`,
+    teamName ? `\n${employeeName} · ${teamName}` : `\n${employeeName}`,
   ];
   return { subject: title, text: lines.filter(Boolean).join("\n"), html };
 }

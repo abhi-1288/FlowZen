@@ -95,7 +95,7 @@ export function ResumeWorkspacePanel() {
         {(counts.pendingHandovers ?? 0) > 0 || (counts.pendingCompactions ?? 0) > 0 ? (
           <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
             {(counts.pendingHandovers ?? 0) > 0 ? (
-              <Link className="rounded-full bg-indigo-50 px-2.5 py-1 font-semibold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300" href="/boards?tab=delegated-work">
+              <Link className="rounded-full bg-indigo-50 px-2.5 py-1 font-semibold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300" href="/board/workspace?tab=delegated-work">
                 {counts.pendingHandovers} handover request(s) need your response
               </Link>
             ) : null}
@@ -319,7 +319,7 @@ export function BoardsOverviewPanel() {
               {(data?.pendingHandovers ?? []).map((handover) => (
                 <Link
                   className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50/60 px-3 py-2 text-[11px] text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-200"
-                  href="/boards?tab=delegated-work"
+                  href="/board/workspace?tab=delegated-work"
                   key={handover.id}
                 >
                   <Users size={12} />

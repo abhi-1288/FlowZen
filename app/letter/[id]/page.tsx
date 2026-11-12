@@ -497,12 +497,14 @@ function SalaryCertificateContent({
   const requesterId = data.requester?._id ?? "";
   const identityCode = data.requester?.companyIdentityCode;
 
-  const date = new Date().toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-
+  const signedAtRaw = data.metadata?.signedAt ?? data.metadata?.approvedAt ?? data.createdAt ?? "";
+  const date = signedAtRaw
+    ? new Date(signedAtRaw).toLocaleDateString("en-IN", {
+        day: "numeric", month: "long", year: "numeric",
+      })
+    : new Date().toLocaleDateString("en-IN", {
+        day: "numeric", month: "long", year: "numeric",
+      });
   const monthlyBase = salary?.baseSalary ?? 0;
   const annualCtc = monthlyBase * 12;
 
@@ -529,7 +531,7 @@ function SalaryCertificateContent({
 
   return (
     <div className="space-y-6 text-sm leading-relaxed text-slate-800 print:space-y-3">
-      <p>Date: <strong>{date}</strong></p>
+      <p>Date of issue: <strong>{date}</strong></p>
 
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 print:p-2">
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 print:mb-1">Employee Details</h3>

@@ -60,6 +60,23 @@ export async function PATCH(request: Request, { params }: Params) {
   const callerRole = String(caller.role);
   const takeoverUpdates: Record<string, unknown> = {};
   const isDoneColumn = targetColumn.title.toLowerCase() === "done";
+  const isExpiredColumn = targetColumn.title.toLowerCase() === "expired-due";
+  const isDecisionColumn = targetColumn.title.toLowerCase() === "decision & dependency";
+  const isRiskColumn = targetColumn.title.toLowerCase() === "risks";
+  const mappedTodoStatus = isDoneColumn || isExpiredColumn
+    ? "completed"
+    : targetColumn.title.toLowerCase() === "blocked"
+      ? "blocked"
+      : isDecisionColumn
+        ? "decision_pending"
+        : isRiskColumn
+          ? "risk_flagged"
+          : targetColumn.title.toLowerCase() === "taken"
+            ? "taken"
+            : targetColumn.title.toLowerCase() === "todo"
+              ? "not_started"
+              : "in_progress";
+  const isCompletedColumn = mappedTodoStatus === "completed";
   const isMovingFromTodo = todoColumn && String(task.column) === String(todoColumn._id);
   const isMovingToTodo = todoColumn && String(toColumnId) === String(todoColumn._id);
 
@@ -130,10 +147,10 @@ export async function PATCH(request: Request, { params }: Params) {
           currentWorkingDate: new Date(),
           dueDate: task.dueDate ?? null,
           priority: task.priority,
-          status: isDoneColumn ? "completed" : "in_progress",
-          progress: isDoneColumn ? 100 : 0,
-          remainingWork: isDoneColumn ? "" : "Continue the active board task.",
-          nextAction: isDoneColumn ? "" : `Continue ${task.title}`,
+          status: mappedTodoStatus,
+          progress: isCompletedColumn ? 100 : 0,
+          remainingWork: isCompletedColumn ? "" : "Continue the active board task.",
+          nextAction: isCompletedColumn ? "" : `Continue ${task.title}`,
           updatedBy: userId,
         },
         $setOnInsert: {
@@ -155,6 +172,20 @@ export async function PATCH(request: Request, { params }: Params) {
       message: activityDetail
     });
     emitToUser(String(board.owner), "notification:new", { boardId: id });
+  }
+
+  if (isDecisionColumn || isRiskColumn) {
+    const recipientId = String(
+      (takeoverUpdates.takenLead as any) ?? task.takenLead ?? board.owner,
+    );
+    await Notification.create({
+      user: recipientId,
+      board: id,
+      task: taskId,
+      title: isDecisionColumn ? "Decision / dependency requested" : "Risk flagged",
+      message: `${caller.name} moved "${task.title}" to ${targetColumn.title} and is requesting guidance.`,
+    });
+    emitToUser(recipientId, "notification:new", { boardId: id });
   }
 
   await Promise.all(

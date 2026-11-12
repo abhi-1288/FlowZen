@@ -1,4 +1,4 @@
-export const EMPLOYEE_TASK_MODES = ["approval", "allowed", "blocked"] as const;
+export const EMPLOYEE_TASK_MODES = ["approval", "allowed", "blocked", "admin_only"] as const;
 
 export type EmployeeTaskMode = (typeof EMPLOYEE_TASK_MODES)[number];
 
@@ -24,7 +24,7 @@ type BoardLike = {
   employeeTaskCreation?: string;
 } | null | undefined;
 
-function idOf(value: unknown) {
+export function idOf(value: unknown) {
   if (!value) return "";
   if (typeof value === "string") return value;
   if (typeof value === "object") {
@@ -66,9 +66,24 @@ export function canManageBoardTasks(
 }
 
 /**
+ * Only company admins, board owners and board-level admins may create tasks
+ * when the board is in `admin_only` mode.
+ */
+export function isAdminCreator(
+  board: BoardLike | null,
+  userId?: string | null,
+  userRole?: string | null
+) {
+  if (!board || !userId) return false;
+  if (idOf(board.owner) === userId) return true;
+  if (String(userRole ?? "") === "admin") return true;
+  return boardRoleForUser(board, userId) === "admin";
+}
+
+/**
  * Employees and "others" can still open the create form while the board is in
  * `approval` mode; their task is created in a pending state. `blocked` hides
- * task creation for them entirely.
+ * task creation for them entirely. `admin_only` restricts creation to admins.
  */
 export function canCreateTaskOnBoard(
   board: BoardLike | null,
@@ -76,8 +91,12 @@ export function canCreateTaskOnBoard(
   userRole?: string | null
 ) {
   if (!board || !userId) return false;
+  const mode = normalizeEmployeeTaskMode(board.employeeTaskCreation);
+  if (mode === "admin_only") {
+    return isAdminCreator(board, userId, userRole);
+  }
   if (canManageBoardTasks(board, userId, userRole)) return true;
-  return normalizeEmployeeTaskMode(board.employeeTaskCreation) !== "blocked";
+  return mode !== "blocked";
 }
 
 export function requiresTaskApproval(
@@ -86,6 +105,8 @@ export function requiresTaskApproval(
   userRole?: string | null
 ) {
   if (!board || !userId) return false;
+  const mode = normalizeEmployeeTaskMode(board.employeeTaskCreation);
+  if (mode === "admin_only") return false;
   if (canManageBoardTasks(board, userId, userRole)) return false;
-  return normalizeEmployeeTaskMode(board.employeeTaskCreation) === "approval";
+  return mode === "approval";
 }

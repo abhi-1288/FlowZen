@@ -12,6 +12,8 @@ import {
   canManageBoardTasks,
   normalizeEmployeeTaskMode,
   requiresTaskApproval,
+  idOf,
+  boardRoleForUser,
 } from "@/lib/task-permissions";
 
 type Params = { params: Promise<{ id: string }> };
@@ -78,15 +80,29 @@ export async function POST(request: Request, { params }: Params) {
   if (column.title.toLowerCase() === "expired-due") return jsonError("You cannot add tasks directly to Expired-due.", 403);
 
   const isReviewer = canManageBoardTasks(board, userId, String(caller.role));
-  if (!isReviewer) {
-    const mode = normalizeEmployeeTaskMode(board.employeeTaskCreation);
+  const mode = normalizeEmployeeTaskMode(board.employeeTaskCreation);
+  if (mode === "admin_only") {
+    const isAdmin =
+      idOf(board.owner) === userId ||
+      String(caller.role) === "admin" ||
+      boardRoleForUser(board, userId) === "admin";
+    if (!isAdmin) {
+      return jsonError("Task creation is disabled for your role on this board.", 403);
+    }
+  } else if (!isReviewer) {
     if (mode === "blocked") {
       return jsonError("Task creation is disabled for your role on this board.", 403);
     }
   }
 
+  const isReviewerForTask =
+    mode === "admin_only"
+      ? idOf(board.owner) === userId ||
+        String(caller.role) === "admin" ||
+        boardRoleForUser(board, userId) === "admin"
+      : isReviewer;
   const approvalStatus =
-    !isReviewer && requiresTaskApproval(board, userId, String(caller.role))
+    !isReviewerForTask && requiresTaskApproval(board, userId, String(caller.role))
       ? "pending"
       : "approved";
 

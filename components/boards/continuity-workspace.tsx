@@ -1,8 +1,8 @@
-"use client";
-
-import { useCallback } from "react";
+﻿"use client";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { apiFetch } from "@/lib/client-utils";
 import {
   ArrowLeft,
   CheckSquare,
@@ -59,6 +59,31 @@ export function ContinuityWorkspace() {
   const compactionFocus = searchParams?.get("focus") ?? "";
   const teamCompactionFocus = searchParams?.get("teamCompaction") ?? "";
 
+  const [counts, setCounts] = useState<Record<string, number>>({});
+
+  const loadCounts = useCallback(async () => {
+    const results = await Promise.allSettled([
+      apiFetch<{ boards?: any[] }>("/api/boards", undefined, { toast: false }).then((r) => r?.boards?.length ?? 0).catch(() => 0),
+      apiFetch<{ tasks?: any[] }>("/api/boards/major-tasks?limit=200", undefined, { toast: false }).then((r) => r?.tasks?.length ?? 0).catch(() => 0),
+      apiFetch<{ todos?: any[] }>("/api/boards/todos?scope=mine&limit=200", undefined, { toast: false }).then((r) => r?.todos?.length ?? 0).catch(() => 0),
+      apiFetch<{ compactions?: any[]; counts?: Record<string, number> }>("/api/compactions?scope=mine&limit=1", undefined, { toast: false }).then((r) => r?.counts?.actionRequired ?? r?.compactions?.length ?? 0).catch(() => 0),
+      apiFetch<{ handovers?: any[] }>("/api/boards/todos/handover?scope=incoming&status=pending", undefined, { toast: false }).then((r) => r?.handovers?.length ?? 0).catch(() => 0),
+      apiFetch<{ compactions?: any[]; counts?: Record<string, number> }>("/api/team-compactions?scope=owned&limit=1", undefined, { toast: false }).then((r) => r?.counts?.actionRequired ?? r?.compactions?.length ?? 0).catch(() => 0),
+    ]);
+    setCounts({
+      "my-boards": results[0].status === "fulfilled" ? results[0].value : 0,
+      "my-tasks": results[1].status === "fulfilled" ? results[1].value : 0,
+      "my-todos": results[2].status === "fulfilled" ? results[2].value : 0,
+      compactions: results[3].status === "fulfilled" ? results[3].value : 0,
+      "delegated-work": results[4].status === "fulfilled" ? results[4].value : 0,
+      "team-compactions": results[5].status === "fulfilled" ? results[5].value : 0,
+    });
+  }, []);
+
+  useEffect(() => {
+    void loadCounts();
+  }, [loadCounts]);
+
   const goToTab = useCallback(
     (next: WorkspaceTab) => {
       const params = new URLSearchParams(searchParams?.toString() ?? "");
@@ -66,7 +91,7 @@ export function ContinuityWorkspace() {
       params.delete("todo");
       params.delete("focus");
       params.delete("teamCompaction");
-      router.push(`/boards?${params.toString()}`);
+      router.push(`/board/workspace?${params.toString()}`);
     },
     [router, searchParams],
   );
@@ -109,47 +134,89 @@ export function ContinuityWorkspace() {
             </Link>
           </div>
         </div>
+      </header>
 
-        <div className="mx-auto max-w-7xl overflow-x-auto px-4 pb-2">
-          <nav className="flex items-center gap-1">
+      <div className="mx-auto flex max-w-7xl gap-4 px-4 py-5">
+        <aside className="hidden w-52 shrink-0 md:block">
+          <nav className="sticky top-20 space-y-1 rounded-xl border border-slate-200 bg-white p-2 dark:border-zinc-800 dark:bg-[#0b0b0b]">
             {TABS.map((item) => {
               const Icon = item.icon;
               const active = tab === item.key;
+              const count = counts[item.key];
               return (
                 <button
-                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold transition ${
+                  className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition ${
                     active
                       ? "bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                      : "text-slate-500 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                      : "text-slate-600 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
                   }`}
                   key={item.key}
                   onClick={() => goToTab(item.key)}
                   type="button"
                 >
-                  <Icon size={13} /> {item.label}
+                  <Icon size={14} />
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {typeof count === "number" && count > 0 ? (
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                        active
+                          ? "bg-white/20 text-white dark:bg-zinc-900/40 dark:text-zinc-900"
+                          : "bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-zinc-300"
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  ) : null}
                 </button>
               );
             })}
           </nav>
-        </div>
-      </header>
+        </aside>
 
-      <main className="mx-auto max-w-7xl px-4 py-5">
-        {tab === "overview" ? (
-          <div className="space-y-4">
-            <BoardsOverviewPanel />
-            <TodosPanel defaultScope="mine" />
+        <main className="min-w-0 flex-1">
+          <div className="mb-4 md:hidden">
+            <div className="flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-2 dark:border-zinc-800 dark:bg-[#0b0b0b]">
+              {TABS.map((item) => {
+                const Icon = item.icon;
+                const active = tab === item.key;
+                const count = counts[item.key];
+                return (
+                  <button
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold transition ${
+                      active
+                        ? "bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                        : "text-slate-500 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                    }`}
+                    key={item.key}
+                    onClick={() => goToTab(item.key)}
+                    type="button"
+                  >
+                    <Icon size={13} /> {item.label}
+                    {typeof count === "number" && count > 0 ? (
+                      <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-bold">{count}</span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        ) : null}
-        {tab === "my-boards" ? <MyBoardsPanel /> : null}
-        {tab === "my-tasks" ? <MyTasksPanel /> : null}
-        {tab === "my-todos" ? <TodosPanel defaultScope="mine" /> : null}
-        {tab === "resume" ? <ResumeWorkspacePanel /> : null}
-        {tab === "compactions" ? <CompactionsPanel defaultScope="mine" focusId={compactionFocus} /> : null}
-        {tab === "delegated-work" ? <DelegatedWorkPanel defaultScope="incoming" /> : null}
-        {tab === "team-compactions" ? <TeamCompactionsPanel defaultScope="owned" focusId={teamCompactionFocus} /> : null}
-        {tab === "task-history" ? <TaskHistoryPanel defaultTodoId={todoFocus} /> : null}
-      </main>
+
+          {tab === "overview" ? (
+            <div className="space-y-4">
+              <BoardsOverviewPanel />
+              <TodosPanel defaultScope="mine" />
+            </div>
+          ) : null}
+          {tab === "my-boards" ? <MyBoardsPanel /> : null}
+          {tab === "my-tasks" ? <MyTasksPanel /> : null}
+          {tab === "my-todos" ? <TodosPanel defaultScope="mine" /> : null}
+          {tab === "resume" ? <ResumeWorkspacePanel /> : null}
+          {tab === "compactions" ? <CompactionsPanel defaultScope="mine" focusId={compactionFocus} /> : null}
+          {tab === "delegated-work" ? <DelegatedWorkPanel defaultScope="incoming" /> : null}
+          {tab === "team-compactions" ? <TeamCompactionsPanel defaultScope="owned" focusId={teamCompactionFocus} /> : null}
+          {tab === "task-history" ? <TaskHistoryPanel defaultTodoId={todoFocus} /> : null}
+        </main>
+      </div>
 
       <footer className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 pb-8 text-[11px] text-slate-400 dark:text-zinc-500">
         <span className="inline-flex items-center gap-1">
