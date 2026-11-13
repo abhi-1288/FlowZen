@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import { Inter } from "next/font/google";
-import { AD_LOADER_SRC } from "@/lib/ads";
 import { SessionProvider } from "@/components/providers/session-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { ToastProvider } from "@/lib/toast-context";
@@ -95,13 +93,6 @@ export default function RootLayout({
         />
       </head>
       <body className={inter.className}>
-        <Script
-          id="google-adsense"
-          async
-          src={AD_LOADER_SRC}
-          crossOrigin="anonymous"
-          strategy="afterInteractive"
-        />
         <SessionProvider>
           <ThemeProvider>
             <ToastProvider>
