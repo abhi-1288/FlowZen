@@ -113,6 +113,8 @@ export function HrPolicyTab({
           onCarryForwardWfhChange={wfh.setCarryForwardWfhDays}
           minWorkHours={policy.minWorkHours}
           onMinWorkHoursChange={policy.setMinWorkHours}
+          compactionAutoDeliver={policy.compactionAutoDeliver}
+          onCompactionAutoDeliverChange={policy.setCompactionAutoDeliver}
           savingDayHour={policy.savingDayHour}
           onSaveDayHour={policy.saveDayHourOnly}
           identityCodePrefix={policy.identityCodePrefix}

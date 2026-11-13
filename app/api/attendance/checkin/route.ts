@@ -4,6 +4,7 @@ import { requireUserId, jsonError } from "@/lib/api";
 import { Attendance } from "@/models/Attendance";
 import { User } from "@/models/User";
 import { Company } from "@/models/Company";
+import { attendanceDay, attendanceDayKey } from "@/lib/attendance-day";
 
 export async function POST() {
   const userId = await requireUserId();
@@ -16,19 +17,19 @@ export async function POST() {
   if (!user.company) return jsonError("You must belong to a company to check in.", 400);
 
   const company = await Company.findById(user.company);
-  
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+
+  // Resolve "today" in the company's timezone so attendance and EOD/EOW
+  // compactions agree on which calendar day an event belongs to.
+  const now = new Date();
+  const todayKey = attendanceDayKey(now, company?.timeZone);
+  const today = attendanceDay(now, company?.timeZone);
 
   // Check if check-in is allowed based on WFH settings
   if (company && company.wfhCheckInMode === "wfh-only") {
-    const todayTime = today.getTime();
     const isWfhDay = company.wfhDates?.some((entry: any) => {
       const dateVal = entry?.date ? entry.date : entry;
-      const dateTime = new Date(dateVal).getTime();
-      const wfhDate = new Date(dateTime);
-      wfhDate.setHours(0, 0, 0, 0);
-      return wfhDate.getTime() === todayTime;
+      if (!dateVal) return false;
+      return attendanceDayKey(dateVal, company.timeZone) === todayKey;
     });
 
     if (!isWfhDay) {
@@ -46,7 +47,7 @@ export async function POST() {
     attendance = await Attendance.create({
       user: userId,
       date: today,
-      checkIn: new Date(),
+      checkIn: now,
       status: "present"
     });
   } catch (err: any) {
@@ -64,15 +65,19 @@ export async function GET() {
   if (!userId) return jsonError("Unauthorized", 401);
 
   await connectDb();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
 
-  const history = await Attendance.find({ user: userId }).sort({ date: -1 }).limit(30);
   const user = await User.findById(userId).select("company");
   let minWorkHours = 8;
+  let timeZone: string | null = null;
   if (user?.company) {
-    const company = await Company.findById(user.company).select("minWorkHours");
-    if (company) minWorkHours = company.minWorkHours ?? 8;
+    const company = await Company.findById(user.company).select("minWorkHours timeZone");
+    if (company) {
+      minWorkHours = company.minWorkHours ?? 8;
+      timeZone = company.timeZone ?? null;
+    }
   }
+
+  const today = attendanceDay(new Date(), timeZone);
+  const history = await Attendance.find({ user: userId }).sort({ date: -1 }).limit(30);
   return NextResponse.json({ history, today: today.toISOString(), minWorkHours });
 }

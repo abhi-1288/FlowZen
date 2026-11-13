@@ -50,6 +50,8 @@ export function PolicyConfigSection({
   onCarryForwardWfhChange,
   minWorkHours,
   onMinWorkHoursChange,
+  compactionAutoDeliver,
+  onCompactionAutoDeliverChange,
   savingDayHour,
   onSaveDayHour,
   identityCodePrefix,
@@ -106,6 +108,8 @@ export function PolicyConfigSection({
   onCarryForwardWfhChange: (value: boolean) => void;
   minWorkHours: number;
   onMinWorkHoursChange: (value: number) => void;
+  compactionAutoDeliver: boolean;
+  onCompactionAutoDeliverChange: (value: boolean) => void;
   savingDayHour: boolean;
   onSaveDayHour: () => Promise<boolean>;
   identityCodePrefix: string;
@@ -416,6 +420,26 @@ export function PolicyConfigSection({
         <p className="mt-3 rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] p-3 text-xs text-slate-500">
           Attendance rules: &lt; {Math.floor(minWorkHours / 2)} hrs = absent, &ge; {Math.floor(minWorkHours / 2)} hrs and &lt; {minWorkHours} hrs = half-day, &ge; {minWorkHours} hrs = present
         </p>
+
+        <div className="mt-3 flex items-center justify-between rounded-lg neu-inset px-3 py-2.5">
+          <div className="pr-3">
+            <span className="text-sm text-slate-700">Auto-deliver EOD report on checkout</span>
+            <p className="mt-0.5 text-xs text-slate-500">
+              When on, a checkout submits the EOD report to the Team Owner automatically. When off, employees review and confirm it first.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={compactionAutoDeliver}
+            onClick={() => onCompactionAutoDeliverChange(!compactionAutoDeliver)}
+            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 ${ compactionAutoDeliver ? "bg-emerald-500" : "bg-slate-300" }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full neu-card ring-0 transition duration-200 ease-in-out mt-0.5 ${ compactionAutoDeliver ? "translate-x-4 ml-0.5" : "translate-x-0 ml-0.5" }`}
+            />
+          </button>
+        </div>
       </PolicyModal>
 
       {/* Identity Code Modal */}

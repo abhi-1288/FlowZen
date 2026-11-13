@@ -38,7 +38,7 @@ export async function GET(request: Request) {
   }
 
   const company = await Company.findById(user.company).select(
-    "owner noticePeriodDays paidLeaveDays paidLeavePeriod wfhDays wfhPeriod carryForwardLeaveDays carryForwardWfhDays minWorkHours",
+    "owner noticePeriodDays paidLeaveDays paidLeavePeriod wfhDays wfhPeriod carryForwardLeaveDays carryForwardWfhDays minWorkHours compactionAutoDeliver",
   );
   const adminRegion = effectiveRegionLabelOf(company, user);
   let policy = await CompanyPolicy.findOne({ company: user.company, region: adminRegion });
@@ -59,6 +59,7 @@ export async function GET(request: Request) {
       carryForwardLeaveDays: company?.carryForwardLeaveDays ?? false,
       carryForwardWfhDays: company?.carryForwardWfhDays ?? false,
       minWorkHours: company?.minWorkHours ?? 8,
+      compactionAutoDeliver: company?.compactionAutoDeliver ?? false,
     },
     settlement: {
       enabled: policy.settlementEnabled !== false,
@@ -80,6 +81,7 @@ export async function PATCH(request: Request) {
   const hasPaidLeavePeriod = Object.prototype.hasOwnProperty.call(body, "paidLeavePeriod");
   const hasCarryForwardLeave = Object.prototype.hasOwnProperty.call(body, "carryForwardLeaveDays");
   const hasMinWorkHours = Object.prototype.hasOwnProperty.call(body, "minWorkHours");
+  const hasCompactionAutoDeliver = Object.prototype.hasOwnProperty.call(body, "compactionAutoDeliver");
   const hasSettlementEnabled = Object.prototype.hasOwnProperty.call(body, "settlementEnabled");
   const hasSettlementHourDays = Object.prototype.hasOwnProperty.call(body, "settlementHourDays");
   const hasSettlementDayDays = Object.prototype.hasOwnProperty.call(body, "settlementDayDays");
@@ -100,6 +102,7 @@ export async function PATCH(request: Request) {
     return jsonError("Invalid paid leave period.", 400);
   }
   const carryForwardLeaveDays = body.carryForwardLeaveDays === true;
+  const compactionAutoDeliver = body.compactionAutoDeliver === true;
   if (hasMinWorkHours && (!Number.isFinite(minWorkHours) || minWorkHours < 1 || minWorkHours > 24)) {
     return jsonError("Invalid minimum work hours.", 400);
   }
@@ -158,6 +161,7 @@ export async function PATCH(request: Request) {
   if (hasPaidLeavePeriod) company.paidLeavePeriod = paidLeavePeriod;
   if (hasCarryForwardLeave) company.carryForwardLeaveDays = carryForwardLeaveDays;
   if (hasMinWorkHours) company.minWorkHours = Math.floor(minWorkHours);
+  if (hasCompactionAutoDeliver) company.compactionAutoDeliver = compactionAutoDeliver;
   await company.save();
 
   const settlementFields: Record<string, unknown> = {};
@@ -196,6 +200,10 @@ export async function PATCH(request: Request) {
     policyFrom.minWorkHours = company.minWorkHours;
     policyTo.minWorkHours = Math.floor(minWorkHours);
   }
+  if (hasCompactionAutoDeliver) {
+    policyFrom.compactionAutoDeliver = company.compactionAutoDeliver;
+    policyTo.compactionAutoDeliver = compactionAutoDeliver;
+  }
   if (Object.keys(settlementFields).length > 0) policyTo.settlement = settlementFields;
 
   await recordAudit({
@@ -215,6 +223,7 @@ export async function PATCH(request: Request) {
     paidLeaveDays: company.paidLeaveDays,
     paidLeavePeriod: company.paidLeavePeriod,
     minWorkHours: company.minWorkHours,
+    compactionAutoDeliver: company.compactionAutoDeliver,
   });
 
   const targets = new Set<string>(
