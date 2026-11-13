@@ -32,6 +32,13 @@ export async function POST(request: Request) {
   if (!user.company || user.companyStatus !== "approved") {
     return jsonError("You must be an approved company member to request an employment type.", 403);
   }
+  if (employmentEndDate && user.company) {
+    const currentUser = await User.findById(userId).select("companyJoined createdAt");
+    const joinedAt = currentUser?.companyJoined ?? currentUser?.createdAt;
+    if (joinedAt && employmentEndDate < new Date(joinedAt)) {
+      return jsonError("Employment end date cannot be earlier than the joining date.", 400);
+    }
+  }
   if (String(user.employmentType ?? "").trim()) {
     return jsonError("Your employment type is already set.", 400);
   }

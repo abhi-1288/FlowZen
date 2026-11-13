@@ -16,6 +16,7 @@ const HolidaySchema = new Schema(
 );
 
 HolidaySchema.index({ company: 1, region: 1 });
+HolidaySchema.index({ company: 1, startDate: 1 });
 
 if (process.env.NODE_ENV === "development") {
   delete (models as any).Holiday;

@@ -6,6 +6,8 @@ import { actingRoleForRequest } from "@/lib/delegation-access";
 import { VisitorPass } from "@/models/VisitorPass";
 import { EntryLog } from "@/models/EntryLog";
 import { Attendance } from "@/models/Attendance";
+import { Company } from "@/models/Company";
+import { attendanceDay } from "@/lib/attendance-day";
 import { findInterviewPassByCode } from "@/lib/candidate-portal";
 
 export async function GET(request: Request) {
@@ -129,6 +131,8 @@ export async function POST(request: Request) {
     companyIdentityCode: { $regex: codeRegex },
   }).select("_id name");
 
+  const company = await Company.findById(actor.company).select("timeZone");
+
   if (employee) {
     await EntryLog.create({
       user: employee._id,
@@ -138,16 +142,18 @@ export async function POST(request: Request) {
       recordedBy: userId,
     });
 
-    // Also update attendance — but self-service always takes priority
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Also update attendance — but self-service always takes priority.
+    // Resolve the day in the company's timezone so gate scans agree with
+    // self-service check-in and EOD/EOW compactions.
+    const now = new Date();
+    const today = attendanceDay(now, company?.timeZone);
     const existing = await Attendance.findOne({ user: employee._id, date: today });
 
     if (type === "entry" && !existing) {
       await Attendance.create({
         user: employee._id,
         date: today,
-        checkIn: new Date(),
+        checkIn: now,
         status: "present",
       });
     } else if (type === "exit" && existing && existing.checkIn && !existing.checkOut) {

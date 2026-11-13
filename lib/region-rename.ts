@@ -126,6 +126,7 @@ export async function applyRegionLabelChanges(options: {
       identityCodeRegions?: { region: string }[];
       wfhDates?: { region: string }[];
       weekendDates?: { region: string }[];
+      weekendExclusions?: { region: string }[];
       markModified?: (path: string) => void;
     } | null;
 
@@ -140,7 +141,7 @@ export async function applyRegionLabelChanges(options: {
       if (changed) company.markModified?.("identityCodeRegions");
     }
 
-    for (const path of ["wfhDates", "weekendDates"] as const) {
+    for (const path of ["wfhDates", "weekendDates", "weekendExclusions"] as const) {
       const list = company?.[path];
       if (list && Array.isArray(list)) {
         let changed = false;

@@ -2,17 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Moon, Sun, Monitor, Sparkles } from "lucide-react";
-import { applyTheme, getThemePreference, THEME_KEY, type ThemePreference, getGlassPreference, applyGlass } from "@/components/providers/theme-provider";
+import { applyTheme, getThemePreference, THEME_KEY, type ThemePreference } from "@/components/providers/theme-provider";
 
 export function AppearanceSection() {
   const [mode, setMode] = useState<ThemePreference>("system");
-  const [glass, setGlass] = useState(false);
 
   useEffect(() => {
     setMode(getThemePreference());
-    const g = getGlassPreference();
-    setGlass(g);
-    applyGlass(g);
   }, []);
 
   useEffect(() => {
@@ -75,23 +71,6 @@ export function AppearanceSection() {
         })}
       </div>
 
-      <div className="mt-5 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-zinc-700 dark:bg-zinc-900">
-        <div>
-          <p className="text-sm font-medium text-slate-900 dark:text-zinc-100">Glassmorphism UI</p>
-          <p className="text-xs text-slate-500 dark:text-zinc-400">Frosted translucent surfaces on headers and cards.</p>
-        </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={glass}
-          onClick={() => { const next = !glass; setGlass(next); applyGlass(next); }}
-          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 ${glass ? "bg-emerald-500" : "bg-slate-300 dark:bg-zinc-600"}`}
-        >
-          <span
-            className={`pointer-events-none absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ease-in-out ${glass ? "translate-x-5" : "translate-x-0"}`}
-          />
-        </button>
-      </div>
     </section>
   );
 }

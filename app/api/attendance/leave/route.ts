@@ -7,6 +7,7 @@ import { User } from "@/models/User";
 import { Notification } from "@/models/Notification";
 import { Company } from "@/models/Company";
 import { emitToUser } from "@/lib/socket-emit";
+import { attendanceDay, attendanceDayKey } from "@/lib/attendance-day";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -67,7 +68,7 @@ export async function POST(req: Request) {
     if (!user.company) return jsonError("You must belong to a company to request leave.", 400);
     if (String(user.role) === "admin") return jsonError("Admins cannot request paid leave.", 403);
 
-    const company = await Company.findById(user.company).select("paidLeaveDays paidLeavePeriod carryForwardLeaveDays");
+    const company = await Company.findById(user.company).select("paidLeaveDays paidLeavePeriod carryForwardLeaveDays timeZone");
     if (!company) return jsonError("Company not found.", 404);
     const paidLeaveDays = Math.max(0, Number(company.paidLeaveDays ?? 0));
     const paidLeavePeriod = String(company.paidLeavePeriod ?? "monthly");
@@ -80,10 +81,12 @@ export async function POST(req: Request) {
 
     // If requesting leave for today and user already checked in, treat as half-day
     let halfDay = false;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (start.getTime() === today.getTime()) {
-      const existingAttendance = await Attendance.findOne({ user: userId, date: today });
+    const now = new Date();
+    if (attendanceDayKey(start, company.timeZone) === attendanceDayKey(now, company.timeZone)) {
+      const existingAttendance = await Attendance.findOne({
+        user: userId,
+        date: attendanceDay(now, company.timeZone),
+      });
       if (existingAttendance) {
         halfDay = true;
       }

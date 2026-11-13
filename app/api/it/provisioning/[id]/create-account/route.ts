@@ -6,6 +6,8 @@ import { ITProvisioningRequest } from "@/models/ITProvisioningRequest";
 import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { Attendance } from "@/models/Attendance";
+import { Company } from "@/models/Company";
+import { attendanceDay } from "@/lib/attendance-day";
 import { emitNotification } from "@/lib/realtime";
 import { canManageIt, pushProvisioningActivity } from "@/lib/it";
 import { actingRoleForRequest } from "@/lib/delegation-access";
@@ -105,9 +107,10 @@ export async function POST(request: Request, { params }: Params) {
       customRole: req.designation || "",
     });
     req.employee = employee._id;
+    const accountCompany = await Company.findById(companyId).select("timeZone");
     await Attendance.create({
       user: employee._id,
-      date: new Date(),
+      date: attendanceDay(new Date(), accountCompany?.timeZone),
       checkIn: null,
       checkOut: null,
       status: "present",

@@ -79,6 +79,7 @@ export function HrPolicyTab({
     setWfhMode: wfh.setWfhMode,
     updateWfhMode: wfh.updateWfhMode,
     wfhLoading: wfh.wfhLoading,
+    assignHolidayWeekend: wfh.assignHolidayWeekend,
   };
 
   const canManageWfh = (actorRole === "admin" || actorRole === "human-resource") && profile?.companyStatus === "approved";
@@ -113,6 +114,8 @@ export function HrPolicyTab({
           onCarryForwardWfhChange={wfh.setCarryForwardWfhDays}
           minWorkHours={policy.minWorkHours}
           onMinWorkHoursChange={policy.setMinWorkHours}
+          compactionAutoDeliver={policy.compactionAutoDeliver}
+          onCompactionAutoDeliverChange={policy.setCompactionAutoDeliver}
           savingDayHour={policy.savingDayHour}
           onSaveDayHour={policy.saveDayHourOnly}
           identityCodePrefix={policy.identityCodePrefix}

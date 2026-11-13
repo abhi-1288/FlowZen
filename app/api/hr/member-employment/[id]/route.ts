@@ -72,6 +72,16 @@ export async function PATCH(request: Request, { params }: Params) {
     return jsonError("Only approved HR, admins, or senior security can update members.", 403);
   }
 
+  const requestedEndDate = body.employmentEndDate === null || body.employmentEndDate === ""
+    ? null
+    : new Date(String(body.employmentEndDate));
+  if (requestedEndDate && !Number.isNaN(requestedEndDate.getTime())) {
+    const joinedAt = member.companyJoined ?? member.createdAt;
+    if (joinedAt && requestedEndDate < new Date(joinedAt)) {
+      return jsonError("Employment end date cannot be earlier than the joining date.", 400);
+    }
+  }
+
   const employmentType = String(body.employmentType ?? "").trim();
   if (employmentType && !VALID_EMPLOYMENT_TYPES.includes(employmentType)) {
     return jsonError(`Invalid employment type. Allowed: ${VALID_EMPLOYMENT_TYPES.join(", ")}.`, 400);
@@ -88,7 +98,7 @@ export async function PATCH(request: Request, { params }: Params) {
   }
 
   if (body.employmentEndDate !== undefined) {
-    const endDate = body.employmentEndDate === null || body.employmentEndDate === "" ? null : new Date(String(body.employmentEndDate));
+    const endDate = requestedEndDate;
     member.employmentEndDate = endDate && !Number.isNaN(endDate.getTime()) ? endDate : null;
   }
 

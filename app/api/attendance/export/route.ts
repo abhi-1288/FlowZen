@@ -13,6 +13,7 @@ import { financeMemberScope } from "@/app/api/finance/helpers";
 import { recordAudit } from "@/lib/audit";
 import { effectiveRegionLabelOf } from "@/lib/company-regions";
 import { actingRoleForRequest } from "@/lib/delegation-access";
+import { isWeekendDate } from "@/lib/weekends";
 
 
 /** Parse a date string and return midnight local time (or null if invalid). */
@@ -152,7 +153,7 @@ export async function GET(request: Request) {
 
   const [members, attendanceRows, leaveRows, wfhRows, holidayRows, company] = await Promise.all([
     User.find({ _id: { $in: memberIds } })
-      .select("name email role customRole companyIdentityCode companyJoined createdAt")
+      .select("name email role customRole companyIdentityCode companyJoined createdAt regionLabel")
       .sort({ name: 1 }),
     Attendance.find({
       user: { $in: memberIds },
@@ -175,7 +176,7 @@ export async function GET(request: Request) {
       startDate: { $lte: endOfDay(to) },
       endDate: { $gte: from },
     }).lean(),
-    Company.findById(actor.company).select("name wfhDates weekendDates").lean(),
+    Company.findById(actor.company).select("name wfhDates weekendDates weekendExclusions addresses address").lean(),
   ]);
 
   const attendanceByUserDay = new Map<string, any>();
@@ -231,22 +232,8 @@ export async function GET(request: Request) {
     }
   });
 
-  const assignedWeekendsByMonth = new Map<string, boolean>();
-  ((company as any)?.weekendDates ?? []).forEach((entry: any) => {
-    const date = startOfDay(String(entry.date));
-    if (date) {
-      assignedWeekendsByMonth.set(date.toISOString().slice(0, 7), true);
-    }
-  });
-
-  const companyWeekendDays = new Set<string>();
-  ((company as any)?.weekendDates ?? []).forEach((entry: any) => {
-    const date = startOfDay(String(entry.date));
-    if (!date) return;
-    if (date.getTime() >= from.getTime() && date.getTime() <= to.getTime()) {
-      companyWeekendDays.add(isoDay(date));
-    }
-  });
+  const companyWeekendEntries = ((company as any)?.weekendDates ?? []) as any[];
+  const companyWeekendExclusions = ((company as any)?.weekendExclusions ?? []) as any[];
 
   const dates = Array.from({ length: dayCount }, (_, offset) => {
     const date = new Date(from);
@@ -261,6 +248,11 @@ export async function GET(request: Request) {
     const joinedAt = startOfDay(String(member.companyJoined || member.createdAt));
     const memberId = String(member._id);
     const identity = memberIdentity(member.companyIdentityCode, memberId);
+    const weekendContext = {
+      weekendEntries: companyWeekendEntries,
+      weekendExclusions: companyWeekendExclusions,
+      region: effectiveRegionLabelOf(company as any, member),
+    };
 
     const statuses = dates.map((date) => {
       if (joinedAt && date.getTime() < joinedAt.getTime()) return "Not Joined";
@@ -276,7 +268,7 @@ export async function GET(request: Request) {
       if (leave) return "Leave";
       if (wfh || companyWfhDays.has(dateText)) return "WFH";
       if (holiday) return "Holiday";
-      if (companyWeekendDays.has(dateText) || (!assignedWeekendsByMonth.has(dateText.slice(0, 7)) && date.getDay() === 0)) return "Weekend";
+      if (isWeekendDate(date, weekendContext)) return "Weekend";
       return "Absent";
     });
 

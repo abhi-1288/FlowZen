@@ -10,6 +10,8 @@ import { LeaveRequest } from "@/models/LeaveRequest";
 import { Holiday } from "@/models/Holiday";
 import { canAccessFinanceRecord } from "../../helpers";
 import { resolveRegionPolicy } from "@/lib/region-scope";
+import { effectiveRegionLabelOf } from "@/lib/company-regions";
+import { isWeekendDate } from "@/lib/weekends";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -86,7 +88,7 @@ export async function GET(request: Request, { params }: Params) {
 
     const [employee, companyDoc] = await Promise.all([
       User.findById(salary.employee).select("name email role companyIdentityCode baseSalary salaryType hourlyRate dailyRate companyJoined createdAt regionLabel pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted bankAccountNumber ifscCode documents"),
-      Company.findById(salary.company).select("name icon"),
+      Company.findById(salary.company).select("name icon weekendDates weekendExclusions addresses address minWorkHours"),
     ]);
 
     if (!employee || !companyDoc) {
@@ -210,10 +212,15 @@ export async function GET(request: Request, { params }: Params) {
 
     let absentDays = 0;
     let halfDayCount = 0;
+    const weekendContext = {
+      weekendEntries: ((companyDoc as any)?.weekendDates ?? []) as any[],
+      weekendExclusions: ((companyDoc as any)?.weekendExclusions ?? []) as any[],
+      region: effectiveRegionLabelOf(companyDoc as any, employee),
+    };
     for (let i = 0; i < totalDays; i += 1) {
       const day = new Date(effectiveStart.getTime() + i * DAY_MS);
       const dayKey = toDateKey(day);
-      const isWeekend = day.getDay() === 0;
+      const isWeekend = isWeekendDate(day, weekendContext);
       const isHoliday = holidayDays.has(dayKey);
       const hasPresent = presentDays.has(dayKey);
       const isHalfDay = halfDayAttendance.has(dayKey);

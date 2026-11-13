@@ -89,9 +89,9 @@ export function CompanyTeamSection({
   };
   const previousStart = fmtDate(previous?.joined);
   const previousEnd = fmtDate(previous?.ended);
-  const previousPeriod = previousStart
+  const previousPeriod = previousStart && previousEnd
     ? `${previousStart} — ${previousEnd}`
-    : previousEnd || undefined;
+    : previousStart || previousEnd || undefined;
 
   if (!inApprovedCompany && previous?.companyName) {
     return (

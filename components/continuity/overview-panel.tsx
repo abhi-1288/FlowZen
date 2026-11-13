@@ -2,15 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import {
   AlertTriangle,
   ArrowRight,
   CalendarClock,
   CheckCircle2,
   Clock,
+  Bell,
+  ChevronDown,
+  Grid2X2,
   Layers,
+  MoreHorizontal,
   RefreshCw,
   RotateCcw,
+  Search,
   Users,
 } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
@@ -209,13 +215,17 @@ type OverviewResponse = {
   boards: Record<string, any>[];
   pendingHandovers: HandoverRecord[];
   awaitingCompactions: Record<string, any>[];
+  priority?: { high: number; medium: number; low: number };
+  activity?: { date: string; count: number }[];
 };
 
 export function BoardsOverviewPanel() {
+  const { data: session } = useSession();
   const [scope, setScope] = useState<"mine" | "team" | "company">("mine");
   const [data, setData] = useState<OverviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -235,80 +245,80 @@ export function BoardsOverviewPanel() {
   }, [load]);
 
   const counts = data?.counts ?? {};
-  const boards = useMemo(() => data?.boards ?? [], [data]);
+  const boards = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    return (data?.boards ?? []).filter((board) => !normalized || String(board.title ?? "").toLowerCase().includes(normalized));
+  }, [data, query]);
+  const statusTotal = Math.max(1, Number(counts.total ?? 0));
+  const active = Number(counts.active ?? counts.inProgress ?? 0);
+  const completed = Number(counts.completed ?? 0);
+  const blocked = Number(counts.blocked ?? 0);
+  const notStarted = Number(counts.notStarted ?? Math.max(0, Number(counts.total ?? 0) - active - completed - blocked));
+  const statusItems = [
+    { label: "In progress", value: active, tone: "bg-blue-600", text: "text-blue-700" },
+    { label: "Completed", value: completed, tone: "bg-emerald-500", text: "text-emerald-700" },
+    { label: "Overdue", value: blocked, tone: "bg-amber-500", text: "text-amber-700" },
+  ];
+  const priorityItems = [
+    { label: "High priority", value: Number(data?.priority?.high ?? 0), color: "bg-blue-700" },
+    { label: "Medium priority", value: Number(data?.priority?.medium ?? 0), color: "bg-sky-500" },
+    { label: "Low priority", value: Number(data?.priority?.low ?? 0), color: "bg-slate-200" },
+  ];
+  const priorityTotal = priorityItems.reduce((sum, item) => sum + item.value, 0);
+  const activityValues = data?.activity ?? [];
+  const maxActivity = Math.max(1, ...activityValues.map((item) => item.count));
+  const displayName = session?.user?.name?.split(" ")[0] || "there";
+  const initials = (session?.user?.name || "FlowZen User")
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div className="space-y-4">
-      <Card>
-        <PanelHeader
-          title="Boards overview"
-          description="How work is flowing across boards, todos, delegations and compactions."
-          actions={
-            <>
-              <div className="flex rounded-lg border border-slate-200 p-0.5 dark:border-zinc-700">
-                {(["mine", "team", "company"] as const).map((value) => (
-                  <button
-                    key={value}
-                    className={`rounded-md px-2.5 py-1.5 text-[11px] font-semibold capitalize transition ${
-                      scope === value
-                        ? "bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                        : "text-slate-500 hover:bg-slate-50 dark:text-zinc-400 dark:hover:bg-zinc-800"
-                    }`}
-                    onClick={() => setScope(value)}
-                    type="button"
-                  >
-                    {value}
-                  </button>
-                ))}
-              </div>
-              <button className={btnSecondary} onClick={() => void load()} type="button">
-                <RefreshCw size={13} /> Refresh
-              </button>
-            </>
-          }
-        />
-
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Metric label="Total todos" value={counts.total ?? 0} tone="slate" />
-          <Metric label="Active" value={counts.active ?? 0} tone="sky" />
-          <Metric label="Completed" value={counts.completed ?? 0} tone="emerald" />
-          <Metric label="Carried forward" value={counts.carriedForward ?? 0} tone="orange" />
-          <Metric label="Blocked" value={counts.blocked ?? 0} tone="rose" />
-          <Metric label="Partially completed" value={counts.partiallyCompleted ?? 0} tone="amber" />
-          <Metric label="Pending review" value={counts.pendingReview ?? 0} tone="violet" />
-          <Metric label="Average progress" value={counts.averageProgress ?? 0} tone="slate" suffix="%" />
+      <Card className="overflow-hidden bg-gradient-to-br from-white via-white to-slate-50 p-0 dark:from-[#0b0b0b] dark:via-[#0b0b0b] dark:to-zinc-950">
+        <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-5 py-4 dark:border-zinc-800">
+          <div className="flex items-center gap-2.5 text-lg font-bold tracking-tight"><span className="grid h-9 w-9 place-items-center rounded-xl bg-blue-600 text-white"><Grid2X2 size={18} /></span> TaskFlow</div>
+          <div className="hidden h-7 w-px bg-slate-200 sm:block dark:bg-zinc-800" />
+          <div className="min-w-[180px] flex-1"><h2 className="text-xl font-semibold tracking-tight">Welcome back, {displayName}! 👋</h2><p className="text-xs text-slate-500 dark:text-zinc-400">Here&apos;s what&apos;s happening with your team today.</p></div>
+          <label className="flex min-w-[210px] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-400 dark:border-zinc-700 dark:bg-zinc-950"><Search size={16} /><input aria-label="Search boards" className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-slate-400" placeholder="Search here..." value={query} onChange={(event) => setQuery(event.target.value)} /></label>
+          <button aria-label="Notifications" className="relative rounded-xl border border-slate-200 p-2.5 text-slate-600 dark:border-zinc-700 dark:text-zinc-300" type="button"><Bell size={17} />{Number(counts.pendingHandovers ?? 0) > 0 ? <span className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-rose-500 text-[9px] font-bold text-white">{Number(counts.pendingHandovers ?? 0)}</span> : null}</button>
+          <button className="flex items-center gap-2 rounded-xl border border-slate-200 px-2.5 py-1.5 text-left dark:border-zinc-700" type="button"><span className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-50 text-sm font-bold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">{initials}</span><span className="hidden text-xs sm:block"><strong className="block text-slate-900 dark:text-zinc-100">{session?.user?.name || "My workspace"}</strong><span className="text-slate-500 dark:text-zinc-400">{session?.user?.email || "Personal overview"}</span></span><ChevronDown size={14} /></button>
+        </div>
+        <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-4">
+          <Metric label="Active projects" value={boards.length} tone="sky" />
+          <Metric label="Utilization rate" value={Number(counts.averageProgress ?? 0)} tone="violet" suffix="%" />
+          <Metric label="Completed tasks" value={completed} tone="emerald" />
+          <Metric label="At risk projects" value={blocked} tone="rose" />
         </div>
       </Card>
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(260px,0.8fr)]">
+        <Card><PanelHeader title="Task status distribution" description="How your tracked work is moving across the workflow." actions={<button aria-label="Task status options" className="rounded-full border border-slate-200 p-2 dark:border-zinc-700" type="button"><MoreHorizontal size={16} /></button>} /><div className="grid gap-5 sm:grid-cols-3">{statusItems.map((item) => <div key={item.label}><div className={`mb-2 h-2 rounded-full ${item.tone}`} /><p className={`text-xs font-medium ${item.text}`}>{item.label}</p><p className="mt-1 text-2xl font-bold text-slate-900 dark:text-zinc-100">{Math.round((item.value / statusTotal) * 100)}%</p><p className="text-[11px] text-slate-500 dark:text-zinc-400">{item.value} tasks</p></div>)}</div></Card>
+
+        <Card>
+          <PanelHeader title="Task priority" description="Distribution by priority level" actions={<button aria-label="Task priority options" className="rounded-full border border-slate-200 p-2 dark:border-zinc-700" type="button"><MoreHorizontal size={16} /></button>} />
+          <div className="mx-auto flex h-36 w-36 items-center justify-center rounded-full" style={{ background: priorityTotal ? `conic-gradient(#1d4ed8 0 ${(priorityItems[0].value / priorityTotal) * 100}%, #38bdf8 ${(priorityItems[0].value / priorityTotal) * 100}% ${((priorityItems[0].value + priorityItems[1].value) / priorityTotal) * 100}%, #dbe4f0 ${((priorityItems[0].value + priorityItems[1].value) / priorityTotal) * 100}% 100%)` : "conic-gradient(#dbe4f0 0 100%)" }}><div className="grid h-24 w-24 place-items-center rounded-full bg-white text-center dark:bg-zinc-900"><strong className="text-2xl text-slate-900 dark:text-zinc-100">{priorityTotal}</strong><span className="text-[10px] text-slate-500">tasks</span></div></div>
+          <div className="mt-4 space-y-2">{priorityItems.map((item) => <div className="flex items-center justify-between text-xs" key={item.label}><span className="inline-flex items-center gap-2 text-slate-600 dark:text-zinc-300"><span className={`h-2.5 w-2.5 rounded-full ${item.color}`} />{item.label}</span><strong>{item.value}</strong></div>)}</div>
+        </Card>
+      </div>
 
       <ErrorNote message={error} />
       {loading ? <LoadingRows rows={3} /> : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+        <Card><PanelHeader title="Team activity" description="Activity from your tracked work over the last 7 days." actions={<button aria-label="Team activity options" className="rounded-full border border-slate-200 p-2 dark:border-zinc-700" type="button"><MoreHorizontal size={16} /></button>} /><div className="flex items-end gap-2"><span className="text-4xl font-bold text-slate-900 dark:text-zinc-100">{Number(counts.averageProgress ?? 0)}%</span><span className="text-[11px] text-slate-500 dark:text-zinc-400">average progress</span></div><div className="mt-5 grid h-28 grid-cols-7 items-end gap-2">{activityValues.map((item) => <div className="flex h-full flex-col items-center justify-end gap-1" key={item.date}><span className="text-[10px] text-slate-500">{item.count}</span><span aria-label={`${item.date}: ${item.count} updates`} className="w-full rounded-t-md bg-blue-600" style={{ height: `${Math.max(item.count ? 8 : 2, (item.count / maxActivity) * 100)}%` }} /></div>)}</div><div className="mt-2 grid grid-cols-7 text-center text-[10px] text-slate-500">{activityValues.map((item) => <span key={item.date}>{new Date(`${item.date}T00:00:00`).toLocaleDateString("en-IN", { weekday: "short" })}</span>)}</div></Card>
         <Card>
-          <PanelHeader title="Boards" description="Open a board to manage its major tasks." />
+          <PanelHeader title="Team workload" description="Open a board to manage its major tasks." actions={<Link className="text-xs font-semibold text-blue-700" href="/board">See all</Link>} />
           {!loading && !boards.length ? (
             <EmptyState title="No boards yet" description="Create a board to start breaking major tasks into todos." action={<Link className={btnSecondary} href="/board">Go to boards</Link>} />
           ) : (
-            <div className="space-y-2">
-              {boards.slice(0, 12).map((board) => (
-                <Link
-                  className="flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-2.5 transition hover:border-slate-300 dark:border-zinc-800 dark:hover:border-zinc-700"
-                  href={`/board/${String(board.id ?? "")}`}
-                  key={String(board.id ?? "")}
-                >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-zinc-300">
-                    <Layers size={14} />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-semibold text-slate-900 dark:text-zinc-100">{String(board.title ?? "Board")}</p>
-                    <p className="text-[10px] text-slate-500 dark:text-zinc-400">
-                      {Number(board.taskCount ?? 0)} tasks · {Number(board.todoCount ?? 0)} todos · {Number(board.activeTodoCount ?? 0)} active
-                    </p>
-                  </div>
-                  <ArrowRight size={13} className="text-slate-400" />
-                </Link>
-              ))}
-            </div>
+            <div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr className="border-b border-slate-100 text-slate-500 dark:border-zinc-800"><th className="pb-2 font-medium">Name</th><th className="pb-2 font-medium">Active work</th><th className="pb-2 font-medium">Status</th><th /></tr></thead><tbody>{boards.slice(0, 8).map((board) => (
+                <tr className="border-b border-slate-50 last:border-0 dark:border-zinc-900" key={String(board.id ?? "")}>
+                  <td className="py-3"><Link className="inline-flex items-center gap-2 font-semibold text-slate-900 hover:text-blue-700 dark:text-zinc-100" href={`/board/${String(board.id ?? "")}`}><span className="grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-500 dark:bg-zinc-800"><Layers size={13} /></span>{String(board.title ?? "Board")}</Link></td><td className="py-3 font-semibold">{Number(board.activeTodoCount ?? board.todoCount ?? 0)}</td><td className="py-3"><span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />On track</span></td><td className="py-3 text-right"><MoreHorizontal size={15} className="ml-auto text-slate-400" /></td>
+                </tr>
+              ))}</tbody></table></div>
           )}
         </Card>
 
@@ -367,6 +377,16 @@ export function BoardsOverviewPanel() {
       </div>
     </div>
   );
+}
+
+function DashboardSignal({ label, value, tone }: { label: string; value: string; tone: "blue" | "rose" | "amber" | "violet" }) {
+  const tones = {
+    blue: "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300",
+    rose: "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300",
+    amber: "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300",
+    violet: "bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300",
+  };
+  return <div className={`flex items-center justify-between rounded-lg px-3 py-2.5 text-xs ${tones[tone]}`}><span className="font-medium">{label}</span><span className="text-sm font-bold">{value}</span></div>;
 }
 
 function Metric({ label, value, tone, suffix = "" }: { label: string; value: number; tone: string; suffix?: string }) {

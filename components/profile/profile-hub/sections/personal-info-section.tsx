@@ -384,9 +384,12 @@ export function PersonalInfoSection({
               : previous?.joined
                 ? fmt(previous.joined)
                 : null;
+            const endDate = new Date(String(profile.employmentEndDate));
+            const startDate = profile.companyJoined ? new Date(String(profile.companyJoined)) : previous?.joined ? new Date(String(previous.joined)) : null;
+            const validEnd = !Number.isNaN(endDate.getTime()) && (!startDate || endDate >= startDate);
             const period = start
-              ? `${start} — ${fmt(profile.employmentEndDate)}`
-              : fmt(profile.employmentEndDate);
+              ? `${start} — ${validEnd ? fmt(profile.employmentEndDate) : "Present"}`
+              : validEnd ? fmt(profile.employmentEndDate) : "Present";
             return (
               <Row
                 label="Employment Period"

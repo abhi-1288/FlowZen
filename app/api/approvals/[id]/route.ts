@@ -933,13 +933,17 @@ export async function PATCH(request: Request, { params }: Params) {
         if (!validTypes.includes(chosen)) {
           return jsonError("A valid employment type is required to approve.", 400);
         }
-        const target = await User.findById(joinRequest.requester).select("name employmentType employmentEndDate company companyStatus");
+        const target = await User.findById(joinRequest.requester).select("name employmentType employmentEndDate company companyStatus companyJoined createdAt");
         if (!target) return jsonError("Requesting user not found.", 404);
         if (String(target.company ?? "") === String(joinRequest.company)) {
           target.employmentType = chosen;
           const endRaw = employmentEndDateRaw || String(meta.employmentEndDate ?? "");
           if (endRaw) {
             const end = new Date(endRaw);
+            const joinedAt = target.companyJoined ?? target.createdAt;
+            if (joinedAt && !Number.isNaN(end.getTime()) && end < new Date(joinedAt)) {
+              return jsonError("Employment end date cannot be earlier than the joining date.", 400);
+            }
             target.employmentEndDate = !Number.isNaN(end.getTime()) ? end : null;
           } else {
             target.employmentEndDate = null;

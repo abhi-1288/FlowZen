@@ -9,6 +9,7 @@ import { emitNotification } from "@/lib/realtime";
 import { effectiveRegionLabelOf } from "@/lib/company-regions";
 import { recordAudit } from "@/lib/audit";
 import { actingRoleForRequest } from "@/lib/delegation-access";
+import { sendPolicyChangeEmail } from "@/lib/company-policy-email";
 
 const ALLOWED_NOTICE_PERIOD_DAYS = new Set([5, 15, 30, 45, 60, 90]);
 const ALLOWED_PAID_LEAVE_PERIODS = new Set(["monthly", "yearly"]);
@@ -38,7 +39,7 @@ export async function GET(request: Request) {
   }
 
   const company = await Company.findById(user.company).select(
-    "owner noticePeriodDays paidLeaveDays paidLeavePeriod wfhDays wfhPeriod carryForwardLeaveDays carryForwardWfhDays minWorkHours",
+    "owner noticePeriodDays paidLeaveDays paidLeavePeriod wfhDays wfhPeriod carryForwardLeaveDays carryForwardWfhDays minWorkHours compactionAutoDeliver",
   );
   const adminRegion = effectiveRegionLabelOf(company, user);
   let policy = await CompanyPolicy.findOne({ company: user.company, region: adminRegion });
@@ -59,6 +60,7 @@ export async function GET(request: Request) {
       carryForwardLeaveDays: company?.carryForwardLeaveDays ?? false,
       carryForwardWfhDays: company?.carryForwardWfhDays ?? false,
       minWorkHours: company?.minWorkHours ?? 8,
+      compactionAutoDeliver: company?.compactionAutoDeliver ?? false,
     },
     settlement: {
       enabled: policy.settlementEnabled !== false,
@@ -80,6 +82,7 @@ export async function PATCH(request: Request) {
   const hasPaidLeavePeriod = Object.prototype.hasOwnProperty.call(body, "paidLeavePeriod");
   const hasCarryForwardLeave = Object.prototype.hasOwnProperty.call(body, "carryForwardLeaveDays");
   const hasMinWorkHours = Object.prototype.hasOwnProperty.call(body, "minWorkHours");
+  const hasCompactionAutoDeliver = Object.prototype.hasOwnProperty.call(body, "compactionAutoDeliver");
   const hasSettlementEnabled = Object.prototype.hasOwnProperty.call(body, "settlementEnabled");
   const hasSettlementHourDays = Object.prototype.hasOwnProperty.call(body, "settlementHourDays");
   const hasSettlementDayDays = Object.prototype.hasOwnProperty.call(body, "settlementDayDays");
@@ -100,6 +103,7 @@ export async function PATCH(request: Request) {
     return jsonError("Invalid paid leave period.", 400);
   }
   const carryForwardLeaveDays = body.carryForwardLeaveDays === true;
+  const compactionAutoDeliver = body.compactionAutoDeliver === true;
   if (hasMinWorkHours && (!Number.isFinite(minWorkHours) || minWorkHours < 1 || minWorkHours > 24)) {
     return jsonError("Invalid minimum work hours.", 400);
   }
@@ -139,6 +143,7 @@ export async function PATCH(request: Request) {
 
   const company = await Company.findById(hr.company);
   if (!company) return jsonError("Company not found.", 404);
+  const previousMinWorkHours = Number(company.minWorkHours ?? 8);
 
   // Regional HR/admin may only configure their own region's policy. The company
   // owner may target any region, or the global policy via region "".
@@ -158,6 +163,7 @@ export async function PATCH(request: Request) {
   if (hasPaidLeavePeriod) company.paidLeavePeriod = paidLeavePeriod;
   if (hasCarryForwardLeave) company.carryForwardLeaveDays = carryForwardLeaveDays;
   if (hasMinWorkHours) company.minWorkHours = Math.floor(minWorkHours);
+  if (hasCompactionAutoDeliver) company.compactionAutoDeliver = compactionAutoDeliver;
   await company.save();
 
   const settlementFields: Record<string, unknown> = {};
@@ -196,6 +202,10 @@ export async function PATCH(request: Request) {
     policyFrom.minWorkHours = company.minWorkHours;
     policyTo.minWorkHours = Math.floor(minWorkHours);
   }
+  if (hasCompactionAutoDeliver) {
+    policyFrom.compactionAutoDeliver = company.compactionAutoDeliver;
+    policyTo.compactionAutoDeliver = compactionAutoDeliver;
+  }
   if (Object.keys(settlementFields).length > 0) policyTo.settlement = settlementFields;
 
   await recordAudit({
@@ -209,12 +219,29 @@ export async function PATCH(request: Request) {
     request,
   });
 
+  if (hasMinWorkHours && previousMinWorkHours !== Math.floor(minWorkHours)) {
+    void sendPolicyChangeEmail({
+      company,
+      actor: hr,
+      kind: "check-in",
+      region: "",
+      title: "Check-in / check-out policy updated",
+      summary: `${String(company.name ?? "The company")} has updated the minimum work hours required for a full day.`,
+      details: [
+        { label: "Previous requirement", value: `${previousMinWorkHours} hrs / day` },
+        { label: "New requirement", value: `${Math.floor(minWorkHours)} hrs / day` },
+        { label: "Applies to", value: "All offices" },
+      ],
+    });
+  }
+
   const resp = NextResponse.json({
     ok: true,
     noticePeriodDays: company.noticePeriodDays,
     paidLeaveDays: company.paidLeaveDays,
     paidLeavePeriod: company.paidLeavePeriod,
     minWorkHours: company.minWorkHours,
+    compactionAutoDeliver: company.compactionAutoDeliver,
   });
 
   const targets = new Set<string>(

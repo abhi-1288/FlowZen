@@ -2,8 +2,7 @@ import { type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Glassmorphism surface — frosted translucent card over the aurora/neumorphic
- * background. Use for hero sections, floating panels and emphasis cards.
+ * Standard opaque card retained under the legacy component name for callers.
  */
 export function GlassCard({
   className,
@@ -13,7 +12,7 @@ export function GlassCard({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-white/30 bg-white/60 p-5 shadow-xl backdrop-blur-md dark:border-white/10 dark:bg-zinc-900/60",
+        "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900",
         className,
       )}
       {...rest}

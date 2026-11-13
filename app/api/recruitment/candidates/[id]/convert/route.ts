@@ -9,6 +9,7 @@ import { Attendance } from "@/models/Attendance";
 import { JoinRequest } from "@/models/JoinRequest";
 import { Notification } from "@/models/Notification";
 import { Company } from "@/models/Company";
+import { attendanceDay } from "@/lib/attendance-day";
 import { withCandidateAccess } from "@/lib/recruitment-candidate-access";
 import { regionJoinApproverId } from "@/lib/join-approvers";
 import { jsonError } from "@/lib/api";
@@ -234,7 +235,7 @@ export async function POST(request: Request, { params }: Params) {
 
   await Attendance.create({
     user: employee._id,
-    date: new Date(),
+    date: attendanceDay(new Date(), company?.timeZone),
     checkIn: null,
     checkOut: null,
     status: "present",

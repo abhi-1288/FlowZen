@@ -26,6 +26,9 @@ export function usePolicySettings(
   const [minWorkHours, setMinWorkHours] = useState<number>(
     Math.max(1, Math.min(24, Number(company?.minWorkHours ?? 8))),
   );
+  const [compactionAutoDeliver, setCompactionAutoDeliver] = useState<boolean>(
+    company?.compactionAutoDeliver === true,
+  );
   const [savingNoticePeriod, setSavingNoticePeriod] = useState(false);
   const [savingPaidLeave, setSavingPaidLeave] = useState(false);
   const [savingCarryForwardLeave, setSavingCarryForwardLeave] = useState(false);
@@ -276,7 +279,7 @@ export function usePolicySettings(
       setSavingDayHour(true);
       await apiFetch("/api/hr/policy", {
         method: "PATCH",
-        body: JSON.stringify({ minWorkHours }),
+        body: JSON.stringify({ minWorkHours, compactionAutoDeliver }),
       });
       showToast("Day-hour working policy updated.", "success");
       setSavingDayHour(false);
@@ -319,6 +322,7 @@ export function usePolicySettings(
     paidLeavePeriod, setPaidLeavePeriod,
     carryForwardLeaveDays, setCarryForwardLeaveDays,
     minWorkHours, setMinWorkHours,
+    compactionAutoDeliver, setCompactionAutoDeliver,
     savingNoticePeriod,
     savingPaidLeave,
     savingCarryForwardLeave,

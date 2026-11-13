@@ -20,6 +20,7 @@ import {
   isPastDay as isPastDayFn, isPendingLeave as isPendingLeaveFn,
   isToday as isTodayFn, normalizeDate as normalizeDateFn,
 } from "./attendance/utils";
+import { isWeekendDate, weekendEntryForDate, weekendLabel, isHolidayWeekend } from "@/lib/weekends";
 export function AttendanceTab({
   profile,
   showToast,
@@ -53,6 +54,7 @@ export function AttendanceTab({
   const [wfhCheckInMode, setWfhCheckInMode] = useState<string>("all-day");
   const [companyWfhDates, setCompanyWfhDates] = useState<{ date: string; reason: string }[]>([]);
   const [companyWeekendDates, setCompanyWeekendDates] = useState<{ date: string; reason?: string }[]>([]);
+  const [companyWeekendExclusions, setCompanyWeekendExclusions] = useState<{ date: string; reason?: string }[]>([]);
   const [wfhDays, setWfhDays] = useState(0);
   const [wfhPeriod, setWfhPeriod] = useState("monthly");
   const [remainingWfhDays, setRemainingWfhDays] = useState(0);
@@ -106,8 +108,8 @@ export function AttendanceTab({
       apiFetch<{ holidays: AnyRecord[] }>("/api/attendance/holidays").catch(
         () => ({ holidays: [] as AnyRecord[] }),
       ),
-      apiFetch<{ wfhDays: number; wfhPeriod: string; wfhCheckInMode?: string; wfhDates?: { date: string; reason: string }[]; weekendDates?: { date: string; reason?: string }[] }>("/api/company/wfh").catch(
-        () => ({ wfhDays: 0, wfhPeriod: "monthly" as string, wfhCheckInMode: "all-day", wfhDates: [], weekendDates: [] }),
+      apiFetch<{ wfhDays: number; wfhPeriod: string; wfhCheckInMode?: string; wfhDates?: { date: string; reason: string }[]; weekendDates?: { date: string; reason?: string }[]; weekendExclusions?: { date: string; reason?: string }[] }>("/api/company/wfh").catch(
+        () => ({ wfhDays: 0, wfhPeriod: "monthly" as string, wfhCheckInMode: "all-day", wfhDates: [], weekendDates: [], weekendExclusions: [] }),
       ),
       apiFetch<{ requests: AnyRecord[] }>("/api/attendance/wfh").catch(
         () => ({ requests: [] as AnyRecord[] }),
@@ -126,6 +128,7 @@ export function AttendanceTab({
     setWfhCheckInMode(wfhRes.wfhCheckInMode ?? "all-day");
     setCompanyWfhDates((wfhRes as any).wfhDates ?? []);
     setCompanyWeekendDates((wfhRes as any).weekendDates ?? []);
+    setCompanyWeekendExclusions((wfhRes as any).weekendExclusions ?? []);
     setWfhDays(wfhRes.wfhDays ?? 0);
     setWfhPeriod(wfhRes.wfhPeriod ?? "monthly");
     setRemainingWfhDays(Math.max(0, Number((wfhReqRes as any)?.wfhPolicy?.remainingWfhDays ?? 0)));
@@ -481,18 +484,23 @@ export function AttendanceTab({
   const isWeekend = (day: number | null) => {
     const date = getDateForDayFn(day, year, month);
     if (!date) return false;
-    const manualWeekendsThisMonth = companyWeekendDates.filter((item) => {
-      const weekendDate = normalizeDateFn(new Date(item.date));
-      return weekendDate.getFullYear() === year && weekendDate.getMonth() === month;
-    });
-    if (manualWeekendsThisMonth.length === 0) {
-      return date.getDay() === 0;
-    }
-    return manualWeekendsThisMonth.some((item) => {
-      const weekendDate = normalizeDateFn(new Date(item.date));
-      return weekendDate.getTime() === date.getTime();
+    return isWeekendDate(date, {
+      weekendEntries: companyWeekendDates,
+      weekendExclusions: companyWeekendExclusions,
     });
   };
+  const selectedWeekendEntry = selectedDate
+    ? weekendEntryForDate(selectedDate, {
+        weekendEntries: companyWeekendDates,
+        weekendExclusions: companyWeekendExclusions,
+      })
+    : null;
+  const selectedIsWeekend = selectedDate
+    ? isWeekendDate(selectedDate, {
+        weekendEntries: companyWeekendDates,
+        weekendExclusions: companyWeekendExclusions,
+      })
+    : false;
   const currentUserId = session?.user?.id;
   const isOwnRequest = (req: any) => isOwnRequestFn(req, currentUserId);
   const isOnLeave = (day: number | null) => isOnLeaveFn(day, requests, currentUserId, year, month);
@@ -1052,7 +1060,7 @@ export function AttendanceTab({
                         }}
                         role={day ? "button" : undefined}
                         tabIndex={day ? 0 : undefined}
-                        className={`relative cursor-pointer grid h-10 w-full place-items-center rounded-xl text-xs font-bold sm:h-14 sm:text-sm transition-all ${day ? beforeStart ? "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-400 border-[var(--c-border-light)] dark:bg-zinc-900 dark:text-zinc-600 dark:border-zinc-800" : pendingLeave ? "bg-amber-50 text-amber-900 border-amber-200 dark:bg-[#2a2300] dark:text-amber-500 dark:border-amber-700" : holiday ? "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200 dark:bg-[#25000d] dark:text-pink-500 dark:border-pink-900" : halfDayStatus ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-[#2a2300] dark:text-amber-500 dark:border-amber-700" : attAbsentStatus ? "bg-rose-50 text-rose-600 border-rose-200 dark:bg-[#25000d] dark:text-pink-500 dark:border-pink-900" : today ? checkedIn ? "bg-sky-100 text-sky-700 border-sky-200 inner dark:bg-[#001b2a] dark:text-sky-400 dark:border-sky-800" : "bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] text-rose-600 border-rose-200 dark:bg-black dark:text-pink-500 dark:border-pink-900" : checkedIn ? "bg-emerald-100 text-emerald-900 border-emerald-200 dark:bg-[#00251b] dark:text-emerald-500 dark:border-emerald-800" : companyWfh ? "bg-teal-100 text-teal-700 border-teal-200 dark:bg-[#00251f] dark:text-teal-400 dark:border-teal-800" : wfh ? "bg-[var(--color-primary-bg)] text-[var(--color-primary-dark)] border-[var(--color-primary-bg)] " : leave ? "bg-pink-100 text-pink-700 border-emerald-200 dark:bg-[#00251b] dark:text-emerald-400 dark:border-emerald-800" : weekend ? "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-500 border-[var(--c-border-light)] dark:bg-zinc-900 dark:text-zinc-500 dark:border-zinc-800" : missed ? "bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] text-rose-600 border-rose-200 dark:bg-black dark:text-pink-500 dark:border-pink-900" : "neu-card border-[var(--c-border-light)] text-slate-700 dark:bg-black dark:border-zinc-800 dark:text-zinc-300" : "opacity-0" }`}
+                        className={`relative cursor-pointer grid h-10 w-full place-items-center rounded-xl text-xs font-bold sm:h-14 sm:text-sm transition-all ${day ? beforeStart ? "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-400 border-[var(--c-border-light)] dark:bg-zinc-900 dark:text-zinc-600 dark:border-zinc-800" : pendingLeave ? "bg-amber-50 text-amber-900 border-amber-200 dark:bg-[#2a2300] dark:text-amber-500 dark:border-amber-700" : holiday ? "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200 dark:bg-[#25000d] dark:text-pink-500 dark:border-pink-900" : halfDayStatus ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-[#2a2300] dark:text-amber-500 dark:border-amber-700" : attAbsentStatus ? "bg-rose-50 text-rose-600 border-rose-200 dark:bg-[#25000d] dark:text-pink-500 dark:border-pink-900" : today ? checkedIn ? "bg-sky-100 text-sky-700 border-sky-200 inner dark:bg-[#001b2a] dark:text-sky-400 dark:border-sky-800" : "bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] text-rose-600 border-rose-200 dark:bg-black dark:text-pink-500 dark:border-pink-900" : checkedIn ? "bg-emerald-100 text-emerald-900 border-emerald-200 dark:bg-[#00251b] dark:text-emerald-500 dark:border-emerald-800" : companyWfh ? "bg-teal-100 text-teal-700 border-teal-200 dark:bg-[#00251f] dark:text-teal-400 dark:border-teal-800" : wfh ? "bg-[var(--color-primary-bg)] text-[var(--color-primary-dark)] border-[var(--color-primary-bg)] " : leave ? "bg-pink-100 text-pink-700 border-emerald-200 dark:bg-[#00251b] dark:text-emerald-400 dark:border-emerald-800" : weekend ? "bg-slate-100 text-slate-500 border-slate-300 border-dashed ring-1 ring-inset ring-slate-200 dark:bg-zinc-900 dark:text-zinc-500 dark:border-zinc-700 dark:ring-zinc-800" : missed ? "bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] text-rose-600 border-rose-200 dark:bg-black dark:text-pink-500 dark:border-pink-900" : "neu-card border-[var(--c-border-light)] text-slate-700 dark:bg-black dark:border-zinc-800 dark:text-zinc-300" : "opacity-0" }`}
                       >
                         {day}
                         {(day && (getWfhDetail(day) || isOnWfh(day) || companyWfh)) && (
@@ -1104,6 +1112,7 @@ export function AttendanceTab({
           <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-pink-100 border border-emerald-300 dark:bg-[#00251b] dark:border-emerald-700"></span> Leave</div>
           <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-rose-50 border border-rose-300 dark:bg-rose-950/50 dark:border-rose-700"></span> Absent</div>
           <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-fuchsia-100 border border-fuchsia-300 dark:bg-fuchsia-950/50 dark:border-fuchsia-700"></span> Holiday</div>
+          <div className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded-full bg-slate-100 border border-dashed border-slate-400 dark:bg-zinc-900 dark:border-zinc-600"></span> Weekend</div>
         </div>
       </section>
       {selectedDate && (
@@ -1116,6 +1125,9 @@ export function AttendanceTab({
           wfhRequests={wfhRequests}
           companyWfhDates={companyWfhDates}
           minWorkHours={minWorkHours}
+          isWeekend={selectedIsWeekend}
+          weekendReason={weekendLabel(selectedWeekendEntry)}
+          weekendIsHoliday={isHolidayWeekend(selectedWeekendEntry)}
         />
       )}
     </>

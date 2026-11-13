@@ -7,6 +7,7 @@ import { signOut, useSession } from "next-auth/react";
 import { apiFetch } from "@/lib/client-utils";
 import {
   ArrowLeft,
+  Activity,
   CheckSquare,
   ClipboardList,
   FolderKanban,
@@ -27,9 +28,11 @@ import { CompactionsPanel } from "@/components/continuity/compactions-panel";
 import { DelegatedWorkPanel } from "@/components/continuity/delegated-work-panel";
 import { TeamCompactionsPanel } from "@/components/continuity/team-compactions-panel";
 import { TaskHistoryPanel } from "@/components/continuity/task-history-panel";
+import { ActivityTimelinePanel } from "@/components/continuity/activity-timeline-panel";
 
 type WorkspaceTab =
   | "overview"
+  | "timeline"
   | "my-boards"
   | "my-tasks"
   | "my-todos"
@@ -41,6 +44,7 @@ type WorkspaceTab =
 
 const TABS: { key: WorkspaceTab; label: string; icon: typeof Layers }[] = [
   { key: "overview", label: "Overview", icon: LayoutDashboard },
+  { key: "timeline", label: "Activity Timeline", icon: Activity },
   { key: "my-boards", label: "My Boards", icon: FolderKanban },
   { key: "my-tasks", label: "My Tasks", icon: ClipboardList },
   { key: "my-todos", label: "My Todos", icon: ListChecks },
@@ -58,10 +62,13 @@ export function ContinuityWorkspace() {
   const searchParams = useSearchParams();
   const { data: session } = useSession();
   const rawTab = searchParams?.get("tab") ?? "";
-  const tab: WorkspaceTab = TAB_KEYS.has(rawTab) ? (rawTab as WorkspaceTab) : "overview";
+  const normalizedTab = rawTab === "activity" ? "timeline" : rawTab;
+  const requestedTab: WorkspaceTab = TAB_KEYS.has(normalizedTab) ? (normalizedTab as WorkspaceTab) : "overview";
+  const tab: WorkspaceTab = requestedTab;
   const todoFocus = searchParams?.get("todo") ?? "";
   const compactionFocus = searchParams?.get("focus") ?? "";
   const teamCompactionFocus = searchParams?.get("teamCompaction") ?? "";
+  const visibleTabs = TABS;
 
   const [counts, setCounts] = useState<Record<string, number>>({});
 
@@ -177,7 +184,7 @@ export function ContinuityWorkspace() {
             </div>
 
             <nav className="space-y-1 p-2">
-            {TABS.map((item) => {
+            {visibleTabs.map((item) => {
               const Icon = item.icon;
               const active = tab === item.key;
               const count = counts[item.key];
@@ -215,7 +222,7 @@ export function ContinuityWorkspace() {
         <main className="min-w-0 flex-1">
           <div className="mb-4 md:hidden">
             <div className="flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-2 dark:border-zinc-800 dark:bg-[#0b0b0b]">
-              {TABS.map((item) => {
+              {visibleTabs.map((item) => {
                 const Icon = item.icon;
                 const active = tab === item.key;
                 const count = counts[item.key];
@@ -246,6 +253,7 @@ export function ContinuityWorkspace() {
               <TodosPanel defaultScope="mine" />
             </div>
           ) : null}
+          {tab === "timeline" ? <ActivityTimelinePanel /> : null}
           {tab === "my-boards" ? <MyBoardsPanel /> : null}
           {tab === "my-tasks" ? <MyTasksPanel /> : null}
           {tab === "my-todos" ? <TodosPanel defaultScope="mine" /> : null}

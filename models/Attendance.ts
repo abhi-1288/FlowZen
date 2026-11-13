@@ -3,7 +3,7 @@ import { Schema, model, models } from "mongoose";
 const AttendanceSchema = new Schema(
   {
     user: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    date: { type: Date, required: true, index: true }, // Normalized to start of day
+    date: { type: Date, required: true, index: true }, // Calendar-day marker: UTC midnight of the company-local day (see lib/attendance-day.ts)
     checkIn: { type: Date, default: Date.now },
     checkOut: { type: Date },
     status: { type: String, enum: ["present", "leave"], default: "present" },

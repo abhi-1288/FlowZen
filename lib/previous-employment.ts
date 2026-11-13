@@ -69,6 +69,18 @@ export async function previousEmploymentForUser(user: Candidate | null | undefin
     regionLabel: String(user.regionLabel ?? ""),
   });
 
+  const joinedAt = lastJoin?.at ? new Date(String(lastJoin.at)) : null;
+  const storedEnd = user.employmentEndDate ? new Date(String(user.employmentEndDate)) : null;
+  const validStoredEnd = storedEnd && !Number.isNaN(storedEnd.getTime()) && (!joinedAt || storedEnd >= joinedAt)
+    ? storedEnd
+    : null;
+  const exitEntry = [...history].reverse().find((entry) => {
+    const action = String(entry?.action ?? "");
+    if (!["removed-company", "left-company", "contract-expired"].includes(action)) return false;
+    if (!entry?.at) return false;
+    return !joinedAt || new Date(String(entry.at)).getTime() >= joinedAt.getTime();
+  });
+
   return {
     companyId: String(companyId),
     companyName: String(company.name ?? "Previous company"),
@@ -76,6 +88,6 @@ export async function previousEmploymentForUser(user: Candidate | null | undefin
     role: String(user.role ?? ""),
     employmentType: String(user.employmentType ?? ""),
     joined: toIso(lastJoin?.at),
-    ended: toIso(user.employmentEndDate),
+    ended: toIso(validStoredEnd ?? exitEntry?.at),
   };
 }

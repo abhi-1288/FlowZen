@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import { AnyRecord } from "../shared";
+import { isWeekendDate } from "@/lib/weekends";
 
 export function CalendarTab() {
   const [viewDate, setViewDate] = useState(new Date());
@@ -11,6 +12,8 @@ export function CalendarTab() {
   const [leavePolicy, setLeavePolicy] = useState<AnyRecord | null>(null);
   const [holidays, setHolidays] = useState<AnyRecord[]>([]);
   const [minWorkHours, setMinWorkHours] = useState(8);
+  const [weekendDates, setWeekendDates] = useState<{ date: string; reason?: string }[]>([]);
+  const [weekendExclusions, setWeekendExclusions] = useState<{ date: string; reason?: string }[]>([]);
 
   const month = viewDate.getMonth();
   const year = viewDate.getFullYear();
@@ -99,7 +102,7 @@ export function CalendarTab() {
   const isWeekend = (day: number | null) => {
     const date = getDateForDay(day);
     if (!date) return false;
-    return date.getDay() === 0;
+    return isWeekendDate(date, { weekendEntries: weekendDates, weekendExclusions });
   };
 
   useEffect(() => {
@@ -114,6 +117,12 @@ export function CalendarTab() {
     apiFetch<{ holidays: AnyRecord[] }>("/api/attendance/holidays").then((res) => {
       setHolidays(res.holidays);
     }).catch(() => {});
+    apiFetch<{ weekendDates?: { date: string }[]; weekendExclusions?: { date: string }[] }>("/api/company/wfh")
+      .then((res) => {
+        setWeekendDates(res.weekendDates ?? []);
+        setWeekendExclusions(res.weekendExclusions ?? []);
+      })
+      .catch(() => {});
   }, []);
 
   const isCheckedIn = (day: number | null) => {

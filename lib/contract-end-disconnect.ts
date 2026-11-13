@@ -166,6 +166,16 @@ export async function runContractEndDisconnect(): Promise<{ generated: string[];
     if (!member.company) continue;
 
     const endDate = new Date(member.employmentEndDate);
+    // A stale end date must never expire a membership that starts later. This
+    // can happen when an employment request carries an old date from an
+    // earlier record. Clear the invalid value and leave the approved member
+    // connected so HR can set a valid contract end date.
+    if (member.companyJoined && endDate < new Date(member.companyJoined)) {
+      member.employmentEndDate = null;
+      member.employmentExpiryNotifiedAt = null;
+      await member.save();
+      continue;
+    }
     const endMonth = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, "0")}`;
     const companyId = member.company;
 

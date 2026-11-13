@@ -38,6 +38,18 @@ const CompanySchema = new Schema(
       {
         date: { type: Date, index: true },
         reason: { type: String },
+        // "manual" = an extra weekend day; "holiday" = a declared holiday
+        // weekend assigned from a date range.
+        kind: { type: String, enum: ["manual", "holiday"], default: "manual" },
+        region: { type: String, default: "", trim: true }
+      }
+    ],
+    // Dates explicitly declared working days, overriding the default Sunday
+    // rule and any company weekend on the same date.
+    weekendExclusions: [
+      {
+        date: { type: Date, index: true },
+        reason: { type: String },
         region: { type: String, default: "", trim: true }
       }
     ],
@@ -45,6 +57,11 @@ const CompanySchema = new Schema(
     carryForwardWfhDays: { type: Boolean, default: false },
     wfhCheckInMode: { type: String, enum: ["all-day", "wfh-only"], default: "all-day" },
     minWorkHours: { type: Number, default: 8 },
+    // Delivery policy for EOD/EOW employee compactions. When false (default) a
+    // checkout only generates a draft and the employee must confirm/submit it.
+    // When true the checkout submits the draft for the employee automatically
+    // (they can still edit and resubmit afterwards).
+    compactionAutoDeliver: { type: Boolean, default: false },
     icon: { type: String, default: "" },
     primaryColor: { type: String, default: "#2563eb" },
     address: { type: String, default: "", maxlength: 500 },

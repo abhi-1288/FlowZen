@@ -7,6 +7,8 @@ import { Holiday } from "@/models/Holiday";
 import { LeaveRequest } from "@/models/LeaveRequest";
 import { User } from "@/models/User";
 import { WfhRequest } from "@/models/WfhRequest";
+import { effectiveRegionLabelOf } from "@/lib/company-regions";
+import { isWeekendDate } from "@/lib/weekends";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -56,7 +58,7 @@ export async function GET(request: Request) {
 
   await connectDb();
 
-  const user = await User.findById(userId).select("company companyStatus companyJoined createdAt");
+  const user = await User.findById(userId).select("company companyStatus companyJoined createdAt regionLabel");
   if (!user) return jsonError("User not found.", 404);
 
   const url = new URL(request.url);
@@ -85,7 +87,7 @@ export async function GET(request: Request) {
       startDate: { $lt: monthEnd },
       endDate: { $gte: monthStart },
     }).select("startDate endDate"),
-    companyId ? Company.findById(companyId).select("wfhDates weekendDates") : null,
+    companyId ? Company.findById(companyId).select("wfhDates weekendDates weekendExclusions addresses address") : null,
     companyId
       ? Holiday.find({ company: companyId, startDate: { $lt: monthEnd }, endDate: { $gte: monthStart } }).select("startDate endDate")
       : [],
@@ -109,21 +111,15 @@ export async function GET(request: Request) {
     const date = startOfDay(new Date(String(entry.date)));
     if (date >= monthStart && date < monthEnd) wfhDays.add(dateKey(date));
   });
-  let hasManualWeekends = false;
-  (company?.weekendDates ?? []).forEach((entry: any) => {
-    const date = startOfDay(new Date(String(entry.date)));
-    if (date >= monthStart && date < monthEnd) {
-      hasManualWeekends = true;
+  const weekendContext = {
+    weekendEntries: ((company as any)?.weekendDates ?? []) as any[],
+    weekendExclusions: ((company as any)?.weekendExclusions ?? []) as any[],
+    region: effectiveRegionLabelOf(company as any, user),
+  };
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = startOfDay(new Date(year, monthNumber - 1, day));
+    if (isWeekendDate(date, weekendContext)) {
       weekendDays.add(dateKey(date));
-    }
-  });
-
-  if (!hasManualWeekends) {
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = startOfDay(new Date(year, monthNumber - 1, day));
-      if (date.getDay() === 0) {
-        weekendDays.add(dateKey(date));
-      }
     }
   }
 

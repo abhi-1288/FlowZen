@@ -6,6 +6,7 @@
 
 import { connectDb } from "@/lib/db";
 import { recordAudit } from "@/lib/audit";
+import { isCompanyAdmin, isTeamOwner } from "@/lib/authz";
 import { sendMail } from "@/lib/mailer";
 import {
   employeeCompactionEmailContent,
@@ -206,17 +207,9 @@ export async function getCompanyAdminRecipients(companyId: string): Promise<AnyD
   return users as AnyDoc[];
 }
 
+/** @deprecated Use `isCompanyAdmin` from `@/lib/authz`. Kept for callers. */
 export async function userIsCompanyAdmin(userId: string, companyId: string): Promise<boolean> {
-  if (!userId || !companyId) return false;
-  const company = await Company.findById(companyId).select("owner");
-  if (company && String(company.owner) === String(userId)) return true;
-  const user = await User.findOne({
-    _id: userId,
-    company: companyId,
-    companyStatus: "approved",
-    role: "admin",
-  }).select("_id");
-  return Boolean(user);
+  return isCompanyAdmin(userId, companyId);
 }
 
 export async function userCanReviewCompaction(
@@ -228,9 +221,9 @@ export async function userCanReviewCompaction(
   return { ok: isTeamOwner || isAdmin, isAdmin };
 }
 
+/** @deprecated Use `isTeamOwner` from `@/lib/authz`. Kept for callers. */
 export async function userOwnsTeam(userId: string, teamId: string): Promise<boolean> {
-  const team = await Team.findOne({ _id: teamId, manager: userId }).select("_id company");
-  return Boolean(team);
+  return isTeamOwner(userId, teamId);
 }
 
 function rangeFor(type: CompactionType, reportingDate: Date, timeZone: string) {
@@ -947,6 +940,61 @@ export async function resolveTeamReportRecipients(input: {
   return users as AnyDoc[];
 }
 
+/**
+ * Materialize the `TeamCompactionSource` rows for a team compaction and keep the
+ * rolled-up flag on each employee compaction in sync.
+ *
+ * Idempotent and self-healing by design: rows are upserted (so a retry never
+ * duplicates or overwrites an already-frozen snapshot), and every source's
+ * `includedInTeamCompaction` flag is (re)written on each call. That is what lets
+ * `createTeamCompactionDraft` repair a report that was created before its source
+ * rows were written — the failure mode a bare check-then-create cannot recover
+ * from, because the report already exists when the retry runs.
+ */
+async function syncTeamCompactionSources(input: {
+  teamCompactionId: unknown;
+  teamOwnerId: string;
+  compactions: AnyDoc[];
+  sources: TeamSourceLike[];
+  exclusions: { id: string; reason: string }[];
+}): Promise<void> {
+  const excludedIds = input.exclusions.map((item) => String(item.id));
+  await Promise.all(
+    input.compactions.map(async (compaction) => {
+      const excluded = excludedIds.includes(String(compaction._id));
+      const reason = input.exclusions.find((item) => String(item.id) === String(compaction._id))?.reason ?? "";
+      const source = input.sources.find((item) => item.sourceCompactionId === String(compaction._id));
+      const saved = (await TeamCompactionSource.findOneAndUpdate(
+        { teamCompaction: input.teamCompactionId, employeeCompaction: compaction._id },
+        {
+          $setOnInsert: {
+            teamCompaction: input.teamCompactionId,
+            employeeCompaction: compaction._id,
+            inclusionStatus: excluded ? "excluded" : "included",
+            exclusionReason: reason,
+            employee: compaction.employee,
+            employeeName: compaction.employeeName,
+            compactionType: compaction.compactionType,
+            reportingDate: compaction.reportingDate,
+            sourceSummary: compaction.summary,
+            sourceContent: source?.content ?? {},
+            includedBy: excluded ? null : input.teamOwnerId,
+            excludedBy: excluded ? input.teamOwnerId : null,
+          },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      )) as AnyDoc | null;
+      // Reflect the row's authoritative status, not just this call's input: a
+      // later exclusion/inclusion by the Team Owner must not be overwritten when
+      // an idempotent retry re-syncs the report.
+      await TaskCompaction.updateOne(
+        { _id: compaction._id },
+        { $set: { includedInTeamCompaction: String(saved?.inclusionStatus ?? "") === "included" } },
+      );
+    }),
+  );
+}
+
 export async function createTeamCompactionDraft(input: {
   teamOwnerId: string;
   teamId: string;
@@ -1028,57 +1076,61 @@ export async function createTeamCompactionDraft(input: {
 
   const idempotencyKey = `TEAM:${team._id}:${weekKey}:${period.start.toISOString()}`;
   const existing = await TeamCompaction.findOne({ idempotencyKey });
-  if (existing) return existing as AnyDoc;
+  if (existing) {
+    // The report may already exist because a previous attempt created it but
+    // failed before (or partway through) writing its source rows. Re-running the
+    // idempotent sync repairs that instead of returning a half-built report.
+    await syncTeamCompactionSources({
+      teamCompactionId: existing._id,
+      teamOwnerId: input.teamOwnerId,
+      compactions,
+      sources,
+      exclusions,
+    });
+    return existing as AnyDoc;
+  }
 
-  const teamCompaction = await TeamCompaction.create({
-    company: team.company,
-    team: team._id,
-    teamName: String(team.name ?? ""),
-    teamOwner: team.manager,
-    teamOwnerName: consolidation.content.overview.teamOwnerName,
-    reportingPeriodStart: period.start,
-    reportingPeriodEnd: period.end,
-    reportingPeriodKey: weekKey,
-    summary: consolidation.content.overallSummary,
-    content: consolidation.content,
-    status: "awaiting_team_owner_confirmation",
-    idempotencyKey,
-    createdBy: input.teamOwnerId,
+  let teamCompaction: AnyDoc;
+  try {
+    teamCompaction = (await TeamCompaction.create({
+      company: team.company,
+      team: team._id,
+      teamName: String(team.name ?? ""),
+      teamOwner: team.manager,
+      teamOwnerName: consolidation.content.overview.teamOwnerName,
+      reportingPeriodStart: period.start,
+      reportingPeriodEnd: period.end,
+      reportingPeriodKey: weekKey,
+      summary: consolidation.content.overallSummary,
+      content: consolidation.content,
+      status: "awaiting_team_owner_confirmation",
+      idempotencyKey,
+      createdBy: input.teamOwnerId,
+    })) as AnyDoc;
+  } catch (error: any) {
+    // Concurrent POSTs race past the check-then-create above; the unique index on
+    // `idempotencyKey` makes the loser throw E11000. Return the winner's report
+    // (after repairing its sources) instead of surfacing a 409.
+    if (error?.code !== 11000) throw error;
+    const raced = (await TeamCompaction.findOne({ idempotencyKey })) as AnyDoc | null;
+    if (!raced) throw error;
+    await syncTeamCompactionSources({
+      teamCompactionId: raced._id,
+      teamOwnerId: input.teamOwnerId,
+      compactions,
+      sources,
+      exclusions,
+    });
+    return raced;
+  }
+
+  await syncTeamCompactionSources({
+    teamCompactionId: teamCompaction._id,
+    teamOwnerId: input.teamOwnerId,
+    compactions,
+    sources,
+    exclusions,
   });
-
-  await Promise.all(
-    compactions.map(async (compaction) => {
-      const excluded = excludedIds.includes(String(compaction._id));
-      const reason = exclusions.find((item) => String(item.id) === String(compaction._id))?.reason ?? "";
-      const source = sources.find((item) => item.sourceCompactionId === String(compaction._id));
-      await TeamCompactionSource.updateOne(
-        { teamCompaction: teamCompaction._id, employeeCompaction: compaction._id },
-        {
-          $setOnInsert: {
-            teamCompaction: teamCompaction._id,
-            employeeCompaction: compaction._id,
-            inclusionStatus: excluded ? "excluded" : "included",
-            exclusionReason: reason,
-            employee: compaction.employee,
-            employeeName: compaction.employeeName,
-            compactionType: compaction.compactionType,
-            reportingDate: compaction.reportingDate,
-            sourceSummary: compaction.summary,
-            sourceContent: source?.content ?? {},
-            includedBy: excluded ? null : input.teamOwnerId,
-            excludedBy: excluded ? input.teamOwnerId : null,
-          },
-        },
-        { upsert: true },
-      );
-      if (!excluded) {
-        await TaskCompaction.updateOne(
-          { _id: compaction._id },
-          { $set: { includedInTeamCompaction: true } },
-        );
-      }
-    }),
-  );
 
   await recordAudit({
     action: "team_compaction.draft.created",
@@ -1094,7 +1146,7 @@ export async function createTeamCompactionDraft(input: {
     },
   });
 
-  return teamCompaction as AnyDoc;
+  return teamCompaction;
 }
 
 export async function updateTeamCompaction(input: {
