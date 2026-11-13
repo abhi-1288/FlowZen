@@ -79,6 +79,7 @@ export function HrPolicyTab({
     setWfhMode: wfh.setWfhMode,
     updateWfhMode: wfh.updateWfhMode,
     wfhLoading: wfh.wfhLoading,
+    assignHolidayWeekend: wfh.assignHolidayWeekend,
   };
 
   const canManageWfh = (actorRole === "admin" || actorRole === "human-resource") && profile?.companyStatus === "approved";

@@ -26,20 +26,23 @@ const WEEKDAYS = ["SUN.", "Mon.", "Tue.", "Wed.", "Thr.", "Fri.", "Sat."];
 type CalendarEvent = {
   date: Date;
   title: string;
-  type: "birthday" | "leave" | "meeting" | "payroll" | "holiday" | "interview" | "event" | "deadline";
+  type: "birthday" | "joining" | "anniversary" | "leaving" | "holiday" | "weekend" | "leave" | "wfh" | "meeting" | "payroll";
+  region?: string;
 };
 
-const EVENT_PRIORITY: CalendarEvent["type"][] = ["holiday", "birthday", "leave", "payroll", "meeting", "interview", "event", "deadline"];
+const EVENT_PRIORITY: CalendarEvent["type"][] = ["holiday", "birthday", "leaving", "anniversary", "joining", "weekend", "wfh", "leave", "payroll", "meeting"];
 
 const EVENT_STYLES: Record<string, { bg: string; text: string; border: string; label: string }> = {
   holiday:  { bg: "bg-fuchsia-100", text: "text-fuchsia-700", border: "border-fuchsia-200", label: "Holiday" },
   birthday: { bg: "bg-pink-100",    text: "text-pink-700",    border: "border-pink-200",    label: "Birthday" },
+  joining:  { bg: "bg-emerald-100", text: "text-emerald-700", border: "border-emerald-200", label: "Joining" },
+  anniversary:{ bg: "bg-amber-100", text: "text-amber-700",   border: "border-amber-200",   label: "Anniversary" },
+  leaving:  { bg: "bg-rose-100",    text: "text-rose-700",    border: "border-rose-200",    label: "Leaving" },
+  weekend:  { bg: "bg-slate-100",   text: "text-slate-700",   border: "border-slate-200",   label: "Weekend" },
+  wfh:      { bg: "bg-teal-100",    text: "text-teal-700",    border: "border-teal-200",    label: "WFH" },
   leave:    { bg: "bg-amber-100",   text: "text-amber-700",   border: "border-amber-200",   label: "Leave" },
   payroll:  { bg: "bg-green-100",   text: "text-green-700",   border: "border-green-200",   label: "Payroll" },
   meeting:  { bg: "bg-[var(--color-primary-bg)]",    text: "text-[var(--color-primary-dark)]",    border: "border-[var(--color-primary-bg)]",    label: "Meeting" },
-  interview:{ bg: "bg-purple-100",  text: "text-purple-700",  border: "border-purple-200",  label: "Interview" },
-  event:    { bg: "bg-indigo-100",  text: "text-indigo-700",  border: "border-indigo-200",  label: "Event" },
-  deadline: { bg: "bg-red-100",     text: "text-red-700",     border: "border-red-200",     label: "Deadline" },
 };
 
 export function CompanyCalendarTab() {
@@ -54,73 +57,15 @@ export function CompanyCalendarTab() {
   useEffect(() => {
     async function load() {
       try {
-        const [profileData, holidaysRes, leaveRes, salaryCycleRes, birthdaysRes, meetingsRes] = await Promise.all([
-          apiFetch<AnyRecord>("/api/profile").catch(() => null),
-          apiFetch<AnyRecord>("/api/attendance/holidays").catch(() => null),
-          apiFetch<AnyRecord>("/api/attendance/leave").catch(() => null),
-          apiFetch<AnyRecord>("/api/finance/salary-cycle").catch(() => null),
-          apiFetch<AnyRecord>("/api/company/members/birthdays").catch(() => null),
-          apiFetch<AnyRecord>(`/api/company/meetings?year=${year}&month=${month}`).catch(() => null),
-        ]);
-
-        const allEvents: CalendarEvent[] = [];
-        const holidayList: AnyRecord[] = (holidaysRes as any)?.holidays ?? [];
-        const leaveList: AnyRecord[] = (leaveRes as any)?.requests ?? [];
-
-        for (const h of holidayList) {
-          const start = new Date(String(h.startDate));
-          const end = new Date(String(h.endDate));
-          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-            allEvents.push({ date: new Date(d), title: String(h.title ?? "Holiday"), type: "holiday" });
-          }
-        }
-
-        for (const l of leaveList) {
-          const startDate = new Date(String(l.startDate));
-          const endDate = new Date(String(l.endDate ?? l.startDate));
-          for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-            allEvents.push({ date: new Date(d), title: `Leave: ${String(l.reason ?? "")}`, type: "leave" });
-          }
-        }
-
-        // Birthdays from dedicated API
-        const birthdayMembers: AnyRecord[] = (birthdaysRes as any)?.members ?? [];
-        for (const m of birthdayMembers) {
-          if (m.dob) {
-            const bday = new Date(String(m.dob));
-            allEvents.push({
-              date: new Date(year, bday.getMonth(), bday.getDate()),
-              title: `Birthday: ${String(m.name ?? "")}`,
-              type: "birthday",
-            });
-          }
-        }
-
-        // Payroll from salary cycle
-        const scd = (salaryCycleRes as any)?.salaryCycleDay ?? 29;
-        const scStart = (salaryCycleRes as any)?.salaryCycleStartDay;
-        const scEnd = (salaryCycleRes as any)?.salaryCycleEndDay;
-        const triggerDay = scStart && scEnd ? scEnd + 1 : scd;
-        const lastDay = new Date(year, month + 1, 0).getDate();
-        const payrollDay = Math.min(triggerDay, lastDay);
-        allEvents.push({
-          date: new Date(year, month, payrollDay),
-          title: "Payroll Date",
-          type: "payroll",
-        });
-
-        // Meetings
-        const meetingList: AnyRecord[] = (meetingsRes as any)?.meetings ?? [];
-        for (const m of meetingList) {
-          const md = new Date(String(m.date));
-          const creatorName = (m.creator as any)?.name ?? "Someone";
-          allEvents.push({
-            date: new Date(year, md.getMonth(), md.getDate()),
-            title: `Meeting: ${String(m.title ?? "")} (${creatorName})`,
-            type: "meeting",
-          });
-        }
-
+        setLoading(true);
+        const res = await apiFetch<AnyRecord>(`/api/company/calendar?year=${year}&month=${month}`).catch(() => null);
+        const list: AnyRecord[] = (res as any)?.events ?? [];
+        const allEvents: CalendarEvent[] = list.map((e: AnyRecord) => ({
+          date: new Date(String(e.date) + "T00:00:00"),
+          title: String(e.title ?? ""),
+          type: String(e.type ?? "event") as CalendarEvent["type"],
+          region: String(e.region ?? "").trim(),
+        }));
         setEvents(allEvents);
       } catch {
         // ignore

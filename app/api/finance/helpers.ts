@@ -3,6 +3,7 @@ import { emitNotification } from "@/lib/realtime";
 import { pushProcurementActivity } from "@/lib/procurement";
 import { effectiveRegionLabelOf } from "@/lib/company-regions";
 import { resolveRegionPolicy } from "@/lib/region-scope";
+import { isWeekendDate } from "@/lib/weekends";
 
 const FINANCE_ROLES = new Set(["finance", "admin"]);
 
@@ -247,11 +248,12 @@ export async function computeSalaryBreakdown(params: {
   // apply to their salary — never the actor's region. Loaded once here and
   // reused for the weekend filtering below.
   const companyDoc = (await Company.findById(actorCompany)
-    .select("addresses address weekendDates minWorkHours")
+    .select("addresses address weekendDates weekendExclusions minWorkHours")
     .lean()) as {
     addresses?: { label?: string | null }[] | null;
     address?: string | null;
     weekendDates?: { date: Date; reason?: string; region?: string | null }[] | null;
+    weekendExclusions?: { date: Date; reason?: string; region?: string | null }[] | null;
     minWorkHours?: number | null;
   } | null;
   const employeeRegion = effectiveRegionLabelOf(companyDoc, employee);
@@ -338,26 +340,19 @@ export async function computeSalaryBreakdown(params: {
     }
   }
 
-  const applicableWeekendDates = (companyDoc?.weekendDates ?? []).filter((item: any) => {
-    const r = String(item?.region ?? "").trim();
-    return !r || r === employeeRegion;
-  });
-  const manualWeekendsKeys = new Set(applicableWeekendDates.map((item: any) => toDateKey(new Date(item.date))));
-  const monthsWithManualWeekends = new Set(applicableWeekendDates.map((item: any) => {
-    const wd = new Date(item.date);
-    return `${wd.getFullYear()}-${wd.getMonth()}`;
-  }));
+  const weekendContext = {
+    weekendEntries: companyDoc?.weekendDates ?? [],
+    weekendExclusions: companyDoc?.weekendExclusions ?? [],
+    region: employeeRegion,
+  };
 
   let absentDays = 0;
   let halfDayCount = 0;
   for (let i = 0; i < totalDays; i += 1) {
     const day = new Date(effectiveStart.getTime() + i * DAY_MS);
     const dayKey = toDateKey(day);
-    
-    const hasManualWeekendsThisMonth = monthsWithManualWeekends.has(`${day.getFullYear()}-${day.getMonth()}`);
-    const isWeekend = hasManualWeekendsThisMonth 
-      ? manualWeekendsKeys.has(dayKey)
-      : day.getDay() === 0;
+
+    const isWeekend = isWeekendDate(day, weekendContext);
 
     const isHoliday = holidayDays.has(dayKey);
     const hasPresent = presentDays.has(dayKey);

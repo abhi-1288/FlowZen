@@ -9,6 +9,7 @@ import { emitNotification } from "@/lib/realtime";
 import { effectiveRegionLabelOf } from "@/lib/company-regions";
 import { recordAudit } from "@/lib/audit";
 import { actingRoleForRequest } from "@/lib/delegation-access";
+import { sendPolicyChangeEmail } from "@/lib/company-policy-email";
 
 const ALLOWED_NOTICE_PERIOD_DAYS = new Set([5, 15, 30, 45, 60, 90]);
 const ALLOWED_PAID_LEAVE_PERIODS = new Set(["monthly", "yearly"]);
@@ -142,6 +143,7 @@ export async function PATCH(request: Request) {
 
   const company = await Company.findById(hr.company);
   if (!company) return jsonError("Company not found.", 404);
+  const previousMinWorkHours = Number(company.minWorkHours ?? 8);
 
   // Regional HR/admin may only configure their own region's policy. The company
   // owner may target any region, or the global policy via region "".
@@ -216,6 +218,22 @@ export async function PATCH(request: Request) {
     result: "success",
     request,
   });
+
+  if (hasMinWorkHours && previousMinWorkHours !== Math.floor(minWorkHours)) {
+    void sendPolicyChangeEmail({
+      company,
+      actor: hr,
+      kind: "check-in",
+      region: "",
+      title: "Check-in / check-out policy updated",
+      summary: `${String(company.name ?? "The company")} has updated the minimum work hours required for a full day.`,
+      details: [
+        { label: "Previous requirement", value: `${previousMinWorkHours} hrs / day` },
+        { label: "New requirement", value: `${Math.floor(minWorkHours)} hrs / day` },
+        { label: "Applies to", value: "All offices" },
+      ],
+    });
+  }
 
   const resp = NextResponse.json({
     ok: true,

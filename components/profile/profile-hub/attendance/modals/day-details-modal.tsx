@@ -10,6 +10,9 @@ export function DayDetailsModal({
   wfhRequests = [],
   companyWfhDates = [],
   minWorkHours = 8,
+  isWeekend = false,
+  weekendReason = "",
+  weekendIsHoliday = false,
 }: {
   date: Date;
   onClose: () => void;
@@ -19,6 +22,9 @@ export function DayDetailsModal({
   wfhRequests?: AnyRecord[];
   companyWfhDates?: { date: string; reason: string }[];
   minWorkHours?: number;
+  isWeekend?: boolean;
+  weekendReason?: string;
+  weekendIsHoliday?: boolean;
 }) {
   const attendance = history.find((h: any) => {
     const d = new Date(h.date);
@@ -99,6 +105,22 @@ export function DayDetailsModal({
               </div>
               {companyWfh.reason && (
                 <p className="mt-1 text-sm text-slate-700 dark:text-zinc-300">{companyWfh.reason}</p>
+              )}
+            </div>
+          )}
+
+          {isWeekend && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-zinc-700 dark:bg-zinc-800/50">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-bold text-slate-800 dark:text-zinc-100">
+                  {weekendIsHoliday ? "Holiday Weekend" : "Weekend"}
+                </p>
+                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-bold text-slate-700 dark:bg-zinc-700 dark:text-zinc-300">
+                  Day off
+                </span>
+              </div>
+              {weekendReason && (
+                <p className="mt-1 text-sm text-slate-700 dark:text-zinc-300">{weekendReason}</p>
               )}
             </div>
           )}

@@ -3,6 +3,7 @@ import { WfhAssignModal } from "../wfh-assign-modal";
 import { ManageWfhDatesModal } from "../manage-wfh-dates-modal";
 import { WeekendModal } from "../modals/weekend-modal";
 import type { WfhState } from "../modals/weekend-modal";
+import { HolidayWeekendModal } from "../modals/holiday-weekend-modal";
 
 export type WfhAdminState = WfhState & {
   showWfhAssignModal: boolean;
@@ -16,6 +17,11 @@ export type WfhAdminState = WfhState & {
   setWfhMode: (v: "all-day" | "wfh-only") => void;
   updateWfhMode: (mode: "all-day" | "wfh-only") => Promise<void>;
   wfhLoading: boolean;
+  assignHolidayWeekend: (
+    startDate: string,
+    endDate: string,
+    reason: string,
+  ) => Promise<void>;
 };
 
 export function WfhAdminSection({
@@ -33,6 +39,8 @@ export function WfhAdminSection({
     wfhDates, setWfhDates, loadWfh,
     wfhMode, setWfhMode,
     updateWfhMode, wfhLoading,
+    showHolidayWeekendModal, setShowHolidayWeekendModal,
+    assignHolidayWeekend,
     ...weekendState
   } = state;
 
@@ -64,7 +72,15 @@ export function WfhAdminSection({
           <div className="rounded-lg neu-inset p-4 sm:col-span-2 dark:border-zinc-800 dark:bg-zinc-700">
             <label className="text-xs font-semibold uppercase text-slate-500 dark:text-zinc-400">Manual Weekends</label>
             <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">View and manage company weekend dates.</p>
-            <WeekendModal state={{ ...weekendState, wfhLoading }} showToast={showToast} />
+            <WeekendModal
+              state={{
+                ...weekendState,
+                wfhLoading,
+                showHolidayWeekendModal,
+                setShowHolidayWeekendModal,
+              }}
+              showToast={showToast}
+            />
           </div>
 
           <div>
@@ -97,6 +113,13 @@ export function WfhAdminSection({
       {showManageWfhModal && (
         <ManageWfhDatesModal wfhDates={wfhDates} onClose={() => setShowManageWfhModal(false)}
           onRefresh={() => void loadWfh()} showToast={showToast} />
+      )}
+      {showHolidayWeekendModal && (
+        <HolidayWeekendModal
+          onClose={() => setShowHolidayWeekendModal(false)}
+          onAssign={assignHolidayWeekend}
+          loading={wfhLoading}
+        />
       )}
     </>
   );

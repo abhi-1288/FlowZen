@@ -38,6 +38,18 @@ const CompanySchema = new Schema(
       {
         date: { type: Date, index: true },
         reason: { type: String },
+        // "manual" = an extra weekend day; "holiday" = a declared holiday
+        // weekend assigned from a date range.
+        kind: { type: String, enum: ["manual", "holiday"], default: "manual" },
+        region: { type: String, default: "", trim: true }
+      }
+    ],
+    // Dates explicitly declared working days, overriding the default Sunday
+    // rule and any company weekend on the same date.
+    weekendExclusions: [
+      {
+        date: { type: Date, index: true },
+        reason: { type: String },
         region: { type: String, default: "", trim: true }
       }
     ],

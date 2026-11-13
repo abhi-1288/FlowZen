@@ -7,8 +7,9 @@ import { Notification } from "@/models/Notification";
 import { emitNotification } from "@/lib/realtime";
 import { effectiveRegionLabelOf } from "@/lib/company-regions";
 import { recordAudit } from "@/lib/audit";
+import { sendPolicyChangeEmail } from "@/lib/company-policy-email";
 
-const formatDate = (date: Date) => date.toLocaleDateString("en-GB");
+const formatDate = (date: Date) => date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 
 const buildWfhNotificationBody = (companyName: string, start: Date, end: Date, reason: string) => {
   const dateText = start.getTime() === end.getTime()
@@ -45,6 +46,7 @@ export async function GET() {
     carryForwardWfhDays: company.carryForwardWfhDays ?? false,
     wfhDates: (company.wfhDates || []).filter(inRegion),
     weekendDates: (company.weekendDates || []).filter(inRegion),
+    weekendExclusions: ((company as any).weekendExclusions || []).filter(inRegion),
   });
 }
 
@@ -81,7 +83,9 @@ export async function POST(request: Request) {
   }
 
   let quotaUpdated = false;
+  let modeUpdated = false;
   let datesAdded = 0;
+  let addedRange: { start: Date; end: Date } | null = null;
 
   if (wfhDays !== undefined) {
     const days = Number(wfhDays);
@@ -102,6 +106,7 @@ export async function POST(request: Request) {
   }
 
   if (mode && ["all-day", "wfh-only"].includes(mode)) {
+    if (company.wfhCheckInMode !== mode) modeUpdated = true;
     company.wfhCheckInMode = mode;
   }
 
@@ -139,6 +144,7 @@ export async function POST(request: Request) {
     }
     company.wfhDates.push(...dates);
     datesAdded = dates.length;
+    addedRange = { start, end };
 
     // Notify all company members
     const populatedCompany = await Company.findById(user.company).select("name owner members");
@@ -187,6 +193,46 @@ export async function POST(request: Request) {
     request,
   });
 
+  const policyChanged = quotaUpdated || modeUpdated;
+  if (policyChanged || datesAdded > 0) {
+    const details: { label: string; value: string }[] = [];
+    if (quotaUpdated) {
+      details.push({
+        label: "WFH quota",
+        value: `${company.wfhDays} day(s) per ${company.wfhPeriod}`,
+      });
+    }
+    if (modeUpdated) {
+      details.push({
+        label: "Check-in mode",
+        value: company.wfhCheckInMode === "wfh-only" ? "WFH only — office check-in disabled" : "All day",
+      });
+    }
+    if (datesAdded > 0 && addedRange) {
+      const dateText =
+        formatDate(addedRange.start) === formatDate(addedRange.end)
+          ? formatDate(addedRange.start)
+          : `${formatDate(addedRange.start)} to ${formatDate(addedRange.end)}`;
+      details.push({ label: "WFH dates", value: `${dateText} (${datesAdded} day${datesAdded === 1 ? "" : "s"})` });
+      details.push({ label: "Applies to", value: dateRegion || "All offices" });
+    }
+
+    void sendPolicyChangeEmail({
+      company,
+      actor: user,
+      kind: "wfh",
+      // Quota/check-in-mode changes are company-wide; only date-only changes
+      // are scoped to the region the dates were added for.
+      region: policyChanged ? "" : dateRegion,
+      title: policyChanged ? "WFH policy updated" : "Company-wide WFH announced",
+      summary: policyChanged
+        ? `${String(company.name ?? "The company")} has updated its WFH policy.`
+        : `${String(company.name ?? "The company")} has announced company-wide WFH.`,
+      details,
+      reason: details.length > 0 && addedRange ? reason || "" : "",
+    });
+  }
+
   return NextResponse.json({
     wfhDays: company.wfhDays,
     wfhPeriod: company.wfhPeriod,
@@ -194,6 +240,7 @@ export async function POST(request: Request) {
     carryForwardWfhDays: company.carryForwardWfhDays ?? false,
     wfhDates: company.wfhDates || [],
     weekendDates: company.weekendDates || [],
+    weekendExclusions: (company as any).weekendExclusions || [],
   });
 }
 
@@ -225,6 +272,7 @@ export async function DELETE(request: Request) {
   // A regional admin may only delete dates for their own region; the owner and
   // HR may delete any. Entries for other regions are left untouched.
   const adminRegion = effectiveRegionLabelOf(company, user);
+  const datesBefore = company.wfhDates.length;
   company.wfhDates = company.wfhDates.filter((d: any) => {
     const dDate = new Date(d.date);
     dDate.setHours(0, 0, 0, 0);
@@ -245,7 +293,26 @@ export async function DELETE(request: Request) {
     request,
   });
 
-  return NextResponse.json({ wfhDates: company.wfhDates || [] });
+  if (company.wfhDates.length !== datesBefore) {
+    void sendPolicyChangeEmail({
+      company,
+      actor: user,
+      kind: "wfh",
+      region: adminRegion,
+      title: "Company WFH day removed",
+      summary: `The company-wide WFH on ${formatDate(targetDate)} has been removed.`,
+      details: [
+        { label: "Date", value: formatDate(targetDate) },
+        { label: "Applies to", value: adminRegion || "All offices" },
+      ],
+    });
+  }
+
+  return NextResponse.json({
+    wfhDates: company.wfhDates || [],
+    weekendDates: company.weekendDates || [],
+    weekendExclusions: (company as any).weekendExclusions || [],
+  });
 }
 
 export async function PATCH(request: Request) {
@@ -269,6 +336,7 @@ export async function PATCH(request: Request) {
     return jsonError("Invalid mode. Must be 'all-day' or 'wfh-only'", 400);
   }
 
+  const previousMode = company.wfhCheckInMode;
   company.wfhCheckInMode = mode;
   await company.save();
 
@@ -277,11 +345,27 @@ export async function PATCH(request: Request) {
     actionLabel: "WFH check-in mode updated",
     company: company._id,
     actor: { id: user._id, name: user.name, role: user.role },
-    from: { wfhCheckInMode: company.wfhCheckInMode },
+    from: { wfhCheckInMode: previousMode },
     to: { wfhCheckInMode: mode },
     result: "success",
     request,
   });
+
+  if (previousMode !== mode) {
+    void sendPolicyChangeEmail({
+      company,
+      actor: user,
+      kind: "wfh",
+      region: "",
+      title: "WFH check-in policy updated",
+      summary: `${String(company.name ?? "The company")} has changed how WFH days are tracked.`,
+      details: [
+        { label: "Previous mode", value: previousMode === "wfh-only" ? "WFH only" : "All day" },
+        { label: "New mode", value: mode === "wfh-only" ? "WFH only — office check-in disabled" : "All day" },
+        { label: "Applies to", value: "All offices" },
+      ],
+    });
+  }
 
   return NextResponse.json({ wfhCheckInMode: company.wfhCheckInMode });
 }

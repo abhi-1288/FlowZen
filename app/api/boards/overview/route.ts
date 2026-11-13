@@ -35,6 +35,7 @@ export async function GET(request: Request) {
     ? await Task.find({ team: { $in: actor.managesTeams } }).select("_id")
     : [];
   const managedTaskIds = managedTasks.map((task) => task._id);
+  const activityWindowStart = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
 
   const todoFilter: Record<string, unknown> = {};
   if (actor.company) todoFilter.company = actor.company;
@@ -52,7 +53,7 @@ export async function GET(request: Request) {
     ? {}
     : { $or: [{ owner: userId }, { "members.user": userId }] };
 
-  const [statusCounts, boards, boardTaskCounts, boardTodoCounts, pendingHandovers, awaitingCompactions] =
+  const [statusCounts, boards, boardTaskCounts, boardTodoCounts, priorityCounts, activityCounts, pendingHandovers, awaitingCompactions] =
     await Promise.all([
       BoardTodo.aggregate([
         { $match: todoFilter },
@@ -70,6 +71,14 @@ export async function GET(request: Request) {
             done: { $sum: { $cond: [{ $in: ["$status", FINISHED_TODO_STATUSES] }, 1, 0] } },
           },
         },
+      ]),
+      BoardTodo.aggregate([
+        { $match: todoFilter },
+        { $group: { _id: "$priority", count: { $sum: 1 } } },
+      ]),
+      BoardTodo.aggregate([
+        { $match: { ...todoFilter, updatedAt: { $gte: activityWindowStart } } },
+        { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$updatedAt" } }, count: { $sum: 1 } } },
       ]),
       TaskHandover.find({
         toEmployee: userId,
@@ -106,6 +115,17 @@ export async function GET(request: Request) {
       { total: row.total, active: row.active, done: row.done },
     ]),
   );
+  const priority = { high: 0, medium: 0, low: 0 };
+  for (const row of priorityCounts as { _id: string; count: number }[]) {
+    if (row._id === "high" || row._id === "medium" || row._id === "low") priority[row._id] = row.count;
+  }
+  const activityByDay = new Map((activityCounts as { _id: string; count: number }[]).map((row) => [row._id, row.count]));
+  const activity = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(activityWindowStart);
+    date.setDate(activityWindowStart.getDate() + index);
+    const key = date.toISOString().slice(0, 10);
+    return { date: key, count: activityByDay.get(key) ?? 0 };
+  });
 
   return NextResponse.json({
     scope,
@@ -124,6 +144,8 @@ export async function GET(request: Request) {
       pendingHandovers: pendingHandovers.length,
       awaitingCompactions: awaitingCompactions.length,
     },
+    priority,
+    activity,
     byStatus,
     boards: serializeDocs(boards).map((board: Record<string, unknown>) => {
       const boardId = String(board.id ?? "");

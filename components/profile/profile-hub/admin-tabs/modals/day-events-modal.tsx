@@ -5,7 +5,7 @@ import { Calendar, Cake, CalendarCheck, Video, DollarSign, Sun, Briefcase, Party
 type DayEvent = {
   date: Date;
   title: string;
-  type: "birthday" | "leave" | "meeting" | "payroll" | "holiday" | "interview" | "event" | "deadline";
+  type: "birthday" | "joining" | "anniversary" | "leaving" | "holiday" | "weekend" | "leave" | "wfh" | "meeting" | "payroll" | "interview" | "event" | "deadline";
 };
 
 const EVENT_STYLES: Record<string, { bg: string; text: string; border: string; icon: React.ReactNode }> = {

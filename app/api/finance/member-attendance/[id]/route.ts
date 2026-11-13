@@ -8,6 +8,8 @@ import { WfhRequest } from "@/models/WfhRequest";
 import { FinanceSalary } from "@/models/FinanceSalary";
 import { Holiday } from "@/models/Holiday";
 import { Company } from "@/models/Company";
+import { effectiveRegionLabelOf } from "@/lib/company-regions";
+import { isWeekendDate } from "@/lib/weekends";
 import { canAccessFinanceRecord } from "../../helpers";
 
 type Params = { params: Promise<{ id: string }> };
@@ -21,7 +23,7 @@ export async function GET(request: Request, { params }: Params) {
   if (!actor || !actor.company || actor.companyStatus !== "approved") return jsonError("Approved company access is required.", 403);
   if (String(actor.role) !== "finance") return jsonError("Only finance can view member attendance.", 403);
   if (!(await canAccessFinanceRecord(actor, memberId))) return jsonError("This member is outside your region.", 403);
-  const member = await User.findOne({ _id: memberId, company: actor.company, companyStatus: "approved" }).select("name email role baseSalary salaryType hourlyRate dailyRate companyJoined createdAt");
+  const member = await User.findOne({ _id: memberId, company: actor.company, companyStatus: "approved" }).select("name email role baseSalary salaryType hourlyRate dailyRate companyJoined createdAt regionLabel");
   if (!member) return jsonError("Member not found.", 404);
 
   const url = new URL(request.url);
@@ -52,23 +54,15 @@ export async function GET(request: Request, { params }: Params) {
     }).sort({ startDate: 1 }),
     Holiday.find({ company: actor.company, startDate: { $lt: monthEnd }, endDate: { $gte: monthStart } }).sort({ startDate: 1 }),
     FinanceSalary.findOne({ company: actor.company, employee: memberId, month, kind: "monthly" }).select("netSalary baseSalary"),
-    Company.findById(actor.company).select("weekendDates minWorkHours"),
+    Company.findById(actor.company).select("weekendDates weekendExclusions addresses address minWorkHours"),
   ]);
 
-  const manualWeekendsThisMonth = ((company as any)?.weekendDates ?? []).filter((entry: any) => {
-    const date = new Date(entry.date);
-    return date.getFullYear() === year && date.getMonth() === mon - 1;
-  });
-
-  const hasManualWeekendsThisMonth = manualWeekendsThisMonth.length > 0;
-
-  const weekendDateTimes = new Set(
-    manualWeekendsThisMonth.map((entry: any) => {
-      const date = new Date(entry.date);
-      date.setHours(0, 0, 0, 0);
-      return date.getTime();
-    }),
-  );
+  const memberRegion = effectiveRegionLabelOf(company as any, member);
+  const weekendContext = {
+    weekendEntries: ((company as any)?.weekendDates ?? []) as any[],
+    weekendExclusions: ((company as any)?.weekendExclusions ?? []) as any[],
+    region: memberRegion,
+  };
 
   const today = new Date();
   today.setHours(23, 59, 59, 999);
@@ -124,9 +118,7 @@ export async function GET(request: Request, { params }: Params) {
       checkDate.setHours(12, 0, 0, 0);
       return checkDate >= start && checkDate <= end;
     });
-    const isWeekend = hasManualWeekendsThisMonth
-      ? weekendDateTimes.has(new Date(year, mon - 1, d).setHours(0, 0, 0, 0))
-      : date.getDay() === 0;
+    const isWeekend = isWeekendDate(date, weekendContext);
 
     const wfh = wfhRecords.find((w: any) => {
       const start = new Date(w.startDate);

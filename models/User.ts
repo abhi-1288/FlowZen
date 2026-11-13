@@ -200,6 +200,8 @@ if (process.env.NODE_ENV === "development") {
   delete models.User;
 }
 
+UserSchema.index({ company: 1, companyStatus: 1 });
+
 export const User = models.User || model("User", UserSchema);
 
 
