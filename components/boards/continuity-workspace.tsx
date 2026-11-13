@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
+import { signOut, useSession } from "next-auth/react";
 import { apiFetch } from "@/lib/client-utils";
 import {
   ArrowLeft,
@@ -13,6 +15,7 @@ import {
   Layers,
   LayoutDashboard,
   ListChecks,
+  LogOut,
   PlayCircle,
   RefreshCw,
   Users,
@@ -53,6 +56,7 @@ const TAB_KEYS = new Set<string>(TABS.map((tab) => tab.key));
 export function ContinuityWorkspace() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: session } = useSession();
   const rawTab = searchParams?.get("tab") ?? "";
   const tab: WorkspaceTab = TAB_KEYS.has(rawTab) ? (rawTab as WorkspaceTab) : "overview";
   const todoFocus = searchParams?.get("todo") ?? "";
@@ -137,8 +141,42 @@ export function ContinuityWorkspace() {
       </header>
 
       <div className="mx-auto flex max-w-7xl gap-4 px-4 py-5">
-        <aside className="hidden w-52 shrink-0 md:block">
-          <nav className="sticky top-20 space-y-1 rounded-xl border border-slate-200 bg-white p-2 dark:border-zinc-800 dark:bg-[#0b0b0b]">
+        <aside className="hidden w-60 shrink-0 md:block">
+          <div className="sticky top-20 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-zinc-800 dark:bg-[#0b0b0b]">
+            <div className="border-b border-slate-200 p-4 dark:border-zinc-800">
+              <div className="flex items-start justify-between gap-3">
+                <Link className="flex min-w-0 items-center gap-2" href="/profile" aria-label="Open profile">
+                  <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg shadow-sm shadow-indigo-500/20">
+                    <Image src="/Logos/logo.jpg" alt="FlowZen logo" fill className="object-cover" />
+                  </span>
+                  <span className="truncate text-lg font-bold tracking-tight text-slate-950 dark:text-zinc-100">FlowZen</span>
+                </Link>
+                <button
+                  aria-label="Sign out"
+                  className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  type="button"
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
+              <p className="mt-3 truncate text-sm font-semibold text-slate-800 dark:text-zinc-100">
+                {session?.user?.name || "FlowZen User"}
+                <span className="mx-1 text-slate-400">•</span>
+                <span className="font-medium capitalize text-slate-500 dark:text-zinc-400">{session?.user?.role || "member"}</span>
+              </p>
+              <p className="mt-1 truncate text-xs text-slate-500 dark:text-zinc-400">
+                {session?.user?.company || "Unemployed"}
+                <span className="mx-1">•</span>
+                {session?.user?.team
+                  ? session.user.team
+                  : session?.user?.managedTeamCount
+                    ? `${session.user.managedTeamCount} Team${session.user.managedTeamCount > 1 ? "s" : ""}`
+                    : "No Team"}
+              </p>
+            </div>
+
+            <nav className="space-y-1 p-2">
             {TABS.map((item) => {
               const Icon = item.icon;
               const active = tab === item.key;
@@ -170,7 +208,8 @@ export function ContinuityWorkspace() {
                 </button>
               );
             })}
-          </nav>
+            </nav>
+          </div>
         </aside>
 
         <main className="min-w-0 flex-1">

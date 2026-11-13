@@ -4,7 +4,6 @@ import { authOptions } from "@/lib/auth";
 import { RecruitmentSidebar } from "@/components/recruitment/recruitment-sidebar";
 import { RecruitmentSSEListener } from "@/components/recruitment/recruitment-sse-listener";
 import { DelegationSync } from "@/components/delegation-sync";
-import AdSlot from "@/components/ads/ad-slot";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -31,11 +30,6 @@ export default async function RecruitmentLayout({ children, params }: { children
       <RecruitmentSidebar />
       <main className="min-w-0 flex-1 overflow-y-auto bg-app">
         {children}
-        <AdSlot
-          placement="recruitment"
-          variant="box"
-          className="mx-auto w-full max-w-4xl px-4 py-6"
-        />
       </main>
     </div>
   );
