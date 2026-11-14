@@ -28,6 +28,7 @@ export function useWfh(
   const [wfhDays, setWfhDays] = useState(0);
   const [wfhPeriod, setWfhPeriod] = useState<"monthly" | "yearly">("monthly");
   const [wfhMode, setWfhMode] = useState<"all-day" | "wfh-only">("all-day");
+  const [weekendCheckInEnabled, setWeekendCheckInEnabled] = useState(false);
   const [carryForwardWfhDays, setCarryForwardWfhDays] = useState<boolean>(
     company?.carryForwardWfhDays === true,
   );
@@ -43,6 +44,7 @@ export function useWfh(
   const [showWfhAssignModal, setShowWfhAssignModal] = useState(false);
   const [showManageWfhModal, setShowManageWfhModal] = useState(false);
   const [showWeekendModal, setShowWeekendModal] = useState(false);
+  const [showManageWeekendModal, setShowManageWeekendModal] = useState(false);
   const [showHolidayWeekendModal, setShowHolidayWeekendModal] = useState(false);
   const [showDateConfirm, setShowDateConfirm] = useState(false);
   const [confirmDateStr, setConfirmDateStr] = useState("");
@@ -57,6 +59,7 @@ export function useWfh(
         wfhDays: number;
         wfhPeriod: string;
         wfhCheckInMode: string;
+        weekendCheckInEnabled?: boolean;
         carryForwardWfhDays: boolean;
         wfhDates: { date: string; reason: string }[];
         weekendDates?: WeekendDate[];
@@ -65,6 +68,7 @@ export function useWfh(
       setWfhDays(res.wfhDays ?? 0);
       setWfhPeriod(res.wfhPeriod === "yearly" ? "yearly" : "monthly");
       setWfhMode(res.wfhCheckInMode === "wfh-only" ? "wfh-only" : "all-day");
+      setWeekendCheckInEnabled(res.weekendCheckInEnabled === true);
       setCarryForwardWfhDays(res.carryForwardWfhDays ?? false);
       setWfhDates(res.wfhDates || []);
       setWeekendDates(res.weekendDates || []);
@@ -126,20 +130,44 @@ export function useWfh(
         "/api/company/wfh",
         {
           method: "PATCH",
+          // The weekend check-in policy is saved separately from the
+          // "Manage Weekend Dates" modal.
           body: JSON.stringify({ mode }),
         },
       );
       setWfhMode(res.wfhCheckInMode === "wfh-only" ? "wfh-only" : "all-day");
-      showToast("WFH mode updated.", "success");
+      showToast("Check-in policy updated.", "success");
     } catch (err) {
       showToast(
-        err instanceof Error ? err.message : "Failed to update mode",
+        err instanceof Error ? err.message : "Failed to update check-in policy",
         "error",
       );
     } finally {
       setWfhLoading(false);
     }
   }, [showToast]);
+
+  const updateWeekendCheckIn = useCallback(async () => {
+    try {
+      setWfhLoading(true);
+      const res = await apiFetch<{ wfhCheckInMode: string; weekendCheckInEnabled?: boolean }>(
+        "/api/company/wfh",
+        {
+          method: "PATCH",
+          body: JSON.stringify({ weekendCheckInEnabled }),
+        },
+      );
+      setWeekendCheckInEnabled(res.weekendCheckInEnabled === true);
+      showToast("Weekend check-in policy updated.", "success");
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Failed to update weekend check-in policy",
+        "error",
+      );
+    } finally {
+      setWfhLoading(false);
+    }
+  }, [weekendCheckInEnabled, showToast]);
 
   const visibleWeekendDates = useMemo(() => {
     return [...weekendDates]
@@ -260,6 +288,7 @@ export function useWfh(
     wfhDays, setWfhDays,
     wfhPeriod, setWfhPeriod,
     wfhMode, setWfhMode,
+    weekendCheckInEnabled, setWeekendCheckInEnabled,
     carryForwardWfhDays, setCarryForwardWfhDays,
     wfhLoading,
     wfhDates, setWfhDates,
@@ -270,6 +299,7 @@ export function useWfh(
     showWfhAssignModal, setShowWfhAssignModal,
     showManageWfhModal, setShowManageWfhModal,
     showWeekendModal, setShowWeekendModal,
+    showManageWeekendModal, setShowManageWeekendModal,
     showHolidayWeekendModal, setShowHolidayWeekendModal,
     showDateConfirm, setShowDateConfirm,
     confirmDateStr, setConfirmDateStr,
@@ -279,6 +309,7 @@ export function useWfh(
     saveWfhQuota,
     saveCarryForwardWfhOnly,
     updateWfhMode,
+    updateWeekendCheckIn,
     visibleWeekendDates,
     visibleWeekendExclusions,
     assignWeekends,

@@ -20,6 +20,8 @@ type MemberAttendance = {
   calendar: {
     day: number;
     date: string;
+    attendanceId: string | null;
+    weekend: boolean;
     checkIn: string | null;
     checkOut: string | null;
     checkInTime: string | null;
@@ -87,6 +89,12 @@ export function FinanceMembersView({
   const [checkOutStep, setCheckOutStep] = useState<"action" | "reject" | "approve-status">("action");
   const [minWorkHours, setMinWorkHours] = useState(8);
 
+  // Attendance record removal requests raised by this finance user.
+  const [removalRequests, setRemovalRequests] = useState<AnyRecord[]>([]);
+  const [removalStep, setRemovalStep] = useState<"idle" | "reason">("idle");
+  const [removalReason, setRemovalReason] = useState("");
+  const [requestingRemoval, setRequestingRemoval] = useState(false);
+
   useEffect(() => {
     apiFetch<{ requests: AnyRecord[]; minWorkHours?: number }>("/api/attendance/checkout-request")
       .then((res) => {
@@ -94,7 +102,31 @@ export function FinanceMembersView({
         if (res.minWorkHours) setMinWorkHours(res.minWorkHours);
       })
       .catch(() => { });
+    apiFetch<{ requests: AnyRecord[] }>("/api/attendance/delete-request")
+      .then((res) => setRemovalRequests(res.requests ?? []))
+      .catch(() => { });
   }, []);
+
+  async function submitRemovalRequest() {
+    if (!dayModal?.attendanceId || !removalReason.trim() || requestingRemoval) return;
+    setRequestingRemoval(true);
+    try {
+      await apiFetch("/api/attendance/delete-request", {
+        method: "POST",
+        body: JSON.stringify({ attendanceId: dayModal.attendanceId, reason: removalReason.trim() }),
+      });
+      showToast("Removal request sent for approval.", "success");
+      setDayModal(null);
+      setRemovalStep("idle");
+      setRemovalReason("");
+      const res = await apiFetch<{ requests: AnyRecord[] }>("/api/attendance/delete-request");
+      setRemovalRequests(res.requests ?? []);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to request removal.", "error");
+    } finally {
+      setRequestingRemoval(false);
+    }
+  }
 
   async function selectMember(
     memberId: string,
@@ -507,6 +539,28 @@ export function FinanceMembersView({
             ) : (
               // Attendance Calendar
               <div className="mt-2">
+                {removalRequests.length > 0 ? (
+                  <div className="mb-5 rounded-xl neu-inset p-4">
+                    <h5 className="mb-2 text-sm font-semibold text-slate-800">Attendance Removal Requests</h5>
+                    <div className="space-y-2">
+                      {removalRequests.slice(0, 5).map((req: any) => (
+                        <div key={String(req.id)} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-3 py-2 text-sm">
+                          <div>
+                            <p className="font-medium text-slate-800">
+                              {req.member?.name ?? "Member"} — {new Date(req.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              Team owner: {req.teamOwnerRequired ? String(req.teamOwnerApproval?.status ?? "pending") : "n/a"} · Admin: {String(req.adminApproval?.status ?? "pending")}
+                            </p>
+                          </div>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${req.status === "approved" ? "bg-emerald-100 text-emerald-700" : req.status === "rejected" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>
+                            {String(req.status)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 <div className="mb-6 flex items-center justify-center gap-4">
                   <ActionButton onClick={() => changeMonth(-1)} variant="secondary" className="h-10 w-12" aria-label="Previous month">
                     <ChevronLeft size={20} />
@@ -562,7 +616,7 @@ export function FinanceMembersView({
                                 <button
                                   key={dayNum}
                                   type="button"
-                                  onClick={() => setDayModal(dayData)}
+                                  onClick={() => { setDayModal(dayData); setRemovalStep("idle"); setRemovalReason(""); }}
                                   className={`relative w-full grid place-items-center h-10 sm:h-14 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-sm ${dayData.notJoined ? "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-400 border border-[var(--c-border-light)] hover:bg-[var(--c-bg-hover)]" : dayData.holiday ? "bg-purple-100 text-purple-700 border border-purple-200 hover:bg-purple-200" : dayData.halfDay ? "bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-200" : today ? dayData.checkIn ? "bg-sky-100 text-sky-700 border border-sky-200 hover:bg-sky-200" : "bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] text-rose-600 border border-rose-200 hover:bg-rose-50 ring-2 ring-rose-400" : dayData.checkIn ? "bg-emerald-100 text-emerald-900 border border-emerald-200 hover:bg-emerald-200" : dayData.wfh ? "bg-[var(--color-primary-bg)] text-[var(--color-primary-dark)] border border-[var(--color-primary-bg)] hover:bg-[var(--color-primary-bg)]" : dayData.leave ? "bg-pink-100 text-pink-700 border border-pink-200 hover:bg-pink-200" : dayData.absent ? "bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100" : i === 0 ? "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-400 border border-[var(--c-border-light)]" : "bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] text-slate-600 border border-[var(--c-border-light)] hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]" }`}
                                 >
                                   <div className="flex flex-col items-center leading-tight">
@@ -694,6 +748,42 @@ export function FinanceMembersView({
                 </div>
               ) : null}
             </div>
+            {dayModal.attendanceId ? (
+              <div className="mt-5 border-t border-[var(--c-border-light)] pt-4">
+                {removalStep === "reason" ? (
+                  <div className="space-y-2">
+                    <textarea
+                      value={removalReason}
+                      onChange={(e) => setRemovalReason(e.target.value)}
+                      placeholder="Why should this record be removed? (required)"
+                      rows={3}
+                      className="w-full rounded-lg border border-[var(--c-border-light)] px-3 py-2 text-sm"
+                    />
+                    <div className="flex gap-2">
+                      <ActionButton variant="secondary" className="flex-1" onClick={() => { setRemovalStep("idle"); setRemovalReason(""); }}>
+                        Cancel
+                      </ActionButton>
+                      <button
+                        onClick={submitRemovalRequest}
+                        disabled={!removalReason.trim() || requestingRemoval}
+                        className="neu-btn neu-btn-danger flex-1 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
+                        type="button"
+                      >
+                        {requestingRemoval ? "Requesting..." : "Submit removal request"}
+                      </button>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Needs approval from the member&apos;s team owner and a regional admin before the record is deleted.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs text-slate-500">Wrong check-in, e.g. made on a day off? Request its removal.</p>
+                    <ActionButton variant="danger" onClick={() => setRemovalStep("reason")}>Request removal</ActionButton>
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
         </div>
       )}

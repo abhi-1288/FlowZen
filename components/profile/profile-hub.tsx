@@ -81,6 +81,8 @@ type ProfileHubCache = {
   wfhRequests: AnyRecord[];
   financeCount: number;
   checkOutRequestCount: number;
+  removalRequestCount: number;
+  removalPendingCount: number;
   jobsCount: number;
   recruitmentCount: number;
   visitorPendingCount: number;
@@ -274,6 +276,8 @@ export function ProfileHub() {
   const [wfhRequests, setWfhRequests] = useState<AnyRecord[]>([]);
   const [financeCount, setFinanceCount] = useState(0);
   const [checkOutRequestCount, setCheckOutRequestCount] = useState(0);
+  const [removalRequestCount, setRemovalRequestCount] = useState(0);
+  const [removalPendingCount, setRemovalPendingCount] = useState(0);
   const [delegationSharedWithMeCount, setDelegationSharedWithMeCount] = useState(0);
   const [delegationSharedByMeCount, setDelegationSharedByMeCount] = useState(0);
   const [jobsCount, setJobsCount] = useState(0);
@@ -304,6 +308,8 @@ export function ProfileHub() {
     setWfhRequests(profileHubCache.wfhRequests);
     setFinanceCount(profileHubCache.financeCount);
     setCheckOutRequestCount(profileHubCache.checkOutRequestCount);
+    setRemovalRequestCount(profileHubCache.removalRequestCount ?? 0);
+    setRemovalPendingCount(profileHubCache.removalPendingCount ?? 0);
     setJobsCount(profileHubCache.jobsCount);
     setRecruitmentCount(profileHubCache.recruitmentCount);
     setVisitorPendingCount(profileHubCache.visitorPendingCount);
@@ -328,7 +334,8 @@ export function ProfileHub() {
   const pendingWfhCount = wfhRequests.filter((r) =>
     ["pending", "manager-approved", "hr-approved"].includes(String(r.status)),
   ).length;
-  const pendingAttendanceCount = pendingLeaveCount + pendingWfhCount;
+  const pendingAttendanceCount =
+    pendingLeaveCount + pendingWfhCount + removalPendingCount;
   const company =
     typeof profile?.company === "object" && profile.company
       ? (profile.company as AnyRecord)
@@ -499,6 +506,8 @@ export function ProfileHub() {
         setWfhRequests(cached.wfhRequests);
         setFinanceCount(cached.financeCount);
         setCheckOutRequestCount(cached.checkOutRequestCount);
+        setRemovalRequestCount(cached.removalRequestCount ?? 0);
+        setRemovalPendingCount(cached.removalPendingCount ?? 0);
         setJobsCount(cached.jobsCount);
         setMessagesCount(cached.messagesCount ?? 0);
         setAuditCount(cached.auditCount ?? 0);
@@ -533,7 +542,7 @@ export function ProfileHub() {
       const actualRole = session?.user?.role ?? String(nextProfile?.role ?? "employee");
       const actualHasCompany = Boolean(nextProfile?.company && nextProfile?.companyStatus === "approved");
 
-      const [attendanceResult, leaveResult, wfhResult] = await Promise.all([
+      const [attendanceResult, leaveResult, wfhResult, removalResult] = await Promise.all([
         apiFetch<{ history: AnyRecord[] }>("/api/attendance/checkin").catch(
           () => ({ history: attendanceHistory }),
         ),
@@ -543,25 +552,39 @@ export function ProfileHub() {
         apiFetch<{ requests: AnyRecord[] }>("/api/attendance/wfh").catch(
           () => ({ requests: wfhRequests }),
         ),
+        apiFetch<{ requests: AnyRecord[]; own?: AnyRecord[] }>(
+          "/api/attendance/delete-request",
+          undefined,
+          { toast: false },
+        ).catch(() => ({ requests: [] as AnyRecord[], own: [] as AnyRecord[] })),
       ]);
 
       const nextAttendanceHistory = attendanceResult.history;
       const nextLeaveRequests = leaveResult.requests;
       const nextWfhRequests = wfhResult.requests;
+      const nextRemovalPending =
+        (removalResult?.requests ?? []).length +
+        (removalResult?.own ?? []).filter(
+          (item: AnyRecord) => String(item?.status ?? "pending") === "pending",
+        ).length;
       let nextFinanceCount = financeCount;
       let nextCheckOutRequestCount = checkOutRequestCount;
+      let nextRemovalRequestCount = removalRequestCount;
       let nextJobsCount = jobsCount;
 
       setAttendanceHistory(nextAttendanceHistory);
       setLeaveRequests(nextLeaveRequests);
       setWfhRequests(nextWfhRequests);
+      setRemovalPendingCount(nextRemovalPending);
 
       if (["finance", "admin"].includes(String(actualRole)) && actualHasCompany) {
         const month = new Date().toISOString().slice(0, 7);
-        const [financeCounts, checkOutResult] = await Promise.all([
+        const [financeCounts, checkOutResult, removalResult] = await Promise.all([
           apiFetch<{ pendingSalaryApproval: number; pendingSalaryPayment: number; pendingExpenseApproval: number; forwardedExpenseApproval: number; pendingExpenseAcceptance: number; pendingAssignedExpenses: number; pendingBills: number; pendingBudgets: number }>(`/api/finance?counts=true&month=${month}`)
             .catch(() => null),
           apiFetch<{ requests: AnyRecord[] }>("/api/attendance/checkout-request")
+            .catch(() => null),
+          apiFetch<{ requests: AnyRecord[] }>("/api/attendance/delete-request")
             .catch(() => null),
         ]);
         if (financeCounts) {
@@ -573,6 +596,13 @@ export function ProfileHub() {
         if (String(actualRole) === "finance" && checkOutResult) {
           nextCheckOutRequestCount = checkOutResult.requests.filter((r: any) => r.status === "pending").length;
           setCheckOutRequestCount(nextCheckOutRequestCount);
+        }
+        // The finance inbox from GET /api/attendance/delete-request only
+        // contains requests waiting on this user's review, so its length is
+        // the pending count.
+        if (String(actualRole) === "finance" && removalResult) {
+          nextRemovalRequestCount = removalResult.requests.length;
+          setRemovalRequestCount(nextRemovalRequestCount);
         }
       }
 
@@ -650,6 +680,8 @@ export function ProfileHub() {
         wfhRequests: nextWfhRequests,
         financeCount: nextFinanceCount,
         checkOutRequestCount: nextCheckOutRequestCount,
+        removalRequestCount: nextRemovalRequestCount,
+        removalPendingCount: nextRemovalPending,
         jobsCount: nextJobsCount,
         recruitmentCount: nextRecruitmentCount,
         visitorPendingCount: nextVisitorPendingCount,
@@ -1051,7 +1083,7 @@ export function ProfileHub() {
             <NavButton
               active={tab === "members"}
               icon={<Users size={16} />}
-              label={`Members${checkOutRequestCount ? ` (${checkOutRequestCount})` : ""}`}
+              label={`Members${checkOutRequestCount + removalRequestCount ? ` (${checkOutRequestCount + removalRequestCount})` : ""}`}
               onClick={() => setTab("members")}
             />
           ) : null}
@@ -1318,8 +1350,8 @@ export function ProfileHub() {
               const label =
                 item === "attendance" && pendingAttendanceCount > 0
                   ? `Attendance (${pendingAttendanceCount})`
-                  : item === "members" && checkOutRequestCount > 0
-                    ? `Members (${checkOutRequestCount})`
+                  : item === "members" && checkOutRequestCount + removalRequestCount > 0
+                    ? `Members (${checkOutRequestCount + removalRequestCount})`
                     : item === "visitors" && visitorPendingCount > 0
                       ? `Visitors (${visitorPendingCount})`
                       : item === "security" && lostCardReportedCount > 0
@@ -1409,6 +1441,7 @@ export function ProfileHub() {
                         wfhRequests={wfhRequests}
                         financeCount={financeCount}
                         checkOutRequestCount={checkOutRequestCount}
+                        removalRequestCount={removalRequestCount}
                         role={String(role)}
                         company={company}
                         showToast={showToast}
@@ -1425,6 +1458,7 @@ export function ProfileHub() {
                       wfhRequests={wfhRequests}
                       financeCount={financeCount}
                       checkOutRequestCount={checkOutRequestCount}
+                      removalRequestCount={removalRequestCount}
                       role={String(role)}
                       company={company}
                       showToast={showToast}

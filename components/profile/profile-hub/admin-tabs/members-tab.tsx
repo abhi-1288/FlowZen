@@ -573,7 +573,12 @@ export function MembersTab({
   }
 
   if (actorRole === "finance") {
-    return <FinanceMembersView members={members} showToast={showToast} />;
+    return (
+      <FinanceMembersView
+        members={members}
+        showToast={showToast}
+      />
+    );
   }
 
   return (

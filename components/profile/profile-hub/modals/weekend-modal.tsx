@@ -96,7 +96,7 @@ export function WeekendModal({
         className="neu-btn neu-btn-primary mt-3 rounded-full px-4 py-2 text-sm font-medium transition"
         type="button"
       >
-        Manage Weekend
+        Assign Weekend
         {weekendDates.length > 0 && (
           <span className="ml-1.5 rounded-full bg-white/20 dark:bg-zinc-900/20 px-1.5 py-0.5 text-xs text-white">{weekendDates.length}</span>
         )}

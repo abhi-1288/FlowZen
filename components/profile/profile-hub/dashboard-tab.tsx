@@ -32,6 +32,7 @@ type DashboardTabProps = {
   wfhRequests: AnyRecord[];
   financeCount: number;
   checkOutRequestCount: number;
+  removalRequestCount: number;
   role: string;
   company: AnyRecord | null;
   showToast: (text: string, type?: "success" | "error") => void;
@@ -88,6 +89,7 @@ export function DashboardTab({
   attendanceHistory,
   financeCount,
   checkOutRequestCount,
+  removalRequestCount,
   role,
   company,
   showToast,
@@ -826,7 +828,7 @@ export function DashboardTab({
             <Wallet size={16} className="text-slate-500" />
             Finance Summary
           </h2>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-amber-700">{financeCount}</p>
               <p className="text-xs text-slate-500">Pending Actions</p>
@@ -834,6 +836,10 @@ export function DashboardTab({
             <div className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{checkOutRequestCount}</p>
               <p className="text-xs text-slate-500">Check-out Requests</p>
+            </div>
+            <div className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 text-center">
+              <p className="text-2xl font-bold text-rose-700">{removalRequestCount}</p>
+              <p className="text-xs text-slate-500">Removal Requests</p>
             </div>
             <div className="rounded-lg bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 text-center">
               <p className="text-2xl font-bold text-slate-900">{approvals.length}</p>

@@ -70,6 +70,8 @@ export async function GET(request: Request, { params }: Params) {
   const calendar: {
     day: number;
     date: string;
+    attendanceId: string | null;
+    weekend: boolean;
     checkIn: string | null;
     checkOut: string | null;
     checkInTime: string | null;
@@ -148,6 +150,8 @@ export async function GET(request: Request, { params }: Params) {
     calendar.push({
       day: d,
       date: dateStr,
+      attendanceId: att?._id ? String(att._id) : null,
+      weekend: isWeekend,
       checkIn: rawCheckIn ? rawCheckIn.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : null,
       checkOut: rawCheckOut ? rawCheckOut.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : null,
       checkInTime: rawCheckIn?.toISOString() ?? null,

@@ -201,6 +201,33 @@ export function isHolidayWeekend(entry: WeekendEntry | null | undefined): boolea
   return String(entry?.kind ?? "").trim() === "holiday";
 }
 
+export type CheckInGate = {
+  /** True when the day is a weekend / holiday weekend (exclusions excluded). */
+  isWeekend: boolean;
+  /** HR policy switch: attendance is allowed on weekend days. */
+  weekendCheckInEnabled: boolean;
+  /** True when an approved personal WFH request covers the day. */
+  hasApprovedWfh: boolean;
+};
+
+/**
+ * Single decision for "may this member check in on this day?".
+ *
+ * Weekend exclusions never reach this gate: `isWeekendDate` already returns
+ * false for a day declared a working day, so `isWeekend` is simply false.
+ * The rule is: weekends block check-in unless the company opted in via the HR
+ * policy or the member works from home that day.
+ */
+export function canCheckInOnDate({
+  isWeekend,
+  weekendCheckInEnabled,
+  hasApprovedWfh,
+}: CheckInGate): boolean {
+  if (!isWeekend) return true;
+  if (weekendCheckInEnabled) return true;
+  return hasApprovedWfh;
+}
+
 /** Human label for a weekend entry, used by the calendar day modal. */
 export function weekendLabel(entry: WeekendEntry | null | undefined): string {
   if (!entry) return "Weekend";

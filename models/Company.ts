@@ -56,6 +56,11 @@ const CompanySchema = new Schema(
     carryForwardLeaveDays: { type: Boolean, default: false },
     carryForwardWfhDays: { type: Boolean, default: false },
     wfhCheckInMode: { type: String, enum: ["all-day", "wfh-only"], default: "all-day" },
+    // Attendance on day-offs: when false (default) check-in is blocked on
+    // weekend and holiday-weekend dates. When true, members may check in/out
+    // there. An approved personal WFH request always overrides the block, and
+    // weekend exclusions (declared working days) are not affected at all.
+    weekendCheckInEnabled: { type: Boolean, default: false },
     minWorkHours: { type: Number, default: 8 },
     // Delivery policy for EOD/EOW employee compactions. When false (default) a
     // checkout only generates a draft and the employee must confirm/submit it.

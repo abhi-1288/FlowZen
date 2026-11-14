@@ -13,6 +13,8 @@ export function DayDetailsModal({
   isWeekend = false,
   weekendReason = "",
   weekendIsHoliday = false,
+  removalRequests = [],
+  onOpenRemoval,
 }: {
   date: Date;
   onClose: () => void;
@@ -25,12 +27,28 @@ export function DayDetailsModal({
   isWeekend?: boolean;
   weekendReason?: string;
   weekendIsHoliday?: boolean;
+  removalRequests?: AnyRecord[];
+  onOpenRemoval?: (attendanceId: string) => void;
 }) {
   const attendance = history.find((h: any) => {
     const d = new Date(h.date);
     d.setHours(0, 0, 0, 0);
     return d.getTime() === date.getTime();
   });
+
+  // The member's own removal request for this record, if one was already sent.
+  const removalRequest = attendance
+    ? removalRequests.find((r: any) => {
+        const requestId = String(r.attendanceId ?? "");
+        if (requestId && requestId === String((attendance as any)._id ?? "")) return true;
+        const d = new Date(String(r.date));
+        d.setHours(0, 0, 0, 0);
+        return d.getTime() === date.getTime();
+      })
+    : undefined;
+  const removalStatus = String((removalRequest as any)?.status ?? "");
+
+  const slotStatus = (slot: unknown) => String((slot as AnyRecord | undefined)?.status ?? "pending");
 
   const leave = requests.find((r: any) => {
     const start = new Date(String(r.startDate));
@@ -178,6 +196,46 @@ export function DayDetailsModal({
               <p className="text-sm font-bold text-slate-900 dark:text-zinc-100">No attendance recorded</p>
             </div>
           )}
+
+          {attendance && onOpenRemoval ? (
+            <>
+              {removalRequest ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-900 dark:bg-[#252000]">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-bold text-amber-800">Attendance removal request</p>
+                    <span className={`rounded-full px-2 py-1 text-xs font-bold ${removalStatus === "approved" ? "bg-emerald-100 text-emerald-700 dark:bg-[#00251b]" : removalStatus === "rejected" ? "bg-rose-100 text-rose-700 dark:bg-rose-950/50" : "bg-amber-100 text-amber-700 dark:bg-amber-950/50"}`}>
+                      {removalStatus || "pending"}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-700 dark:text-zinc-300">
+                    {String((removalRequest as any).reason ?? "")}
+                  </p>
+                  <div className="mt-2 space-y-1 text-xs text-slate-500 dark:text-zinc-400">
+                    <p>Finance review: {slotStatus((removalRequest as any).financeApproval)}</p>
+                    {Boolean((removalRequest as any).teamOwnerRequired) && (
+                      <p>Team owner approval: {slotStatus((removalRequest as any).teamOwnerApproval)}</p>
+                    )}
+                    <p>Admin approval: {slotStatus((removalRequest as any).adminApproval)}</p>
+                  </div>
+                </div>
+              ) : null}
+              {!removalRequest || removalStatus === "rejected" ? (
+                <div className="rounded-xl border border-[var(--c-border-light)] p-4 dark:border-zinc-800">
+                  <p className="text-sm font-bold text-slate-900 dark:text-zinc-100">Wrong check-in or check-out?</p>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
+                    e.g. a check-in made on a day off. Finance reviews your request first, then your team owner and a regional admin.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => onOpenRemoval(String((attendance as any)._id ?? ""))}
+                    className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-400"
+                  >
+                    Request removal
+                  </button>
+                </div>
+              ) : null}
+            </>
+          ) : null}
 
           {leave && (
             <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 dark:border-emerald-900 dark:bg-[#00251b]">
