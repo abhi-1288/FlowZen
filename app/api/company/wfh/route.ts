@@ -43,6 +43,7 @@ export async function GET() {
     wfhDays: company.wfhDays ?? 0,
     wfhPeriod: company.wfhPeriod ?? "monthly",
     wfhCheckInMode: company.wfhCheckInMode || "all-day",
+    weekendCheckInEnabled: (company as any).weekendCheckInEnabled === true,
     carryForwardWfhDays: company.carryForwardWfhDays ?? false,
     wfhDates: (company.wfhDates || []).filter(inRegion),
     weekendDates: (company.weekendDates || []).filter(inRegion),
@@ -327,45 +328,74 @@ export async function PATCH(request: Request) {
   const company = await Company.findById(user.company);
   if (!company) return jsonError("Company not found", 404);
 
-  if (String(company.owner) !== String(userId) && user.role !== "human-resource") {
-    return jsonError("Only company owner or HR can manage WFH settings", 403);
+  // Matches the POST/DELETE permission level in this file: owner, HR, or admin.
+  const isOwner = String(company.owner) === String(userId);
+  if (!isOwner && !["human-resource", "admin"].includes(String(user.role))) {
+    return jsonError("Only company owner, HR, or admins can manage WFH settings", 403);
   }
 
-  const { mode } = await request.json();
-  if (!mode || !["all-day", "wfh-only"].includes(mode)) {
+  const body = await request.json().catch(() => ({}));
+  const mode = (body as any).mode;
+  const hasWeekendCheckIn = Object.prototype.hasOwnProperty.call(body, "weekendCheckInEnabled");
+  if (!mode && !hasWeekendCheckIn) {
+    return jsonError("Nothing to update. Send 'mode' and/or 'weekendCheckInEnabled'.", 400);
+  }
+  if (mode && !["all-day", "wfh-only"].includes(mode)) {
     return jsonError("Invalid mode. Must be 'all-day' or 'wfh-only'", 400);
   }
+  const weekendCheckInEnabled = hasWeekendCheckIn
+    ? (body as any).weekendCheckInEnabled === true
+    : null;
 
   const previousMode = company.wfhCheckInMode;
-  company.wfhCheckInMode = mode;
+  const previousWeekendCheckIn = (company as any).weekendCheckInEnabled === true;
+  if (mode) company.wfhCheckInMode = mode;
+  if (hasWeekendCheckIn) (company as any).weekendCheckInEnabled = weekendCheckInEnabled;
   await company.save();
 
   await recordAudit({
     action: "company.settings.change",
-    actionLabel: "WFH check-in mode updated",
+    actionLabel: "WFH check-in policy updated",
     company: company._id,
     actor: { id: user._id, name: user.name, role: user.role },
-    from: { wfhCheckInMode: previousMode },
-    to: { wfhCheckInMode: mode },
+    from: { wfhCheckInMode: previousMode, weekendCheckInEnabled: previousWeekendCheckIn },
+    to: {
+      wfhCheckInMode: company.wfhCheckInMode,
+      weekendCheckInEnabled: (company as any).weekendCheckInEnabled === true,
+    },
     result: "success",
     request,
   });
 
-  if (previousMode !== mode) {
+  const modeChanged = Boolean(mode) && previousMode !== company.wfhCheckInMode;
+  const weekendChanged = hasWeekendCheckIn && previousWeekendCheckIn !== weekendCheckInEnabled;
+  if (modeChanged || weekendChanged) {
     void sendPolicyChangeEmail({
       company,
       actor: user,
       kind: "wfh",
       region: "",
       title: "WFH check-in policy updated",
-      summary: `${String(company.name ?? "The company")} has changed how WFH days are tracked.`,
+      summary: `${String(company.name ?? "The company")} has changed how check-ins are tracked.`,
       details: [
-        { label: "Previous mode", value: previousMode === "wfh-only" ? "WFH only" : "All day" },
-        { label: "New mode", value: mode === "wfh-only" ? "WFH only — office check-in disabled" : "All day" },
+        ...(modeChanged
+          ? [
+              { label: "Previous mode", value: previousMode === "wfh-only" ? "WFH only" : "All day" },
+              { label: "New mode", value: company.wfhCheckInMode === "wfh-only" ? "WFH only — office check-in disabled" : "All day" },
+            ]
+          : []),
+        ...(weekendChanged
+          ? [
+              { label: "Weekend check-in", value: weekendCheckInEnabled ? "Allowed on weekends & holiday weekends" : "Blocked on weekends & holiday weekends" },
+            ]
+          : []),
         { label: "Applies to", value: "All offices" },
       ],
     });
   }
 
-  return NextResponse.json({ wfhCheckInMode: company.wfhCheckInMode });
+  return NextResponse.json({
+    wfhCheckInMode: company.wfhCheckInMode,
+    weekendCheckInEnabled: (company as any).weekendCheckInEnabled === true,
+  });
 }

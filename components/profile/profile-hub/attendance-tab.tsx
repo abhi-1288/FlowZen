@@ -7,6 +7,7 @@ import { LeaveModal, RequestsListModal } from "./attendance/modals/leave-modals"
 import { HolidayModal, EditHolidayModal, AdminLeaveHistoryModal } from "./attendance/modals/holiday-modals";
 import { WfhRequestModal, WfhRequestsListModal } from "./attendance/modals/wfh-modals";
 import { CheckOutRequestModal, CheckOutRequestsListModal } from "./attendance/modals/checkout-modals";
+import { CheckInRemovalRequestModal, CheckInRemovalRequestsListModal } from "./attendance/modals/removal-modals";
 import { DayDetailsModal } from "./attendance/modals/day-details-modal";
 import { AskModal, RequestsModal } from "./attendance/inline-modals";
 import {
@@ -52,9 +53,12 @@ export function AttendanceTab({
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [wfhCheckInMode, setWfhCheckInMode] = useState<string>("all-day");
+  const [weekendCheckInEnabled, setWeekendCheckInEnabled] = useState(false);
   const [companyWfhDates, setCompanyWfhDates] = useState<{ date: string; reason: string }[]>([]);
   const [companyWeekendDates, setCompanyWeekendDates] = useState<{ date: string; reason?: string }[]>([]);
   const [companyWeekendExclusions, setCompanyWeekendExclusions] = useState<{ date: string; reason?: string }[]>([]);
+  const [removalRequests, setRemovalRequests] = useState<AnyRecord[]>([]);
+  const [myRemovalRequests, setMyRemovalRequests] = useState<AnyRecord[]>([]);
   const [wfhDays, setWfhDays] = useState(0);
   const [wfhPeriod, setWfhPeriod] = useState("monthly");
   const [remainingWfhDays, setRemainingWfhDays] = useState(0);
@@ -78,6 +82,9 @@ export function AttendanceTab({
   const [showWfhRequestsModal, setShowWfhRequestsModal] = useState(false);
   const [showAskModal, setShowAskModal] = useState(false);
   const [showCheckOutRequestModal, setShowCheckOutRequestModal] = useState(false);
+  const [showRemovalRequestModal, setShowRemovalRequestModal] = useState(false);
+  const [removalPreselectId, setRemovalPreselectId] = useState("");
+  const [showRemovalListModal, setShowRemovalListModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [wfhRejectingId, setWfhRejectingId] = useState<string | null>(null);
   const [wfhRejectionReason, setWfhRejectionReason] = useState("");
@@ -108,7 +115,7 @@ export function AttendanceTab({
       apiFetch<{ holidays: AnyRecord[] }>("/api/attendance/holidays").catch(
         () => ({ holidays: [] as AnyRecord[] }),
       ),
-      apiFetch<{ wfhDays: number; wfhPeriod: string; wfhCheckInMode?: string; wfhDates?: { date: string; reason: string }[]; weekendDates?: { date: string; reason?: string }[]; weekendExclusions?: { date: string; reason?: string }[] }>("/api/company/wfh").catch(
+      apiFetch<{ wfhDays: number; wfhPeriod: string; wfhCheckInMode?: string; weekendCheckInEnabled?: boolean; wfhDates?: { date: string; reason: string }[]; weekendDates?: { date: string; reason?: string }[]; weekendExclusions?: { date: string; reason?: string }[] }>("/api/company/wfh").catch(
         () => ({ wfhDays: 0, wfhPeriod: "monthly" as string, wfhCheckInMode: "all-day", wfhDates: [], weekendDates: [], weekendExclusions: [] }),
       ),
       apiFetch<{ requests: AnyRecord[] }>("/api/attendance/wfh").catch(
@@ -126,6 +133,7 @@ export function AttendanceTab({
     setLeavePolicy((rRes as { leavePolicy?: AnyRecord | null }).leavePolicy ?? null);
     setHolidays(holRes.holidays);
     setWfhCheckInMode(wfhRes.wfhCheckInMode ?? "all-day");
+    setWeekendCheckInEnabled((wfhRes as any).weekendCheckInEnabled === true);
     setCompanyWfhDates((wfhRes as any).wfhDates ?? []);
     setCompanyWeekendDates((wfhRes as any).weekendDates ?? []);
     setCompanyWeekendExclusions((wfhRes as any).weekendExclusions ?? []);
@@ -173,6 +181,41 @@ export function AttendanceTab({
       .then((result) => setIncomingExportRequests(result.requests ?? []))
       .catch(() => undefined);
   }, [canExportAttendance, profile?.role]);
+
+  // Members fetch their own removal requests for the Requests picker; the
+  // `requests` inbox is only populated for reviewers.
+  const refreshRemovalRequests = async () => {
+    const result = await apiFetch<{ requests: AnyRecord[]; own?: AnyRecord[] }>(
+      "/api/attendance/delete-request",
+      undefined,
+      { toast: false },
+    ).catch(() => undefined);
+    if (result) {
+      setRemovalRequests(result.requests ?? []);
+      setMyRemovalRequests(result.own ?? []);
+    }
+  };
+
+  useEffect(() => {
+    refreshRemovalRequests();
+  }, [profile?.role]);
+
+  const decideRemovalRequest = async (id: string, action: "approve" | "reject", reason = "", adminId = "") => {
+    try {
+      await apiFetch(`/api/attendance/delete-request/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action, reason, ...(adminId ? { adminId } : {}) }),
+      });
+      setRemovalRequests((current) => current.filter((item) => String(item.id) !== id));
+      setMyRemovalRequests((current) => current.filter((item) => String(item.id) !== id));
+      showToast(
+        action === "approve" ? "Removal approved and forwarded." : "Removal request rejected.",
+        "success",
+      );
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Could not update the removal request.", "error");
+    }
+  };
 
   const decideExportRequest = async (id: string, action: "approve" | "reject") => {
     try {
@@ -536,6 +579,14 @@ export function AttendanceTab({
       return todayTime >= start.getTime() && todayTime <= end.getTime();
     });
   }, [wfhRequests, todayDate]);
+  // Day-off gate mirrors the check-in API: weekend and holiday-weekend dates
+  // block check-in unless the HR policy allows it or an approved WFH request
+  // covers today.
+  const todayIsWeekend = isWeekendDate(todayDate, {
+    weekendEntries: companyWeekendDates,
+    weekendExclusions: companyWeekendExclusions,
+  });
+  const weekendCheckInBlocked = todayIsWeekend && !weekendCheckInEnabled && !isTodayWfh;
   const weekDays = ["SUN.", "Mon.", "Tue.", "Wed.", "Thr.", "Fri.", "Sat."];
   if (!isAttendanceEnabled) {
     return (
@@ -673,7 +724,9 @@ export function AttendanceTab({
                   ).length +
                   wfhRequests.filter((r) =>
                     ["pending", "manager-approved", "hr-approved"].includes(String(r.status))
-                  ).length;
+                  ).length +
+                  removalRequests.length +
+                  myRemovalRequests.filter((r: any) => String(r.status ?? "pending") === "pending").length;
                 return totalPending > 0 ? (
                   <span className="neu-btn neu-btn-danger absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[10px]">
                     {totalPending}
@@ -702,21 +755,25 @@ export function AttendanceTab({
               ) : (!todayAttendance && !isHoliday(todayDate.getDate())) ? (
                 <ActionButton
                   variant="approve"
-                  disabled={isCheckingIn || todayLeave || isHoliday(todayDate.getDate())}
+                  disabled={isCheckingIn || todayLeave || weekendCheckInBlocked}
                   onClick={handleCheckIn}
                   title={
                     todayLeave
                       ? "Today is approved leave, check-in disabled."
                       : isHoliday(todayDate.getDate())
                         ? "Today is a holiday, check-in disabled."
-                        : "Check in for today."
+                        : weekendCheckInBlocked
+                          ? "Today is a weekend (day off), check-in disabled."
+                          : "Check in for today."
                   }
                 >
                   {isCheckingIn
                     ? "Checking..."
                     : todayLeave
                       ? "On Leave"
-                      : "Check In"}
+                      : weekendCheckInBlocked
+                        ? "Day Off"
+                        : "Check In"}
                 </ActionButton>
               ) : null
             )}
@@ -754,6 +811,8 @@ export function AttendanceTab({
           onLeave={() => { setShowAskModal(false); setShowLeaveModal(true); }}
           onWfh={() => { setShowAskModal(false); setShowWfhFormModal(true); }}
           onCheckout={() => { setShowAskModal(false); setShowCheckOutRequestModal(true); }}
+          onRemoval={() => { setShowAskModal(false); setRemovalPreselectId(""); setShowRemovalRequestModal(true); }}
+          removalPending={myRemovalRequests.filter((r: any) => String(r.status ?? "pending") === "pending").length}
         />
         <RequestsModal
           isOpen={showViewModal}
@@ -765,9 +824,11 @@ export function AttendanceTab({
             ["pending", "manager-approved", "hr-approved"].includes(String(r.status)),
           ).length}
           checkOutCount={checkOutRequests.filter((r: any) => r.status === "pending").length}
+          removalCount={removalRequests.length + myRemovalRequests.filter((r: any) => String(r.status ?? "pending") === "pending").length}
           onLeaveClick={() => { setShowViewModal(false); setShowRequestsModal(true); }}
           onWfhClick={() => { setShowViewModal(false); setShowWfhRequestsModal(true); }}
           onCheckoutClick={() => { setShowViewModal(false); setShowCheckOutRequestsModal(true); }}
+          onRemovalClick={() => { setShowViewModal(false); setShowRemovalListModal(true); }}
         />
         {showLeaveModal && (
           <LeaveModal
@@ -926,6 +987,25 @@ export function AttendanceTab({
           <CheckOutRequestsListModal
             requests={checkOutRequests}
             onClose={() => setShowCheckOutRequestsModal(false)}
+          />
+        )}
+        {showRemovalRequestModal && (
+          <CheckInRemovalRequestModal
+            history={history}
+            preselectedId={removalPreselectId}
+            onClose={() => { setShowRemovalRequestModal(false); setRemovalPreselectId(""); }}
+            onRefresh={async () => { await loadData(); await refreshRemovalRequests(); }}
+            showToast={showToast}
+          />
+        )}
+        {showRemovalListModal && (
+          <CheckInRemovalRequestsListModal
+            requests={removalRequests}
+            own={myRemovalRequests}
+            isFinance={String(profile?.role ?? "") === "finance"}
+            onApprove={(id, adminId) => decideRemovalRequest(id, "approve", "", adminId)}
+            onReject={(id, reason) => decideRemovalRequest(id, "reject", reason)}
+            onClose={() => setShowRemovalListModal(false)}
           />
         )}
         {showWfhFormModal && (
@@ -1128,6 +1208,12 @@ export function AttendanceTab({
           isWeekend={selectedIsWeekend}
           weekendReason={weekendLabel(selectedWeekendEntry)}
           weekendIsHoliday={isHolidayWeekend(selectedWeekendEntry)}
+          removalRequests={myRemovalRequests}
+          onOpenRemoval={(attendanceId) => {
+            setSelectedDate(null);
+            setRemovalPreselectId(attendanceId);
+            setShowRemovalRequestModal(true);
+          }}
         />
       )}
     </>

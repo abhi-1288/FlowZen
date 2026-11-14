@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  canCheckInOnDate,
   dateKey,
   isWeekendDate,
   monthKey,
@@ -90,4 +91,32 @@ test("date keys handle date-only and UTC-midnight values", () => {
   assert.equal(dateKey(normalizeDateOnly("2026-11-07")), "2026-11-07");
   assert.equal(monthKey(2026, 10), "2026-11");
   assert.equal(dateKey(""), "");
+});
+
+test("weekend check-in gate: blocked by default on day-offs", () => {
+  assert.equal(
+    canCheckInOnDate({ isWeekend: true, weekendCheckInEnabled: false, hasApprovedWfh: false }),
+    false,
+  );
+});
+
+test("weekend check-in gate: HR policy allows day-off attendance", () => {
+  assert.equal(
+    canCheckInOnDate({ isWeekend: true, weekendCheckInEnabled: true, hasApprovedWfh: false }),
+    true,
+  );
+});
+
+test("weekend check-in gate: an approved WFH request overrides the block", () => {
+  assert.equal(
+    canCheckInOnDate({ isWeekend: true, weekendCheckInEnabled: false, hasApprovedWfh: true }),
+    true,
+  );
+});
+
+test("weekend check-in gate: working days are never blocked", () => {
+  assert.equal(
+    canCheckInOnDate({ isWeekend: false, weekendCheckInEnabled: false, hasApprovedWfh: false }),
+    true,
+  );
 });
