@@ -946,33 +946,16 @@ export default function JobDetailPage() {
               {canRunPipeline && activeJob.status === "closed" && (
                 <ActionButton accent={accent} icon={Download} label={exporting ? "Exporting…" : "Export Candidates"} disabled={exporting} onClick={() => { void handleExport(); }} />
               )}
-              {activeJob.assessment && (
-                {activeJob.status === "closed" ? (
-                  <>
-
-                    {/* Check candidate stages: screening = eligible, applied = needs ATS scoring */}
-                    {jobCandidates.length > 0 ? (
-                      <>
-                        {jobCandidates.some((c) => c.stage === "screening") ? (
-                          <ActionButton accent={accent} icon={Users} label="View Eligible Candidates" onClick={() => { void fetchCandidates({ jobId: id }); setAssessmentCandidatesOpen(true); }} />
-                        ) : jobCandidates.some((c) => c.stage === "applied") && (
-                          <p className="text-xs text-slate-500 dark:text-zinc-400">
-                            Please run ATS scoring or move candidate stage to screening
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      {/* No candidates loaded */}
-                      {}
-                    )}
-
-                  </>
-                ) : (
-                  /*eslint-disable react/no-unused-expression */
-                  <p className="text-xs text-slate-500 dark:text-zinc-400">
-                    No candidates found for this closed job.
-                  </p>
-                )}
+              {activeJob.assessment && activeJob.status === "closed" && (
+                <>
+                  {jobCandidates.some((c) => c.stage === "screening") ? (
+                    <ActionButton accent={accent} icon={Users} label="View Eligible Candidates" onClick={() => { void fetchCandidates({ jobId: id }); setAssessmentCandidatesOpen(true); }} />
+                  ) : jobCandidates.some((c) => c.stage === "applied") ? (
+                    <p className="text-xs text-slate-500 dark:text-zinc-400">
+                      Please run ATS scoring or move candidate stage to screening
+                    </p>
+                  ) : null}
+                </>
               )}
               {canRunPipeline && activeJob.assessment && assessmentResultsUnlocked({ assessment: activeJob.assessment, assessmentDate: activeJob.assessmentDate }) && (
                 <ActionButton
