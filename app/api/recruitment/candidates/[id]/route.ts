@@ -39,6 +39,7 @@ export async function PATCH(request: Request, { params }: Params) {
     // endpoint stays the only writer and the offer can keep inheriting one
     // source of truth.
     "regionLabel",
+    "assessmentSlotStart",
   ];
   const updates: Record<string, unknown> = {};
   for (const field of allowedFields) {

@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import type { ATSCandidate } from "@/lib/recruitment-types";
+import { useNotificationToast } from "@/lib/toast-context";
 
 function initials(first?: string, last?: string): string {
   const f = (first || "").trim().charAt(0);
@@ -10,14 +12,67 @@ function initials(first?: string, last?: string): string {
 
 type Props = {
   candidates: ATSCandidate[];
+  slots: string[];
+  jobId: string;
+  assessmentDate: string | null;
   onClose: () => void;
 };
 
-export function AssessmentCandidatesModal({ candidates, onClose }: Props) {
+export function AssessmentCandidatesModal({ candidates, slots, jobId, assessmentDate, onClose }: Props) {
+  const { showSuccessToast, showErrorToast } = useNotificationToast();
+  const [filter, setFilter] = useState<string>("all");
+  const [assigning, setAssigning] = useState(false);
   const sorted = [...candidates].sort((a, b) => {
     const rank = (c: ATSCandidate) => (c.assessmentSubmittedAt ? 0 : c.assessmentStartedAt ? 1 : 2);
     return rank(a) - rank(b);
   });
+
+  const slotOptions = slots.length ? slots : ["single"];
+
+  const filtered = filter === "all" ? sorted : sorted.filter((c) => (c.assessmentSlotStart ? new Date(c.assessmentSlotStart).toLocaleTimeString() : "single") === filter);
+
+  const autoAssign = async () => {
+    if (sorted.length === 0) {
+      showErrorToast("No candidates available to assign.");
+      return;
+    }
+    const k = slotOptions.length;
+    const n = sorted.length;
+    const base = Math.floor(n / k);
+    const rem = n % k;
+    const preview = slotOptions.map((s, i) => `${s}: ${base + (i < rem ? 1 : 0)}`).join(", ");
+    setAssigning(true);
+    try {
+      const n = sorted.length;
+      const k = slotOptions.length;
+      // distribute n across k as evenly as possible
+      const base = Math.floor(n / k);
+      const rem = n % k;
+      let idx = 0;
+      for (let s = 0; s < k; s++) {
+        const count = base + (s < rem ? 1 : 0);
+        for (let i = 0; i < count; i++) {
+          const c = sorted[idx++];
+          if (!c) break;
+          const slotTime = slotOptions[s];
+          const [hh, mm] = slotTime.split(":").map(Number);
+          const base = assessmentDate ? new Date(assessmentDate) : new Date();
+          const assigned = new Date(base);
+          assigned.setHours(hh || 0, mm || 0, 0, 0);
+          await fetch(`/api/recruitment/candidates/${c.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ assessmentSlotStart: assigned.toISOString() }),
+          });
+        }
+      }
+      showSuccessToast(`Candidates assigned across ${k} slots. ${preview}`);
+    } catch {
+      showErrorToast("Could not auto-optimize candidate slots.");
+    } finally {
+      setAssigning(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/35 px-4">
@@ -34,18 +89,30 @@ export function AssessmentCandidatesModal({ candidates, onClose }: Props) {
           </button>
         </div>
 
+        <div className="flex items-center gap-2 border-b border-slate-200 px-5 py-3 dark:border-zinc-800">
+          <select value={filter} onChange={(e) => setFilter(e.target.value)} className="rounded-md border border-slate-200 px-2 py-1 text-xs dark:border-zinc-800 dark:bg-zinc-900">
+            <option value="all">All slots</option>
+            {slotOptions.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+          <button onClick={autoAssign} disabled={assigning} className="ml-auto rounded-md bg-emerald-600 px-3 py-1 text-xs font-medium text-white disabled:opacity-50">
+            {assigning ? "Assigning…" : "Auto-optimize slots"}
+          </button>
+        </div>
+
         <div className="max-h-[70vh] overflow-y-auto p-5">
-          {sorted.length === 0 ? (
+          {filtered.length === 0 ? (
             <p className="py-10 text-center text-sm text-slate-500 dark:text-zinc-400">No candidates are ready to receive the test link yet.</p>
           ) : (
             <ul className="divide-y divide-slate-100 dark:divide-zinc-800">
-              {sorted.map((c) => {
+              {filtered.map((c) => {
                 const submitted = c.assessmentSubmittedAt != null;
                 const started = c.assessmentStartedAt != null;
                 const statusBadge = submitted
                   ? { label: "Submitted", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" }
                   : started
-                    ? { label: "Started", cls: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" }
+                    ? { label: "Started", cls: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-emerald-300" }
                     : { label: "Not started", cls: "bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-zinc-400" };
                 return (
                   <li key={c.id} className="flex items-center gap-3 py-3">
@@ -57,14 +124,10 @@ export function AssessmentCandidatesModal({ candidates, onClose }: Props) {
                         {c.firstName} {c.lastName}
                       </p>
                       <p className="truncate text-xs text-slate-500 dark:text-zinc-400">
-                        {c.email}
-                        {c.phone ? <><span className="mx-1">·</span>{c.phone}</> : null}
+                        {c.email} · {c.assessmentSlotStart ? new Date(c.assessmentSlotStart).toLocaleString() : "unassigned"}
                       </p>
                     </div>
-                    <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${statusBadge.cls}`}>
-                      {statusBadge.label}
-                      {submitted && c.assessmentScore != null ? ` · ${c.assessmentScore}` : ""}
-                    </span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadge.cls}`}>{statusBadge.cls.includes("emerald") ? statusBadge.label : statusBadge.label}</span>
                   </li>
                 );
               })}

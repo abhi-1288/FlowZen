@@ -125,7 +125,7 @@ const ATSAssessmentSchema = new Schema(
     negativeMarkingLabel: { type: String, default: "", trim: true, maxlength: 40 },
     // "uniform" pins every candidate who picks a slot to that slot's fixed end;
     // "relief" lets each candidate start any time and run the full duration.
-    windowMode: { type: String, enum: ["uniform", "relief"], default: "relief" },
+    windowMode: { type: String, enum: ["uniform", "relief", "forced"], default: "relief" },
     // "HH:mm" start times on the assessment date's day. Empty means a single
     // slot derived from the job's assessmentDate.
     timeSlots: { type: [ATSAssessmentTimeSlotSchema], default: [] },
