@@ -48,6 +48,7 @@ async function run() {
   });
   const User = mongoose.models.User || mongoose.model("User", UserSchema);
 
+  
   const MessageSchema = new mongoose.Schema({
     sender: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     recipient: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
