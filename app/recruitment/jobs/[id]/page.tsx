@@ -1148,7 +1148,7 @@ export default function JobDetailPage() {
       {assessmentCandidatesOpen && (
         <AssessmentCandidatesModal
           candidates={jobCandidates.filter((c) => c.stage === "screening" || c.stage === "assessment")}
-          slots={((activeJob.assessment as { timeSlots?: Array<{ start: string }> } | null)?.timeSlots ?? []).map((s: { start: string }) => s.start).filter(Boolean)}
+          slots={(((activeJob.assessment as unknown as { timeSlots?: Array<{ start: string }> } | null)?.timeSlots) ?? []).map((s: { start: string }) => s.start).filter(Boolean)}
           jobId={id}
           assessmentDate={activeJob.assessmentDate ?? null}
           onClose={() => setAssessmentCandidatesOpen(false)}
