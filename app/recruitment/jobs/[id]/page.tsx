@@ -948,7 +948,7 @@ export default function JobDetailPage() {
               )}
               {activeJob.assessment && activeJob.status === "closed" && (
                 <>
-                  {jobCandidates.some((c) => c.stage === "screening") ? (
+                  {jobCandidates.some((c) => c.stage === "screening") || jobCandidates.length === 0 ? (
                     <ActionButton accent={accent} icon={Users} label="View Eligible Candidates" onClick={() => { void fetchCandidates({ jobId: id }); setAssessmentCandidatesOpen(true); }} />
                   ) : jobCandidates.some((c) => c.stage === "applied") ? (
                     <p className="text-xs text-slate-500 dark:text-zinc-400">
@@ -1148,6 +1148,9 @@ export default function JobDetailPage() {
       {assessmentCandidatesOpen && (
         <AssessmentCandidatesModal
           candidates={jobCandidates.filter((c) => c.stage === "screening" || c.stage === "assessment")}
+          slots={((activeJob.assessment as { timeSlots?: Array<{ start: string }> } | null)?.timeSlots ?? []).map((s: { start: string }) => s.start).filter(Boolean)}
+          jobId={id}
+          assessmentDate={activeJob.assessmentDate ?? null}
           onClose={() => setAssessmentCandidatesOpen(false)}
         />
       )}

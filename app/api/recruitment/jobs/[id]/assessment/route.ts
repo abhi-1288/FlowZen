@@ -177,7 +177,7 @@ export async function POST(request: Request, { params }: Params) {
   // Scheduling mode, extra start times, and the optional pre-exam notice the
   // candidate reads in the waiting room. Slots are "HH:mm" values on the job's
   // assessment date; an empty list means a single slot taken from that date.
-  const windowMode: "uniform" | "relief" = body.windowMode === "uniform" ? "uniform" : "relief";
+  const windowMode: "uniform" | "relief" | "forced" = body.windowMode === "forced" ? "forced" : body.windowMode === "uniform" ? "uniform" : "relief";
   const timeSlots = (Array.isArray(body.timeSlots) ? body.timeSlots : [])
     .map((s: any) => ({ start: String(s?.start || "").trim() }))
     .filter((s: { start: string }) => /^([01]?\d|2[0-3]):([0-5]\d)$/.test(s.start))

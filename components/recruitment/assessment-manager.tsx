@@ -30,7 +30,7 @@ type DomainSection = {
   questions: Question[];
 };
 
-type WindowMode = "uniform" | "relief";
+type WindowMode = "uniform" | "relief" | "forced";
 
 const DEFAULT_PROCTORING_UI: ProctoringConfig = {
   enabled: false,
@@ -110,6 +110,12 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
   const [general, setGeneral] = useState<Question[]>([]);
   const [domains, setDomains] = useState<DomainSection[]>([]);
   const [step, setStep] = useState<"menu" | "manual" | "pdf-upload" | "pdf-review" | "final-check">("menu");
+  const saveDraft = () => {
+    try {
+      const draft = { step, savedAt: Date.now() };
+      localStorage.setItem("assessment-draft", JSON.stringify(draft));
+    } catch {}
+  };
   const [pdfQuestions, setPdfQuestions] = useState<Question[]>([]);
   const [pdfWarnings, setPdfWarnings] = useState<string[]>([]);
   const [pdfError, setPdfError] = useState("");
@@ -813,6 +819,11 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
                 label: "Fixed slots",
                 hint: "The candidate picks a start time and is held to that slot's fixed end. Offer several times so they can choose.",
               },
+               {
+                 value: "forced" as WindowMode,
+                 label: "Assigned slots",
+                 hint: "Admin assigns each candidate a specific start time; the candidate cannot choose.",
+               },
             ]
           ).map((opt) => (
             <button
@@ -832,7 +843,7 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
         </p>
       </div>
 
-      {windowMode === "uniform" && (
+      {(windowMode === "uniform" || windowMode === "forced") && (
         <div>
           <span className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-zinc-300">
             Start times <span className="text-xs font-normal text-slate-400">on the assessment date</span>
@@ -1719,12 +1730,27 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
               {success && <p className="text-emerald-600 dark:text-emerald-400">{success}</p>}
             </div>
             <div className="flex flex-wrap justify-end gap-2">
-              <button onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700">Cancel</button>
-              {(step === "manual" || step === "menu") && (
-                <button onClick={() => void handleSave().then((ok) => { if (ok) onClose(); })} disabled={saving} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-zinc-200">
-                  {saving ? "Saving..." : "Save Assessment"}
+              <button onClick={() => {
+                if (step === "menu") { onClose(); return; }
+                if (step === "manual") setStep("menu");
+                else if (step === "pdf-review") setStep("menu");
+                else if (step === "final-check") setStep("manual");
+                else onClose();
+              }} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700">
+                {step === "menu" ? "Cancel" : "Back"}
+              </button>
+              <button onClick={() => saveDraft()} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700">Save as draft</button>
+              {step === "menu" && (
+                <button onClick={() => setStep("manual")} disabled={saving} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-zinc-200">
+                  Next
                 </button>
               )}
+              {(step === "manual") && (
+                <button onClick={() => setStep("final-check")} disabled={saving} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-zinc-200">
+                  Next
+                </button>
+              )}
+
               {step === "pdf-review" && (
                 <button onClick={handlePdfConfirm} disabled={saving} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50">
                   {saving ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
