@@ -537,8 +537,8 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
 
   /** Commit the staged merge for real. This is the only thing that writes. */
   async function handleSubmitPending() {
-    if (!pdfPending) return;
-    const ok = await handleSave(pdfPending.general, pdfPending.domains);
+    const pending = pdfPending ?? { general, domains };
+    const ok = await handleSave(pending.general, pending.domains);
     if (!ok) return;
     onClose();
   }
@@ -1764,7 +1764,7 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
                   </button>
                   <button
                     onClick={() => void handleSubmitPending()}
-                    disabled={saving || !pdfPending || !negativeMarking.ok}
+                    disabled={saving || !negativeMarking.ok}
                     className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
                   >
                     {saving ? <Loader2 size={14} className="animate-spin" /> : <CircleCheck size={14} />}
