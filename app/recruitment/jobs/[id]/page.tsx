@@ -85,6 +85,7 @@ function stagePillClass(stage: string): string {
 }
 
 export default function JobDetailPage() {
+  const { showSuccessToast, showErrorToast } = useNotificationToast();
   const params = useParams()!;
   const id = params.id as string;
   const router = useRouter();
