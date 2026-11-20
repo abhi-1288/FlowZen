@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ATSCandidate } from "@/lib/recruitment-types";
 import { useNotificationToast } from "@/lib/toast-context";
 import { dateInputValue, wallClockToIso } from "@/lib/date-utils";
@@ -16,63 +16,100 @@ type Props = {
   slots: string[];
   jobId: string;
   assessmentDate: string | null;
+  onRefresh?: () => void;
   onClose: () => void;
 };
 
-export function AssessmentCandidatesModal({ candidates, slots, jobId, assessmentDate, onClose }: Props) {
+export function AssessmentCandidatesModal({ candidates, slots, jobId, assessmentDate, onRefresh, onClose }: Props) {
   const { showSuccessToast, showErrorToast } = useNotificationToast();
+  const [rows, setRows] = useState<ATSCandidate[]>(candidates);
   const [filter, setFilter] = useState<string>("all");
   const [assigning, setAssigning] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [optimized, setOptimized] = useState(false);
   const [inviting, setInviting] = useState(false);
-  const sorted = [...candidates].sort((a, b) => {
+
+  useEffect(() => setRows(candidates), [candidates]);
+
+  const sorted = [...rows].sort((a, b) => {
     const rank = (c: ATSCandidate) => (c.assessmentSubmittedAt ? 0 : c.assessmentStartedAt ? 1 : 2);
     return rank(a) - rank(b);
   });
 
   const slotOptions = slots.length ? slots : ["single"];
+  const slotLabel = (c: ATSCandidate) =>
+    c.assessmentSlotStart
+      ? new Date(c.assessmentSlotStart).toLocaleTimeString("en-IN", {
+          timeZone: "Asia/Kolkata",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        })
+      : "single";
 
-  const filtered = filter === "all" ? sorted : sorted.filter((c) => (c.assessmentSlotStart ? new Date(c.assessmentSlotStart).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: false }) : "single") === filter);
+  const filtered = filter === "all" ? sorted : sorted.filter((c) => slotLabel(c) === filter);
 
-  const autoAssign = async () => {
-    if (sorted.length === 0) {
-      showErrorToast("No candidates available to assign.");
-      return;
+  const assignCandidates = async (list: ATSCandidate[], silent = false) => {
+    if (list.length === 0) {
+      if (!silent) showErrorToast("No candidates available to assign.");
+      return false;
     }
     const k = slotOptions.length;
-    const n = sorted.length;
+    const n = list.length;
     const base = Math.floor(n / k);
     const rem = n % k;
     const preview = slotOptions.map((s, i) => `${s}: ${base + (i < rem ? 1 : 0)}`).join(", ");
+    const day = assessmentDate ? dateInputValue(assessmentDate) : "";
+    const assignments = new Map<string, string | null>();
+    let idx = 0;
+    for (let s = 0; s < k; s++) {
+      const count = base + (s < rem ? 1 : 0);
+      for (let i = 0; i < count; i++) {
+        const c = list[idx++];
+        if (!c) break;
+        assignments.set(c.id, day ? wallClockToIso(day, slotOptions[s], "09:00") : null);
+      }
+    }
+
     setAssigning(true);
     try {
-      const n = sorted.length;
-      const k = slotOptions.length;
-      // distribute n across k as evenly as possible
-      const base = Math.floor(n / k);
-      const rem = n % k;
-      let idx = 0;
-      for (let s = 0; s < k; s++) {
-        const count = base + (s < rem ? 1 : 0);
-        for (let i = 0; i < count; i++) {
-          const c = sorted[idx++];
-          if (!c) break;
-          const slotTime = slotOptions[s];
-          const day = assessmentDate ? dateInputValue(assessmentDate) : "";
-          const assignedIso = day ? wallClockToIso(day, slotTime, "09:00") : null;
-          await fetch(`/api/recruitment/candidates/${c.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ assessmentSlotStart: assignedIso }),
-          });
-        }
+      for (const c of list) {
+        const slot = assignments.get(c.id) ?? null;
+        const res = await fetch(`/api/recruitment/candidates/${c.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ assessmentSlotStart: slot }),
+        });
+        if (!res.ok) throw new Error("assign failed");
       }
+      setRows((prev) => prev.map((c) => assignments.has(c.id) ? { ...c, assessmentSlotStart: assignments.get(c.id) ?? null } : c));
       setOptimized(true);
-      showSuccessToast(`Candidates assigned across ${k} slots. ${preview}`);
+      onRefresh?.();
+      if (!silent) showSuccessToast(`Candidates assigned across ${k} slots. ${preview}`);
+      return true;
     } catch {
-      showErrorToast("Could not auto-optimize candidate slots.");
+      if (!silent) showErrorToast("Could not auto-optimize candidate slots.");
+      return false;
     } finally {
       setAssigning(false);
+    }
+  };
+
+  const resetAndReassign = async () => {
+    setResetting(true);
+    try {
+      const res = await fetch(`/api/recruitment/jobs/${jobId}/assessment/reset-assignments`, { method: "POST" });
+      if (!res.ok) throw new Error("reset failed");
+      const cleared = rows.map((c) => ({ ...c, assessmentSlotStart: null }));
+      setRows(cleared);
+      setOptimized(false);
+      onRefresh?.();
+      const ok = await assignCandidates(cleared, true);
+      if (ok) showSuccessToast("Assignments reset and new timings applied.");
+    } catch {
+      showErrorToast("Could not reset candidate assignments.");
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -91,14 +128,23 @@ export function AssessmentCandidatesModal({ candidates, slots, jobId, assessment
           </button>
         </div>
 
-        <div className="flex items-center gap-2 border-b border-slate-200 px-5 py-3 dark:border-zinc-800">
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-5 py-3 dark:border-zinc-800">
           <select value={filter} onChange={(e) => setFilter(e.target.value)} className="rounded-md border border-slate-200 px-2 py-1 text-xs dark:border-zinc-800 dark:bg-zinc-900">
             <option value="all">All slots</option>
             {slotOptions.map((s) => (
               <option key={s} value={s}>{s}</option>
             ))}
           </select>
-          <button onClick={autoAssign} disabled={assigning} className="ml-auto rounded-md bg-emerald-600 px-3 py-1 text-xs font-medium text-white disabled:opacity-50">
+          {sorted.some((c) => c.assessmentSlotStart) && (
+            <button
+              onClick={() => void resetAndReassign()}
+              disabled={resetting || assigning}
+              className="rounded-md border border-amber-200 px-3 py-1 text-xs font-medium text-amber-700 disabled:opacity-50 dark:border-amber-900/60 dark:text-amber-300"
+            >
+              {resetting ? "Resetting…" : "Reset & reassign"}
+            </button>
+          )}
+          <button onClick={() => void assignCandidates(sorted)} disabled={assigning || resetting} className="ml-auto rounded-md bg-emerald-600 px-3 py-1 text-xs font-medium text-white disabled:opacity-50">
             {assigning ? "Assigning…" : "Auto-optimize slots"}
           </button>
           {optimized && (
@@ -150,7 +196,7 @@ export function AssessmentCandidatesModal({ candidates, slots, jobId, assessment
                         {c.email} · {c.assessmentSlotStart ? new Date(c.assessmentSlotStart).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }) : "unassigned"}
                       </p>
                     </div>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadge.cls}`}>{statusBadge.cls.includes("emerald") ? statusBadge.label : statusBadge.label}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadge.cls}`}>{statusBadge.label}</span>
                   </li>
                 );
               })}
