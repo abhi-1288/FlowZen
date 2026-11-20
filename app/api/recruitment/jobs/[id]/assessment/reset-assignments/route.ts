@@ -7,7 +7,7 @@ import { User } from "@/models/User";
 
 type Params = { params: Promise<{ id: string }> };
 
-/** Clear all slot assignments and invite latches so HR can re-time a cohort. */
+/** Clear all slot assignments. HR decides separately whether to re-assign and re-invite. */
 export async function POST(_request: Request, { params }: Params) {
   const { id } = await params;
   const userId = await requireUserId();
@@ -20,7 +20,7 @@ export async function POST(_request: Request, { params }: Params) {
   await connectDb();
   const result = await ATSCandidate.updateMany(
     { job: id, company: (user as any).company },
-    { $set: { assessmentSlotStart: null, assessmentInviteSentAt: null } },
+    { $set: { assessmentSlotStart: null } },
   );
 
   return NextResponse.json({ ok: true, reset: result.modifiedCount });
