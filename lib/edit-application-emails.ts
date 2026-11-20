@@ -64,6 +64,19 @@ export async function sendEditApplicationInvites(
         })
       : "";
 
+    const opensAtLabel = closeAt
+      ? new Date().toLocaleString("en-IN", {
+          timeZone: "Asia/Kolkata",
+          weekday: "short",
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        })
+      : "";
+
     // Hoisted out of the candidate loop: the company is the same for all of them.
     const companyDoc = await Company.findById(job.company).select("name icon").lean();
     const brand = { name: (companyDoc as any)?.name, icon: (companyDoc as any)?.icon };
@@ -86,6 +99,7 @@ export async function sendEditApplicationInvites(
           jobTitle: job.title,
           portalLink: buildPortalLink(origin, token),
           company: brand,
+          opensAtLabel,
           closesAtLabel,
         });
         // Stamped before the send, not after: a crash mid-send would otherwise

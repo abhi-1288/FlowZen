@@ -156,7 +156,7 @@ export async function GET(request: Request) {
       // extension, so this is the same value submit and auto-submit will use.
       const endsAt = isStarted
         ? getCandidateDeadlineMs(candidate, durationMin)
-        : mode === "uniform"
+        : mode === "uniform" || mode === "forced"
           ? getAssessmentDeadlineMs(info.startsAt, durationMin)
           : null;
 

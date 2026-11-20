@@ -75,7 +75,8 @@ export function assessmentIsOpen(
   now: Date = new Date()
 ): boolean {
   if (!opts?.assessment || !opts.assessmentDate) return false;
-  const mode = opts.windowMode === "uniform" ? "uniform" : "relief";
+  const mode =
+    opts.windowMode === "uniform" || opts.windowMode === "forced" ? opts.windowMode : "relief";
   const slots = resolveAssessmentSlots(opts.assessmentDate, opts.timeSlots, {
     mode,
     durationMinutes: opts.durationMinutes ?? null,

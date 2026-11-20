@@ -22,6 +22,10 @@ type Props = {
 export function AssessmentCandidatesModal({ candidates, slots, jobId, assessmentDate, onRefresh, onClose }: Props) {
   const { showSuccessToast, showErrorToast } = useNotificationToast();
   const [rows, setRows] = useState<ATSCandidate[]>(candidates);
+  // The job doc's `assessment` is only a boolean flag, so the page cannot supply
+  // the real slots. Load them from the assessment document instead.
+  const [liveSlots, setLiveSlots] = useState<string[]>(slots);
+  const [liveDate, setLiveDate] = useState<string | null>(assessmentDate);
   const [filter, setFilter] = useState<string>("all");
   const [assigning, setAssigning] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -30,15 +34,57 @@ export function AssessmentCandidatesModal({ candidates, slots, jobId, assessment
 
   useEffect(() => setRows(candidates), [candidates]);
 
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/recruitment/jobs/${jobId}/assessment`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!alive || !data) return;
+        const saved: string[] = Array.isArray(data.assessment?.timeSlots)
+          ? data.assessment.timeSlots.map((s: any) => String(s?.start || "")).filter(Boolean)
+          : [];
+        if (saved.length) setLiveSlots(saved);
+        const date = data.job?.assessmentDate;
+        if (date) setLiveDate(String(date));
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [jobId]);
+
   const sorted = [...rows].sort((a, b) => {
     const rank = (c: ATSCandidate) => (c.assessmentSubmittedAt ? 0 : c.assessmentStartedAt ? 1 : 2);
     return rank(a) - rank(b);
   });
 
-  const slotOptions = slots.length ? slots : ["single"];
-  const slotLabel = (c: ATSCandidate) =>
+  const slotOptions = liveSlots.length ? liveSlots : ["single"];
+
+  /** IST wall-clock label with an explicit AM/PM so 12:00 is never read as midnight. */
+  function formatAssigned(value?: string | null): string {
+    if (!value) return "";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    const ist = new Date(d.getTime() + 5.5 * 60 * 60 * 1000);
+    const h24 = ist.getUTCHours();
+    const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+    const mm = String(ist.getUTCMinutes()).padStart(2, "0");
+    return `${h12}:${mm} ${h24 >= 12 ? "PM" : "AM"}`;
+  }
+
+  function formatAssignedFull(value?: string | null): string {
+    const time = formatAssigned(value);
+    if (!time) return "";
+    const d = new Date(value as string);
+    const ist = new Date(d.getTime() + 5.5 * 60 * 60 * 1000);
+    const dd = String(ist.getUTCDate()).padStart(2, "0");
+    const mo = String(ist.getUTCMonth() + 1).padStart(2, "0");
+    const yyyy = ist.getUTCFullYear();
+    return `${dd}/${mo}/${yyyy}, ${time}`;
+  }
+
+  /** 24-hour IST key used only for matching the filter dropdown values. */
+  const slotKey = (c: ATSCandidate) =>
     c.assessmentSlotStart
-      ? new Date(c.assessmentSlotStart).toLocaleTimeString("en-IN", {
+      ? new Date(c.assessmentSlotStart).toLocaleTimeString("en-GB", {
           timeZone: "Asia/Kolkata",
           hour: "2-digit",
           minute: "2-digit",
@@ -46,7 +92,7 @@ export function AssessmentCandidatesModal({ candidates, slots, jobId, assessment
         })
       : "single";
 
-  const filtered = filter === "all" ? sorted : sorted.filter((c) => slotLabel(c) === filter);
+  const filtered = filter === "all" ? sorted : sorted.filter((c) => slotKey(c) === filter);
 
   const assignCandidates = async (list: ATSCandidate[], silent = false) => {
     if (list.length === 0) {
@@ -65,20 +111,29 @@ export function AssessmentCandidatesModal({ candidates, slots, jobId, assessment
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           slots: slotOptions,
-          assessmentDate,
+          assessmentDate: liveDate,
           candidateIds: list.map((c) => c.id),
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "assign failed");
-      const assignments: Record<string, string | null> = data.assignments || {};
-      setRows((prev) => prev.map((c) => ({ ...c, assessmentSlotStart: assignments[c.id] ?? null })));
+      // Trust the values read back from Mongo, not a client-side reconstruction.
+      const stored: Array<{ id: string; assessmentSlotStart: string | null }> = Array.isArray(data.candidates)
+        ? data.candidates
+        : [];
+      const byId = new Map(stored.map((r) => [r.id, r.assessmentSlotStart]));
+      setRows((prev) =>
+        prev.map((c) => ({
+          ...c,
+          assessmentSlotStart: byId.has(c.id) ? (byId.get(c.id) ?? null) : c.assessmentSlotStart,
+        }))
+      );
       setOptimized(true);
       onRefresh?.();
       if (!silent) showSuccessToast(`Candidates assigned across ${k} slots. ${preview}`);
       return true;
-    } catch {
-      if (!silent) showErrorToast("Could not auto-optimize candidate slots.");
+    } catch (err) {
+      if (!silent) showErrorToast(err instanceof Error && err.message ? err.message : "Could not auto-optimize candidate slots.");
       return false;
     } finally {
       setAssigning(false);
@@ -123,19 +178,17 @@ export function AssessmentCandidatesModal({ candidates, slots, jobId, assessment
               <option key={s} value={s}>{s}</option>
             ))}
           </select>
-          {sorted.some((c) => c.assessmentSlotStart) && (
-            <button
-              onClick={() => void resetTimes()}
-              disabled={resetting || assigning}
-              className="rounded-md border border-amber-200 px-3 py-1 text-xs font-medium text-amber-700 disabled:opacity-50 dark:border-amber-900/60 dark:text-amber-300"
-            >
-              {resetting ? "Resetting…" : "Reset time for all"}
-            </button>
-          )}
+          <button
+            onClick={() => void resetTimes()}
+            disabled={resetting || assigning || sorted.length === 0}
+            className="rounded-md border border-amber-200 px-3 py-1 text-xs font-medium text-amber-700 disabled:opacity-50 dark:border-amber-900/60 dark:text-amber-300"
+          >
+            {resetting ? "Resetting…" : "Reset time for all"}
+          </button>
           <button onClick={() => void assignCandidates(sorted)} disabled={assigning || resetting} className="ml-auto rounded-md bg-emerald-600 px-3 py-1 text-xs font-medium text-white disabled:opacity-50">
             {assigning ? "Assigning…" : "Auto-optimize slots"}
           </button>
-          {optimized && (
+          {(optimized || sorted.some((c) => c.assessmentSlotStart)) && (
             <button
               onClick={async () => {
                 setInviting(true);
@@ -181,7 +234,7 @@ export function AssessmentCandidatesModal({ candidates, slots, jobId, assessment
                         {c.firstName} {c.lastName}
                       </p>
                       <p className="truncate text-xs text-slate-500 dark:text-zinc-400">
-                        {c.email} · {c.assessmentSlotStart ? new Date(c.assessmentSlotStart).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }) : "unassigned"}
+                        {c.email} · {formatAssignedFull(c.assessmentSlotStart) || "unassigned"}
                       </p>
                     </div>
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadge.cls}`}>{statusBadge.label}</span>

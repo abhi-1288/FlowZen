@@ -4,7 +4,7 @@ import { resolveProctoringConfig, type ProctoringConfig } from "@/lib/assessment
 
 export type CandidateAssessmentWindow = {
   slots: ResolvedSlot[];
-  mode: "uniform" | "relief";
+  mode: "uniform" | "relief" | "forced";
   durationMinutes: number | null;
   instructions: string;
   passScore: number;
@@ -37,7 +37,10 @@ export function resolveCandidateAssessmentWindow(
   const assessmentDate = job.assessmentDate ? new Date(job.assessmentDate) : null;
   if (!assessmentDate || Number.isNaN(assessmentDate.getTime())) return null;
 
-  const mode: "uniform" | "relief" = assessment?.windowMode === "uniform" ? "uniform" : "relief";
+  const mode: "uniform" | "relief" | "forced" =
+    assessment?.windowMode === "uniform" || assessment?.windowMode === "forced"
+      ? assessment.windowMode
+      : "relief";
 
   const durationMinutes = (() => {
     const raw = Number(job.assessmentDurationMinutes);
