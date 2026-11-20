@@ -252,6 +252,18 @@ export default function JobDetailPage() {
 
   useEffect(() => { void fetchJob(id); void fetchCandidates({ jobId: id }); void loadAssessmentStats(); }, [id, fetchJob, fetchCandidates]);
 
+  // Non-cron: when an HR/admin opens a job whose assessment is within 24h,
+  // send the pending invites. The per-candidate latch makes this idempotent.
+  const autoInviteRef = useRef(false);
+  useEffect(() => {
+    if (!activeJob?.assessment || !activeJob.assessmentDate || autoInviteRef.current) return;
+    const diff = new Date(activeJob.assessmentDate).getTime() - Date.now();
+    if (diff < -60 * 60 * 1000 || diff > 24 * 60 * 60 * 1000) return;
+    autoInviteRef.current = true;
+    void apiFetch(`/api/recruitment/jobs/${id}/assessment/invite`, { method: "POST" }).catch(() => {});
+    void apiFetch(`/api/recruitment/jobs/${id}/assessment/mock-test/invite?auto=1`, { method: "POST" }).catch(() => {});
+  }, [id, activeJob?.assessment, activeJob?.assessmentDate]);
+
   const autoDetectRanRef = useRef(false);
   useEffect(() => {
     if (!id || !canRunPipeline || autoDetectRanRef.current) return;

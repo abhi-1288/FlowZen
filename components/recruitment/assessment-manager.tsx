@@ -109,13 +109,7 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
   const [instructions, setInstructions] = useState("");
   const [general, setGeneral] = useState<Question[]>([]);
   const [domains, setDomains] = useState<DomainSection[]>([]);
-  const [step, setStep] = useState<"menu" | "manual" | "pdf-upload" | "pdf-review" | "final-check">("menu");
-  const saveDraft = () => {
-    try {
-      const draft = { step, savedAt: Date.now() };
-      localStorage.setItem("assessment-draft", JSON.stringify(draft));
-    } catch {}
-  };
+  const [step, setStep] = useState<"menu" | "manual" | "pdf-upload" | "pdf-review" | "review" | "final-check">("menu");
   const [pdfQuestions, setPdfQuestions] = useState<Question[]>([]);
   const [pdfWarnings, setPdfWarnings] = useState<string[]>([]);
   const [pdfError, setPdfError] = useState("");
@@ -246,6 +240,18 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
 
   function updateTimeSlot(idx: number, value: string) {
     setTimeSlots((prev) => prev.map((s, i) => (i === idx ? value : s)));
+  }
+
+  function setTimeSlotPeriod(idx: number, period: "AM" | "PM") {
+    setTimeSlots((prev) => prev.map((s, i) => {
+      if (i !== idx) return s;
+      const m = TIME_RE.exec(s);
+      if (!m) return s;
+      let h = Number(m[1]);
+      if (period === "PM" && h < 12) h += 12;
+      if (period === "AM" && h >= 12) h -= 12;
+      return `${String(h).padStart(2, "0")}:${m[2]}`;
+    }));
   }
 
   function removeTimeSlot(idx: number) {
@@ -532,7 +538,7 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
     setPdfPending(mergePdfIntoSaved());
     setError("");
     setSuccess("");
-    setStep("final-check");
+    setStep("review");
   }
 
   /** Commit the staged merge for real. This is the only thing that writes. */
@@ -862,6 +868,14 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
                   onChange={(e) => updateTimeSlot(i, e.target.value)}
                   className="w-32 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-800"
                 />
+                <select
+                  value={Number(slot.split(":")[0]) >= 12 ? "PM" : "AM"}
+                  onChange={(e) => setTimeSlotPeriod(i, e.target.value as "AM" | "PM")}
+                  className="rounded-lg border border-slate-200 px-2 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-900"
+                >
+                  <option value="AM">AM</option>
+                  <option value="PM">PM</option>
+                </select>
                 <span className="text-xs text-slate-400">
                   stops at{" "}
                   {formatSlotEnd(slot, durationMinutes)}
@@ -1248,7 +1262,7 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
     { key: "review", label: "Review" },
     { key: "confirm", label: "Confirm" },
   ] as const;
-  const crumbIndex = step === "menu" ? 0 : step === "final-check" ? 3 : step === "pdf-review" ? 2 : 1;
+  const crumbIndex = step === "menu" ? 0 : step === "final-check" ? 3 : step === "pdf-review" || step === "review" ? 2 : 1;
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/35 px-4">
@@ -1262,7 +1276,7 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
                     // From the settings check, Back returns to the review list so
                     // routing can be fixed; the staged merge is recomputed from
                     // there, so it is safe to leave it in place.
-                    if (step === "final-check") { setStep("pdf-review"); return; }
+                    if (step === "final-check") { setStep("review"); return; }
                     setPdfBatchActive(false);
                     setAddingAnother(false);
                     setPdfError("");
@@ -1360,8 +1374,6 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
 
           {step === "pdf-upload" && (
             <>
-              {renderSettings()}
-
               {totalCount > 0 && (
                 <>
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1394,6 +1406,19 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
                 Upload a PDF containing questions with options and their answers. Choose where it goes, then pick the file.
               </p>
               {renderPdfDraftForm()}
+            </>
+          )}
+
+          {step === "review" && (
+            <>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Review assessment</h3>
+                <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
+                  Review your questions and settings before the final confirmation.
+                </p>
+              </div>
+              {renderPendingSummary()}
+              {renderSettings()}
             </>
           )}
 
@@ -1659,7 +1684,27 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
 
           {step === "manual" && (
             <>
-              {renderSettings()}
+              <div className="mb-4 rounded-xl border border-slate-200 p-4 dark:border-zinc-800">
+                <p className="mb-2 text-sm font-medium text-slate-700 dark:text-zinc-300">How do you want to add the questions?</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setStep("pdf-upload")}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400"
+                  >
+                    <Upload size={14} /> Upload PDF
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white"
+                  >
+                    <PenLine size={14} /> Manual questions
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-slate-400">
+                  {totalCount > 0 ? `${totalCount} question${totalCount === 1 ? "" : "s"} currently saved.` : "No questions saved yet."}
+                </p>
+              </div>
 
               {totalCount > 0 && (
                 <div className="flex justify-end">
@@ -1734,18 +1779,23 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
                 if (step === "menu") { onClose(); return; }
                 if (step === "manual") setStep("menu");
                 else if (step === "pdf-review") setStep("menu");
-                else if (step === "final-check") setStep("manual");
+                else if (step === "review") setStep("manual");
+                else if (step === "final-check") setStep("review");
                 else onClose();
               }} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700">
                 {step === "menu" ? "Cancel" : "Back"}
               </button>
-              <button onClick={() => saveDraft()} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700">Save as draft</button>
               {step === "menu" && (
                 <button onClick={() => setStep("manual")} disabled={saving} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-zinc-200">
                   Next
                 </button>
               )}
-              {(step === "manual") && (
+              {step === "manual" && (
+                <button onClick={() => setStep("review")} disabled={saving} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-zinc-200">
+                  Next
+                </button>
+              )}
+              {step === "review" && (
                 <button onClick={() => setStep("final-check")} disabled={saving} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-zinc-200">
                   Next
                 </button>

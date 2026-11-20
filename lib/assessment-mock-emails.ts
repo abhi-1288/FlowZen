@@ -265,3 +265,11 @@ export async function sendMockTestInvitationsForJob(jobId: string): Promise<Invi
 
   return inviteCandidatesForJob(job, Date.now(), "manual");
 }
+
+/** Non-cron auto blast: only inside the 24h window, for page-visit triggers. */
+export async function sendAutoMockTestInvitationsForJob(jobId: string): Promise<InviteOutcome> {
+  await connectDb();
+  const job = await ATSJob.findOne({ _id: jobId, assessment: true });
+  if (!job) return { status: "unavailable", reason: "not-configured" };
+  return inviteCandidatesForJob(job, Date.now(), "auto");
+}
