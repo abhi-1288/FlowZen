@@ -151,7 +151,11 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
           setNegativeMarkingText(
             String(data.assessment.negativeMarkingLabel || "") || String(data.assessment.negativeMarking ?? 0)
           );
-          setWindowMode(data.assessment.windowMode === "uniform" ? "uniform" : "relief");
+          setWindowMode(
+            data.assessment.windowMode === "uniform" || data.assessment.windowMode === "forced"
+              ? data.assessment.windowMode
+              : "relief"
+          );
           setProctoring({
             ...DEFAULT_PROCTORING_UI,
             ...(typeof data.assessment.proctoring === "object" && data.assessment.proctoring
@@ -280,7 +284,7 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
       generalList.length > 0 || domainList.some((d) => d.questions.length > 0);
     if (!hasAny) return "Add at least one question across the general section or the domain sections.";
 
-    if (windowMode === "uniform" && timeSlots.length && timeSlots.some((s) => !TIME_RE.test(s))) {
+    if ((windowMode === "uniform" || windowMode === "forced") && timeSlots.length && timeSlots.some((s) => !TIME_RE.test(s))) {
       return "Every time slot needs a valid HH:MM start time.";
     }
 

@@ -1,3 +1,5 @@
+import { fmtJobDateTime } from "@/lib/date-utils";
+
 // ── Shared helpers ──────────────────────────────────────────
 
 export function baseEmailLayout(content: string, options: { title?: string; companyName?: string; companyLogo?: string } = {}): string {
@@ -682,48 +684,60 @@ export function editApplicationsEnabledEmail({
   portalLink,
   company,
   closesAtLabel,
+  opensAtLabel,
 }: {
   candidateName: string;
   jobTitle: string;
   portalLink?: string;
   company?: { name?: string; icon?: string };
-  /**
-   * Human-readable deadline, already formatted for the candidate's timezone.
-   * Optional so existing callers keep working, but the window is now required in
-   * practice and an invite without it reads as an open-ended invitation.
-   */
+  /** Human-readable deadline, already formatted for the candidate's timezone. */
   closesAtLabel?: string;
+  /** When the editing window became available. Defaults to the send time. */
+  opensAtLabel?: string;
 }): { subject: string; text: string; html: string } {
-  const deadlineLine = closesAtLabel
-    ? ` Please update by <strong>${closesAtLabel}</strong> — after that the option to edit is switched off.`
-    : "";
-  const deadlineText = closesAtLabel
-    ? ` Please update by ${closesAtLabel} — after that the option to edit is switched off.`
-    : "";
+  const opened = opensAtLabel || fmtJobDateTime(new Date().toISOString());
+  const closes = closesAtLabel || "Not specified";
 
   const html = baseEmailLayout(`
-    <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#1e293b;">Update your application</h2>
+    <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#1e293b;">Application Editing Window Open</h2>
     <p style="margin:0 0 20px;font-size:14px;color:#64748b;">${jobTitle}</p>
 
     <p style="margin:0 0 8px;font-size:15px;color:#334155;">Dear ${candidateName},</p>
-    <p style="margin:0 0 24px;font-size:15px;color:#334155;">
-      We have opened <strong>editing</strong> for your application to <strong>${jobTitle}</strong>.
-      You can now update your name, phone number, resume, and portfolio or LinkedIn links.${deadlineLine}
+    <p style="margin:0 0 16px;font-size:15px;color:#334155;">
+      The application editing window for <strong>${jobTitle}</strong> is now open. You can update your details before the window closes.
     </p>
 
-    ${portalLink
-      ? `<div style="margin:0 0 24px;padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
-          <p style="margin:0 0 8px;font-size:14px;color:#64748b;">Use the button below to review and update your application:</p>
-          ${emailButton(portalLink, "Update Application")}
-        </div>`
-      : `<p style="margin:0 0 8px;font-size:14px;color:#64748b;">Log in to the candidate portal to update your application.</p>`}
+    <table role="presentation" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:4px 16px;width:100%;margin:0 0 24px;">
+      <tr>
+        <td style="padding:12px 0;border-bottom:1px solid #e2e8f0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;width:140px;">Opens</td>
+              <td style="font-size:15px;font-weight:600;color:#1e293b;">${opened}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:12px 0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;width:140px;">Closes</td>
+              <td style="font-size:15px;font-weight:600;color:#1e293b;">${closes}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
 
-    <p style="margin:0;font-size:14px;color:#64748b;">If you did not apply for this role, you can ignore this email.</p>
-  `, { title: "Update your application", companyName: company?.name, companyLogo: company?.icon });
+    ${portalLink ? emailButton(portalLink, "Update Application") : ""}
+
+    <p style="margin:0;font-size:14px;color:#64748b;">Please update your details before the window closes. If you did not apply for this role, you can ignore this email.</p>
+  `, { title: "Application Editing Window Open", companyName: company?.name, companyLogo: company?.icon });
 
   return {
-    subject: `Update your application for ${jobTitle}`,
-    text: `Dear ${candidateName},\n\nWe have opened editing for your application to ${jobTitle}. You can now update your name, phone number, resume, and portfolio or LinkedIn links.${deadlineText}${portalLink ? `\n\nUpdate your application: ${portalLink}` : "\n\nLog in to the candidate portal to update your application."}`,
+    subject: `Application editing window open for ${jobTitle}`,
+    text: `Dear ${candidateName},\n\nThe application editing window for ${jobTitle} is now open.\n\nOpens: ${opened}\nCloses: ${closes}\n\nPlease update your details before the window closes.${portalLink ? `\n\nUpdate your application: ${portalLink}` : ""}`,
     html,
   };
 }

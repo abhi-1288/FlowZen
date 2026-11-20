@@ -1,4 +1,4 @@
-export type AssessmentWindowMode = "uniform" | "relief";
+export type AssessmentWindowMode = "uniform" | "relief" | "forced";
 
 /** Candidate-facing proctoring settings, plus the per-candidate exemption. */
 export type AssessmentProctoring = {

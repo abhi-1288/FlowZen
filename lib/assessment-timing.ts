@@ -8,10 +8,12 @@
  * regardless of the server timezone; only the day boundaries are IST, because
  * "the 11th of October" means the candidate's day.
  *
- * Two window modes, chosen per assessment:
+ * Three window modes, chosen per assessment:
  *   - "uniform": the candidate picks a slot and is bound to that slot's fixed
  *     end (slot start + duration). Everyone who picks 09:00 stops at the same
  *     wall-clock time.
+ *   - "forced": HR assigns each candidate a slot; the candidate cannot change
+ *     it and is bound to that slot's fixed end, exactly like uniform.
  *   - "relief": the candidate may start any time once the configured start is
  *     reached (and until the end of that day), and the full duration counts
  *     from their own start.
@@ -25,7 +27,7 @@ import { KOLKATA_OFFSET_MS } from "@/lib/date-utils";
 
 export const ASSESSMENT_JOIN_EARLY_MS = 10 * 60 * 1000;
 
-export type AssessmentWindowMode = "uniform" | "relief";
+export type AssessmentWindowMode = "uniform" | "relief" | "forced";
 
 export type AssessmentTimeSlot = { start: string };
 
@@ -36,7 +38,7 @@ export type ResolvedSlot = {
   startMs: number;
   /**
    * Absolute end of this slot's *entry window* (ms): the slot's fixed end in
-   * uniform mode (start + duration), the end of the day in relief mode.
+   * uniform/forced mode (start + duration), the end of the day in relief mode.
    */
   endMs: number;
   /** Absolute end of the exam for anyone anchoring to this slot (start + duration). */
@@ -79,9 +81,9 @@ function durationMsOf(durationMinutes: number | null | undefined): number {
  * `assessmentDate` itself, so single-slot assessments need no new data.
  *
  * `durationMinutes` and `mode` decide when each slot stops accepting entries:
- * uniform slots close at start + duration, while relief entries stay open to the
- * end of the day. They are optional so legacy single-slot callers that only need
- * the start instants keep working (defaults to relief with no fixed end).
+ * uniform/forced slots close at start + duration, while relief entries stay open
+ * to the end of the day. They are optional so legacy single-slot callers that
+ * only need the start instants keep working (defaults to relief with no fixed end).
  */
 export function resolveAssessmentSlots(
   assessmentDate: string | Date | null | undefined,
@@ -94,15 +96,16 @@ export function resolveAssessmentSlots(
   const dayStart = startOfKolkataDayMs(base);
   const dayEnd = endOfKolkataDayMs(base);
   const durationMs = durationMsOf(options.durationMinutes);
-  const mode: AssessmentWindowMode = options.mode === "uniform" ? "uniform" : "relief";
+  const mode: AssessmentWindowMode =
+    options.mode === "uniform" || options.mode === "forced" ? options.mode : "relief";
 
   const build = (startMs: number, label: string): ResolvedSlot => {
     const examEndsAtMs = durationMs > 0 ? startMs + durationMs : Number.POSITIVE_INFINITY;
     return {
       start: label,
       startMs,
-      // Uniform slots are fixed: they close at their own end, not at midnight.
-      endMs: mode === "uniform" ? examEndsAtMs : dayEnd,
+      // Uniform/forced slots are fixed: they close at their own end, not at midnight.
+      endMs: mode === "uniform" || mode === "forced" ? examEndsAtMs : dayEnd,
       examEndsAtMs,
     };
   };
@@ -144,15 +147,15 @@ export function getAssessmentLastEntryAt(slots: ResolvedSlot[]): number {
 
 /**
  * The anchored start instant for a candidate — what the exam clock counts
- * from. Uniform mode pins this to the slot's fixed start so a skewed client
- * clock cannot hand out extra time; relief mode pins it to the real start.
+ * from. Uniform/forced modes pin this to the slot's fixed start so a skewed
+ * client clock cannot hand out extra time; relief mode pins it to the real start.
  */
 export function getAssessmentAnchorMs(
   slot: ResolvedSlot,
   mode: AssessmentWindowMode,
   actualStartMs: number = Date.now()
 ): number {
-  return mode === "uniform" ? slot.startMs : actualStartMs;
+  return mode === "uniform" || mode === "forced" ? slot.startMs : actualStartMs;
 }
 
 /**

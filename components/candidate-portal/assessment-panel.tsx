@@ -58,7 +58,7 @@ type Props = {
     submittable: boolean;
     endsAt: string | null;
     rejectionNote?: string;
-    windowMode: "uniform" | "relief";
+    windowMode: "uniform" | "relief" | "forced";
     instructions?: string;
     phase: "closed" | "lobby" | "open" | "expired";
     lobbyOpensAt: string | null;
