@@ -1412,13 +1412,46 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
           {step === "review" && (
             <>
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Review assessment</h3>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Review questions</h3>
                 <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
-                  Review your questions and settings before the final confirmation.
+                  Review the questions before the final confirmation.
                 </p>
               </div>
-              {renderPendingSummary()}
-              {renderSettings()}
+              {(() => {
+                const reviewGeneral = pdfPending?.general ?? general;
+                const reviewDomains = pdfPending?.domains ?? domains;
+                const all = [
+                  ...reviewGeneral.map((q) => ({ q, section: "General / Common" })),
+                  ...reviewDomains.flatMap((d) => d.questions.map((q) => ({ q, section: d.name || "Untitled domain" }))),
+                ];
+                const required = all.filter((x) => x.q.required).length;
+                return (
+                  <div className="space-y-3">
+                    <div className="rounded-xl border border-slate-200 p-3 text-sm dark:border-zinc-800">
+                      <p className="font-medium text-slate-700 dark:text-zinc-200">{all.length} questions</p>
+                      <p className="text-xs text-slate-500 dark:text-zinc-400">{required} required · {all.length - required} optional</p>
+                      <p className="text-xs text-slate-500 dark:text-zinc-400">
+                        {reviewDomains.length} domain{reviewDomains.length === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    {all.length === 0 ? (
+                      <p className="py-8 text-center text-sm text-slate-500 dark:text-zinc-400">No questions added yet.</p>
+                    ) : all.map(({ q, section }, i) => (
+                      <div key={i} className="rounded-xl border border-slate-200 p-3 text-sm dark:border-zinc-800">
+                        <p className="text-[11px] uppercase tracking-wide text-slate-400">{section} · Question {i + 1}</p>
+                        <p className="mt-1 font-medium text-slate-800 dark:text-zinc-100">{q.text}</p>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
+                          {q.type === "essay" ? "Essay" : q.options.map((o, idx) => `${String.fromCharCode(65 + idx)}. ${o}`).join("  ")}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
+                          Marks {q.marks} · {q.required ? "Required" : "Optional"}
+                          {q.type === "mcq" && ` · Answer ${String.fromCharCode(65 + q.correctIndex)}`}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </>
           )}
 
