@@ -23,14 +23,16 @@ const LOOKAHEAD_MS = 24 * 60 * 60 * 1000;
  * formats it in IST. An assessment scheduled for 09:00 stays 09:00 in the email
  * and the portal.
  */
-export async function sendAssessmentReminderEmails(): Promise<{ emailed: number; jobsChecked: number }> {
+export async function sendAssessmentReminderEmails(jobId?: string): Promise<{ emailed: number; jobsChecked: number }> {
   await connectDb();
 
   const nowMs = Date.now();
   const windowStart = new Date(nowMs - GRACE_MS);
   const windowEnd = new Date(nowMs + LOOKAHEAD_MS);
 
-  const jobs = await ATSJob.find({
+  const jobs = jobId
+    ? await ATSJob.find({ _id: jobId, assessment: true })
+    : await ATSJob.find({
     assessment: true,
     assessmentDate: { $gte: windowStart, $lte: windowEnd },
     // Deliberately no status filter: candidates already in the "assessment"
@@ -42,7 +44,7 @@ export async function sendAssessmentReminderEmails(): Promise<{ emailed: number;
   for (const job of jobs) {
     const candidates = await ATSCandidate.find({
       job: job._id,
-      stage: "assessment",
+      stage: { $in: ["screening", "assessment"] },
       company: job.company,
       assessmentInviteSentAt: null,
     });

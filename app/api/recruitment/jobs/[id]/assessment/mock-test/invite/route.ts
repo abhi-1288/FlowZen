@@ -4,7 +4,7 @@ import { jsonError, requireUserId } from "@/lib/api";
 import { ATSJob } from "@/models/ATSJob";
 import { User } from "@/models/User";
 import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
-import { sendMockTestInvitationsForJob, MOCK_ELIGIBLE_STAGES } from "@/lib/assessment-mock-emails";
+import { sendMockTestInvitationsForJob, sendAutoMockTestInvitationsForJob, MOCK_ELIGIBLE_STAGES } from "@/lib/assessment-mock-emails";
 import { ATSCandidate } from "@/models/ATSCandidate";
 
 /**
@@ -40,7 +40,8 @@ export async function POST(request: Request, { params }: Params) {
   if (!job) return jsonError("Job not found.", 404);
   if (!job?.assessment) return jsonError("Online assessment is not enabled for this job.", 400);
 
-  const outcome = await sendMockTestInvitationsForJob(id);
+  const auto = new URL(request.url).searchParams.get("auto") === "1";
+  const outcome = auto ? await sendAutoMockTestInvitationsForJob(id) : await sendMockTestInvitationsForJob(id);
   if (outcome.status === "unavailable") {
     return jsonError(
       outcome.reason === "window"

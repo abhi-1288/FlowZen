@@ -22,6 +22,8 @@ export function AssessmentCandidatesModal({ candidates, slots, jobId, assessment
   const { showSuccessToast, showErrorToast } = useNotificationToast();
   const [filter, setFilter] = useState<string>("all");
   const [assigning, setAssigning] = useState(false);
+  const [optimized, setOptimized] = useState(false);
+  const [inviting, setInviting] = useState(false);
   const sorted = [...candidates].sort((a, b) => {
     const rank = (c: ATSCandidate) => (c.assessmentSubmittedAt ? 0 : c.assessmentStartedAt ? 1 : 2);
     return rank(a) - rank(b);
@@ -66,6 +68,7 @@ export function AssessmentCandidatesModal({ candidates, slots, jobId, assessment
           });
         }
       }
+      setOptimized(true);
       showSuccessToast(`Candidates assigned across ${k} slots. ${preview}`);
     } catch {
       showErrorToast("Could not auto-optimize candidate slots.");
@@ -99,6 +102,27 @@ export function AssessmentCandidatesModal({ candidates, slots, jobId, assessment
           <button onClick={autoAssign} disabled={assigning} className="ml-auto rounded-md bg-emerald-600 px-3 py-1 text-xs font-medium text-white disabled:opacity-50">
             {assigning ? "Assigning…" : "Auto-optimize slots"}
           </button>
+          {optimized && (
+            <button
+              onClick={async () => {
+                setInviting(true);
+                try {
+                  const res = await fetch(`/api/recruitment/jobs/${jobId}/assessment/invite`, { method: "POST" });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error(data.error || "Failed");
+                  showSuccessToast(`Invite emails sent to ${data.emailed} candidate(s).`);
+                } catch {
+                  showErrorToast("Could not send invite emails.");
+                } finally {
+                  setInviting(false);
+                }
+              }}
+              disabled={inviting}
+              className="rounded-md bg-slate-900 px-3 py-1 text-xs font-medium text-white disabled:opacity-50 dark:bg-white dark:text-slate-900"
+            >
+              {inviting ? "Sending…" : "Send invite emails now"}
+            </button>
+          )}
         </div>
 
         <div className="max-h-[70vh] overflow-y-auto p-5">
