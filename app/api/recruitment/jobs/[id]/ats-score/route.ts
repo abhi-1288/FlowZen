@@ -85,6 +85,25 @@ export async function POST(request: Request, { params }: Params) {
         continue;
       }
 
+      const rawNotes = (candidate as any).notes;
+      const coverLetter = Array.isArray(rawNotes)
+        ? rawNotes
+            .map((n: any) => (typeof n === "string" ? n : n?.content || ""))
+            .filter(Boolean)
+            .join("\n")
+            .trim()
+        : "";
+      const applicationProfile = {
+        currentCompany: (candidate as any).currentCompany,
+        experienceYears: (candidate as any).experienceYears,
+        internshipExperienceMonths: (candidate as any).internshipExperienceMonths,
+        noticePeriod: (candidate as any).noticePeriod,
+        coverLetter,
+        portfolioUrl: (candidate as any).portfolioUrl,
+        linkedInUrl: (candidate as any).linkedInUrl,
+        address: (candidate as any).address,
+      };
+
       const regionMatch = closestRegionOf({
         address: (candidate as any).address,
         resumeText,
@@ -100,6 +119,7 @@ export async function POST(request: Request, { params }: Params) {
         (job as any).requiredExperienceYears ?? null,
         (job as any).requiredExperienceMaxYears ?? null,
         modelConfig,
+        applicationProfile,
       );
 
       const status = result.score >= threshold ? "selected" : "rejected";

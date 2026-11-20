@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ATSCandidate } from "@/lib/recruitment-types";
 import { useNotificationToast } from "@/lib/toast-context";
+import { dateInputValue, wallClockToIso } from "@/lib/date-utils";
 
 function initials(first?: string, last?: string): string {
   const f = (first || "").trim().charAt(0);
@@ -31,7 +32,7 @@ export function AssessmentCandidatesModal({ candidates, slots, jobId, assessment
 
   const slotOptions = slots.length ? slots : ["single"];
 
-  const filtered = filter === "all" ? sorted : sorted.filter((c) => (c.assessmentSlotStart ? new Date(c.assessmentSlotStart).toLocaleTimeString() : "single") === filter);
+  const filtered = filter === "all" ? sorted : sorted.filter((c) => (c.assessmentSlotStart ? new Date(c.assessmentSlotStart).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: false }) : "single") === filter);
 
   const autoAssign = async () => {
     if (sorted.length === 0) {
@@ -57,14 +58,12 @@ export function AssessmentCandidatesModal({ candidates, slots, jobId, assessment
           const c = sorted[idx++];
           if (!c) break;
           const slotTime = slotOptions[s];
-          const [hh, mm] = slotTime.split(":").map(Number);
-          const base = assessmentDate ? new Date(assessmentDate) : new Date();
-          const assigned = new Date(base);
-          assigned.setHours(hh || 0, mm || 0, 0, 0);
+          const day = assessmentDate ? dateInputValue(assessmentDate) : "";
+          const assignedIso = day ? wallClockToIso(day, slotTime, "09:00") : null;
           await fetch(`/api/recruitment/candidates/${c.id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ assessmentSlotStart: assigned.toISOString() }),
+            body: JSON.stringify({ assessmentSlotStart: assignedIso }),
           });
         }
       }
@@ -148,7 +147,7 @@ export function AssessmentCandidatesModal({ candidates, slots, jobId, assessment
                         {c.firstName} {c.lastName}
                       </p>
                       <p className="truncate text-xs text-slate-500 dark:text-zinc-400">
-                        {c.email} · {c.assessmentSlotStart ? new Date(c.assessmentSlotStart).toLocaleString() : "unassigned"}
+                        {c.email} · {c.assessmentSlotStart ? new Date(c.assessmentSlotStart).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }) : "unassigned"}
                       </p>
                     </div>
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadge.cls}`}>{statusBadge.cls.includes("emerald") ? statusBadge.label : statusBadge.label}</span>

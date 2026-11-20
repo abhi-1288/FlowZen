@@ -172,7 +172,7 @@ const INVITE_FAILURE_COPY: Record<InviteFailure["reason"], string> = {
 };
 
 export function MockTestModal({ jobId, onClose, totalQuestions }: Props) {
-  const { showSuccessToast } = useNotificationToast();
+  const { showSuccessToast, showErrorToast } = useNotificationToast();
   const [data, setData] = useState<Payload | null>(null);
   const [form, setForm] = useState<Form | null>(null);
   const [loading, setLoading] = useState(true);
@@ -402,9 +402,12 @@ export function MockTestModal({ jobId, onClose, totalQuestions }: Props) {
       } else {
         setNotice({ level: "warn", text: "No invitations went out." });
       }
+      if (emailed > 0) showSuccessToast(`Invite emails sent to ${emailed} candidate(s).`);
+      else showErrorToast("No invitation emails were sent.");
       await load();
     } catch {
       setError("Could not send the invitations.");
+      showErrorToast("Could not send the invitations.");
     } finally {
       setInviting(false);
     }

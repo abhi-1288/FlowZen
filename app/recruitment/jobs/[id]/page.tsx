@@ -144,6 +144,7 @@ export default function JobDetailPage() {
   const [regionResult, setRegionResult] = useState<RegionTransferResult | null>(null);
   const [atsDecisionTarget, setAtsDecisionTarget] = useState<ATSCandidate | null>(null);
   const [editAppsConfirm, setEditAppsConfirm] = useState<"enable" | "update" | "disable" | null>(null);
+  const [editInviting, setEditInviting] = useState(false);
 
   async function handleRunAts(force: boolean) {
     if (!activeJob) return;
@@ -926,11 +927,14 @@ export default function JobDetailPage() {
                 <ActionButton
                   accent={accent}
                   icon={Send}
-                  label="Send edit-window emails"
+                  label={editInviting ? "Sending…" : "Send edit-window emails"}
+                  disabled={editInviting}
                   onClick={() => {
+                    setEditInviting(true);
                     void apiFetch(`/api/recruitment/jobs/${id}/edit-window/invite`, { method: "POST" })
                       .then(() => showSuccessToast("Edit-window emails sent."))
-                      .catch(() => showErrorToast("Could not send edit-window emails."));
+                      .catch(() => showErrorToast("Could not send edit-window emails."))
+                      .finally(() => setEditInviting(false));
                   }}
                 />
               )}

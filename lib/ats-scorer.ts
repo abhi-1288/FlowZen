@@ -22,6 +22,18 @@ export type AtsScoreResult = {
   missingSkills: string[];
 };
 
+/** Optional application-form context. Personal identifiers are excluded by the caller. */
+export type AtsApplicationProfile = {
+  currentCompany?: string | null;
+  experienceYears?: number | string | null;
+  internshipExperienceMonths?: number | string | null;
+  noticePeriod?: number | string | null;
+  coverLetter?: string | null;
+  portfolioUrl?: string | null;
+  linkedInUrl?: string | null;
+  address?: string | null;
+};
+
 export type AtsModelConfig = {
   provider: AtsProvider;
   apiKey: string;
@@ -129,6 +141,24 @@ export async function extractResumeText(resumeUrl: string): Promise<string> {
   return data.text || "";
 }
 
+function buildApplicationProfileText(profile?: AtsApplicationProfile | null): string {
+  if (!profile) return "";
+  const lines: string[] = [];
+  const add = (label: string, value: unknown) => {
+    const text = String(value ?? "").trim();
+    if (text) lines.push(`${label}: ${text.substring(0, 500)}`);
+  };
+  add("Current company", profile.currentCompany);
+  add("Years of experience", profile.experienceYears);
+  add("Internship experience (months)", profile.internshipExperienceMonths);
+  add("Notice period (days)", profile.noticePeriod);
+  add("Cover letter / notes", profile.coverLetter);
+  add("Portfolio", profile.portfolioUrl);
+  add("LinkedIn", profile.linkedInUrl);
+  add("Location / address", profile.address);
+  return lines.join("\n");
+}
+
 function buildPrompt(
   resumeText: string,
   jobTitle: string,
@@ -136,6 +166,7 @@ function buildPrompt(
   requiredSkills: string[],
   requiredExperienceYears: number | null,
   requiredExperienceMaxYears: number | null,
+  applicationProfile?: AtsApplicationProfile | null,
 ): string {
   const skillsList = requiredSkills.length > 0 ? requiredSkills.join(", ") : "Not specified";
 
@@ -157,8 +188,12 @@ Required Experience: ${expRequirement}
 
 Resume: ${resumeText.substring(0, 4000)}
 
+Application Form Details (optional supporting context; ignore if empty):
+${buildApplicationProfileText(applicationProfile) || "Not provided"}
+
 Scoring rules:
-- Anchor the score strictly to the JOB TITLE and the required skills/description above.
+- Anchor the score strictly to the JOB TITLE and the required skills/description above, using the Resume as the primary candidate evidence.
+- Application Form Details are secondary context only: use them to corroborate or clarify experience and skills, but never let them override the job description or resume, and never penalize a candidate for leaving them blank. Do not use personal identifiers such as name, email or phone as scoring signals.
 - A candidate whose background is clearly unrelated to the role (for example, a software-engineering resume for an HR role) MUST score LOW (typically below 30).
 ${contextMissing ? "- No job description or required skills were provided. Judge ONLY on how relevant the candidate's experience, education, and skills are to the job title. Be conservative and do NOT inflate scores; if the resume does not clearly relate to the role, score it low." : "- Match the resume against the provided description and required skills. Reward matched skills and relevant experience; penalize missing or unrelated ones."}
 
@@ -326,6 +361,7 @@ export async function scoreResume(
   requiredExperienceYears: number | null,
   requiredExperienceMaxYears: number | null,
   config: AtsModelConfig,
+  applicationProfile?: AtsApplicationProfile | null,
 ): Promise<AtsScoreResult> {
   if (!config.apiKey) {
     throw new Error(`No ${providerLabel(config.provider)} API key configured.`);
@@ -344,6 +380,7 @@ export async function scoreResume(
     requiredSkills,
     requiredExperienceYears,
     requiredExperienceMaxYears,
+    applicationProfile,
   );
 
   if (config.provider === "gemini") {
