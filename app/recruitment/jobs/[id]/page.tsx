@@ -1180,6 +1180,7 @@ export default function JobDetailPage() {
           slots={(((activeJob.assessment as unknown as { timeSlots?: Array<{ start: string }> } | null)?.timeSlots) ?? []).map((s: { start: string }) => s.start).filter(Boolean)}
           jobId={id}
           assessmentDate={activeJob.assessmentDate ?? null}
+          onRefresh={() => void fetchCandidates({ jobId: id })}
           onClose={() => setAssessmentCandidatesOpen(false)}
         />
       )}
