@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import type { ATSCandidate } from "@/lib/recruitment-types";
 import { useNotificationToast } from "@/lib/toast-context";
-import { dateInputValue, wallClockToIso } from "@/lib/date-utils";
 
 function initials(first?: string, last?: string): string {
   const f = (first || "").trim().charAt(0);
@@ -59,30 +58,21 @@ export function AssessmentCandidatesModal({ candidates, slots, jobId, assessment
     const base = Math.floor(n / k);
     const rem = n % k;
     const preview = slotOptions.map((s, i) => `${s}: ${base + (i < rem ? 1 : 0)}`).join(", ");
-    const day = assessmentDate ? dateInputValue(assessmentDate) : "";
-    const assignments = new Map<string, string | null>();
-    let idx = 0;
-    for (let s = 0; s < k; s++) {
-      const count = base + (s < rem ? 1 : 0);
-      for (let i = 0; i < count; i++) {
-        const c = list[idx++];
-        if (!c) break;
-        assignments.set(c.id, day ? wallClockToIso(day, slotOptions[s], "09:00") : null);
-      }
-    }
-
     setAssigning(true);
     try {
-      for (const c of list) {
-        const slot = assignments.get(c.id) ?? null;
-        const res = await fetch(`/api/recruitment/candidates/${c.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ assessmentSlotStart: slot }),
-        });
-        if (!res.ok) throw new Error("assign failed");
-      }
-      setRows((prev) => prev.map((c) => assignments.has(c.id) ? { ...c, assessmentSlotStart: assignments.get(c.id) ?? null } : c));
+      const res = await fetch(`/api/recruitment/jobs/${jobId}/assessment/assign-slots`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slots: slotOptions,
+          assessmentDate,
+          candidateIds: list.map((c) => c.id),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "assign failed");
+      const assignments: Record<string, string | null> = data.assignments || {};
+      setRows((prev) => prev.map((c) => ({ ...c, assessmentSlotStart: assignments[c.id] ?? null })));
       setOptimized(true);
       onRefresh?.();
       if (!silent) showSuccessToast(`Candidates assigned across ${k} slots. ${preview}`);
@@ -95,19 +85,17 @@ export function AssessmentCandidatesModal({ candidates, slots, jobId, assessment
     }
   };
 
-  const resetAndReassign = async () => {
+  const resetTimes = async () => {
     setResetting(true);
     try {
       const res = await fetch(`/api/recruitment/jobs/${jobId}/assessment/reset-assignments`, { method: "POST" });
       if (!res.ok) throw new Error("reset failed");
-      const cleared = rows.map((c) => ({ ...c, assessmentSlotStart: null }));
-      setRows(cleared);
+      setRows((prev) => prev.map((c) => ({ ...c, assessmentSlotStart: null })));
       setOptimized(false);
       onRefresh?.();
-      const ok = await assignCandidates(cleared, true);
-      if (ok) showSuccessToast("Assignments reset and new timings applied.");
+      showSuccessToast("Assigned times removed for all candidates.");
     } catch {
-      showErrorToast("Could not reset candidate assignments.");
+      showErrorToast("Could not reset candidate times.");
     } finally {
       setResetting(false);
     }
@@ -137,11 +125,11 @@ export function AssessmentCandidatesModal({ candidates, slots, jobId, assessment
           </select>
           {sorted.some((c) => c.assessmentSlotStart) && (
             <button
-              onClick={() => void resetAndReassign()}
+              onClick={() => void resetTimes()}
               disabled={resetting || assigning}
               className="rounded-md border border-amber-200 px-3 py-1 text-xs font-medium text-amber-700 disabled:opacity-50 dark:border-amber-900/60 dark:text-amber-300"
             >
-              {resetting ? "Resetting…" : "Reset & reassign"}
+              {resetting ? "Resetting…" : "Reset time for all"}
             </button>
           )}
           <button onClick={() => void assignCandidates(sorted)} disabled={assigning || resetting} className="ml-auto rounded-md bg-emerald-600 px-3 py-1 text-xs font-medium text-white disabled:opacity-50">
