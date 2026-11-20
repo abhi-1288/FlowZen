@@ -922,6 +922,18 @@ export default function JobDetailPage() {
                 </button>
               )}
               {canRunPipeline && editWindow.enabled && editWindow.closeAt && (
+                <ActionButton
+                  accent={accent}
+                  icon={Send}
+                  label="Send edit-window emails"
+                  onClick={() => {
+                    void apiFetch(`/api/recruitment/jobs/${id}/edit-window/invite`, { method: "POST" })
+                      .then(() => showSuccessToast("Edit-window emails sent."))
+                      .catch(() => showErrorToast("Could not send edit-window emails."));
+                  }}
+                />
+              )}
+              {canRunPipeline && editWindow.enabled && editWindow.closeAt && (
                 <p className="rounded-lg bg-[var(--c-bg-muted)] px-3 py-2 text-[11px] text-slate-500">
                   {editWindow.expired ? (
                     <>
