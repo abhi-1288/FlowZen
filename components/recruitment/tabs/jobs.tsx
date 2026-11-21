@@ -181,26 +181,28 @@ export function JobsTab() {
                     </>
                   )}
                 </div>
-                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 dark:border-zinc-800">
-                  <button suppressHydrationWarning
-                    onClick={() => router.push(`/recruitment/jobs/${job.id}`)}
-                    className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                  >
-                    <Eye size={14} /> View
-                  </button>
-                  {canCreateJobs && (
+                <div className="mt-4 flex flex-nowrap items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-zinc-800">
+                  <div className="flex shrink-0 items-center gap-1.5">
                     <button suppressHydrationWarning
-                      onClick={() => { setModal({ type: "edit-job", jobId: job.id }); }}
-                      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                      onClick={() => router.push(`/recruitment/jobs/${job.id}`)}
+                      className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
                     >
-                      <Pencil size={14} /> Edit
+                      <Eye size={14} /> View
                     </button>
-                  )}
-                  <div className="ml-auto flex flex-wrap items-center gap-2">
+                    {canCreateJobs && (
+                      <button suppressHydrationWarning
+                        onClick={() => { setModal({ type: "edit-job", jobId: job.id }); }}
+                        className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                      >
+                        <Pencil size={14} /> Edit
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
                     {job.status === "draft" && canPublishJobs && (
                       <button suppressHydrationWarning
                         onClick={() => { void updateJob(job.id, { status: "open" as JobStatus }); }}
-                        className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-medium text-white hover:bg-emerald-700"
+                        className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-emerald-600 px-2.5 text-xs font-medium text-white hover:bg-emerald-700"
                       >
                         <Globe size={14} /> Publish
                       </button>
@@ -213,7 +215,7 @@ export function JobsTab() {
                           const url = slug ? `${window.location.origin}/careers/jobs/${slug}/${job.id}` : "";
                           if (url) navigator.clipboard.writeText(url).then(() => { setCopiedJobId(job.id); setTimeout(() => setCopiedJobId(null), 2000); });
                         }}
-                        className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-indigo-200 px-3 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:border-indigo-900 dark:text-indigo-400 dark:hover:bg-indigo-950"
+                        className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-indigo-200 px-2.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:border-indigo-900 dark:text-indigo-400 dark:hover:bg-indigo-950"
                       >
                         {copiedJobId === job.id ? <Check size={14} /> : <Share2 size={14} />} {copiedJobId === job.id ? "Copied" : "Share"}
                       </button>
@@ -221,14 +223,14 @@ export function JobsTab() {
                     {job.status === "open" && canCreateJobs && (
                       <button suppressHydrationWarning
                         onClick={() => { void updateJob(job.id, { status: "closed" as JobStatus }); }}
-                        className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-rose-200 px-3 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:border-rose-900 dark:text-rose-400 dark:hover:bg-rose-950"
+                        className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-rose-200 px-2.5 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:border-rose-900 dark:text-rose-400 dark:hover:bg-rose-950"
                       >
                         <Globe size={14} /> Close
                       </button>
                     )}
                     {canCreateJobs && (job.status === "closed" || job.status === "draft") && <button suppressHydrationWarning
                       onClick={() => setModal({ type: "delete-job", jobId: job.id })}
-                      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-red-200 px-3 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
+                      className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-red-200 px-2.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
                     >
                       <Trash2 size={14} /> Delete
                     </button>}
