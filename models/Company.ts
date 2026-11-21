@@ -127,7 +127,7 @@ const CompanySchema = new Schema(
     }],
     stageOrder: {
       type: [String],
-      default: ["applied", "screening", "assessment", "technical-interview", "manager-round", "hr-round", "offer", "joined", "ats-rejected", "rejected"],
+      default: ["applied", "screening", "assessment", "assessment-pass", "technical-interview", "manager-round", "hr-round", "offer", "joined", "assessment-fail", "not-assessed", "ats-rejected", "rejected"],
     },
     // Company-wide ATS resume-scoring model. The API key is stored as plain
     // text and is only ever returned to the UI masked; `atsModelName` blank

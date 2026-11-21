@@ -77,7 +77,7 @@ export default function JobBoardPage() {
       </header>
 
       {selectedJobId ? (
-        <RecruitmentKanbanBoard candidates={boardCandidates} excludeStages={selectedJob?.assessment ? undefined : ["assessment"]} />
+        <RecruitmentKanbanBoard candidates={boardCandidates} excludeStages={selectedJob?.assessment ? undefined : ["assessment", "assessment-pass", "assessment-fail", "not-assessed"]} />
       ) : (
         <div className="grid flex-1 place-items-center">
           <p className="text-sm text-slate-500">Select a job above to view its candidate pipeline.</p>

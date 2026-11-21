@@ -83,7 +83,7 @@ export const CANDIDATE_TIMELINE_METADATA: Record<string, readonly string[]> = {
  * would render as "moved to ats rejected" and reveals that automated screening
  * rejected them. The candidate already gets a proper `rejected` entry instead.
  */
-const INTERNAL_ONLY_STAGES = new Set(["ats-rejected", "assessment-rejected"]);
+const INTERNAL_ONLY_STAGES = new Set(["ats-rejected", "assessment-rejected", "assessment-fail", "not-assessed"]);
 
 /**
  * Candidate-facing fields of the candidate document.

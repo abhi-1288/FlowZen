@@ -8,7 +8,6 @@ import { Card } from "@/components/ui/card";
 import { Empty } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { inputCls } from "@/components/ui/field";
 import { useRecruitmentStore } from "@/store/recruitment-store";
 import { useShallow } from "zustand/react/shallow";
 import { STAGES, STAGE_LABELS, type Stage } from "@/lib/recruitment-types";
@@ -16,6 +15,10 @@ import { STAGES, STAGE_LABELS, type Stage } from "@/lib/recruitment-types";
 const LIMIT = 10;
 /** Domain filter value that means "candidate never picked a domain". */
 const NO_DOMAIN = "__none__";
+
+/** Compact single-line filter control (inputCls is w-full and stacks these). */
+const filterCls =
+  "rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none transition-colors focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200";
 
 export function CandidatesTab() {
   const router = useRouter();
@@ -96,11 +99,11 @@ export function CandidatesTab() {
       title="Candidates"
       subtitle={`${totalCandidates} total${activeDomainLabel ? ` in ${activeDomainLabel}` : ""}`}
     >
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 max-w-xs">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      <div className="flex flex-nowrap items-center gap-2">
+        <div className="relative min-w-0 flex-1 sm:max-w-[240px]">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
-            className={`${inputCls} py-1.5 pl-9 text-xs`}
+            className={`${filterCls} w-full pl-8`}
             placeholder="Search candidates..."
             value={search}
             onChange={(e) => debouncedSearch(e.target.value)}
@@ -108,7 +111,7 @@ export function CandidatesTab() {
         </div>
         <select
           suppressHydrationWarning
-          className={`${inputCls} w-auto py-1.5 text-xs`}
+          className={`${filterCls} w-[110px] shrink-0`}
           value={stageFilter}
           onChange={(e) => handleStageChange(e.target.value)}
         >
@@ -118,7 +121,7 @@ export function CandidatesTab() {
         <select
           suppressHydrationWarning
           aria-label="Filter by assessment domain"
-          className={`${inputCls} w-auto py-1.5 text-xs`}
+          className={`${filterCls} w-[130px] shrink-0`}
           value={domainFilter}
           onChange={(e) => handleDomainChange(e.target.value)}
           disabled={assessmentDomains.length === 0 && domainFilter === ""}

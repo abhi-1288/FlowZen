@@ -16,6 +16,7 @@ type Props = {
     total: number;
     passed: number;
     failed: number;
+    notAssessed?: number;
     essayReviews?: EssayReview[];
   } | null;
   jobId: string;
@@ -67,7 +68,7 @@ export function AssessmentResultsModal({ data, jobId, onClose, onSubmit }: Props
         <div className="p-5">
           <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100">Update candidate timelines from assessment results?</h2>
 
-          <div className="mt-4 grid grid-cols-3 gap-3">
+          <div className="mt-4 grid grid-cols-4 gap-3">
             <div className="rounded-lg bg-slate-50 dark:bg-zinc-900 p-3 text-center">
               <p className="text-2xl font-bold text-slate-900 dark:text-zinc-100">{data.total}</p>
               <p className="text-xs text-slate-500">Total</p>
@@ -79,6 +80,10 @@ export function AssessmentResultsModal({ data, jobId, onClose, onSubmit }: Props
             <div className="rounded-lg bg-rose-50 dark:bg-rose-500/10 p-3 text-center">
               <p className="text-2xl font-bold text-rose-700">{data.failed}</p>
               <p className="text-xs text-rose-600">Failed</p>
+            </div>
+            <div className="rounded-lg bg-amber-50 dark:bg-amber-500/10 p-3 text-center">
+              <p className="text-2xl font-bold text-amber-700">{data.notAssessed ?? 0}</p>
+              <p className="text-xs text-amber-600">Not assessed</p>
             </div>
           </div>
 
@@ -123,13 +128,13 @@ export function AssessmentResultsModal({ data, jobId, onClose, onSubmit }: Props
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-zinc-300">Assessment timeline action</span>
               <select value={action} onChange={(e) => setAction(e.target.value as "auto" | "manual")} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none dark:border-zinc-800">
-                <option value="auto">Auto-advance (reject assessment-failed, move passed to Technical Interview)</option>
+                <option value="auto">Apply results (Failed / Passed / Not Assessed stages)</option>
                 <option value="manual">Manual review (leave stages as-is)</option>
               </select>
             </label>
             {action === "auto" && (
               <p className="mt-2 text-xs text-slate-500 dark:text-zinc-400">
-                Passed candidates still in Assessment will be moved to Technical Interview. Failed candidates will be moved to ATS Rejected. Offer and Joined stages are never auto-changed.
+                Passed candidates in Assessment move to Assessment Passed, failed candidates to Assessment Failed, and candidates who never submitted to Not Assessed. HR can then schedule interviews for passed candidates. Offer and Joined stages are never auto-changed.
               </p>
             )}
           </div>

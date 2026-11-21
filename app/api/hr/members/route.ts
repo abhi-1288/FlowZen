@@ -31,7 +31,16 @@ import { actingRoleForRequest } from "@/lib/delegation-access";
  * security user read the whole company roster by calling this endpoint
  * directly. The senior case is handled by the `isSeniorSecurity` check below.
  */
-const ALLOWED_ROLES = new Set(["human-resource", "admin", "finance"]);
+const ALLOWED_ROLES = new Set([
+  "human-resource",
+  "admin",
+  "finance",
+  "warehouse",
+  "project-manager",
+  "qa-tester",
+  "it-admin",
+  "it-administration",
+]);
 
 export async function GET(request: Request) {
   const userId = await requireUserId();

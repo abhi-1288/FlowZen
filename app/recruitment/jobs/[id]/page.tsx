@@ -79,7 +79,8 @@ function initials(first?: string, last?: string): string {
 
 function stagePillClass(stage: string): string {
   if (stage === "joined") return "bg-emerald-50 text-emerald-700";
-  if (stage === "rejected" || stage === "ats-rejected") return "bg-rose-50 text-rose-700";
+  if (stage === "rejected" || stage === "ats-rejected" || stage === "assessment-fail" || stage === "not-assessed") return "bg-rose-50 text-rose-700";
+  if (stage === "assessment-pass") return "bg-teal-50 text-teal-700";
   if (stage === "offer") return "bg-indigo-50 text-indigo-700";
   return "bg-[var(--c-bg-muted)] text-slate-600";
 }
@@ -128,11 +129,12 @@ export default function JobDetailPage() {
     total: number;
     passed: number;
     failed: number;
+    notAssessed?: number;
     essayReviews?: { _id: string; firstName: string; lastName: string; email: string; score: number | null; answers: { questionIndex: number; questionText: string; textAnswer: string }[] }[];
   } | null>(null);
   const [questionBankTotal, setQuestionBankTotal] = useState(0);
-  const [assessmentApplied, setAssessmentApplied] = useState<{ moved: number; advanced: number } | null>(null);
-  const [assessmentStatsData, setAssessmentStatsData] = useState<{ inAssessment: number; started: number; submitted: number; passed: number; failed: number; pending: number } | null>(null);
+  const [assessmentApplied, setAssessmentApplied] = useState<{ moved: number; advanced: number; notAssessed: number } | null>(null);
+  const [assessmentStatsData, setAssessmentStatsData] = useState<{ inAssessment: number; started: number; submitted: number; passed: number; failed: number; notAssessed: number; pending: number } | null>(null);
   const [answerKeyPublished, setAnswerKeyPublished] = useState(false);
   const [answerKeyBusy, setAnswerKeyBusy] = useState(false);
   const [answerKeyError, setAnswerKeyError] = useState("");
@@ -182,7 +184,7 @@ export default function JobDetailPage() {
       const data = await res.json();
       setAssessmentStatsData(data.stats || null);
       if (data.stats) {
-        setAssessmentStats({ total: data.stats.submitted + data.stats.failed + data.stats.passed, passed: data.stats.passed, failed: data.stats.failed, essayReviews: data.essayReviews || [] });
+        setAssessmentStats({ total: data.stats.submitted + data.stats.failed + data.stats.passed + (data.stats.notAssessed ?? 0), passed: data.stats.passed, failed: data.stats.failed, notAssessed: data.stats.notAssessed ?? 0, essayReviews: data.essayReviews || [] });
       }
       setAnswerKeyPublished(Boolean(data.assessment?.answerKeyPublished));
       // Questions available to draw a paper from. Distinct from
@@ -525,7 +527,7 @@ export default function JobDetailPage() {
                   )}
                   {assessmentApplied && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-                      {assessmentApplied.advanced} advanced to Technical Interview &middot; {assessmentApplied.moved} moved to ATS Rejected
+                      {assessmentApplied.advanced} to Assessment Passed &middot; {assessmentApplied.moved} to Assessment Failed &middot; {assessmentApplied.notAssessed} not assessed
                     </span>
                   )}
                   {atsApplied && (
@@ -1196,7 +1198,7 @@ export default function JobDetailPage() {
               body: JSON.stringify({ mode, note }),
             });
             const data = await res.json();
-            if (mode === "auto") setAssessmentApplied({ moved: data.moved, advanced: data.advanced });
+            if (mode === "auto") setAssessmentApplied({ moved: data.moved, advanced: data.advanced, notAssessed: data.notAssessed ?? 0 });
             setAssessmentResultsOpen(false);
             void fetchCandidates({ jobId: id });
             void loadAssessmentStats();

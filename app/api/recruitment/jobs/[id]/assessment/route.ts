@@ -66,6 +66,13 @@ export async function GET(_request: Request, { params }: Params) {
   const submitted = await ATSCandidate.countDocuments({ job: id, company: user.company, stage: "assessment", assessmentSubmittedAt: { $ne: null } });
   const passed = await ATSCandidate.countDocuments({ job: id, company: user.company, assessmentStatus: "selected" });
   const failed = await ATSCandidate.countDocuments({ job: id, company: user.company, assessmentStatus: "rejected" });
+  const notAssessed = await ATSCandidate.countDocuments({
+    job: id,
+    company: user.company,
+    stage: "assessment",
+    assessmentStatus: "pending",
+    assessmentSubmittedAt: null,
+  });
   const pending = inAssessment - started;
 
   const essayPendingCandidates = await ATSCandidate.find({
@@ -105,7 +112,7 @@ export async function GET(_request: Request, { params }: Params) {
 
   return NextResponse.json({
     assessment: assessment ? serializeDoc(assessment) : null,
-    stats: { inAssessment, started, submitted, passed, failed, pending: Math.max(0, pending) },
+    stats: { inAssessment, started, submitted, passed, failed, notAssessed, pending: Math.max(0, pending) },
     essayReviews,
     job: { assessment: job.assessment, assessmentDate: job.assessmentDate, assessmentDurationMinutes: job.assessmentDurationMinutes },
   });
