@@ -40,6 +40,7 @@ export async function POST(request: Request, { params }: Params) {
 
   let moved = 0;
   let advanced = 0;
+  let notAssessed = 0;
 
   if (mode === "auto") {
     const candidates = await ATSCandidate.find({
@@ -59,12 +60,12 @@ export async function POST(request: Request, { params }: Params) {
         } else {
           const score = (candidate as any).assessmentScore ?? 0;
           const scorePart = threshold != null
-            ? `Rejected via assessment — score ${score}/100 was below the pass threshold of ${threshold}.`
-            : `Rejected via assessment — score ${score}/100 did not meet the pass requirements.`;
+            ? `Failed assessment — score ${score}/100 was below the pass threshold of ${threshold}.`
+            : `Failed assessment — score ${score}/100 did not meet the pass requirements.`;
           noteContent = (candidate as any).assessmentReason ? `${scorePart} ${(candidate as any).assessmentReason}` : scorePart;
         }
 
-        candidate.stage = "ats-rejected" as typeof candidate.stage;
+        candidate.stage = "assessment-fail" as typeof candidate.stage;
         (candidate as any).assessmentRejectionNote = noteContent;
         await candidate.save();
 
@@ -72,7 +73,7 @@ export async function POST(request: Request, { params }: Params) {
           candidate: candidate._id,
           job: candidate.job,
           action: "stage-changed",
-          metadata: { from: fromStage, to: "ats-rejected", reason: "assessment-rejection" },
+          metadata: { from: fromStage, to: "assessment-fail", reason: "assessment-failed" },
           actor: userId,
           company: user.company,
         });
@@ -81,7 +82,7 @@ export async function POST(request: Request, { params }: Params) {
           candidate: candidate._id,
           job: candidate.job,
           action: "note-added",
-          metadata: { content: noteContent, type: "assessment-rejection" },
+          metadata: { content: noteContent, type: "assessment-failed" },
           actor: userId,
           company: user.company,
         });
@@ -90,14 +91,14 @@ export async function POST(request: Request, { params }: Params) {
         moved++;
       } else if (candidate.assessmentStatus === "selected" && candidate.stage === "assessment") {
         const fromStage = candidate.stage;
-        candidate.stage = "technical-interview" as typeof candidate.stage;
+        candidate.stage = "assessment-pass" as typeof candidate.stage;
         await candidate.save();
 
         await ATSTimeline.create({
           candidate: candidate._id,
           job: candidate.job,
           action: "stage-changed",
-          metadata: { from: fromStage, to: "technical-interview", reason: "assessment-passed" },
+          metadata: { from: fromStage, to: "assessment-pass", reason: "assessment-passed" },
           actor: userId,
           company: user.company,
         });
@@ -105,6 +106,35 @@ export async function POST(request: Request, { params }: Params) {
         emitToUser(String(userId), "recruitment:update", { type: "stage-changed", candidateId: String(candidate._id) });
         advanced++;
       }
+    }
+
+    // Candidates invited to the assessment who never started/submitted it are
+    // still parked in `assessment` with a pending status. Close that cohort out
+    // explicitly so the stage column empties and HR has a clear disposition.
+    const neverAssessed = await ATSCandidate.find({
+      job: job._id,
+      company: user.company,
+      stage: "assessment",
+      assessmentStatus: "pending",
+      assessmentSubmittedAt: null,
+    });
+
+    for (const candidate of neverAssessed) {
+      const fromStage = candidate.stage;
+      candidate.stage = "not-assessed" as typeof candidate.stage;
+      await candidate.save();
+
+      await ATSTimeline.create({
+        candidate: candidate._id,
+        job: candidate.job,
+        action: "stage-changed",
+        metadata: { from: fromStage, to: "not-assessed", reason: "not-assessed" },
+        actor: userId,
+        company: user.company,
+      });
+
+      emitToUser(String(userId), "recruitment:update", { type: "stage-changed", candidateId: String(candidate._id) });
+      notAssessed++;
     }
   }
 
@@ -148,7 +178,7 @@ export async function POST(request: Request, { params }: Params) {
     { $set: { resultsAppliedAt: new Date() } }
   );
 
-  if (moved > 0 || advanced > 0) {
+  if (moved > 0 || advanced > 0 || notAssessed > 0) {
     const hrAndAdmin = await User.find({ company: user.company, role: { $in: ["admin", "human-resource"] }, _id: { $ne: userId } });
     for (const u of hrAndAdmin) {
       await Notification.create({
@@ -156,13 +186,13 @@ export async function POST(request: Request, { params }: Params) {
         company: user.company,
         type: "info",
         title: "Assessment Results Applied",
-        message: `${moved} candidate(s) rejected and ${advanced} candidate(s) advanced to Technical Interview.`,
+        message: `${moved} moved to Assessment Failed, ${advanced} to Assessment Passed, ${notAssessed} to Not Assessed.`,
         link: `/recruitment/jobs/${id}`,
       });
-      emitToUser(String(u._id), "notification:new", { message: `Assessment results: ${moved} rejected, ${advanced} advanced.` });
+      emitToUser(String(u._id), "notification:new", { message: `Assessment results: ${moved} failed, ${advanced} passed, ${notAssessed} not assessed.` });
       emitToUser(String(u._id), "recruitment:update", { type: "assessment-rejections-applied", jobId: id });
     }
   }
 
-  return NextResponse.json({ moved, advanced, mode });
+  return NextResponse.json({ moved, advanced, notAssessed, mode });
 }

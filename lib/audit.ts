@@ -26,7 +26,7 @@ export type RecordAuditOptions = {
 
 export function canViewAuditCenter(role: string, isSeniorSecurity?: boolean): boolean {
   const r = String(role ?? "");
-  if (["admin", "human-resource", "it-admin", "it-administration"].includes(r)) return true;
+  if (["admin", "human-resource", "finance", "warehouse", "project-manager", "qa-tester", "it-admin", "it-administration"].includes(r)) return true;
   return r === "security" && Boolean(isSeniorSecurity);
 }
 

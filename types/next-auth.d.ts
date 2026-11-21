@@ -11,6 +11,7 @@ export type AppUserRole =
   | "security"
   | "it-admin"
   | "it-administration"
+  | "warehouse"
   | "others";
 
 declare module "next-auth" {

@@ -4,7 +4,7 @@ import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 import { jsonError, requireUserId } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
-import { CORE_STAGES, STAGES, STAGE_LABELS, TERMINAL_STAGES, type Stage } from "@/lib/recruitment-types";
+import { CORE_STAGES, STAGE_LABELS, TERMINAL_STAGES, normalizeStageOrder, type Stage } from "@/lib/recruitment-types";
 import { canRunRecruitmentPipeline, requireRecruitmentHQ } from "@/lib/recruitment-hq";
 
 const HR_ROLES = ["admin", "human-resource"];
@@ -19,11 +19,7 @@ export async function GET() {
   if (!user.company) return jsonError("No company found.", 400);
 
   const company = await Company.findById(user.company);
-  const order = Array.isArray(company?.stageOrder) && company.stageOrder.length ? company.stageOrder : STAGES;
-
-  const ordered = order.filter((s: string) => (STAGES as string[]).includes(s));
-  const missing = STAGES.filter((s) => !ordered.includes(s));
-  const stages = [...ordered, ...missing];
+  const stages = normalizeStageOrder(company?.stageOrder);
 
   return NextResponse.json({
     stages: stages.map((stage) => ({

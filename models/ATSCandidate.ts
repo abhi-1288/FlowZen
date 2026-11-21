@@ -94,7 +94,7 @@ const ATSCandidateSchema = new Schema(
     },
     stage: {
       type: String,
-      enum: ["applied", "screening", "assessment", "technical-interview", "manager-round", "hr-round", "offer", "joined", "ats-rejected", "rejected"],
+      enum: ["applied", "screening", "assessment", "assessment-pass", "technical-interview", "manager-round", "hr-round", "offer", "joined", "assessment-fail", "not-assessed", "ats-rejected", "rejected"],
       default: "applied",
       index: true,
     },
@@ -280,11 +280,14 @@ const REFERRAL_STAGE_MAP: Record<string, string> = {
   applied: "pending",
   screening: "reviewed",
   assessment: "reviewed",
+  "assessment-pass": "reviewed",
   "technical-interview": "reviewed",
   "manager-round": "reviewed",
   "hr-round": "reviewed",
   offer: "reviewed",
   joined: "hired",
+  "assessment-fail": "rejected",
+  "not-assessed": "rejected",
   "ats-rejected": "rejected",
   rejected: "rejected",
 };

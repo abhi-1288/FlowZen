@@ -25,6 +25,7 @@ import {
   publicInterviewProjection,
   sanitizeTimelineEntry,
 } from "@/lib/candidate-visibility";
+import { normalizeStageOrder } from "@/lib/recruitment-types";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -361,10 +362,7 @@ export async function GET(request: Request) {
     }
   }
 
-  const defaultStageOrder = ["applied", "screening", "assessment", "technical-interview", "manager-round", "hr-round", "offer", "joined"];
-  const companyStageOrder = Array.isArray((more as any)?.company?.stageOrder) && (more as any).company.stageOrder.length
-    ? (more as any).company.stageOrder
-    : [];
+  const companyStageOrder = normalizeStageOrder((more as any)?.company?.stageOrder);
 
   return NextResponse.json({
     // Projected rather than serialized wholesale: the full document ships the
@@ -388,6 +386,6 @@ export async function GET(request: Request) {
     offer: offer ? serializeDoc(offer) : null,
     assessment: assessmentPayload,
     mockTest: mockTestPayload,
-    stageOrder: companyStageOrder.length ? companyStageOrder : defaultStageOrder,
+    stageOrder: companyStageOrder,
   });
 }

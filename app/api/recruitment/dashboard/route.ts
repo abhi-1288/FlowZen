@@ -78,12 +78,12 @@ export async function GET() {
       ]),
     ]);
 
-  const stageOrder = ["applied", "screening", "technical-interview", "manager-round", "hr-round", "offer", "joined", "rejected"];
+  const stageOrder = ["applied", "screening", "assessment", "assessment-pass", "technical-interview", "manager-round", "hr-round", "offer", "joined", "rejected"];
   const stageMap = new Map<string, number>(candidatesByStage.map((s: any) => [s._id, s.count as number]));
   const hiringFunnel = stageOrder.map((stage) => ({ stage, count: stageMap.get(stage) || 0 }));
 
   const conversionFunnel: { from: string; to: string; fromCount: number; toCount: number; conversionRate: number; dropOffRate: number }[] = [];
-  const funnelStages = ["applied", "screening", "technical-interview", "manager-round", "hr-round", "offer", "joined"];
+  const funnelStages = ["applied", "screening", "assessment", "assessment-pass", "technical-interview", "manager-round", "hr-round", "offer", "joined"];
   for (let i = 0; i < funnelStages.length - 1; i++) {
     const from = funnelStages[i];
     const to = funnelStages[i + 1];

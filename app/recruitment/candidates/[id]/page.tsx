@@ -571,7 +571,7 @@ export default function CandidateProfilePage() {
               Stage
             </p>
             <span
-              className={`rounded-full px-3 py-1 text-sm font-semibold ${ activeCandidate.stage === "joined" ? "bg-emerald-50 text-emerald-700" : activeCandidate.stage === "rejected" || activeCandidate.stage === "ats-rejected" ? "bg-rose-50 text-rose-700" : "bg-indigo-50 text-indigo-700" }`}
+              className={`rounded-full px-3 py-1 text-sm font-semibold ${ activeCandidate.stage === "joined" ? "bg-emerald-50 text-emerald-700" : ["rejected", "ats-rejected", "assessment-fail", "not-assessed"].includes(activeCandidate.stage) ? "bg-rose-50 text-rose-700" : "bg-indigo-50 text-indigo-700" }`}
             >
               {STAGE_LABELS[activeCandidate.stage]}
             </span>

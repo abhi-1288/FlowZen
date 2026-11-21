@@ -39,7 +39,7 @@ import { ApprovalsTab, MembersTab, MessagesTab, NotificationsTab, SecurityTab, V
 import { FinanceTab } from "./profile-hub/finance-tab";
 import { ProfileTab } from "./profile-hub/profile-tabs";
 import { TimelineTab } from "./profile-hub/timeline-tab";
-import { AuditTab } from "./profile-hub/audit-tab";
+import { AuditReportTab } from "./profile-hub/audit-report-tab";
 import { OnboardingTab } from "./profile-hub/onboarding-tab";
 import { DocumentsTab } from "./profile-hub/documents-tab";
 import { MyLetters } from "./profile-hub/my-letters";
@@ -404,7 +404,7 @@ export function ProfileHub() {
   const canViewCompanyTabs = hasCompany;
   const canViewAuditCenter =
     hasCompany &&
-    (["admin", "human-resource", "it-admin", "it-administration"].includes(String(role)) ||
+    (["admin", "human-resource", "finance", "warehouse", "project-manager", "qa-tester", "it-admin", "it-administration"].includes(String(role)) ||
       actorIsSeniorSecurity);
   const canViewGamesTab = hasCompany;
   // A member who has been disconnected loses every company tab, including
@@ -1040,7 +1040,7 @@ export function ProfileHub() {
           <NavButton
             active={tab === "timeline"}
             icon={<History size={16} />}
-            label={`Timeline${canViewAuditCenter && auditCount ? ` (${auditCount})` : ""}`}
+            label="Timeline"
             onClick={() => setTab("timeline")}
           />
           <NavButton
@@ -1477,7 +1477,7 @@ export function ProfileHub() {
 
                 {tab === "timeline" ? (
                   canViewAuditCenter ? (
-                    <AuditTab />
+                    <AuditReportTab />
                   ) : (
                     <TimelineTab items={timeline} role={role} />
                   )

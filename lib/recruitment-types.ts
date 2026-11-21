@@ -47,11 +47,14 @@ export type Stage =
   | "applied"
   | "screening"
   | "assessment"
+  | "assessment-pass"
   | "technical-interview"
   | "manager-round"
   | "hr-round"
   | "offer"
   | "joined"
+  | "assessment-fail"
+  | "not-assessed"
   | "ats-rejected"
   | "rejected";
 
@@ -59,11 +62,14 @@ export const STAGES: Stage[] = [
   "applied",
   "screening",
   "assessment",
+  "assessment-pass",
   "technical-interview",
   "manager-round",
   "hr-round",
   "offer",
   "joined",
+  "assessment-fail",
+  "not-assessed",
   "ats-rejected",
   "rejected",
 ];
@@ -72,6 +78,7 @@ export const CORE_STAGES: Stage[] = [
   "applied",
   "screening",
   "assessment",
+  "assessment-pass",
   "technical-interview",
   "manager-round",
   "hr-round",
@@ -79,20 +86,44 @@ export const CORE_STAGES: Stage[] = [
   "joined",
 ];
 
-export const TERMINAL_STAGES: Stage[] = ["ats-rejected", "rejected"];
+export const TERMINAL_STAGES: Stage[] = ["assessment-fail", "not-assessed", "ats-rejected", "rejected"];
 
 export const STAGE_LABELS: Record<Stage, string> = {
   applied: "Applied",
   screening: "Screening",
   assessment: "Assessment",
+  "assessment-pass": "Assessment Passed",
   "technical-interview": "Technical Interview",
   "manager-round": "Manager Round",
   "hr-round": "HR Round",
   offer: "Offer",
   joined: "Joined",
+  "assessment-fail": "Assessment Failed",
+  "not-assessed": "Not Assessed",
   "ats-rejected": "ATS Rejected",
   rejected: "Rejected",
 };
+
+/**
+ * Merge a saved (possibly stale) stage order with stages added since it was
+ * saved. Core stages are inserted at their canonical position; terminal stages
+ * are appended. Companies created before `assessment-pass` existed would
+ * otherwise show it after the rejected columns in the Kanban board and portal.
+ */
+export function normalizeStageOrder(order: string[] | null | undefined): Stage[] {
+  const result = (order ?? []).filter((s): s is Stage => (STAGES as string[]).includes(s));
+  for (const stage of CORE_STAGES) {
+    if (result.includes(stage)) continue;
+    const idx = CORE_STAGES.indexOf(stage);
+    const previous = idx > 0 ? CORE_STAGES[idx - 1] : null;
+    const at = previous ? result.indexOf(previous) + 1 : 0;
+    result.splice(Math.max(at, 0), 0, stage);
+  }
+  for (const stage of STAGES) {
+    if (!result.includes(stage)) result.push(stage);
+  }
+  return result;
+}
 
 export type EmploymentType = "full-time" | "part-time" | "contract" | "internship";
 export type SalaryType = "per-annum" | "per-month" | "per-day" | "per-hour";
@@ -365,6 +396,7 @@ export type AssessmentStats = {
   submitted: number;
   passed: number;
   failed: number;
+  notAssessed: number;
   pending: number;
 };
 

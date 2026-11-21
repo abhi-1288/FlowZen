@@ -36,7 +36,7 @@ import {
 import QRCode from "qrcode";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
-import { CURRENCY_SYMBOLS } from "@/lib/recruitment-types";
+import { CURRENCY_SYMBOLS, normalizeStageOrder, type Stage } from "@/lib/recruitment-types";
 import { getInterviewJoinCountdownMs, isInterviewJoinWindowOpen, isInterviewJoinable, formatInterviewCountdown } from "@/lib/interview-timing";
 import { isEditWindowOpen } from "@/lib/edit-window";
 import { JobDescription } from "@/components/recruitment/job-description";
@@ -118,11 +118,15 @@ const STAGE_LABELS: Record<string, string> = {
   applied: "Application Submitted",
   screening: "Screening",
   assessment: "Assessment",
+  "assessment-pass": "Assessment Passed",
   "technical-interview": "Technical Interview",
   "manager-round": "Manager Round",
   "hr-round": "HR Round",
   offer: "Offer",
   joined: "Joined",
+  "assessment-fail": "Assessment Failed",
+  "not-assessed": "Not Assessed",
+  "ats-rejected": "Not Selected",
   rejected: "Not Selected",
 };
 
@@ -144,7 +148,7 @@ const ACTION_LABELS: Record<string, string> = {
   "application-updated": "Application Updated",
 };
 
-const STAGE_ORDER = ["applied", "screening", "assessment", "technical-interview", "manager-round", "hr-round", "offer", "joined"];
+const STAGE_ORDER = ["applied", "screening", "assessment", "assessment-pass", "technical-interview", "manager-round", "hr-round", "offer", "joined"];
 
 function TimelineAccordion({ timeline, accent }: { timeline: TimelineEntry[]; accent: string }) {
   const [openId, setOpenId] = useState<string | null>(timeline[0]?.id ?? null);
@@ -588,11 +592,11 @@ function CandidatePortalInner() {
     );
   }
 
-  const stageOrder = (candidate.stageOrder?.length ? candidate.stageOrder : STAGE_ORDER).filter(
-    (s) => s !== "ats-rejected" && s !== "rejected"
+  const stageOrder = normalizeStageOrder(candidate.stageOrder?.length ? candidate.stageOrder : STAGE_ORDER).filter(
+    (s) => !["ats-rejected", "rejected", "assessment-fail", "not-assessed"].includes(s)
   );
-  const stageIdx = stageOrder.indexOf(candidate.stage);
-  const isRejected = candidate.stage === "rejected";
+  const stageIdx = stageOrder.indexOf(candidate.stage as Stage);
+  const isRejected = ["rejected", "ats-rejected", "assessment-fail", "not-assessed"].includes(candidate.stage);
   const isJoined = candidate.stage === "joined";
 
   const stagePill =

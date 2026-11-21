@@ -10,7 +10,7 @@ import { jsonError, serializeDoc } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
 
 type Params = { params: Promise<{ id: string }> };
-const VALID_STAGES = ["applied", "screening", "assessment", "technical-interview", "manager-round", "hr-round", "offer", "joined", "ats-rejected", "rejected"];
+const VALID_STAGES = ["applied", "screening", "assessment", "assessment-pass", "technical-interview", "manager-round", "hr-round", "offer", "joined", "assessment-fail", "not-assessed", "ats-rejected", "rejected"];
 
 export async function PATCH(request: Request, { params }: Params) {
   const { id } = await params;
@@ -38,7 +38,7 @@ export async function PATCH(request: Request, { params }: Params) {
 
   // When moving backward to a pre-assessment stage, reset assessment state
   // so the candidate can restart the assessment.
-  const ASSESSMENT_STAGES = ["assessment", "technical-interview", "manager-round", "hr-round", "offer", "joined"];
+  const ASSESSMENT_STAGES = ["assessment", "assessment-pass", "technical-interview", "manager-round", "hr-round", "offer", "joined", "assessment-fail", "not-assessed", "ats-rejected"];
   const PRE_ASSESSMENT_STAGES = ["applied", "screening"];
   if (ASSESSMENT_STAGES.includes(fromStage) && PRE_ASSESSMENT_STAGES.includes(toStage)) {
     candidate.assessmentStartedAt = null;
