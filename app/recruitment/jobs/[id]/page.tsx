@@ -123,6 +123,7 @@ export default function JobDetailPage() {
   const [assessmentPreviewOpen, setAssessmentPreviewOpen] = useState(false);
   const [assessmentResultsOpen, setAssessmentResultsOpen] = useState(false);
   const [assessmentCandidatesOpen, setAssessmentCandidatesOpen] = useState(false);
+  const [assessmentDefaultTabSeed, setAssessmentDefaultTabSeed] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
   const [assessmentStats, setAssessmentStats] = useState<{
@@ -978,15 +979,7 @@ export default function JobDetailPage() {
                 <ActionButton accent={accent} icon={Download} label={exporting ? "Exporting…" : "Export Candidates"} disabled={exporting} onClick={() => { void handleExport(); }} />
               )}
               {activeJob.assessment && activeJob.status === "closed" && (
-                <>
-                  {jobCandidates.some((c) => c.stage === "screening") || jobCandidates.length === 0 ? (
-                    <ActionButton accent={accent} icon={Users} label="View Eligible Candidates" onClick={() => { void fetchCandidates({ jobId: id }); setAssessmentCandidatesOpen(true); }} />
-                  ) : jobCandidates.some((c) => c.stage === "applied") ? (
-                    <p className="text-xs text-slate-500 dark:text-zinc-400">
-                      Please run ATS scoring or move candidate stage to screening
-                    </p>
-                  ) : null}
-                </>
+                <ActionButton accent={accent} icon={Users} label="View Eligible Candidates" onClick={() => { void fetchCandidates({ jobId: id }); setAssessmentCandidatesOpen(true); }} />
               )}
               {canRunPipeline && activeJob.assessment && assessmentResultsUnlocked({ assessment: activeJob.assessment, assessmentDate: activeJob.assessmentDate }) && (
                 <ActionButton
@@ -1158,7 +1151,7 @@ export default function JobDetailPage() {
           }}
         />
       )}
-      {assessmentManagerOpen && <AssessmentManagerModal jobId={id} onClose={() => { setAssessmentManagerOpen(false); void loadAssessmentStats(); }} />}
+      {assessmentManagerOpen && <AssessmentManagerModal jobId={id} onSaved={() => setAssessmentDefaultTabSeed((s) => s + 1)} onClose={() => { setAssessmentManagerOpen(false); void loadAssessmentStats(); }} />}
 
       {mockTestOpen && (
         <MockTestModal
@@ -1178,10 +1171,11 @@ export default function JobDetailPage() {
       )}
       {assessmentCandidatesOpen && (
         <AssessmentCandidatesModal
-          candidates={jobCandidates.filter((c) => c.stage === "screening" || c.stage === "assessment")}
+          candidates={jobCandidates}
           slots={(((activeJob.assessment as unknown as { timeSlots?: Array<{ start: string }> } | null)?.timeSlots) ?? []).map((s: { start: string }) => s.start).filter(Boolean)}
           jobId={id}
           assessmentDate={activeJob.assessmentDate ?? null}
+          defaultTabSeed={assessmentDefaultTabSeed}
           onRefresh={() => void fetchCandidates({ jobId: id })}
           onClose={() => setAssessmentCandidatesOpen(false)}
         />

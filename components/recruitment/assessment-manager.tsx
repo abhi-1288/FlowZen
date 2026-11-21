@@ -95,7 +95,7 @@ function normalizeQuestion(q: any): Question {
   };
 }
 
-export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onClose: () => void }) {
+export function AssessmentManagerModal({ jobId, onClose, onSaved }: { jobId: string; onClose: () => void; onSaved?: () => void }) {
   const { showSuccessToast } = useNotificationToast();
   const [passScore, setPassScore] = useState(50);
   const [durationMinutes, setDurationMinutes] = useState(60);
@@ -371,6 +371,7 @@ export function AssessmentManagerModal({ jobId, onClose }: { jobId: string; onCl
       if (!res.ok) throw new Error((data as { error?: string })?.error || `Server error (${res.status}).`);
       setSuccess("Assessment saved successfully.");
       showSuccessToast("Assessment saved successfully.");
+      onSaved?.();
       return true;
     } catch (e: any) {
       setError(e.message);
