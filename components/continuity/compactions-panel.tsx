@@ -139,6 +139,7 @@ export function CompactionsPanel({
   const [statusFilter, setStatusFilter] = useState("");
   const [compactions, setCompactions] = useState<CompactionRecord[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [eod, setEod] = useState<EodStatus | null>(null);
@@ -162,16 +163,21 @@ export function CompactionsPanel({
     setLoading(true);
     setError("");
     try {
-      const query = new URLSearchParams({ scope, limit: "200" });
+      const query = new URLSearchParams({ scope, limit: "200", tabCounts: "1" });
       if (typeFilter) query.set("type", typeFilter);
       if (statusFilter) query.set("status", statusFilter);
-      const result = await apiFetch<{ compactions: CompactionRecord[]; counts: Record<string, number> }>(
+      const result = await apiFetch<{
+        compactions: CompactionRecord[];
+        counts: Record<string, number>;
+        tabCounts?: Record<string, number>;
+      }>(
         `/api/compactions?${query.toString()}`,
         undefined,
         { toast: false },
       );
       setCompactions(result.compactions ?? []);
       setCounts(result.counts ?? {});
+      if (result.tabCounts) setTabCounts(result.tabCounts);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load compactions.");
     } finally {
@@ -355,6 +361,8 @@ export function CompactionsPanel({
       );
       setReviewBody("");
       await openDetail(detail.compaction.id);
+      // Refresh the list + tab badges so the unconfirmed count drops.
+      void load();
     } catch {
       // handled
     } finally {
@@ -497,6 +505,17 @@ export function CompactionsPanel({
                   type="button"
                 >
                   {value === "mine" ? "Mine" : value === "team" ? "Team" : "Received"}
+                  {Number(tabCounts[value] ?? 0) > 0 ? (
+                    <span
+                      className={`ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${
+                        scope === value
+                          ? "bg-white/20 text-white dark:bg-black/20 dark:text-zinc-100"
+                          : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+                      }`}
+                    >
+                      {Number(tabCounts[value])}
+                    </span>
+                  ) : null}
                 </button>
               ))}
             </div>

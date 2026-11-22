@@ -32,9 +32,9 @@ type BoardStore = {
   fetchBoard: (boardId: string, silent?: boolean) => Promise<void>;
   createBoard: (title: string, description?: string) => Promise<Board>;
   updateBoard: (boardId: string, updates: Partial<Pick<Board, "title" | "description" | "attachments" | "pinned">>) => Promise<void>;
-  updateTaskSettings: (boardId: string, mode: NonNullable<Board["employeeTaskCreation"]>) => Promise<void>;
+  updateTaskSettings: (boardId: string, mode: NonNullable<Board["employeeTaskCreation"]>, allowAdminTakeover?: boolean, allowTeamLeadTakeover?: boolean) => Promise<void>;
   deleteBoard: (boardId: string) => Promise<void>;
-  inviteUser: (boardId: string, email: string, role: string) => Promise<void>;
+  inviteUser: (boardId: string, identifier: string, identifierType: string, role: string, crossRegion?: boolean) => Promise<void>;
   assignMember: (boardId: string, memberId?: string, leadId?: string, teamId?: string) => Promise<void>;
   unassignTeam: (boardId: string, teamId: string) => Promise<void>;
   removeMember: (boardId: string, memberId: string) => Promise<void>;
@@ -128,10 +128,10 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
       activeBoard: state.activeBoard?.id === board.id ? board : state.activeBoard
     }));
   },
-  updateTaskSettings: async (boardId, mode) => {
+  updateTaskSettings: async (boardId, mode, allowAdminTakeover, allowTeamLeadTakeover) => {
     const { board } = await apiFetch<{ board: Board }>(`/api/boards/${boardId}/task-settings`, {
       method: "PATCH",
-      body: JSON.stringify({ employeeTaskCreation: mode })
+      body: JSON.stringify({ employeeTaskCreation: mode, allowAdminTakeover, allowTeamLeadTakeover })
     });
     set((state) => ({
       boards: state.boards.map((item) => (item.id === board.id ? board : item)),
@@ -145,10 +145,10 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
       activeBoard: state.activeBoard?.id === boardId ? null : state.activeBoard
     }));
   },
-  inviteUser: async (boardId, email, role) => {
+  inviteUser: async (boardId, identifier, identifierType, role, crossRegion) => {
     const { board } = await apiFetch<{ board: Board }>(`/api/boards/${boardId}/invite`, {
       method: "POST",
-      body: JSON.stringify({ email, role })
+      body: JSON.stringify({ identifier, identifierType, role, crossRegion })
     });
     set((state) => ({
       boards: state.boards.map((item) => (item.id === board.id ? board : item)),

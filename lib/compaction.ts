@@ -222,9 +222,11 @@ export function categoryForTodo(todo: {
   if (status === "decision_pending") return "decision";
   if (status === "risk_flagged") return "risk";
   if (status === "partially_completed") return "partial";
+  // Started but unfinished work counts as partial, even when no percentage
+  // has been logged yet — it is no longer "pending / not started".
+  if (status === "in_progress") return "partial";
   const progress = Number(todo.progress ?? 0);
   if (progress > 0 && progress < 100) return "partial";
-  if (status === "in_progress" && progress >= 100) return "partial";
   return "pending";
 }
 

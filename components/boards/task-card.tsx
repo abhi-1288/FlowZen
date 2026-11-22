@@ -21,6 +21,7 @@ import { useSession } from "next-auth/react";
 import { cn } from "@/lib/client-utils";
 import { useBoardStore } from "@/store/board-store";
 import type { Task } from "@/lib/types";
+import { boardRoleForUser } from "@/lib/task-permissions";
 
 const priorityStyles = {
   low: "bg-sky-50 text-sky-700",
@@ -92,8 +93,12 @@ export function TaskCard({
   const isRejected = task.approvalStatus === "rejected";
   const isCreator = Boolean(session?.user?.id && task.createdBy === session.user.id);
   const canDelete = isOwner || isCreator;
+  const isAdminUser = session?.user?.role === "admin" || boardRoleForUser(activeBoard, session?.user?.id) === "admin" || isOwner;
+  const canTakeOverTakenTask =
+    (Boolean(activeBoard?.allowAdminTakeover) && isAdminUser) ||
+    (Boolean(activeBoard?.allowTeamLeadTakeover) && String(task.takenLead ?? "") === session?.user?.id);
   const isLocked =
-    Boolean(task.takenBy && task.takenBy !== session?.user?.id && !isOwner) ||
+    Boolean(task.takenBy && task.takenBy !== session?.user?.id && !canTakeOverTakenTask) ||
     (isPending && !canReview);
 
   useEffect(() => {

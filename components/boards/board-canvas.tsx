@@ -40,6 +40,25 @@ export function BoardCanvas({ boardId }: { boardId: string }) {
   const [activeColumn, setActiveColumn] = useState<Column | null>(null);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [showBoardMenu, setShowBoardMenu] = useState(false);
+  const [taskFilter, setTaskFilter] = useState<string>("all");
+
+  // Distinct users who have taken / own tasks on this board
+  const taskTakers = useMemo(() => {
+    const map = new Map<string, string>();
+    tasks.forEach((task) => {
+      const id = String(task.takenBy ?? "");
+      if (id && !map.has(id)) map.set(id, task.takenByName || "Unknown");
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [tasks]);
+
+  const filteredTasks = useMemo(() => {
+    if (taskFilter === "all") return tasks;
+    if (taskFilter === "mine") {
+      return tasks.filter((task) => String(task.takenBy ?? "") === session?.user?.id);
+    }
+    return tasks.filter((task) => String(task.takenBy ?? "") === taskFilter);
+  }, [tasks, taskFilter, session?.user?.id]);
   const currentMember = activeBoard?.members?.find((member: any) => {
     const memberUser = member.user as any;
     const memberId = typeof memberUser === "string" ? memberUser : memberUser?.id || memberUser?._id;
@@ -238,9 +257,29 @@ export function BoardCanvas({ boardId }: { boardId: string }) {
         </div>
       </header>
 
-      <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-2 text-xs text-slate-500 sm:px-6 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-400">
-        <CalendarDays size={14} />
-        <span>{loading ? "Syncing..." : `${tasks.length} tasks tracked`}</span>
+      <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-2 text-xs text-slate-500 sm:px-6 dark:border-zinc-800 dark:bg-[#000000] dark:text-zinc-400">
+        <span className="flex items-center gap-2">
+          <CalendarDays size={14} />
+          {loading ? "Syncing..." : `${tasks.length} tasks tracked`}
+        </span>
+        <label className="ml-auto flex items-center gap-2">
+          <span className="font-medium">Filter</span>
+          <select
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 outline-none focus:border-emerald-400"
+            value={taskFilter}
+            onChange={(e) => setTaskFilter(e.target.value)}
+          >
+            <option value="all">All tasks</option>
+            <option value="mine">My tasks (taken by me)</option>
+            {taskTakers
+              .filter((taker) => taker.id !== session?.user?.id)
+              .map((taker) => (
+                <option key={taker.id} value={taker.id}>
+                  {taker.name}
+                </option>
+              ))}
+          </select>
+        </label>
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd}>
@@ -253,7 +292,8 @@ export function BoardCanvas({ boardId }: { boardId: string }) {
               canReview={canReviewTasks}
               column={column}
               key={column.id}
-              tasks={tasks
+              filterActive={taskFilter !== "all"}
+              tasks={filteredTasks
                 .filter((task) => task.column === column.id)
                 .sort(
                   (a, b) =>

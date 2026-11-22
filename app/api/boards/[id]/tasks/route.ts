@@ -4,6 +4,7 @@ import { Column } from "@/models/Column";
 import { Task } from "@/models/Task";
 import { User } from "@/models/User";
 import { Notification } from "@/models/Notification";
+import { BoardTodo } from "@/models/BoardTodo";
 import { findAccessibleBoard } from "@/lib/board-access";
 import { isObjectId, jsonError, requireUserId, serializeDoc, serializeDocs } from "@/lib/api";
 import { emitToBoard, emitToUser } from "@/lib/socket-emit";
@@ -331,6 +332,9 @@ export async function DELETE(request: Request, { params }: Params) {
   }
 
   await Task.deleteOne({ _id: taskId, board: id });
+  // Remove the continuity shadow records so the deleted task no longer
+  // shows up in the continuity workspace / my-todos lists.
+  await BoardTodo.deleteMany({ task: taskId, sourceType: "board_task" });
   emitToBoard(board, "board:update", id);
   return NextResponse.json({ ok: true });
 }

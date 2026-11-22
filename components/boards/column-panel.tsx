@@ -15,6 +15,7 @@ export function ColumnPanel({
   canEdit,
   canCreate,
   canReview,
+  filterActive = false,
 }: {
   boardId: string;
   column: Column;
@@ -22,6 +23,7 @@ export function ColumnPanel({
   canEdit: boolean;
   canCreate: boolean;
   canReview: boolean;
+  filterActive?: boolean;
 }) {
   const { setModal, deleteColumn } = useBoardStore();
   const isExpiredColumn = column.title.toLowerCase() === "expired-due";
@@ -84,7 +86,11 @@ export function ColumnPanel({
           <TaskCard key={task.id} task={task} canEdit={canEdit} canReview={canReview} />
         ))}
         {tasks.length === 0 ? (
-          canCreate ? (
+          filterActive ? (
+            <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-4 text-center text-sm text-slate-400 dark:border-zinc-700 dark:bg-zinc-700/70 dark:text-zinc-500">
+              No tasks match filter
+            </div>
+          ) : canCreate ? (
             <button
               className="flex w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-slate-300 bg-white/70 p-4 text-center text-slate-500 transition hover:border-slate-400 hover:bg-white hover:text-slate-800 dark:border-zinc-700 dark:bg-zinc-700/70 dark:text-zinc-400 dark:hover:bg-zinc-700"
               onClick={() => setModal({ type: "task", columnId: column.id })}

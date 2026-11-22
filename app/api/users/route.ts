@@ -12,6 +12,7 @@ export async function GET(req: Request) {
 
     const url = new URL(req.url);
     const roleParam = url.searchParams.get("role");
+    const searchQuery = url.searchParams.get("q") || undefined;
     if (!roleParam) return jsonError("role query param required");
 
     // Comma-separated roles are matched with $in; a single role stays exact.
@@ -31,12 +32,22 @@ export async function GET(req: Request) {
       companyStatus: "approved",
     };
 
+    // Optional text search on name or email
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      filter.$or = [
+        { name: { $regex: q, $options: "i" } },
+        { email: { $regex: q, $options: "i" } },
+        { companyIdentityCode: { $regex: q, $options: "i" } },
+      ];
+    }
+
     const isSeniorSecurity = url.searchParams.get("isSeniorSecurity") === "true";
     if (isSeniorSecurity) {
       filter.isSeniorSecurity = true;
     }
 
-    const select = "name email role regionLabel isSeniorSecurity";
+    const select = "name email role regionLabel isSeniorSecurity companyIdentityCode";
 
     // Opt-in: `region=mine` restricts results to the requester's own region.
     // Callers that omit it keep the company-wide list they had before.
@@ -64,6 +75,12 @@ export async function GET(req: Request) {
       }
       // Region has no matching approver — fall back to the company-wide list.
       regionFallback = true;
+    }
+
+    // A specific region label (e.g. "Delhi") restricts results to that region.
+    const regionParam = url.searchParams.get("region");
+    if (regionParam && regionParam !== "mine") {
+      filter.regionLabel = regionParam;
     }
 
     const users = await User.find(filter).select(select);

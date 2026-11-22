@@ -24,7 +24,9 @@ export async function GET(_request: Request, { params }: Params) {
   if (!board) return jsonError("Board not found.", 404);
 
   return NextResponse.json({
-    employeeTaskCreation: normalizeEmployeeTaskMode(board.employeeTaskCreation)
+    employeeTaskCreation: normalizeEmployeeTaskMode(board.employeeTaskCreation),
+    allowAdminTakeover: Boolean(board.allowAdminTakeover),
+    allowTeamLeadTakeover: Boolean(board.allowTeamLeadTakeover)
   });
 }
 
@@ -39,6 +41,8 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!EMPLOYEE_TASK_MODES.includes(mode as (typeof EMPLOYEE_TASK_MODES)[number])) {
     return jsonError("employeeTaskCreation must be approval, allowed or blocked.");
   }
+  const allowAdminTakeover = Boolean(body.allowAdminTakeover);
+  const allowTeamLeadTakeover = Boolean(body.allowTeamLeadTakeover);
 
   await connectDb();
   const [board, caller] = await Promise.all([
@@ -56,9 +60,11 @@ export async function PATCH(request: Request, { params }: Params) {
   }
 
   board.employeeTaskCreation = mode as (typeof EMPLOYEE_TASK_MODES)[number];
+  board.allowAdminTakeover = allowAdminTakeover;
+  board.allowTeamLeadTakeover = allowTeamLeadTakeover;
   await board.save();
 
-  await board.populate("members.user", "name email");
+  await board.populate("members.user", "name email regionLabel");
   await board.populate("members.assignedTo", "name email");
 
   emitToBoard(board, "board:update", id);

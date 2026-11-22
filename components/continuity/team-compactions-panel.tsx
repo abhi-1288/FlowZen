@@ -95,6 +95,7 @@ export function TeamCompactionsPanel({
   const [teams, setTeams] = useState<TeamOption[]>([]);
   const [compactions, setCompactions] = useState<TeamCompactionRecord[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -117,16 +118,18 @@ export function TeamCompactionsPanel({
     setLoading(true);
     setError("");
     try {
-      const query = new URLSearchParams({ scope, limit: "150" });
+      const query = new URLSearchParams({ scope, limit: "150", tabCounts: "1" });
       if (statusFilter) query.set("status", statusFilter);
       const result = await apiFetch<{
         compactions: TeamCompactionRecord[];
         teams: TeamOption[];
         counts: Record<string, number>;
+        tabCounts?: Record<string, number>;
       }>(`/api/team-compactions?${query.toString()}`, undefined, { toast: false });
       setCompactions(result.compactions ?? []);
       setTeams(result.teams ?? []);
       setCounts(result.counts ?? {});
+      if (result.tabCounts) setTabCounts(result.tabCounts);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load team compactions.");
     } finally {
@@ -320,6 +323,17 @@ export function TeamCompactionsPanel({
                   type="button"
                 >
                   {value === "owned" ? "My teams" : value === "team" ? "All team" : "Received"}
+                  {Number(tabCounts[value] ?? 0) > 0 ? (
+                    <span
+                      className={`ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${
+                        scope === value
+                          ? "bg-white/20 text-white dark:bg-black/20 dark:text-zinc-100"
+                          : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+                      }`}
+                    >
+                      {Number(tabCounts[value])}
+                    </span>
+                  ) : null}
                 </button>
               ))}
             </div>

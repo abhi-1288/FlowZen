@@ -19,8 +19,8 @@ export async function GET(_request: Request, { params }: Params) {
   await connectDb();
   const board = await findAccessibleBoard(id, userId);
   if (!board) return jsonError("Board not found.", 404);
-  await board.populate("members.user", "name email");
-  await board.populate("members.assignedTo", "name email");
+  await board.populate("members.user", "name email regionLabel role");
+  await board.populate("members.assignedTo", "name email regionLabel role");
 
   const [columns, tasks] = await Promise.all([
     Column.find({ board: id }).sort({ order: 1 }).exec(),
