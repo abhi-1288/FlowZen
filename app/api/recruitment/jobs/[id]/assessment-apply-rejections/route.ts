@@ -8,6 +8,8 @@ import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import { jsonError, requireUserId } from "@/lib/api";
 import { emitToUser } from "@/lib/socket-emit";
+import { sendMail } from "@/lib/mailer";
+import { assessmentRejectionEmail } from "@/lib/email-templates";
 import { requireRecruitmentHQ } from "@/lib/recruitment-hq";
 
 const HR_ROLES = ["admin", "human-resource"];
@@ -68,6 +70,20 @@ export async function POST(request: Request, { params }: Params) {
         candidate.stage = "assessment-fail" as typeof candidate.stage;
         (candidate as any).assessmentRejectionNote = noteContent;
         await candidate.save();
+
+        try {
+          const emailBody = assessmentRejectionEmail({
+            candidateName: `${(candidate as any).firstName ?? ""} ${(candidate as any).lastName ?? ""}`.trim() || "Candidate",
+            jobTitle: (job as any).title ?? "the role",
+            note: noteContent,
+            company: { name: (user as any).companyName },
+          });
+          if ((candidate as any).email) {
+            await sendMail({ to: (candidate as any).email, subject: emailBody.subject, text: emailBody.text, html: emailBody.html });
+          }
+        } catch (e) {
+          console.error("Failed to send rejection email", e);
+        }
 
         await ATSTimeline.create({
           candidate: candidate._id,

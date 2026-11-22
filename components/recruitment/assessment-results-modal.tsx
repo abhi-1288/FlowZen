@@ -155,6 +155,12 @@ export function AssessmentResultsModal({ data, jobId, onClose, onSubmit }: Props
 
           <div className="mt-5 flex justify-end gap-2">
             <button
+              onClick={() => window.open("/candidate-portal", "_blank")}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+            >
+              Go to candidate portal
+            </button>
+            <button
               onClick={onClose}
               className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
             >
