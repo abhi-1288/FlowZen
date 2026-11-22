@@ -51,6 +51,8 @@ export type Board = {
   owner: string;
   pinned?: boolean;
   employeeTaskCreation?: "approval" | "allowed" | "blocked" | "admin_only";
+  allowAdminTakeover?: boolean;
+  allowTeamLeadTakeover?: boolean;
   members: { user: string; assignedTo?: string | null; role: Role }[];
   attachments: { id: string; name: string; url: string }[];
   createdAt: string;

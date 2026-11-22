@@ -238,17 +238,17 @@ export function BoardShell({ boardId }: { boardId?: string }) {
               <LogOut size={18} />
             </button>
           </div>
-          <div className="mt-5 flex gap-2">
+          <div className="mt-5 flex min-w-0 gap-2">
             <input
               value={boardSearchInput}
               onChange={(e) => setBoardSearchInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") setBoardSearchQuery(boardSearchInput.trim()); }}
               placeholder="Search boards..."
-              className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-950 focus:ring-0"
+              className="w-0 min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-950 focus:ring-0"
             />
             <button
               onClick={() => setBoardSearchQuery(boardSearchInput.trim())}
-              className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              className="shrink-0 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
             >
               <Search size={16} />
             </button>

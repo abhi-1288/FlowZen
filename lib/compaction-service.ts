@@ -272,33 +272,41 @@ async function syncTakenBoardTasksToContinuity(input: {
     const isCompleted = mappedStatus === "completed";
     const wasUpdatedInPeriod = task.updatedAt >= input.range.start && task.updatedAt <= input.range.end;
     if (isCompleted && !wasUpdatedInPeriod) return;
+    const $set: Record<string, unknown> = {
+      company: input.companyId,
+      board: task.board,
+      carryForwardKey: `board-task:${String(task._id)}`,
+      title: String(task.title ?? ""),
+      description: String(task.description ?? ""),
+      assigneeId: input.employeeId,
+      originalOwnerId: task.owner ?? task.createdBy ?? input.employeeId,
+      originalAssignedDate: task.createdAt ?? input.range.start,
+      currentWorkingDate: isCompleted ? (task.updatedAt ?? input.range.start) : input.range.start,
+      dueDate: task.dueDate ?? null,
+      priority: ["low", "medium", "high"].includes(String(task.priority)) ? task.priority : "medium",
+      status: mappedStatus,
+      updatedBy: input.employeeId,
+    };
+    const $setOnInsert: Record<string, unknown> = {
+      task: task._id,
+      sourceType: "board_task",
+      createdBy: input.employeeId,
+    };
+    if (isCompleted) {
+      // Completed work is authoritative: full progress, no remaining work.
+      $set.progress = 100;
+      $set.remainingWork = "";
+      $set.nextAction = "";
+    } else {
+      // Never clobber real progress/notes on existing rows; only seed them
+      // when the shadow row is created for the first time.
+      $setOnInsert.progress = 0;
+      $setOnInsert.remainingWork = "Continue the active board task.";
+      $setOnInsert.nextAction = `Continue ${String(task.title ?? "this task")}`;
+    }
     await BoardTodo.findOneAndUpdate(
       { task: task._id, sourceType: "board_task" },
-      {
-        $set: {
-          company: input.companyId,
-          board: task.board,
-          carryForwardKey: `board-task:${String(task._id)}`,
-          title: String(task.title ?? ""),
-          description: String(task.description ?? ""),
-          assigneeId: input.employeeId,
-          originalOwnerId: task.owner ?? task.createdBy ?? input.employeeId,
-          originalAssignedDate: task.createdAt ?? input.range.start,
-          currentWorkingDate: isCompleted ? (task.updatedAt ?? input.range.start) : input.range.start,
-          dueDate: task.dueDate ?? null,
-          priority: ["low", "medium", "high"].includes(String(task.priority)) ? task.priority : "medium",
-          status: mappedStatus,
-          progress: isCompleted ? 100 : 0,
-          remainingWork: isCompleted ? "" : "Continue the active board task.",
-          nextAction: isCompleted ? "" : `Continue ${String(task.title ?? "this task")}`,
-          updatedBy: input.employeeId,
-        },
-        $setOnInsert: {
-          task: task._id,
-          sourceType: "board_task",
-          createdBy: input.employeeId,
-        },
-      },
+      { $set, $setOnInsert },
       { upsert: true },
     );
   }));

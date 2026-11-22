@@ -250,7 +250,7 @@ export async function PATCH(request: Request, { params }: Params) {
   emitToBoard(board, "board:update", { id: String(board._id) });
 
   const freshBoard = await Board.findById(id)
-    .populate("members.user", "name email")
+    .populate("members.user", "name email regionLabel")
     .populate("members.assignedTo", "name email");
   if (!freshBoard) return jsonError("Board not found.", 404);
 
@@ -317,7 +317,7 @@ export async function DELETE(request: Request, { params }: Params) {
   emitToBoard(board, "board:update", { id: String(board._id) });
 
   const freshBoard = await Board.findById(id)
-    .populate("members.user", "name email")
+    .populate("members.user", "name email regionLabel")
     .populate("members.assignedTo", "name email");
 
   return NextResponse.json({ board: serializeDoc(freshBoard) });

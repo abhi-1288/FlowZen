@@ -37,7 +37,8 @@ function Field({
   onChange,
   type = "text",
   required = false,
-  disabled = false
+  disabled = false,
+  placeholder
 }: {
   label: string;
   value: string;
@@ -45,6 +46,7 @@ function Field({
   type?: string;
   required?: boolean;
   disabled?: boolean;
+  placeholder?: string;
 }) {
   return (
     <label className="block">
@@ -56,6 +58,7 @@ function Field({
         onChange={(event) => onChange(event.target.value)}
         required={required}
         disabled={disabled}
+        placeholder={placeholder}
       />
     </label>
   );

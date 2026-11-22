@@ -23,6 +23,7 @@ export async function GET(request: Request) {
   const status = url.searchParams.get("status") ?? "";
   const teamId = url.searchParams.get("teamId") ?? "";
   const limit = Math.min(Number(url.searchParams.get("limit") ?? 100) || 100, 300);
+  const wantTabCounts = url.searchParams.get("tabCounts") === "1";
 
   const companyId = String(context.company?._id ?? "");
   const isAdmin = companyId ? await userIsCompanyAdmin(userId, companyId) : false;
@@ -75,9 +76,50 @@ export async function GET(request: Request) {
     .sort({ reportingPeriodStart: -1, createdAt: -1 })
     .limit(limit);
 
+  // Badge counts for the My teams / All team / Received tabs. "Unconfirmed"
+  // means the report still needs someone to act: either the team owner has not
+  // confirmed it, or it has been submitted/delivered without acknowledgement.
+  let tabCounts: Record<string, number> | null = null;
+  if (wantTabCounts) {
+    const UNCONFIRMED = [
+      "awaiting_team_owner_confirmation",
+      "submitted_to_admin",
+      "delivered",
+      "email_sent",
+      "under_admin_review",
+      "correction_requested",
+    ];
+    const base: Record<string, unknown> = companyId ? { company: companyId } : {};
+    const count = (extra: Record<string, unknown>) =>
+      TeamCompaction.countDocuments({ ...base, ...extra, status: { $in: UNCONFIRMED } });
+
+    const owned = await count({ teamOwner: userId });
+
+    let team = 0;
+    if (isAdmin) team = await count({});
+    else if (managedTeamIds.length) team = await count({ team: { $in: managedTeamIds } });
+    else team = await count({ teamOwner: userId });
+
+    let received = 0;
+    if (isAdmin) {
+      received = await count({});
+    } else {
+      const delivered = await CompactionDelivery.find({
+        recipient: userId,
+        teamCompaction: { $ne: null },
+        deliveryChannel: "in_app",
+      }).select("teamCompaction");
+      const ids = delivered.map((row: any) => row.teamCompaction).filter(Boolean);
+      if (ids.length) received = await count({ _id: { $in: ids } });
+    }
+
+    tabCounts = { owned, team, received };
+  }
+
   return NextResponse.json({
     compactions: serializeDocs(compactions),
     teams: teams.map((team) => ({ id: String(team._id), name: String(team.name ?? "") })),
+    ...(tabCounts ? { tabCounts } : {}),
     counts: {
       available: scope === "received" ? await TeamCompaction.countDocuments(filter) : undefined,
       draft: await TeamCompaction.countDocuments({ ...filter, status: "draft" }),

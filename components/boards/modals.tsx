@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
-import { AlertTriangle, Check, CheckSquare, Clock3, Settings2, Trash2, Users, X } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Check, CheckCircle2, CheckSquare, Clock3, Settings2, Trash2, Users, X } from "lucide-react";
 import { Dialog, Field, TextArea, Submit } from "./modal-primitives";
 import { useSession } from "next-auth/react";
 import { usePathname, useRouter } from "next/navigation";
@@ -217,8 +217,6 @@ export function InviteModal({ boardId }: { boardId: string }) {
   const router = useRouter();
   const { data: session } = useSession();
   const { activeBoard, boards, inviteUser, removeMember, setModal } = useBoardStore();
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState("employee");
   const currentUserId = session?.user?.id;
   const board = useMemo(
     () => boards.find((item) => item.id === boardId) ?? activeBoard,
@@ -226,9 +224,53 @@ export function InviteModal({ boardId }: { boardId: string }) {
   );
   const isOwner = Boolean(currentUserId && board?.owner === currentUserId);
 
+  // Board owner's region (fallback "Delhi")
+  const ownerRegion = useMemo(() => {
+    const b = board ?? activeBoard;
+    if (b?.owner) {
+      const member = (b.members ?? []).find((m: any) => String(m.user?.id ?? m.user) === String(b.owner));
+      const user = (member as any)?.user;
+      const label = user && typeof user === "object" ? user.regionLabel : undefined;
+      return label || "Delhi";
+    }
+    return "Delhi";
+  }, [currentUserId, board, activeBoard]);
+
+  // Search / selection state (mirrors feature-delegation member picker)
+  const [role, setRole] = useState("employee");
+  const [query, setQuery] = useState("");
+  const [memberResults, setMemberResults] = useState<any[]>([]);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [otherRegionMode, setOtherRegionMode] = useState(false);
+  const [selectedRegion, setSelectedRegion] = useState("");
+  const [searching, setSearching] = useState(false);
+
+  // Debounced search while typing
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2 || selectedUser) {
+      setMemberResults([]);
+      return;
+    }
+    setSearching(true);
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams({ role, q: trimmed });
+      if (otherRegionMode && selectedRegion) params.set("region", selectedRegion);
+      fetch(`/api/users?${params.toString()}`)
+        .then((res) => res.json())
+        .then((data) => setMemberResults(data.users ?? []))
+        .catch(() => setMemberResults([]))
+        .finally(() => setSearching(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query, role, otherRegionMode, selectedRegion, selectedUser]);
+
   async function submit(event: FormEvent) {
     event.preventDefault();
-    await inviteUser(boardId, email, role);
+    if (!selectedUser) return;
+    const identifierType = selectedUser.companyIdentityCode ? "identity" : "email";
+    const identifier = selectedUser.companyIdentityCode || selectedUser.email;
+    await inviteUser(boardId, identifier, identifierType, role, otherRegionMode);
     setModal(null);
   }
 
@@ -240,26 +282,153 @@ export function InviteModal({ boardId }: { boardId: string }) {
     }
   }
 
+  const roleLabel = (r = "") => r.replaceAll("-", " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
+
   return (
     <Dialog title={isOwner ? "Invite collaborator" : "Board members"} bodyClassName="max-h-[85vh] overflow-y-auto">
       {isOwner ? (
-        <form className="space-y-4 p-5" onSubmit={submit}>
-          <Field label="Email" value={email} onChange={setEmail} type="email" required />
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">Role</span>
+        <form className="space-y-5 p-5" onSubmit={submit}>
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-700">Member</label>
+
+            {/* Region banner + cross-region toggle */}
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-4 py-3 text-sm">
+              <span className="text-slate-600">
+                Showing employees from{" "}
+                <strong>{otherRegionMode ? selectedRegion || "another region" : ownerRegion}</strong>
+              </span>
+              {otherRegionMode ? (
+                <button
+                  type="button"
+                  className="font-semibold text-violet-700 hover:underline"
+                  onClick={() => {
+                    setOtherRegionMode(false);
+                    setSelectedRegion("");
+                    setSelectedUser(null);
+                    setQuery("");
+                    setMemberResults([]);
+                  }}
+                >
+                  Use my region
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="font-semibold text-violet-700 hover:underline"
+                  onClick={() => {
+                    setOtherRegionMode(true);
+                    setSelectedUser(null);
+                    setQuery("");
+                    setMemberResults([]);
+                  }}
+                >
+                  Send invite to another region
+                </button>
+              )}
+            </div>
+
+            {otherRegionMode ? (
+              <select
+                value={selectedRegion}
+                onChange={(e) => {
+                  setSelectedRegion(e.target.value);
+                  setSelectedUser(null);
+                  setQuery("");
+                  setMemberResults([]);
+                }}
+                className="mb-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-violet-500"
+              >
+                <option value="">Select destination region</option>
+                <option value="Delhi">Delhi (Main Office)</option>
+                <option value="Bangalore">Bangalore</option>
+                <option value="Mumbai">Mumbai</option>
+                <option value="Chennai">Chennai</option>
+              </select>
+            ) : null}
+
+            {/* Role first */}
             <select
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 outline-none ring-emerald-500 focus:ring-2"
               value={role}
-              onChange={(event) => setRole(event.target.value)}
+              onChange={(e) => {
+                setRole(e.target.value);
+                setSelectedUser(null);
+                setQuery("");
+                setMemberResults([]);
+              }}
+              className="mb-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-violet-500"
             >
-              <option value="admin">Admin</option>
-              <option value="manager">Manager</option>
               <option value="employee">Employee</option>
-              <option value="tester">Tester</option>
+              <option value="project-manager">Project Manager</option>
+              <option value="qa-tester">QA Tester</option>
+              <option value="human-resource">Human Resource</option>
+              <option value="finance">Finance</option>
+              <option value="admin">Admin</option>
+              <option value="security">Security</option>
+              <option value="it-admin">IT Admin</option>
+              <option value="it-administration">IT Administration</option>
               <option value="others">Others</option>
+              <option value="warehouse">Warehouse</option>
             </select>
-          </label>
-          <Submit label="Send invite" />
+
+            {/* Search input with dropdown results */}
+            <div className="relative">
+              <input
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setSelectedUser(null);
+                }}
+                placeholder="Search by name, email or unique identity"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-violet-500"
+              />
+              {memberResults.length > 0 && !selectedUser ? (
+                <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                  {memberResults.map((member: any) => (
+                    <button
+                      type="button"
+                      key={member._id}
+                      onClick={() => {
+                        setSelectedUser(member);
+                        setQuery(member.name || member.email || "");
+                        setMemberResults([]);
+                      }}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-violet-50"
+                    >
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">
+                        {(member.name || member.email || "U").charAt(0).toUpperCase()}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-slate-800">
+                          {member.name || member.email}
+                        </span>
+                        <span className="block truncate text-xs capitalize text-slate-500">
+                          {roleLabel(member.role)} · {member.email}
+                          {member.companyIdentityCode ? ` · ${member.companyIdentityCode}` : ""}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {searching ? (
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+                  Searching…
+                </span>
+              ) : null}
+            </div>
+
+            {selectedUser ? (
+              <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+                <CheckCircle2 size={13} /> Member selected: {selectedUser.name || selectedUser.email}
+              </p>
+            ) : (
+              <p className="mt-2 text-xs text-slate-400">
+                Only approved members in your company appear in search.
+              </p>
+            )}
+          </div>
+
+          <Submit label="Send invite" disabled={!selectedUser} />
         </form>
       ) : null}
 
@@ -270,7 +439,7 @@ export function InviteModal({ boardId }: { boardId: string }) {
             {(() => {
               const members = (board.members ?? []) as BoardMemberView[];
               const memberEntries = members.map((member) => {
-                const { name, email, teamName } = memberLabel(member);
+                const { name, email, teamName, userRole } = memberLabel(member);
                 return {
                   member,
                   id: memberUserId(member),
@@ -278,6 +447,7 @@ export function InviteModal({ boardId }: { boardId: string }) {
                   email,
                   teamName,
                   role: member.role,
+                  userRole: userRole || member.role,
                   assignedTo: assignedLeadId(member),
                 };
               });
@@ -295,7 +465,7 @@ export function InviteModal({ boardId }: { boardId: string }) {
               const showGrouped = groupedLeads.length > 0 || unassignedEmployees.length > 0;
 
               if (!showGrouped) {
-                return memberEntries.map(({ id, name, email, teamName, role }) => {
+                return memberEntries.map(({ id, name, email, teamName, userRole }) => {
                   const canRemoveMember = isOwner ? board.owner !== id : Boolean(currentUserId && id === currentUserId);
                   return (
                     <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 p-2 text-sm" key={id}>
@@ -306,7 +476,7 @@ export function InviteModal({ boardId }: { boardId: string }) {
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">
-                          {role}
+                          {userRole}
                         </span>
                         {canRemoveMember ? (
                           <button
@@ -337,7 +507,7 @@ export function InviteModal({ boardId }: { boardId: string }) {
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">
-                              {lead.role}
+                              {lead.userRole}
                             </span>
                             {canRemoveLead ? (
                               <button
@@ -366,7 +536,7 @@ export function InviteModal({ boardId }: { boardId: string }) {
                                   </div>
                                   <div className="flex shrink-0 items-center gap-2">
                                     <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">
-                                      {employee.role}
+                                      {employee.userRole}
                                     </span>
                                     {canRemoveEmployee ? (
                                       <button
@@ -412,7 +582,7 @@ export function InviteModal({ boardId }: { boardId: string }) {
                               </div>
                               <div className="flex shrink-0 items-center gap-2">
                                 <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">
-                                  {employee.role}
+                                  {employee.userRole}
                                 </span>
                                 {canRemoveEmployee ? (
                                   <button
@@ -819,6 +989,12 @@ export function TaskSettingsModal() {
   const [mode, setMode] = useState<EmployeeTaskMode>(
     activeBoard?.employeeTaskCreation ?? "approval"
   );
+  const [allowAdminTakeover, setAllowAdminTakeover] = useState<boolean>(
+    Boolean(activeBoard?.allowAdminTakeover)
+  );
+  const [allowTeamLeadTakeover, setAllowTeamLeadTakeover] = useState<boolean>(
+    Boolean(activeBoard?.allowTeamLeadTakeover)
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -858,7 +1034,7 @@ export function TaskSettingsModal() {
     setSaving(true);
     setError(null);
     try {
-      await updateTaskSettings(activeBoard.id, mode);
+      await updateTaskSettings(activeBoard.id, mode, allowAdminTakeover, allowTeamLeadTakeover);
       setModal(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to save task rules.");
@@ -877,7 +1053,7 @@ export function TaskSettingsModal() {
           </span>
         </div>
 
-        <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-2">
           {options.map((option) => (
             <label
               className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition ${
@@ -900,6 +1076,27 @@ export function TaskSettingsModal() {
               </span>
             </label>
           ))}
+        </div>
+
+        <div className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
+          <span className="text-sm text-slate-700">Allow admin to take over a task already taken by another user</span>
+          <button
+            type="button"
+            onClick={() => setAllowAdminTakeover((v) => !v)}
+            className={`h-6 w-11 rounded-full transition ${allowAdminTakeover ? "bg-emerald-500" : "bg-slate-300"}`}
+          >
+            <span className={`block h-5 w-5 rounded-full bg-white transition ${allowAdminTakeover ? "translate-x-5" : "translate-x-0.5"}`} />
+          </button>
+        </div>
+        <div className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
+          <span className="text-sm text-slate-700">Allow team owner to take over a task already taken by another user</span>
+          <button
+            type="button"
+            onClick={() => setAllowTeamLeadTakeover((v) => !v)}
+            className={`h-6 w-11 rounded-full transition ${allowTeamLeadTakeover ? "bg-emerald-500" : "bg-slate-300"}`}
+          >
+            <span className={`block h-5 w-5 rounded-full bg-white transition ${allowTeamLeadTakeover ? "translate-x-5" : "translate-x-0.5"}`} />
+          </button>
         </div>
 
         {error ? (

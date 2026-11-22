@@ -24,7 +24,10 @@ export async function GET() {
   const boardQuery = hasCompanyAccess
     ? { $or: [{ owner: userId }, { "members.user": userId }] }
     : { owner: userId };
-  const boards = await Board.find(boardQuery).sort({ updatedAt: -1 });
+  const boards = await Board.find(boardQuery)
+    .sort({ updatedAt: -1 })
+    .populate("members.user", "name email regionLabel role")
+    .populate("members.assignedTo", "name email regionLabel role");
   return NextResponse.json({ boards: serializeDocs(boards) });
 }
 

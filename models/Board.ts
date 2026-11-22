@@ -20,6 +20,8 @@ const BoardSchema = new Schema(
       enum: ["approval", "allowed", "blocked", "admin_only"],
       default: "approval"
     },
+    allowAdminTakeover: { type: Boolean, default: false },
+    allowTeamLeadTakeover: { type: Boolean, default: false },
     members: [
       {
         user: { type: Schema.Types.ObjectId, ref: "User", required: true },

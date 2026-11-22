@@ -35,19 +35,24 @@ export async function POST(request: Request, { params }: Params) {
     if (!isObjectId(id)) return jsonError("Invalid board id.");
 
     const body = await request.json();
-    const email = String(body.email ?? "").trim().toLowerCase();
+    const identifierType = String(body.identifierType ?? "email");
+    const identifier = String(body.identifier ?? "").trim();
     const role = normalizeBoardRole(body.role);
-    if (!email) return jsonError("Email is required.");
+    const crossRegion = Boolean(body.crossRegion);
+    if (!identifier) return jsonError("Identifier is required.");
 
     await connectDb();
+    const query = identifierType === "identity"
+      ? { companyIdentityCode: identifier }
+      : { email: identifier.toLowerCase() };
     const [board, invitedUser, caller] = await Promise.all([
       findOwnedBoard(id, userId).exec(),
-      User.findOne({ email }).exec(),
+      User.findOne(query).exec(),
       User.findById(userId).exec(),
     ]);
 
     if (!board) return jsonError("Only the owner can invite collaborators.", 403);
-    if (!invitedUser) return jsonError("No user found for that email.", 404);
+    if (!invitedUser) return jsonError("No user found for that identifier.", 404);
     if (!caller) return jsonError("Caller not found.", 404);
 
     normalizeBoardMemberRoles(board);
@@ -96,7 +101,7 @@ export async function POST(request: Request, { params }: Params) {
     }
 
     const freshBoard = await Board.findById(id)
-      .populate("members.user", "name email")
+      .populate("members.user", "name email regionLabel")
       .populate("members.assignedTo", "name email");
     if (!freshBoard) return jsonError("Board not found.", 404);
     return NextResponse.json({ board: serializeDoc(freshBoard) });
@@ -183,7 +188,7 @@ export async function DELETE(request: Request, { params }: Params) {
     }
 
     const freshBoard = await Board.findById(id)
-      .populate("members.user", "name email")
+      .populate("members.user", "name email regionLabel")
       .populate("members.assignedTo", "name email");
     if (!freshBoard) return jsonError("Board not found.", 404);
     return NextResponse.json({ board: serializeDoc(freshBoard), removedSelf: isSelfRemoval });

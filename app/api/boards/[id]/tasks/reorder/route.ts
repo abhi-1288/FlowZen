@@ -6,7 +6,7 @@ import { Team } from "@/models/Team";
 import { User } from "@/models/User";
 import { Notification } from "@/models/Notification";
 import { findAccessibleBoard } from "@/lib/board-access";
-import { canManageBoardTasks } from "@/lib/task-permissions";
+import { canManageBoardTasks, boardRoleForUser } from "@/lib/task-permissions";
 import { isObjectId, jsonError, requireUserId, serializeDocs } from "@/lib/api";
 import { emitToBoard, emitToUser } from "@/lib/socket-emit";
 import { BoardTodo } from "@/models/BoardTodo";
@@ -43,6 +43,7 @@ export async function PATCH(request: Request, { params }: Params) {
   }
 
   const isOwner = String(board.owner) === userId;
+  const isAdmin = String(caller.role) === "admin" || boardRoleForUser(board, userId) === "admin" || isOwner;
   const isReviewer = canManageBoardTasks(board, userId, String(caller.role));
   const isTaskTakenByOthers = task.takenBy && String(task.takenBy) !== userId;
 
@@ -50,8 +51,11 @@ export async function PATCH(request: Request, { params }: Params) {
     return jsonError("This task is waiting for approval and cannot be moved yet.", 403);
   }
 
-  // Lock logic: If taken by others, only the owner or the person who took it can move it.
-  if (isTaskTakenByOthers && !isOwner) {
+  const canTakeOverTakenTask =
+    (Boolean(board.allowAdminTakeover) && (isAdmin)) ||
+    (Boolean(board.allowTeamLeadTakeover) && String(task.takenLead ?? "") === userId);
+  // Lock logic: If taken by others, only the person who took it (or owner/team lead if enabled) can move it.
+  if (isTaskTakenByOthers && !canTakeOverTakenTask) {
     return jsonError(`This task is currently being worked on by ${task.takenByName} and is locked.`, 403);
   }
 
@@ -97,12 +101,14 @@ export async function PATCH(request: Request, { params }: Params) {
         team = await Team.findOne({ manager: caller._id }).select("name");
       }
 
-      takeoverUpdates.takenBy = caller._id;
-      takeoverUpdates.takenByName = caller.name;
-      takeoverUpdates.takenLead = lead?._id ?? caller._id;
-      takeoverUpdates.takenLeadName = lead?.name ?? caller.name;
-      takeoverUpdates.takenTeam = team?._id ?? null;
-      takeoverUpdates.takenTeamName = team?.name ?? "";
+      if (!isAdmin) {
+        takeoverUpdates.takenBy = caller._id;
+        takeoverUpdates.takenByName = caller.name;
+        takeoverUpdates.takenLead = lead?._id ?? caller._id;
+        takeoverUpdates.takenLeadName = lead?.name ?? caller.name;
+        takeoverUpdates.takenTeam = team?._id ?? null;
+        takeoverUpdates.takenTeamName = team?.name ?? "";
+      }
     } else if (isMovingToTodo) {
       // Release ownership when moving back to Todo
       takeoverUpdates.takenBy = null;
@@ -132,33 +138,40 @@ export async function PATCH(request: Request, { params }: Params) {
   // takes it out of Todo. The Task remains authoritative; this shadow record
   // gives EOD/EOW and My Todos a shared tracking representation.
   if (movedAcrossColumns && !isMovingToTodo) {
+    const shadowSet: Record<string, unknown> = {
+      company: (task as any).company ?? (caller as any).company ?? null,
+      board: task.board,
+      carryForwardKey: `board-task:${String(task._id)}`,
+      title: task.title,
+      description: task.description ?? "",
+      assigneeId: caller._id,
+      originalOwnerId: (task as any).owner ?? task.createdBy ?? caller._id,
+      originalAssignedDate: task.createdAt ?? new Date(),
+      currentWorkingDate: new Date(),
+      dueDate: task.dueDate ?? null,
+      priority: task.priority,
+      status: mappedTodoStatus,
+      updatedBy: userId,
+    };
+    const shadowSetOnInsert: Record<string, unknown> = {
+      task: task._id,
+      sourceType: "board_task",
+      createdBy: userId,
+    };
+    if (isCompletedColumn) {
+      // Only a completed column forces full progress; otherwise the existing
+      // progress / notes recorded by the assignee are preserved.
+      shadowSet.progress = 100;
+      shadowSet.remainingWork = "";
+      shadowSet.nextAction = "";
+    } else {
+      shadowSetOnInsert.progress = 0;
+      shadowSetOnInsert.remainingWork = "Continue the active board task.";
+      shadowSetOnInsert.nextAction = `Continue ${task.title}`;
+    }
     await BoardTodo.findOneAndUpdate(
       { task: task._id, sourceType: "board_task" },
-      {
-        $set: {
-          company: (task as any).company ?? (caller as any).company ?? null,
-          board: task.board,
-          carryForwardKey: `board-task:${String(task._id)}`,
-          title: task.title,
-          description: task.description ?? "",
-          assigneeId: caller._id,
-          originalOwnerId: (task as any).owner ?? task.createdBy ?? caller._id,
-          originalAssignedDate: task.createdAt ?? new Date(),
-          currentWorkingDate: new Date(),
-          dueDate: task.dueDate ?? null,
-          priority: task.priority,
-          status: mappedTodoStatus,
-          progress: isCompletedColumn ? 100 : 0,
-          remainingWork: isCompletedColumn ? "" : "Continue the active board task.",
-          nextAction: isCompletedColumn ? "" : `Continue ${task.title}`,
-          updatedBy: userId,
-        },
-        $setOnInsert: {
-          task: task._id,
-          sourceType: "board_task",
-          createdBy: userId,
-        },
-      },
+      { $set: shadowSet, $setOnInsert: shadowSetOnInsert },
       { upsert: true },
     );
   }

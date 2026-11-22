@@ -8,7 +8,7 @@ import { apiFetch } from "@/lib/client-utils";
 import { Dialog } from "./modal-primitives";
 
 export type BoardMemberView = {
-  user?: { id?: string; _id?: string; name?: string; email?: string; team?: { name?: string } } | string;
+  user?: { id?: string; _id?: string; name?: string; email?: string; team?: { name?: string }; role?: string } | string;
   assignedTo?: { id?: string; _id?: string; name?: string; email?: string } | string | null;
   role: string;
 };
@@ -50,11 +50,17 @@ export function assignedLeadId(member: BoardMemberView) {
 }
 
 export function memberLabel(member: BoardMemberView) {
-  if (typeof member.user === "string") return { name: "User", email: "", teamName: "" };
+  // If user is stored as a raw string ID, try to look up the name from the board's member cache
+  if (typeof member.user === "string") {
+    return { name: "User", email: "", teamName: "", userRole: member.role };
+  }
+  // If user object exists but name is missing, fall back to email prefix or "User"
+  const userName = member.user?.name || member.user?.email?.split("@")[0] || "User";
   return {
-    name: member.user?.name || "User",
+    name: userName,
     email: member.user?.email || "",
     teamName: typeof member.user?.team === "object" ? String(member.user?.team?.name ?? "") : "",
+    userRole: member.user?.role || member.role,
   };
 }
 

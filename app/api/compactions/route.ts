@@ -41,28 +41,43 @@ export async function GET(request: Request) {
   const dateFrom = url.searchParams.get("dateFrom") ?? "";
   const dateTo = url.searchParams.get("dateTo") ?? "";
   const limit = Math.min(Number(url.searchParams.get("limit") ?? 100) || 100, 300);
+  // The panel renders Mine / Team / Received tabs and wants an "unconfirmed"
+  // badge on each one, so ask for counts across every scope in a single call.
+  const wantTabCounts = url.searchParams.get("tabCounts") === "1";
 
-  const filter: Record<string, unknown> = {
+  // Shared base: company + type/board/date filters, before any scope clause.
+  const baseFilter: Record<string, unknown> = {
     company: context.company?._id ?? null,
   };
-  if (isCompactionType(type)) filter.compactionType = type;
-  if (boardId && isObjectId(boardId)) filter.board = boardId;
-  if (status && EMPLOYEE_COMPACTION_STATUSES.includes(status as any)) filter.status = status;
+  if (isCompactionType(type)) baseFilter.compactionType = type;
+  if (boardId && isObjectId(boardId)) baseFilter.board = boardId;
   if (dateFrom || dateTo) {
-    filter.reportingDate = {
+    baseFilter.reportingDate = {
       ...(dateFrom ? { $gte: new Date(dateFrom) } : {}),
       ...(dateTo ? { $lte: new Date(dateTo) } : {}),
     };
   }
 
+  const filter: Record<string, unknown> = { ...baseFilter };
+  if (status && EMPLOYEE_COMPACTION_STATUSES.includes(status as any)) filter.status = status;
+
+  // Scope clauses, reused for both the row list and the tab badge counts.
+  const receivedClause = () => ({
+    $or: [
+      { teamOwner: userId },
+      { status: { $in: ["submitted", "delivered_to_team_owner", "email_sent", "email_pending", "delivery_failed"] } },
+    ],
+  });
+  const isAdmin = scope === "received" || wantTabCounts || (scope === "employee" && employeeId && employeeId !== userId)
+    ? await userIsCompanyAdmin(userId, String(context.company?._id ?? ""))
+    : false;
+
   if (scope === "received") {
-    const isAdmin = await userIsCompanyAdmin(userId, String(context.company?._id ?? ""));
     if (!isAdmin) return jsonError("Only company admins can view the team inbox.", 403);
-    filter.$or = [{ teamOwner: userId }, { status: { $in: ["submitted", "delivered_to_team_owner", "email_sent", "email_pending", "delivery_failed"] } }];
+    Object.assign(filter, receivedClause());
   } else if (scope === "team") {
     filter.teamOwner = userId;
   } else if (scope === "employee" && isObjectId(employeeId)) {
-    const isAdmin = await userIsCompanyAdmin(userId, String(context.company?._id ?? ""));
     if (employeeId !== userId && !isAdmin) {
       // A Team Owner may inspect their own team's reports; resolve the target's
       // team server-side rather than trusting any client-supplied role.
@@ -82,6 +97,34 @@ export async function GET(request: Request) {
     filter.employee = userId;
   }
 
+  // Badge counts for the Mine / Team / Received tabs. "Unconfirmed" means the
+  // report is still waiting on someone: either the employee has not confirmed
+  // their own draft, or it has been delivered but the reviewer has not marked
+  // it reviewed yet.
+  let tabCounts: Record<string, number> | null = null;
+  if (wantTabCounts) {
+    const UNCONFIRMED = [
+      "awaiting_confirmation",
+      "submitted",
+      "delivered_to_team_owner",
+      "email_pending",
+      "email_sent",
+    ];
+    const unconfirmedCount = (scopeFilter: Record<string, unknown>) =>
+      TaskCompaction.countDocuments({
+        ...baseFilter,
+        ...scopeFilter,
+        status: { $in: UNCONFIRMED },
+        reviewStatus: { $ne: "reviewed" },
+      });
+
+    tabCounts = {
+      mine: await unconfirmedCount({ employee: userId }),
+      team: await unconfirmedCount({ teamOwner: userId }),
+      received: isAdmin ? await unconfirmedCount(receivedClause()) : 0,
+    };
+  }
+
   const compactions = await TaskCompaction.find(filter)
     .populate("employee", "name email avatarUrl")
     .populate("teamOwner", "name email avatarUrl")
@@ -92,6 +135,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     compactions: serializeDocs(compactions),
+    ...(tabCounts ? { tabCounts } : {}),
     counts: {
       available: scope === "received" ? await TaskCompaction.countDocuments(filter) : undefined,
       awaitingConfirmation: await TaskCompaction.countDocuments({
