@@ -1,9 +1,6 @@
-
-import { X } from "lucide-react";
+import { UserMinus } from "lucide-react";
 import { ActionButton } from "../../shared";
-
-const overlayClass = "fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4";
-const modalClass = "w-full max-w-lg overflow-hidden rounded-xl neu-card dark:border-zinc-800 dark:bg-[#000000]";
+import { MemberActionModal } from "./member-action-modal";
 
 export function FireModal({
   member,
@@ -27,31 +24,23 @@ export function FireModal({
   const canConfirm = fireConfirmText.trim().toUpperCase() === "FIRE";
 
   return (
-    <div className={overlayClass} role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
-      <div className={modalClass} role="dialog" aria-modal="true" aria-labelledby="fire-modal-title">
-        <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border-light)] px-6 py-4 dark:border-zinc-800/50">
-          <div>
-            <h4 className="text-sm font-semibold text-rose-700" id="fire-modal-title">Fire member</h4>
-            <p className="mt-1 text-xs text-slate-600 dark:text-zinc-400">
-              This will remove the member from the company, teams, and boards.
-            </p>
-          </div>
-          <button
-            aria-label="Close"
-            className="inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 text-slate-500 hover:text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] h-10 w-10 dark:text-zinc-400 dark:hover:text-zinc-300 dark:hover:bg-zinc-700"
-            type="button"
-            onClick={onCancel}
-          >
-            <X size={18} />
-          </button>
-        </div>
-        <div className="px-6 py-5">
+    <MemberActionModal
+      title="Fire member"
+      icon={<UserMinus size={15} />}
+      zIndexClass="z-[60]"
+      onBackdropClick={onCancel}
+    >
+      <div>
+        <p className="text-xs text-slate-600 dark:text-zinc-400">
+          This will remove the member from the company, teams, and boards.
+        </p>
+        <div className="mt-4">
           <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 dark:bg-rose-950">
-            <p className="text-sm font-semibold text-rose-800">
+            <p className="text-sm font-semibold text-rose-800 dark:text-rose-200">
               You are about to fire{" "}
               <span className="font-extrabold">{String(member.name ?? "Member")}</span>
             </p>
-            <p className="mt-1 text-sm text-rose-700">
+            <p className="mt-1 text-sm text-rose-700 dark:text-rose-300">
               Type <span className="font-bold">FIRE</span> to confirm.
             </p>
           </div>
@@ -62,18 +51,18 @@ export function FireModal({
             onChange={(e) => onTextChange(e.target.value)}
           />
           <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
-            <ActionButton variant="secondary" type="button" onClick={onCancel}>Cancel</ActionButton>
+            <ActionButton variant="secondary" className="px-3 py-1.5 text-xs" type="button" onClick={onCancel}>Cancel</ActionButton>
             <button
               className="neu-btn neu-btn-danger rounded-full px-4 py-1.5 text-xs font-semibold disabled:cursor-not-allowed"
               disabled={isFiring || !canConfirm}
               type="button"
               onClick={onConfirm}
             >
-              {isFiring ? "Removing�" : "Confirm fire"}
+              {isFiring ? "Removing..." : "Confirm fire"}
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </MemberActionModal>
   );
 }

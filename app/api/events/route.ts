@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { eventHub } from "@/lib/event-hub";
+import { eventHub, isOnlineGlobally } from "@/lib/event-hub";
 import { requireUserId } from "@/lib/api";
 import { connectDb } from "@/lib/db";
 import { Message } from "@/models/Message";
@@ -16,9 +16,10 @@ export async function GET(request: NextRequest) {
 
   const stream = new ReadableStream({
     start(controller) {
-      // Send initial heartbeat
+      // Send initial heartbeat (and a retry hint so a dropped stream reconnects
+      // quickly without hammering a load balancer).
       const encoder = new TextEncoder();
-      controller.enqueue(encoder.encode("event: connected\ndata: {}\n\n"));
+      controller.enqueue(encoder.encode("retry: 3000\nevent: connected\ndata: {}\n\n"));
 
       // Subscribe to the event hub
       eventHub.subscribe(userId, controller);
@@ -50,6 +51,9 @@ export async function GET(request: NextRequest) {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       "Connection": "keep-alive",
+      // Ask reverse proxies (nginx, Caddy, ALBs) not to buffer the stream;
+      // buffering turns SSE into late, batched notifications.
+      "X-Accel-Buffering": "no",
     },
   });
 }
@@ -95,8 +99,8 @@ async function onUserOnline(userId: string) {
 
 async function onUserOffline(userId: string) {
   try {
-    // Only notify if no more active connections for this user
-    if (eventHub.hasSubscriber(userId)) return;
+    // Only notify if no more active connections for this user on any instance
+    if (await isOnlineGlobally(userId)) return;
 
     await connectDb();
     const user = await User.findById(userId).select("company lastOnline");

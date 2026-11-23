@@ -32,7 +32,7 @@ export function ConfirmActionModal({
   const confirmed = noInput || inputValue === confirmWord;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/95 p-4 dark:bg-zinc-900/95">
       <div className="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-xl dark:bg-[#000000]">
         <h3 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">{title}</h3>
         {description ? (

@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { apiFetch } from "@/lib/client-utils";
 import { CodePanel, JoinPanel } from "./admin-tabs";
-import { DocumentLetterModal } from "./document-letter-modal";
+
 import { ImageCropModal } from "./image-crop-modal";
 import { useSetupWizard } from "./hooks/use-setup-wizard";
 import { PersonalInfoSection } from "./sections/personal-info-section";
@@ -10,7 +10,7 @@ import { CompanyTeamSection } from "./sections/company-team-section";
 import { CompensationSection } from "./sections/compensation-section";
 import { CompanyControlsSection } from "./sections/company-controls-section";
 import { TeamOnboardingCodesSection } from "./sections/team-onboarding-codes-section";
-import { DocumentLettersSection } from "./sections/document-letters-section";
+
 import { SecuritySection } from "./sections/security-section";
 import { GreenPinRecoverySection } from "./sections/green-pin-recovery-section";
 import { ReleaseNotesSection } from "./sections/release-notes-section";
@@ -56,8 +56,7 @@ export function ProfileTab({
   const [companyActionLoading, setCompanyActionLoading] = useState(false);
   const [adminJoinCode, setAdminJoinCode] = useState("");
   const [identityRequesting, setIdentityRequesting] = useState(false);
-  const [showDocLetterModal, setShowDocLetterModal] = useState(false);
-  const [docLetterMode, setDocLetterMode] = useState<"request" | "send">("request");
+  
   const [showIdCardModal, setShowIdCardModal] = useState(false);
   const [idCardRequestStatus, setIdCardRequestStatus] = useState<string | null>(null);
   const [idCardSignature, setIdCardSignature] = useState<{ name: string; role: string; signedAt: string } | null>(null);
@@ -375,18 +374,12 @@ export function ProfileTab({
           <TeamOnboardingCodesSection managerTeams={managerTeams} showToast={showToast} />
         ) : null}
 
-        {inApprovedCompany ? (
-          <DocumentLettersSection
-            onRequestLetter={() => { setDocLetterMode("request"); setShowDocLetterModal(true); }}
-            onSendResignation={() => { setDocLetterMode("send"); setShowDocLetterModal(true); }} />
-        ) : null}
-
         <SecuritySection passwordResetRequired={passwordResetRequired} currentPassword={currentPassword}
           onCurrentPasswordChange={setCurrentPassword} newPassword={newPassword}
           onNewPasswordChange={setNewPassword} onUpdatePassword={updatePassword}
           onDeleteAccount={() => setModal(true)} showToast={showToast} />
 
-        {(role === "admin" || role === "human-resource") && profile?.companyStatus === "approved" ? (
+        {(role === "human-resource") && profile?.companyStatus === "approved" ? (
           <div className="mt-4">
             <GreenPinRecoverySection showToast={showToast} />
           </div>
@@ -408,12 +401,6 @@ export function ProfileTab({
             refresh={refresh}
           />
         </div>
-      ) : null}
-
-      {showDocLetterModal ? (
-        <DocumentLetterModal mode={docLetterMode} onClose={() => setShowDocLetterModal(false)}
-          onSuccess={() => { setShowDocLetterModal(false); void refresh(true); }} showToast={showToast}
-          isJuniorSecurity={isJuniorSecurity} />
       ) : null}
 
       <ConfirmActionModal open={modal} title="Delete account?"

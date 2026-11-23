@@ -94,7 +94,7 @@ export async function GET(request: Request) {
       .sort({ createdAt: -1 })
       .populate("requester", "name email role companyIdentityCode companyJoined employmentEndDate baseSalary pfNumber pfDeductionAmount esicNumber esicDeductionAmount pfExempted esicExempted tdsExempted")
       .populate("approver", "name role")
-      .populate("company", "name icon")
+      .populate("company", "name icon createdAt owner")
       .lean();
 
     return NextResponse.json({ requests });

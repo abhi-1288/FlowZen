@@ -1,7 +1,6 @@
+import { Receipt } from "lucide-react";
 import { ActionButton } from "../../shared";
-
-const overlayClass = "fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4";
-const modalClass = "w-full max-w-md rounded-xl bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] p-5 shadow-xl overflow-y-auto max-h-[90vh]";
+import { MemberActionModal } from "./member-action-modal";
 
 export type PfEsicFormData = {
   pfNumber: string;
@@ -38,12 +37,14 @@ export function PfEsicModal({
   if (!member) return null;
 
   return (
-    <div className={overlayClass}>
-      <div className={modalClass}>
-        <h3 className="text-sm font-semibold text-slate-900">PF, ESIC & TDS Details</h3>
-        <p className="mt-1 text-xs text-slate-500">
+    <MemberActionModal
+      title="PF, ESIC & TDS Details"
+      icon={<Receipt size={15} />}
+      panelClassName="max-w-md max-h-[90vh] overflow-y-auto"
+    >
+      <p className="text-xs text-slate-500">
           Update PF, ESIC and TDS information for <strong>{String(member.name ?? "")}</strong>.
-        </p>
+      </p>
         <div className="mt-4 space-y-4">
           <div>
             <label className="text-[11px] font-medium text-slate-500 mb-1 block">PF Account Number</label>
@@ -85,10 +86,9 @@ export function PfEsicModal({
           </label>
         </div>
         <div className="mt-5 flex justify-end gap-3">
-          <ActionButton variant="secondary" onClick={onCancel} type="button">Cancel</ActionButton>
-          <ActionButton variant="primary" disabled={saving} onClick={() => onSave()} type="button">{saving ? "Saving..." : "Save details"}</ActionButton>
+          <ActionButton variant="secondary" className="px-3 py-1.5 text-xs" onClick={onCancel} type="button">Cancel</ActionButton>
+          <ActionButton variant="primary" className="px-3 py-1.5 text-xs" disabled={saving} onClick={() => onSave()} type="button">{saving ? "Saving..." : "Save details"}</ActionButton>
         </div>
-      </div>
-    </div>
+    </MemberActionModal>
   );
 }

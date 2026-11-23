@@ -61,7 +61,7 @@ type LetterData = {
     status: "pending" | "signed" | "declined";
     signedAt: string | null;
   }>;
-  company: { _id: string; name: string; icon?: string };
+  company: { _id: string; name: string; icon?: string; createdAt?: string; owner?: string };
   createdAt: string;
 };
 
@@ -118,6 +118,51 @@ const LETTER_TITLES: Record<string, string> = {
 
 function formatCurrency(amount: number): string {
   return "₹" + amount.toLocaleString("en-IN");
+}
+
+const LETTER_DATE_FORMAT: Intl.DateTimeFormatOptions = {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+};
+
+function formatLetterDate(value: unknown): string {
+  if (!value) return "";
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-IN", LETTER_DATE_FORMAT);
+}
+
+/**
+ * "Date of issue" is the day the letter was approved. While the request is
+ * still pending (draft preview), the only meaningful date is when it was
+ * requested, so the label changes accordingly.
+ */
+function issueDateLabelOf(data: LetterData): string {
+  return data.metadata?.approvedAt ? "Date of issue" : "Date of request";
+}
+
+function issueDateOf(data: LetterData): string {
+  return formatLetterDate(data.metadata?.approvedAt ?? data.createdAt);
+}
+
+/**
+ * Joining date is fixed to the member's own `companyJoined` date — it must not
+ * drift with the date the letter is viewed or printed. Company creators (the
+ * admin/owner who founded the company) have no join date, so their tenure
+ * starts at the company's creation date instead.
+ */
+function joinDateOf(data: LetterData): string {
+  if (data.requester?.companyJoined) {
+    return formatLetterDate(data.requester.companyJoined);
+  }
+  const isCompanyCreator =
+    String(data.requester?.role) === "admin" ||
+    (Boolean(data.company?.owner) && String(data.company?.owner) === String(data.requester?._id));
+  if (isCompanyCreator && data.company?.createdAt) {
+    return formatLetterDate(data.company.createdAt);
+  }
+  return formatLetterDate(data.createdAt);
 }
 
 type LetterBodyVars = {
@@ -310,16 +355,14 @@ function InternshipCertificateContent({
   const teamManagerName = data.metadata?.teamManagerName ?? "";
   const identityCode = data.requester?.companyIdentityCode;
 
-  const date = new Date().toLocaleDateString("en-IN", {
-    day: "numeric", month: "long", year: "numeric",
-  });
+  const date = issueDateOf(data);
+  const dateLabel = issueDateLabelOf(data);
 
-  const formatDate = (d: string) =>
-    new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+  const formatDate = (d: string) => formatLetterDate(d);
 
   return (
     <div className="space-y-5 text-sm leading-relaxed text-slate-800 print:space-y-2">
-      <p>Date: <strong>{date}</strong></p>
+      <p>{dateLabel}: <strong>{date}</strong></p>
 
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 print:p-2">
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 print:mb-1">Intern Details</h3>
@@ -406,22 +449,19 @@ function EmployeeRecognitionContent({
   const purpose = data.metadata?.purpose ?? "";
   const identityCode = data.requester?.companyIdentityCode;
 
-  const startRaw = data.requester?.companyJoined ?? data.createdAt ?? "";
   const endRaw = data.requester?.employmentEndDate ?? "";
 
-  const formatDate = (d: string) =>
-    new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+  const formatDate = (d: string) => formatLetterDate(d);
 
-  const startDate = startRaw ? formatDate(startRaw) : "";
+  const startDate = joinDateOf(data);
   const endDate = endRaw ? formatDate(endRaw) : "Present";
 
-  const date = new Date().toLocaleDateString("en-IN", {
-    day: "numeric", month: "long", year: "numeric",
-  });
+  const date = issueDateOf(data);
+  const dateLabel = issueDateLabelOf(data);
 
   return (
     <div className="space-y-5 text-sm leading-relaxed text-slate-800 print:space-y-2">
-      <p>Date: <strong>{date}</strong></p>
+      <p>{dateLabel}: <strong>{date}</strong></p>
 
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 print:p-2">
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 print:mb-1">Employee Details</h3>
@@ -497,14 +537,8 @@ function SalaryCertificateContent({
   const requesterId = data.requester?._id ?? "";
   const identityCode = data.requester?.companyIdentityCode;
 
-  const signedAtRaw = data.metadata?.signedAt ?? data.metadata?.approvedAt ?? data.createdAt ?? "";
-  const date = signedAtRaw
-    ? new Date(signedAtRaw).toLocaleDateString("en-IN", {
-        day: "numeric", month: "long", year: "numeric",
-      })
-    : new Date().toLocaleDateString("en-IN", {
-        day: "numeric", month: "long", year: "numeric",
-      });
+  const date = issueDateOf(data);
+  const dateLabel = issueDateLabelOf(data);
   const monthlyBase = salary?.baseSalary ?? 0;
   const annualCtc = monthlyBase * 12;
 
@@ -531,7 +565,7 @@ function SalaryCertificateContent({
 
   return (
     <div className="space-y-6 text-sm leading-relaxed text-slate-800 print:space-y-3">
-      <p>Date of issue: <strong>{date}</strong></p>
+      <p>{dateLabel}: <strong>{date}</strong></p>
 
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 print:p-2">
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 print:mb-1">Employee Details</h3>
@@ -663,19 +697,9 @@ function LetterBody({ data }: { data: LetterData }) {
 
   const identityCode = data.requester?.companyIdentityCode;
 
-  const date = new Date().toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-
-  const joinDate = new Date(
-    data.requester?.companyJoined ?? data.createdAt ?? Date.now(),
-  ).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  const date = issueDateOf(data);
+  const dateLabel = issueDateLabelOf(data);
+  const joinDate = joinDateOf(data);
 
   const paragraphs: Record<string, string> = buildLetterParagraphs({
     name,
@@ -691,7 +715,7 @@ function LetterBody({ data }: { data: LetterData }) {
 
   return (
     <>
-      <p>Date: {date}</p>
+      <p>{dateLabel}: {date}</p>
       <br />
       <p>TO,</p>
       <p><strong>{name}</strong><br />{role}<br />{companyName}</p>
@@ -721,27 +745,18 @@ function ResignationLetterContent({ data }: { data: LetterData }) {
   const name = data.metadata?.requesterName ?? data.requester?.name ?? "Employee";
   const role = data.metadata?.requesterRole ?? data.requester?.role ?? "Member";
   const companyName = data.company?.name ?? "Company";
-  const joinDate = new Date(
-    data.requester?.companyJoined ?? data.createdAt ?? Date.now(),
-  ).toLocaleDateString("en-IN", {
-    day: "numeric", month: "long", year: "numeric",
-  });
-  const lastWorkingDay = data.metadata?.resignationLastWorkingDay
-    ? new Date(data.metadata.resignationLastWorkingDay).toLocaleDateString("en-IN", {
-        day: "numeric", month: "long", year: "numeric",
-      })
-    : "";
+  const joinDate = joinDateOf(data);
+  const lastWorkingDay = formatLetterDate(data.metadata?.resignationLastWorkingDay);
   const noticePeriod = data.metadata?.noticePeriodDays ?? "";
   const identityCode = data.requester?.companyIdentityCode;
   const teamName = data.metadata?.teamName ?? "";
 
-  const date = new Date().toLocaleDateString("en-IN", {
-    day: "numeric", month: "long", year: "numeric",
-  });
+  const date = issueDateOf(data);
+  const dateLabel = issueDateLabelOf(data);
 
   return (
     <div className="space-y-4 text-sm leading-relaxed text-slate-800 print:space-y-2">
-      <p>Date: <strong>{date}</strong></p>
+      <p>{dateLabel}: <strong>{date}</strong></p>
       <br />
       <p><strong>Subject: Resignation Letter</strong></p>
       <br />
@@ -880,10 +895,8 @@ export default function LetterPage() {
     const companyName = data.company?.name ?? "Company";
     const purpose = data.metadata?.purpose ?? "";
     const customType = data.metadata?.customType ?? "";
-    const joinDate = new Date(
-      data.requester?.companyJoined ?? data.createdAt ?? Date.now(),
-    ).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
-    const date = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+    const joinDate = joinDateOf(data);
+    const date = issueDateOf(data);
     const paras = buildLetterParagraphs({ name, role, companyName, joinDate, date, purpose, customType });
     const initial = data.metadata?.letterContent
       ? String(data.metadata.letterContent)
@@ -1171,7 +1184,7 @@ export default function LetterPage() {
         />
 
         <div className="mt-12 border-t border-slate-200 pt-4 text-center text-xs text-slate-400 print:mt-6 print:pt-2 print:text-[9px]">
-          Generated by FlowZen  ·  {new Date().toLocaleDateString("en-IN")}
+          Generated by FlowZen  ·  {issueDateOf(data)}
         </div>
       </div>
     </div>

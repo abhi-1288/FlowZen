@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/client-utils";
 import { ActionButton, AnyRecord } from "./shared";
+import { DocumentLettersTab } from "./document-letters-tab";
 
 type DocField = { label: string; type: string };
 type DocCategory = { name: string; mandatory: boolean; acceptedFileTypes: string[]; fields: DocField[] };
@@ -21,7 +22,7 @@ export function DocumentsTab({
   showToast: (text: string, type?: "success" | "error") => void;
 }) {
   const isHrOrAdmin = ["human-resource", "admin", "finance"].includes(String(actorRole ?? ""));
-  const [subTab, setSubTab] = useState<"required" | "upload">("upload");
+  const [subTab, setSubTab] = useState<"required" | "upload" | "letters">("upload");
 
   const sectionClass = "rounded-xl neu-card p-5";
 
@@ -50,10 +51,19 @@ export function DocumentsTab({
           >
             Upload Documents
           </button>
+          <button
+            type="button"
+            className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${ subTab === "letters" ? "neu-tab-pressed" : "text-slate-500 hover:text-slate-700" }`}
+            onClick={() => setSubTab("letters")}
+          >
+            Request Letter
+          </button>
         </div>
       ) : null}
 
-      {isHrOrAdmin && subTab === "required" ? (
+      {subTab === "letters" ? (
+        <DocumentLettersTab showToast={showToast} refresh={() => {}} />
+      ) : isHrOrAdmin && subTab === "required" ? (
         <RequiredDocumentsSection showToast={showToast} />
       ) : (
         <section className={sectionClass}>

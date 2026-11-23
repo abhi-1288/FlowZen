@@ -129,6 +129,7 @@ export function ApprovalsTab({
   // flag, needed for a letter HR has not approved yet, which the page refuses
   // to render otherwise.
   const [letterPreview, setLetterPreview] = useState<{ id: string; draft: boolean } | null>(null);
+  const [letterPreviewLoading, setLetterPreviewLoading] = useState(false);
   const [detailRequestId, setDetailRequestId] = useState<string | null>(null);
   const [detailData, setDetailData] = useState<AnyRecord | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -245,6 +246,7 @@ export function ApprovalsTab({
   );
 
   const [activeGroup, setActiveGroup] = useState<"all" | ApprovalGroup>("all");
+  const [expandedUsers, setExpandedUsers] = useState<Record<string, boolean>>({});
 
   const countsByGroup = visibleApprovals.reduce<Record<string, number>>((acc, request) => {
     const group = groupOf(request);
@@ -263,6 +265,13 @@ export function ApprovalsTab({
     effectiveGroup === "all"
       ? visibleApprovals
       : visibleApprovals.filter((request) => groupOf(request) === effectiveGroup);
+
+  const approvalsByUser = groupedApprovals.reduce<Record<string, AnyRecord[]>>((acc, request) => {
+    const key = `${String(displayNested(request.requester, "_id", ""))}|${String(displayNested(request.requester, "role", ""))}`;
+    (acc[key] ??= []).push(request);
+    return acc;
+  }, {});
+  const userKeys = Object.keys(approvalsByUser);
 
   async function openDetail(id: string) {
     if (!id) return;
@@ -322,8 +331,29 @@ export function ApprovalsTab({
           </div>
         </div>
       ) : null}
-      <div className="mt-5 divide-y divide-slate-200">
-        {groupedApprovals.map((request) => {
+      <div className="mt-5 space-y-3">
+        {userKeys.map((key) => {
+          const requests = approvalsByUser[key];
+          const first = requests[0];
+          const expanded = expandedUsers[key] ?? false;
+          return (
+            <div key={key} className="rounded-xl neu-card p-3">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-3 text-left"
+                onClick={() => setExpandedUsers((prev) => ({ ...prev, [key]: !expanded }))}
+              >
+                <span className="font-medium">
+                  {displayNested(first.requester, "name", "User")}, {displayNested(first.requester, "role", "User")}
+                  <span className="ml-2 text-xs text-slate-500">({requests.length})</span>
+                </span>
+                <svg className={`h-5 w-5 shrink-0 text-slate-500 transition-transform ${expanded ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              {expanded ? (
+                <div className="mt-3 space-y-3">
+                  {requests.map((request) => {
           const requestId = requestIdOf(request);
           const isDeciding = Boolean(decidingIds[requestId]);
           const metadata = (request.metadata ?? {}) as AnyRecord;
@@ -331,7 +361,7 @@ export function ApprovalsTab({
           // decides whether the preview needs `?draft=1` to render at all.
           const signatureReady = (request as AnyRecord).signatureReady !== false;
           return (
-            <div className="flex flex-wrap items-center justify-between gap-4 py-4" key={requestId}>
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-slate-200 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] p-4 shadow-sm" key={requestId}>
               <div>
                 {(request as AnyRecord).signatoryView ? (
                   <p
@@ -477,7 +507,7 @@ export function ApprovalsTab({
               <div className="flex gap-2">
                 {String(request.kind) === "document-letter" ? (
                   <ActionButton variant="secondary" className="px-3" disabled={isDeciding}
-                    onClick={() => setLetterPreview({ id: requestId, draft: true })}
+                    onClick={() => { setLetterPreview({ id: requestId, draft: true }); setLetterPreviewLoading(true); }}
                   >
                     Preview
                   </ActionButton>
@@ -499,7 +529,7 @@ export function ApprovalsTab({
                 {(request as AnyRecord).signatoryView ? (
                   <>
                     <ActionButton variant="secondary" className="px-3" disabled={isDeciding}
-                      onClick={() => setLetterPreview({ id: requestId, draft: !signatureReady })}
+                      onClick={() => { setLetterPreview({ id: requestId, draft: !signatureReady }); setLetterPreviewLoading(true); }}
                     >
                       View letter
                     </ActionButton>
@@ -630,6 +660,11 @@ export function ApprovalsTab({
                   </button>
                 ) : null}
               </div>
+            </div>
+          );
+                  })}
+                </div>
+              ) : null}
             </div>
           );
         })}
@@ -845,6 +880,7 @@ export function ApprovalsTab({
           open
           onClose={() => {
             setLetterPreview(null);
+            setLetterPreviewLoading(false);
             // The framed page can sign or approve the letter itself, so refresh
             // to pick up whatever happened while it was open.
             void refresh();
@@ -864,6 +900,7 @@ export function ApprovalsTab({
               </a>
               <ActionButton variant="secondary" onClick={() => {
                 setLetterPreview(null);
+                setLetterPreviewLoading(false);
                 void refresh();
               }}>
                 Close
@@ -871,11 +908,20 @@ export function ApprovalsTab({
             </>
           }
         >
-          <iframe
-            src={`/letter/${letterPreview.id}${letterPreview.draft ? "?draft=1" : ""}`}
-            title="Letter preview"
-            className="h-[68vh] w-full rounded-lg border border-slate-200"
-          />
+          <div className="relative">
+            {letterPreviewLoading ? (
+              <div className="flex h-[68vh] w-full items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
+                <p className="text-sm text-slate-500">Loading letter…</p>
+              </div>
+            ) : null}
+            <iframe
+              src={`/letter/${letterPreview.id}${letterPreview.draft ? "?draft=1" : ""}`}
+              title="Letter preview"
+              onLoad={() => setLetterPreviewLoading(false)}
+              onError={() => setLetterPreviewLoading(false)}
+              className={`h-[68vh] w-full rounded-lg border border-slate-200 ${letterPreviewLoading ? "invisible" : ""}`}
+            />
+          </div>
         </Modal>
       ) : null}
     </section>

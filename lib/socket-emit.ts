@@ -14,10 +14,12 @@ export function isUserOnline(userId: string): boolean {
 export function emitToBoard(board: any, event: string, payload: any) {
   if (!board?.members) return;
 
+  const memberIds: string[] = [];
   board.members.forEach((member: any) => {
     const memberId = typeof member.user === "string" ? member.user : member.user?._id || member.user?.id;
-    if (memberId) {
-      eventHub.emit(String(memberId), event, payload);
-    }
+    if (memberId) memberIds.push(String(memberId));
   });
+
+  // One fan-out write for the whole board instead of one per member.
+  eventHub.emitMany(memberIds, event, payload);
 }

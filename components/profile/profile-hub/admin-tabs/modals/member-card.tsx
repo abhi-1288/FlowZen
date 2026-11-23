@@ -6,6 +6,7 @@ import { currencySymbol } from "../helpers";
 import { apiFetch } from "@/lib/client-utils";
 import { effectiveRegionLabelOf, withMainOfficeSuffix } from "@/lib/company-regions";
 import { memberRoleChipMeta } from "../types";
+import { MemberActionModal } from "./member-action-modal";
 
 /**
  * One member row, with the full set of actions.
@@ -50,6 +51,7 @@ export function MemberCard({
   showToast: (text: string, type?: "success" | "error") => void;
   onRefresh?: (silent?: boolean) => Promise<void>;
 }) {
+  const [confirmRevokeIdCard, setConfirmRevokeIdCard] = useState(false);
   const [revokingIdCardFor, setRevokingIdCardFor] = useState<string | null>(null);
 
   const memberId = String(member.id);
@@ -86,13 +88,14 @@ export function MemberCard({
   const chipIcon = "shrink-0 text-slate-400 dark:text-zinc-500";
 
   return (
-    <motion.li
-      variants={{
-        hidden: { opacity: 0, y: 14 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } },
-      }}
-      className="neu-card rounded-2xl p-4 dark:border-zinc-800 dark:bg-[#000000]"
-    >
+    <>
+      <motion.li
+        variants={{
+          hidden: { opacity: 0, y: 14 },
+          visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } },
+        }}
+        className="neu-card rounded-2xl p-4 dark:border-zinc-800 dark:bg-[#000000]"
+      >
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         {/* ── Identity ── */}
         <div className="flex min-w-0 items-start gap-3">
@@ -171,7 +174,7 @@ export function MemberCard({
             className="w-full justify-start px-3 py-1.5 text-xs"
             type="button"
             disabled={revokingIdCardFor === memberId}
-            onClick={() => void revokeIdCard()}
+            onClick={() => setConfirmRevokeIdCard(true)}
           >
             <CreditCard size={13} /> {revokingIdCardFor === memberId ? "Revoking..." : "Revoke ID"}
           </ActionButton>
@@ -196,6 +199,36 @@ export function MemberCard({
           </ActionButton>
         </div>
       </div>
-    </motion.li>
+      </motion.li>
+      {confirmRevokeIdCard ? (
+        <MemberActionModal title="Revoke ID card?" icon={<CreditCard size={15} />}>
+          <p className="text-xs text-slate-600 dark:text-zinc-400">
+            This will revoke the member&apos;s ID card.
+          </p>
+          <div className="mt-5 flex justify-end gap-2">
+            <ActionButton
+              variant="secondary"
+              className="px-3 py-1.5 text-xs"
+              onClick={() => setConfirmRevokeIdCard(false)}
+              type="button"
+            >
+              Cancel
+            </ActionButton>
+            <ActionButton
+              variant="danger"
+              className="px-3 py-1.5 text-xs"
+              disabled={revokingIdCardFor === memberId}
+              onClick={() => {
+                setConfirmRevokeIdCard(false);
+                void revokeIdCard();
+              }}
+              type="button"
+            >
+              {revokingIdCardFor === memberId ? "Revoking..." : "Confirm"}
+            </ActionButton>
+          </div>
+        </MemberActionModal>
+      ) : null}
+    </>
   );
 }
