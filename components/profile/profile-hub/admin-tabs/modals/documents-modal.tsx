@@ -1,8 +1,7 @@
+import { FolderOpen } from "lucide-react";
 import { ActionButton } from "../../shared";
 import type { DocModalData } from "../types";
-
-const overlayClass = "fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4";
-const modalClass = "w-full max-w-lg rounded-xl bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] p-5 shadow-xl";
+import { MemberActionModal } from "./member-action-modal";
 
 export function DocumentsModal({
   member,
@@ -18,12 +17,14 @@ export function DocumentsModal({
   if (!member) return null;
 
   return (
-    <div className={overlayClass}>
-      <div className={modalClass}>
-        <h3 className="text-sm font-semibold text-slate-900">Documents</h3>
-        <p className="mt-1 text-xs text-slate-500">
+    <MemberActionModal
+      title="Documents"
+      icon={<FolderOpen size={15} />}
+      panelClassName="max-w-lg max-h-[90vh] overflow-y-auto"
+    >
+      <p className="text-xs text-slate-500">
           Documents uploaded by <strong>{String(member.name ?? "")}</strong>.
-        </p>
+      </p>
         <div className="mt-4 space-y-3">
           {loading ? (
             <p className="text-sm text-slate-400">Loading...</p>
@@ -39,7 +40,7 @@ export function DocumentsModal({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium text-slate-800">{cat.name}</span>
-                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${cat.mandatory ? "bg-rose-100 text-rose-700" : "bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-600"}`}>
+                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${cat.mandatory ? "bg-rose-100 text-rose-700" : "bg-slate-50 text-slate-600 dark:bg-zinc-800/60 dark:text-zinc-300"}`}>
                             {cat.mandatory ? "Required" : "Optional"}
                           </span>
                         </div>
@@ -51,7 +52,7 @@ export function DocumentsModal({
                       </div>
                       {doc ? (
                         <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer"
-                          className="rounded-md neu-card px-3 py-1 text-[11px] font-medium text-indigo-600 hover:bg-indigo-50 transition">
+                          className="rounded-md neu-card px-3 py-1 text-[11px] font-medium text-indigo-600 transition hover:bg-indigo-50">
                           View
                         </a>
                       ) : (
@@ -76,9 +77,8 @@ export function DocumentsModal({
           )}
         </div>
         <div className="mt-5 flex justify-end gap-3">
-          <ActionButton variant="secondary" onClick={onClose} type="button">Close</ActionButton>
+          <ActionButton variant="secondary" className="px-3 py-1.5 text-xs" onClick={onClose} type="button">Close</ActionButton>
         </div>
-      </div>
-    </div>
+    </MemberActionModal>
   );
 }

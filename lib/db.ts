@@ -14,6 +14,55 @@ declare global {
 
 const cached = global.mongooseConnection ?? { conn: null, promise: null };
 
+function positiveInt(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+/**
+ * Connection settings tuned for running several app instances behind a load
+ * balancer.
+ *
+ * The pool is per process. With N replicas the cluster opens up to
+ * `N * maxPoolSize` sockets, so keep the product inside the database plan's
+ * connection limit (Atlas shows it as "Connections"). 10 is a safe default for
+ * serverless-style deployments where many short-lived instances can exist;
+ * raise it for long-lived containers with a known replica count.
+ *
+ * `compressors` enables wire compression, which meaningfully cuts bytes for
+ * the large list/document payloads this API returns. `waitQueueTimeoutMS`
+ * makes a saturated pool fail fast instead of letting requests hang and pile
+ * up behind one another.
+ */
+function connectOptions() {
+  const isProduction = process.env.NODE_ENV === "production";
+  const maxPoolSize = positiveInt(process.env.MONGODB_MAX_POOL_SIZE, isProduction ? 10 : 5);
+  const compressors = (process.env.MONGODB_COMPRESSORS ?? "zlib")
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean) as ("zlib" | "snappy" | "zstd")[];
+  const minPoolSize = Math.min(
+    positiveInt(process.env.MONGODB_MIN_POOL_SIZE, isProduction ? 2 : 0),
+    maxPoolSize,
+  );
+
+  return {
+    bufferCommands: false,
+    serverSelectionTimeoutMS: 5000,
+    connectTimeoutMS: positiveInt(process.env.MONGODB_CONNECT_TIMEOUT_MS, 10_000),
+    maxPoolSize,
+    minPoolSize,
+    maxConnecting: positiveInt(process.env.MONGODB_MAX_CONNECTING, 4),
+    maxIdleTimeMS: positiveInt(process.env.MONGODB_MAX_IDLE_TIME_MS, 30_000),
+    waitQueueTimeoutMS: positiveInt(process.env.MONGODB_WAIT_QUEUE_TIMEOUT_MS, 10_000),
+    // zlib is supported by every MongoDB server; the driver silently skips
+    // compression when the server cannot negotiate it.
+    compressors,
+    retryWrites: true,
+    appName: process.env.MONGODB_APP_NAME ?? "flowzen",
+  };
+}
+
 if (!global.mongooseConnection) {
   global.mongooseConnection = cached;
 }
@@ -26,10 +75,7 @@ export async function connectDb() {
 
   if (cached.conn) return cached.conn;
 
-  cached.promise ??= mongoose.connect(MONGODB_URI, {
-    bufferCommands: false,
-    serverSelectionTimeoutMS: 5000
-  });
+  cached.promise ??= mongoose.connect(MONGODB_URI, connectOptions());
 
   try {
     cached.conn = await cached.promise;

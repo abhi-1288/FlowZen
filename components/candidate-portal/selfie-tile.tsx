@@ -31,7 +31,7 @@ export function SelfieTile({
   const loud = requireMic && micDb !== null && micDb > -35;
 
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-50 w-40 sm:w-48">
+    <div className="pointer-events-none fixed right-4 top-20 z-50 w-28 sm:bottom-4 sm:top-auto sm:w-40 md:w-48">
       <VideoSurface
         stream={stream}
         muted

@@ -8,6 +8,7 @@ import { PushNotificationSetup } from "@/components/push-notification-setup";
 import { CookieConsentBanner } from "@/components/cookie-consent-banner";
 import { PinLockProvider } from "@/components/auth/pin-lock-provider";
 import { DevCronProvider } from "@/components/providers/DevCronProvider";
+import { GlobalRouteLoading } from "@/components/global-route-loading";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -100,6 +101,7 @@ export default function RootLayout({
                 <DevCronProvider />
                 <GlobalNotificationListener />
                 <PushNotificationSetup />
+                <GlobalRouteLoading />
                 {children}
                 <CookieConsentBanner />
               </PinLockProvider>

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Download, Search, SearchX, X } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -92,6 +92,13 @@ export function MemberListModal({
       return name.includes(query) || email.includes(query) || code.includes(query) || codeNum.includes(query);
     });
   }, [modalMembers, modalSearchQuery]);
+
+  const PAGE_SIZE = 15;
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(filteredMembers.length / PAGE_SIZE));
+  const pagedMembers = filteredMembers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  useEffect(() => { setPage(1); }, [modalRole, modalSearchQuery, selectedOtherRole]);
 
   function exportToExcel() {
     const fmtDate = (val: unknown): string => {
@@ -272,7 +279,7 @@ export function MemberListModal({
                   initial="hidden"
                   animate="visible"
                 >
-                  {filteredMembers.map((member) => (
+                  {pagedMembers.map((member) => (
                     <MemberCard
                       key={String(member.id)}
                       member={member}
@@ -294,6 +301,13 @@ export function MemberListModal({
                   ))}
                 </motion.ul>
               )}
+              {filteredMembers.length > PAGE_SIZE ? (
+                <div className="mt-4 flex items-center justify-center gap-3">
+                  <button type="button" className="neu-btn neu-btn-secondary rounded-lg px-3 py-1.5 text-xs" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>Previous</button>
+                  <span className="text-xs text-slate-500">Page {page} of {totalPages}</span>
+                  <button type="button" className="neu-btn neu-btn-secondary rounded-lg px-3 py-1.5 text-xs" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>Next</button>
+                </div>
+              ) : null}
             </div>
           </motion.div>
         </motion.div>

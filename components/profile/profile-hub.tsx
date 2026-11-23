@@ -42,6 +42,7 @@ import { TimelineTab } from "./profile-hub/timeline-tab";
 import { AuditReportTab } from "./profile-hub/audit-report-tab";
 import { OnboardingTab } from "./profile-hub/onboarding-tab";
 import { DocumentsTab } from "./profile-hub/documents-tab";
+import { DocumentLettersTab } from "./profile-hub/document-letters-tab";
 import { MyLetters } from "./profile-hub/my-letters";
 import { CareersTab } from "./profile-hub/careers-tab";
 import { GamesTab } from "./profile-hub/games-tab";
@@ -112,6 +113,7 @@ export type Tab =
   | "finance"
   | "attendance"
   | "documents"
+  | "document"
   | "careers"
   | "calendar"
   | "visitors"
@@ -126,7 +128,7 @@ export type Tab =
   | "team-compactions"
   | "received-team-compactions";
 
-const VALID_TABS = new Set<string>(["dashboard", "command-center", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "careers", "calendar", "visitors", "security", "games", "finance-policy", "hr-policy", "it", "store", "feature-delegation", "compactions", "team-compactions", "received-team-compactions"]);
+const VALID_TABS = new Set<string>(["dashboard", "command-center", "profile", "timeline", "onboarding", "members", "messages", "approvals", "notifications", "finance", "attendance", "documents", "document", "careers", "calendar", "visitors", "security", "games", "finance-policy", "hr-policy", "it", "store", "feature-delegation", "compactions", "team-compactions", "received-team-compactions"]);
 
 const LEADER_DASH_ROLES = new Set<string>([
   "admin",
@@ -1037,6 +1039,14 @@ export function ProfileHub() {
             label="Profile"
             onClick={() => setTab("profile")}
           />
+          {hasCompany ? (
+            <NavButton
+              active={tab === "document"}
+              icon={<FileText size={16} />}
+              label="Document Letters"
+              onClick={() => setTab("document")}
+            />
+          ) : null}
           <NavButton
             active={tab === "timeline"}
             icon={<History size={16} />}
@@ -1399,7 +1409,7 @@ export function ProfileHub() {
         </div>
 
         <div className="bg-[var(--c-bg)] p-5 sm:p-6 dark:bg-[#1a1a1a]">
-          {loading ? (
+          {loading && !profile ? (
             <ProfileSkeleton />
           ) : (
             <>
@@ -1473,6 +1483,10 @@ export function ProfileHub() {
                     refresh={load}
                     showToast={showToast}
                   />
+                ) : null}
+
+                {tab === "document" ? (
+                  <DocumentLettersTab showToast={showToast} refresh={load} />
                 ) : null}
 
                 {tab === "timeline" ? (

@@ -165,7 +165,17 @@ export async function POST(request: Request) {
   await recordIdentityCodeRelease(company._id, releasedCode, new Date());
   await member.save();
 
-  await Company.updateOne({ _id: company._id }, { $pull: { members: member._id } });
+// Auto-generate experience & termination letters available for 30 days.
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  for (const letterType of ["experience", "termination"]) {
+    await JoinRequest.create({
+      requester: member._id,
+      company: company._id,
+      kind: "document-letter",
+      status: "approved",
+      metadata: { letterType, purpose: `Auto-generated on termination`, expiresAt },
+    });
+  }
 
   await recordAudit({
     action: "member.terminated",

@@ -1,7 +1,6 @@
+import { UserCog } from "lucide-react";
 import { ActionButton } from "../../shared";
-
-const overlayClass = "fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4";
-const modalClass = "w-full max-w-md rounded-xl bg-[var(--c-bg-slate-100 dark:bg-zinc-800)] p-5 shadow-xl";
+import { MemberActionModal } from "./member-action-modal";
 
 export function RoleModal({
   member,
@@ -25,47 +24,44 @@ export function RoleModal({
   if (!member) return null;
 
   return (
-    <div className={overlayClass}>
-      <div className={modalClass}>
-        <h3 className="text-sm font-semibold text-slate-900">Change role</h3>
-        <p className="mt-1 text-xs text-slate-500">
-          Change role for <strong>{String(member.name ?? "")}</strong>.
-        </p>
-        <select
-          className="mt-4 w-full rounded-md neu-inset px-3 py-1.5 text-xs"
-          value={newRoleValue}
-          onChange={(e) => onRoleChange(e.target.value)}
-        >
-          <option value="employee">Employee</option>
-          <option value="project-manager">Project Manager</option>
-          <option value="qa-tester">QA Tester</option>
-          <option value="human-resource">Human Resource</option>
-          <option value="finance">Finance</option>
-          <option value="security">Security</option>
-          <option value="admin">Admin</option>
-          <option value="it-admin">IT Admin</option>
-          <option value="it-administration">IT Administration</option>
-          <option value="warehouse">Warehouse</option>
-          <option value="others">Others</option>
-        </select>
-        {newRoleValue === "security" && onIsSeniorSecurityChange ? (
-          <label className="mt-3 flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
-              checked={!!isSeniorSecurityChecked}
-              onChange={(e) => onIsSeniorSecurityChange(e.target.checked)}
-            />
-            <span className="text-sm text-slate-700">Senior Security</span>
-          </label>
-        ) : null}
-        <div className="mt-5 flex justify-end gap-3">
-          <ActionButton variant="secondary" onClick={onCancel} type="button">Cancel</ActionButton>
-          <ActionButton variant="primary" disabled={saving || !newRoleValue} onClick={() => onSave()} type="button">
-            {saving ? "Saving..." : "Save role"}
-          </ActionButton>
-        </div>
+    <MemberActionModal title="Change role" icon={<UserCog size={15} />}>
+      <p className="text-xs text-slate-500">
+        Change role for <strong>{String(member.name ?? "")}</strong>.
+      </p>
+      <select
+        className="mt-4 w-full rounded-md neu-inset px-3 py-1.5 text-xs"
+        value={newRoleValue}
+        onChange={(e) => onRoleChange(e.target.value)}
+      >
+        <option value="employee">Employee</option>
+        <option value="project-manager">Project Manager</option>
+        <option value="qa-tester">QA Tester</option>
+        <option value="human-resource">Human Resource</option>
+        <option value="finance">Finance</option>
+        <option value="security">Security</option>
+        <option value="admin">Admin</option>
+        <option value="it-admin">IT Admin</option>
+        <option value="it-administration">IT Administration</option>
+        <option value="warehouse">Warehouse</option>
+        <option value="others">Others</option>
+      </select>
+      {newRoleValue === "security" && onIsSeniorSecurityChange ? (
+        <label className="mt-3 flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+            checked={!!isSeniorSecurityChecked}
+            onChange={(e) => onIsSeniorSecurityChange(e.target.checked)}
+          />
+          <span className="text-sm text-slate-700">Senior Security</span>
+        </label>
+      ) : null}
+      <div className="mt-5 flex justify-end gap-3">
+        <ActionButton variant="secondary" className="px-3 py-1.5 text-xs" onClick={onCancel} type="button">Cancel</ActionButton>
+        <ActionButton variant="primary" className="px-3 py-1.5 text-xs" disabled={saving || !newRoleValue} onClick={() => onSave()} type="button">
+          {saving ? "Saving..." : "Save role"}
+        </ActionButton>
       </div>
-    </div>
+    </MemberActionModal>
   );
 }
