@@ -68,7 +68,17 @@ export function MembersTab({
   const companyPfPct = Number(payload?.companyPfPct ?? 12);
   const companyEsicPct = Number(payload?.companyEsicPct ?? 0.75);
   const companyTdsPct = Number(payload?.companyTdsPct ?? 0);
-  const roleCounts = useMemo(() => payload?.roleCounts ?? {}, [payload]);
+  // Count the exact list the tiles open. The API also returns `roleCounts`, but
+  // deriving here keeps a tile from ever disagreeing with the members behind it
+  // when a region is selected or a write refreshes one source before the other.
+  const roleCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    members.forEach((member) => {
+      const role = String(member.role ?? "employee");
+      counts[role] = (counts[role] ?? 0) + 1;
+    });
+    return counts;
+  }, [members]);
 
   // The assign-region picker must offer every office, not just the ones this
   // viewer can switch between, or a head could never move a member into an

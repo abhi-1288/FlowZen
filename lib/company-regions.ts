@@ -181,7 +181,7 @@ export function effectiveRegionLabelOf(
   company: AddressCarrier | null,
   user: RegionLabelCarrier | null | undefined,
 ): string {
-  const own = String(user?.regionLabel ?? "").trim();
+  const own = canonicalRegionLabelOf(company, user?.regionLabel);
   if (own) return own;
   return mainOfficeLabelOf(company);
 }
@@ -230,6 +230,37 @@ export function isLegacyMainOfficeLabel(
 }
 
 /**
+ * The canonical office label behind any stored/display value.
+ *
+ * `regionLabel` is an office label, but the UI shows the main office with a
+ * "(Main Office)" suffix and older records sometimes stored that *display*
+ * string. Left alone, a member whose card says "Uttarakhand Region (Main
+ * Office)" can be invisible to a region query for "Uttarakhand Region", which
+ * is exactly the kind of quiet headcount drift this module exists to prevent.
+ *
+ * Resolution order: exact office label (case-insensitive), legacy placeholder,
+ * the suffixed main-office display label. Anything else is returned unchanged so
+ * an unknown label stays visibly wrong instead of being guessed into an office.
+ */
+export function canonicalRegionLabelOf(
+  company: AddressesCarrier | null,
+  label: string | null | undefined,
+): string {
+  const raw = String(label ?? "").trim();
+  if (!raw) return "";
+
+  const entry = regionEntryOf(company, raw);
+  if (entry) return String(entry.label ?? "").trim() || raw;
+  if (isLegacyMainOfficeLabel(company, raw)) return mainOfficeLabelOf(company);
+
+  const main = mainOfficeLabelOf(company);
+  if (main && raw.toLowerCase() === withMainOfficeSuffix(company, main).toLowerCase()) {
+    return main;
+  }
+  return raw;
+}
+
+/**
  * The `addresses[]` entry backing a member's region.
  *
  * `effectiveRegionLabelOf` hands back the member's stored `regionLabel`
@@ -245,16 +276,9 @@ export function regionEntryForMember(
   company: AddressesCarrier | null,
   user: RegionLabelCarrier | null | undefined,
 ): OfficeAddressLike | null {
-  const own = String(user?.regionLabel ?? "").trim();
-  if (own) {
-    const match = regionEntryOf(company, own);
-    if (match) return match;
-    if (isLegacyMainOfficeLabel(company, own)) {
-      return regionEntryOf(company, mainOfficeLabelOf(company as AddressCarrier | null));
-    }
-    return null;
-  }
-  return regionEntryOf(company, mainOfficeLabelOf(company as AddressCarrier | null));
+  const own = canonicalRegionLabelOf(company, user?.regionLabel);
+  const label = own || mainOfficeLabelOf(company);
+  return label ? regionEntryOf(company, label) : null;
 }
 
 /**
@@ -314,11 +338,22 @@ export function regionApproverClause(
   company: AddressesCarrier | null,
   label: string | null | undefined,
 ): Record<string, unknown> | null {
-  const raw = String(label ?? "").trim();
+  const raw = canonicalRegionLabelOf(company, label);
   if (!raw) return null;
 
+  // Match the canonical label and the suffixed display string some older
+  // records stored. Without the second variant, a main-office member whose card
+  // renders "Uttarakhand Region (Main Office)" is missing from the very region
+  // the card claims they belong to.
+  const variants = [raw];
+  if (isMainOfficeLabel(company, raw)) {
+    const suffixed = withMainOfficeSuffix(company, raw);
+    if (suffixed.toLowerCase() !== raw.toLowerCase()) variants.push(suffixed);
+  }
+  const pattern = `^(?:${variants.map(escapeRegex).join("|")})$`;
+
   const or: Record<string, unknown>[] = [
-    { regionLabel: { $regex: `^${escapeRegex(raw)}$`, $options: "i" } },
+    { regionLabel: { $regex: pattern, $options: "i" } },
   ];
   const staffIds = regionStaffIdsOf(company, raw);
   if (staffIds.length > 0) or.push({ _id: { $in: staffIds } });
@@ -368,9 +403,10 @@ export function isUserInRegion(
   regionLabel: string | null | undefined,
   user: (RegionLabelCarrier & { _id?: unknown }) | null | undefined,
 ): boolean {
-  const raw = String(regionLabel ?? "").trim();
+  const raw = canonicalRegionLabelOf(company, regionLabel);
   if (!raw || !user) return false;
-  if (String(user.regionLabel ?? "").trim().toLowerCase() === raw.toLowerCase()) return true;
+  const own = canonicalRegionLabelOf(company, user.regionLabel);
+  if (own.toLowerCase() === raw.toLowerCase()) return true;
   return regionStaffIdsOf(company, raw).includes(String(user._id ?? ""));
 }
 
