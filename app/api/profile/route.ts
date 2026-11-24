@@ -16,7 +16,7 @@ import { FinanceSalary } from "@/models/FinanceSalary";
 import { Attendance } from "@/models/Attendance";
 import { resolveEnrollingHr, resolveJoinedByInfo } from "@/lib/enrolling-hr";
 import { previousEmploymentForUser } from "@/lib/previous-employment";
-import { effectiveRegionApproverClause, effectiveRegionLabelOf, regionEntryForMember, type OfficeAddressLike } from "@/lib/company-regions";
+import { canonicalRegionLabelOf, effectiveRegionApproverClause, effectiveRegionLabelOf, regionEntryForMember, type OfficeAddressLike } from "@/lib/company-regions";
 import { resolveRegionPolicy } from "@/lib/region-scope";
 import { recordAudit } from "@/lib/audit";
 import "@/models/Company";
@@ -579,12 +579,25 @@ export async function PATCH(request: Request) {
 
   // Update personal info fields (name, phone, dob, address, regionLabel — email is NOT allowed)
   const personalFields: (keyof typeof body)[] = ["name", "phone", "dob", "address", "regionLabel", "emergencyContact", "bloodGroup", "maskPhone"];
+
+  // `regionLabel` is an office key, not a display string. A self-service edit
+  // that stored "Uttarakhand Region (Main Office)" would look right on the card
+  // but drop the member out of every region-scoped list, so canonicalise it.
+  let canonicalRegionLabel: string | null = null;
+  if (body.regionLabel !== undefined && user.company) {
+    const company = (await Company.findById(user.company)
+      .select("addresses address")
+      .lean()) as { addresses?: OfficeAddressLike[] | null; address?: string | null } | null;
+    canonicalRegionLabel = canonicalRegionLabelOf(company, String(body.regionLabel ?? ""));
+  }
+
   let personalUpdated = false;
   for (const field of personalFields) {
-    if (body[field] !== undefined) {
-      (user as any)[field] = body[field];
-      personalUpdated = true;
-    }
+    if (body[field] === undefined) continue;
+    (user as any)[field] = field === "regionLabel" && canonicalRegionLabel !== null
+      ? canonicalRegionLabel
+      : body[field];
+    personalUpdated = true;
   }
   if (personalUpdated) {
     await user.save();

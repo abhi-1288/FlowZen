@@ -3,7 +3,7 @@ import { connectDb } from "@/lib/db";
 import { databaseUnavailable, jsonError, requireUserId } from "@/lib/api";
 import { User } from "@/models/User";
 import { Company } from "@/models/Company";
-import { addressLabelsOf, effectiveRegionLabelOf, isLegacyMainOfficeLabel, isUserInEffectiveRegion, regionEntryOf, type OfficeAddressLike } from "@/lib/company-regions";
+import { addressLabelsOf, canonicalRegionLabelOf, effectiveRegionLabelOf, isLegacyMainOfficeLabel, isUserInEffectiveRegion, regionEntryOf, type OfficeAddressLike } from "@/lib/company-regions";
 import { actingRoleForRequest } from "@/lib/delegation-access";
 
 export async function PATCH(request: Request) {
@@ -31,7 +31,7 @@ export async function PATCH(request: Request) {
 
   const body = await request.json();
   const memberId = String(body.memberId ?? "").trim();
-  const regionLabel = String(body.regionLabel ?? "").trim();
+  const rawRegionLabel = String(body.regionLabel ?? "").trim();
 
   if (!memberId) return jsonError("Member ID is required.", 400);
 
@@ -46,6 +46,11 @@ export async function PATCH(request: Request) {
     addresses?: OfficeAddressLike[] | null;
     address?: string | null;
   } | null;
+
+  // Store the canonical office label, not the "(Main Office)" display string:
+  // region queries compare against `addresses[].label`, so a suffixed value
+  // would render correctly but silently drop the member from that region.
+  const regionLabel = canonicalRegionLabelOf(company, rawRegionLabel);
 
   // A `regionLabel` that matches no office silently breaks everything that
   // resolves a region by label — the org chart loses that region's HR/admin
