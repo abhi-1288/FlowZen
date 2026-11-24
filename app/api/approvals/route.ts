@@ -62,7 +62,7 @@ export async function GET() {
     if (String(actor.role) === "admin" && actor.company) {
       const companyPendingRequests = await JoinRequest.find({
         company: actor.company,
-        kind: { $in: ["company", "identity-code", "identity-code-range", "quit-company", "quit-company-board-transfer", "role-transfer", "region-address", "employment-type"] },
+        kind: { $in: ["company", "identity-code", "identity-code-range", "quit-company", "quit-company-board-transfer", "role-transfer", "region-address", "employment-type", "department"] },
         status: "pending",
       })
         .sort({ createdAt: -1 })
@@ -93,7 +93,7 @@ export async function GET() {
       const adminVisibleRequests = companyPendingRequests.filter((request) => {
         const requesterRole = rolesByUserId.get(String(request.requester ?? ""));
         let roleVisible;
-        if (["quit-company-board-transfer", "role-transfer"].includes(String(request.kind))) {
+        if (["quit-company-board-transfer", "role-transfer", "department"].includes(String(request.kind))) {
           roleVisible = true;
         } else if (String(request.kind) === "identity-code") {
           roleVisible = requesterRole === "human-resource";
@@ -119,7 +119,7 @@ export async function GET() {
     ) {
       const hrCompanyRequests = await JoinRequest.find({
         company: actor.company,
-        kind: { $in: ["quit-company", "document-letter"] },
+        kind: { $in: ["quit-company", "document-letter", "department"] },
         status: "pending",
       })
         .sort({ createdAt: -1 })

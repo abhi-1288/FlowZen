@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Search, Send, Users, Check, Info, X, Calendar, Clock, Video, MapPin, Reply, MoreVertical, Copy, Forward, Trash2, SmilePlus, SquareCheck, Paperclip, Download } from "lucide-react";
+import { Search, Send, Users, Check, Info, X, Calendar, Clock, Video, MapPin, Reply, MoreVertical, Copy, Forward, Trash2, SmilePlus, SquareCheck, Paperclip, Download, Plus } from "lucide-react";
 import { apiFetch } from "@/lib/client-utils";
 import { ActionButton, AnyRecord, formatRoleWithCustom, SectionHeader } from "../shared";
 
@@ -56,6 +56,18 @@ export function MessagesTab({
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [showInfoModal, setShowInfoModal] = useState(false);
+
+  // New Chat State
+  const [showNewChat, setShowNewChat] = useState(false);
+  const [newChatQuery, setNewChatQuery] = useState("");
+  const [newChatResults, setNewChatResults] = useState<AnyRecord[]>([]);
+  const [newChatSelected, setNewChatSelected] = useState<AnyRecord | null>(null);
+  const [newChatRegions, setNewChatRegions] = useState<string[]>([]);
+  const [newChatCurrentRegion, setNewChatCurrentRegion] = useState("");
+  const [newChatRegion, setNewChatRegion] = useState("");
+  const [newChatOtherRegionMode, setNewChatOtherRegionMode] = useState(false);
+  const [newChatSearching, setNewChatSearching] = useState(false);
+  const [newChatSearched, setNewChatSearched] = useState(false);
 
   // Reaction & Reply State
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
@@ -208,6 +220,98 @@ export function MessagesTab({
     });
   }
 
+  function formatNewChatDate(value: unknown): string {
+    if (!value) return "—";
+    const date = new Date(String(value));
+    if (Number.isNaN(date.getTime())) return "—";
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  function resetNewChatResults() {
+    setNewChatResults([]);
+    setNewChatSelected(null);
+    setNewChatSearched(false);
+  }
+
+  async function openNewChat() {
+    setShowNewChat(true);
+    setMode("normal");
+    setSelectedMember(null);
+    setSelectedGroup(null);
+    setNewChatQuery("");
+    setNewChatOtherRegionMode(false);
+    resetNewChatResults();
+    try {
+      const result = await apiFetch<{
+        members: AnyRecord[];
+        regions: string[];
+        currentRegion: string;
+        selectedRegion: string;
+      }>("/api/messages/search", undefined, { toast: false });
+      setNewChatRegions(result.regions ?? []);
+      setNewChatCurrentRegion(result.currentRegion ?? "");
+      setNewChatRegion(result.currentRegion ?? "");
+    } catch {
+      setNewChatRegions([]);
+      setNewChatCurrentRegion("");
+      setNewChatRegion("");
+    }
+  }
+
+  function toggleNewChatRegionMode() {
+    const next = !newChatOtherRegionMode;
+    setNewChatOtherRegionMode(next);
+    setNewChatRegion(next ? "all" : newChatCurrentRegion);
+    resetNewChatResults();
+  }
+
+  async function searchNewChat() {
+    const query = newChatQuery.trim();
+    if (query.length < 2) {
+      showToast("Type at least 2 characters to search.", "error");
+      return;
+    }
+    setNewChatSearching(true);
+    setNewChatSearched(true);
+    setNewChatSelected(null);
+    try {
+      const params = new URLSearchParams({ q: query });
+      if (newChatOtherRegionMode) {
+        if (newChatRegion === "all") params.set("all", "1");
+        else if (newChatRegion) params.set("region", newChatRegion);
+      }
+      const result = await apiFetch<{
+        members: AnyRecord[];
+        regions: string[];
+        currentRegion: string;
+        selectedRegion: string;
+      }>(`/api/messages/search?${params.toString()}`, undefined, { toast: false });
+      setNewChatResults(result.members ?? []);
+      if (result.currentRegion) setNewChatCurrentRegion(result.currentRegion);
+    } catch (err) {
+      setNewChatResults([]);
+      showToast(err instanceof Error ? err.message : "Could not search members.", "error");
+    } finally {
+      setNewChatSearching(false);
+    }
+  }
+
+  function startNewChat() {
+    const member = newChatSelected;
+    if (!member) return;
+    const memberId = String(member.id ?? member._id ?? "");
+    if (!memberId) return;
+    setMembers((current) => current.some((m) => String(m.id ?? m._id ?? "") === memberId)
+      ? current
+      : [member, ...current]);
+    setMode("normal");
+    setSelectedMember(member);
+    setShowNewChat(false);
+    setNewChatSelected(null);
+    setNewChatResults([]);
+    setNewChatSearched(false);
+  }
+
   // Fetch company members
   async function fetchMembers() {
     try {
@@ -239,6 +343,16 @@ export function MessagesTab({
     window.addEventListener("messages:refresh", onRefresh);
     return () => window.removeEventListener("messages:refresh", onRefresh);
   }, [selectedMember, selectedGroup]);
+
+  // Close the new-chat picker with Escape.
+  useEffect(() => {
+    if (!showNewChat) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setShowNewChat(false);
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [showNewChat]);
 
   // Fetch conversation with selected user
   async function fetchConversation(recipientId: string, showLoading = true) {
@@ -756,7 +870,7 @@ export function MessagesTab({
   }
 
   return (
-    <section className="rounded-xl neu-card p-5">
+    <section className="relative rounded-xl neu-card p-5">
       <SectionHeader title="Messages" description="Real-time company chat and announcements." accent="sky" />
 
       {/* Main chat window split grid */}
@@ -2003,6 +2117,20 @@ export function MessagesTab({
             </div>
           )}
 
+          {/* New chat floating action button. Lift it above the composer when a
+              conversation is open so it never covers the Send button. */}
+          <button
+            type="button"
+            onClick={openNewChat}
+            aria-label="New chat"
+            title="New chat"
+            className={`absolute right-6 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-sky-600 text-white shadow-lg shadow-sky-500/30 transition hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-400 ${
+              selectedMember || selectedGroup ? "bottom-24" : "bottom-6"
+            }`}
+          >
+            <Plus size={20} strokeWidth={2.5} />
+          </button>
+
           {/* User Info Modal */}
           {showInfoModal && selectedMember && (
             <div className="fixed inset-0 z-50 flex items-center justify-center neu-overlay" onClick={() => setShowInfoModal(false)}>
@@ -2396,6 +2524,227 @@ export function MessagesTab({
                   {members.length === 0 && (
                     <p className="py-8 text-center text-[11px] text-slate-400 italic">No members available</p>
                   )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* New Chat Modal */}
+          {showNewChat && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center neu-overlay p-4"
+              onClick={() => setShowNewChat(false)}
+            >
+              <div
+                className="relative flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-xl bg-white dark:bg-zinc-900 shadow-xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => setShowNewChat(false)}
+                  className="absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] hover:text-slate-700"
+                  aria-label="Close new chat"
+                >
+                  <X size={15} />
+                </button>
+
+                <div className="border-b border-[var(--c-border-light)] px-5 py-4">
+                  <h3 className="text-sm font-bold text-slate-900">New chat</h3>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    Find an approved company member and start a conversation.
+                  </p>
+                </div>
+
+                <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] px-4 py-3 text-[11px]">
+                    <span>
+                      Showing employees from{" "}
+                      <strong>
+                        {newChatOtherRegionMode
+                          ? newChatRegion === "all"
+                            ? "all regions"
+                            : newChatRegion || "another region"
+                          : newChatCurrentRegion || "your region"}
+                      </strong>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={toggleNewChatRegionMode}
+                      className="font-semibold text-sky-700 hover:underline"
+                    >
+                      {newChatOtherRegionMode ? "Use my region" : "Search another region"}
+                    </button>
+                  </div>
+
+                  {newChatOtherRegionMode ? (
+                    <select
+                      value={newChatRegion}
+                      onChange={(e) => {
+                        setNewChatRegion(e.target.value);
+                        resetNewChatResults();
+                      }}
+                      className="w-full rounded-xl border border-[var(--c-border-light)] bg-white px-4 py-2.5 text-[11px] text-slate-700 outline-none focus:border-sky-500 dark:bg-zinc-900 dark:text-slate-200"
+                    >
+                      <option value="all">All regions</option>
+                      {newChatRegions
+                        .filter((region) => region.toLowerCase() !== newChatCurrentRegion.toLowerCase())
+                        .map((region) => (
+                          <option key={region} value={region}>{region}</option>
+                        ))}
+                    </select>
+                  ) : null}
+
+                  <div>
+                    <label className="mb-2 block text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+                      Member
+                    </label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          autoFocus
+                          type="text"
+                          value={newChatQuery}
+                          onChange={(e) => setNewChatQuery(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") void searchNewChat();
+                          }}
+                          placeholder="Search by name, email, or ID-card number"
+                          className="neu-inset w-full rounded-xl py-2.5 pl-9 pr-3 text-[11px]"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void searchNewChat()}
+                        disabled={newChatSearching}
+                        className="neu-btn neu-btn-primary shrink-0 rounded-xl px-4 py-2.5 text-[11px] font-semibold disabled:opacity-50"
+                      >
+                        {newChatSearching ? "Searching…" : "Search"}
+                      </button>
+                    </div>
+                    <p className="mt-2 text-[10px] text-slate-400">
+                      Only approved members in your company appear in search.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {newChatSearching ? (
+                      <p className="py-6 text-center text-[11px] text-slate-400">Searching members…</p>
+                    ) : newChatResults.length > 0 ? (
+                      newChatResults.map((member) => {
+                        const memberId = String(member.id ?? "");
+                        const name = String(member.name ?? "Member");
+                        const isSelected = newChatSelected?.id === memberId;
+                        return (
+                          <button
+                            key={memberId}
+                            type="button"
+                            onClick={() => setNewChatSelected(isSelected ? null : member)}
+                            className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                              isSelected
+                                ? "border-sky-300 bg-sky-50 dark:border-sky-700 dark:bg-sky-900/20"
+                                : "border-transparent hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]"
+                            }`}
+                          >
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--c-bg-hover)] text-[10px] font-bold text-slate-600">
+                              {member.avatarUrl ? (
+                                <img src={String(member.avatarUrl)} alt="" className="h-full w-full object-cover" />
+                              ) : (
+                                getInitials(name)
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-[11px] font-semibold text-slate-800 capitalize dark:text-slate-100">
+                                {name}
+                              </p>
+                              <p className="truncate text-[10px] text-slate-400">
+                                {formatRoleWithCustom(
+                                  String(member.role ?? "employee"),
+                                  member.customRole,
+                                  Boolean(member.isSeniorSecurity),
+                                )} · {String(member.email ?? "")}
+                              </p>
+                              <p className="truncate text-[9px] text-slate-400">
+                                ID: {String(member.companyIdentityCode || "—")} · {String(member.regionLabel || "—")}
+                              </p>
+                            </div>
+                            {member.isOnline ? (
+                              <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" title="Online" />
+                            ) : null}
+                          </button>
+                        );
+                      })
+                    ) : newChatSearched ? (
+                      <p className="py-6 text-center text-[11px] text-slate-400">No members found.</p>
+                    ) : null}
+                  </div>
+
+                  {newChatSelected ? (
+                    <div className="rounded-xl border border-[var(--c-border-light)] p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--c-bg-hover)] text-[11px] font-bold text-slate-600">
+                          {newChatSelected.avatarUrl ? (
+                            <img src={String(newChatSelected.avatarUrl)} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            getInitials(String(newChatSelected.name ?? "Member"))
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-bold text-slate-900 capitalize dark:text-slate-100">
+                            {String(newChatSelected.name ?? "Member")}
+                          </p>
+                          <p className="truncate text-[10px] text-slate-400">
+                            {formatRoleWithCustom(
+                              String(newChatSelected.role ?? "employee"),
+                              newChatSelected.customRole,
+                              Boolean(newChatSelected.isSeniorSecurity),
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      <p className="mt-4 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                        Member details
+                      </p>
+                      <div className="mt-2 grid grid-cols-1 gap-x-4 gap-y-2 text-[11px] sm:grid-cols-2">
+                        {[
+                          ["Name", String(newChatSelected.name ?? "—")],
+                          ["Email", String(newChatSelected.email ?? "—")],
+                          ["Employee ID", String(newChatSelected.companyIdentityCode || "—")],
+                          ["Contact", String(newChatSelected.phone || "—")],
+                          ["Team", String((newChatSelected.team as AnyRecord | null)?.name || "—")],
+                          ["Region", String(newChatSelected.regionLabel || "—")],
+                          ["Date of Birth", formatNewChatDate(newChatSelected.dob)],
+                          ["Joined", formatNewChatDate(newChatSelected.companyJoined)],
+                          ["Status", newChatSelected.isOnline
+                            ? "Online"
+                            : `Last online: ${formatLastOnline(newChatSelected.lastOnline as Date | string | null | undefined) || "—"}`],
+                        ].map(([label, value]) => (
+                          <div key={label} className="flex min-w-0 justify-between gap-2">
+                            <span className="shrink-0 text-slate-400">{label}</span>
+                            <span className="truncate text-right font-medium text-slate-800 dark:text-slate-200">{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="flex items-center justify-end gap-2 border-t border-[var(--c-border-light)] px-5 py-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowNewChat(false)}
+                    className="rounded-full px-4 py-2 text-[11px] font-semibold text-slate-600 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={startNewChat}
+                    disabled={!newChatSelected}
+                    className="neu-btn neu-btn-primary rounded-full px-4 py-2 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Start chat
+                  </button>
                 </div>
               </div>
             </div>

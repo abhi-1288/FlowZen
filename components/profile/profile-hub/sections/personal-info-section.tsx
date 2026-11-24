@@ -358,6 +358,7 @@ export function PersonalInfoSection({
           </div>
         ) : null}
         <Row label="Unique Identity" value={profile?.companyIdentityCode ? String(profile.companyIdentityCode) : undefined} />
+        <Row label="Department" value={profile?.department ? String(profile.department) : undefined} />
         {profile?.employmentEndDate ? (
           (() => {
             // After a disconnect `companyJoined` is nulled, so fall back to the

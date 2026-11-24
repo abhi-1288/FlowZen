@@ -157,6 +157,7 @@ export async function POST(request: Request, { params }: Params) {
     companyJoined: joiningDate,
     employmentEndDate,
     employmentType: jobEmploymentType,
+    department: String(job?.department ?? ""),
     durationMonths: jobDurationMonths,
     durationDays: jobDurationDays,
     durationHours: jobDurationHours,

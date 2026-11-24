@@ -114,7 +114,7 @@ export async function GET(request: Request) {
     const [members, teams, policy] = await Promise.all([
       User.find({ company: companyId, companyStatus: "approved", ...scopeClause })
         .select(
-          "name email role customRole isSeniorSecurity team teamStatus activeTeams membershipHistory companyJoined employmentEndDate employmentType durationMonths durationDays durationHours durationYears salaryType baseSalary hourlyRate dailyRate salaryCurrency companyIdentityCode regionLabel phone dob address emergencyContact bloodGroup pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted",
+          "name email role customRole department isSeniorSecurity team teamStatus activeTeams membershipHistory companyJoined employmentEndDate employmentType durationMonths durationDays durationHours durationYears salaryType baseSalary hourlyRate dailyRate salaryCurrency companyIdentityCode regionLabel avatarUrl phone dob address emergencyContact bloodGroup pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted",
         )
         .populate("membershipHistory.inviter", "name role")
         .sort({ role: 1, name: 1 }),
@@ -180,6 +180,8 @@ export async function GET(request: Request) {
           email: member.email ?? "",
           role: member.role ?? "employee",
           customRole: member.customRole ?? "",
+          department: String(member.department ?? ""),
+          avatarUrl: String(member.avatarUrl ?? ""),
           isSeniorSecurity: Boolean(member.isSeniorSecurity ?? false),
           baseSalary: Math.max(0, Number(member.baseSalary ?? 0)),
           salaryCurrency: String(member.salaryCurrency ?? "INR"),

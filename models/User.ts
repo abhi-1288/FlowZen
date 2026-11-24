@@ -145,6 +145,9 @@ const UserSchema = new Schema(
     },
     avatarUrl: { type: String, default: "" },
     customRole: { type: String, default: "", trim: true, maxlength: 80 },
+    // Free-text department the member belongs to (e.g. "Engineering"). Set from
+    // the ATS job / offer at conversion + join approval; HR/admins can reassign.
+    department: { type: String, default: "", trim: true, maxlength: 100, index: true },
     companyIdentityCode: { type: String, trim: true, unique: true, sparse: true, index: true },
     baseSalary: { type: Number, default: 0 },
     salaryCurrency: { type: String, default: "INR", trim: true },
