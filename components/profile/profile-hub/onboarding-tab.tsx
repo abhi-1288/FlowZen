@@ -8,6 +8,8 @@ import { ImageCropModal } from "./image-crop-modal";
 import {
   HrQuitModal, RoleQuitModal, CancelQuitModal, CancelJoinModal,
   TeamEmployeesModal, KickModal, DeleteTeamModal, CompanyIconSection, DeleteConfirmModal,
+  DepartmentModal, DepartmentDetailsModal, DepartmentDeleteModal, DepartmentTeamModal, DepartmentMembersModal,
+  type DepartmentInfo, type DepartmentApproverOption,
 } from "./onboarding-modals";
 
 export function OnboardingTab({
@@ -36,8 +38,30 @@ export function OnboardingTab({
   const [teamModal, setTeamModal] = useState<AnyRecord | null>(null);
   const [kickModal, setKickModal] = useState<{ teamId: string; employeeId: string; employeeName: string; teamName: string } | null>(null);
   const [kickConfirmText, setKickConfirmText] = useState("");
+  const [kickingEmployee, setKickingEmployee] = useState(false);
+  const [deletingTeam, setDeletingTeam] = useState(false);
   const [deleteTeamModal, setDeleteTeamModal] = useState<{ teamId: string; teamName: string } | null>(null);
   const [deleteTeamConfirmText, setDeleteTeamConfirmText] = useState("");
+  const [deptSaving, setDeptSaving] = useState(false);
+  const [deptName, setDeptName] = useState("");
+  const [deptReason, setDeptReason] = useState("");
+  const [deptApprovers, setDeptApprovers] = useState<DepartmentApproverOption[]>([]);
+  const [deptApproverId, setDeptApproverId] = useState("");
+  const [deptMode, setDeptMode] = useState<"approve" | "direct">("approve");
+  const [deptRoutingReason, setDeptRoutingReason] = useState("");
+  const [deptRoutingLoading, setDeptRoutingLoading] = useState(false);
+  const [deptModalOpen, setDeptModalOpen] = useState(false);
+  const [departments, setDepartments] = useState<DepartmentInfo[]>([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(false);
+  const [deptDetails, setDeptDetails] = useState<DepartmentInfo | null>(null);
+  const [deptDeleteTarget, setDeptDeleteTarget] = useState<string | null>(null);
+  const [deptDeleteConfirm, setDeptDeleteConfirm] = useState("");
+  const [deptDeleting, setDeptDeleting] = useState(false);
+  const [deptCancelling, setDeptCancelling] = useState(false);
+  const [deptTeamTarget, setDeptTeamTarget] = useState<DepartmentInfo | null>(null);
+  const [deptMembersTarget, setDeptMembersTarget] = useState<DepartmentInfo | null>(null);
+  const [deptTeamOptions, setDeptTeamOptions] = useState<{ id: string; name: string }[]>([]);
+  const [deptTeamLoading, setDeptTeamLoading] = useState(false);
   const company = typeof profile?.company === "object" && profile.company ? (profile.company as AnyRecord) : null;
   const team = typeof profile?.team === "object" && profile.team ? (profile.team as AnyRecord) : null;
   const managerInsight = (insights?.manager as AnyRecord | undefined) ?? null;
@@ -248,6 +272,42 @@ export function OnboardingTab({
     await refresh();
   }
 
+  async function handleCreateDepartment() {
+    const name = deptName.trim();
+    if (!name) {
+      showToast("Department name is required.", "error");
+      return;
+    }
+    if (deptMode === "approve" && !deptApproverId) {
+      showToast("Please select an approver.", "error");
+      return;
+    }
+    setDeptSaving(true);
+    try {
+      const result = await apiFetch<{ status: string }>("/api/department/request", {
+        method: "POST",
+        body: JSON.stringify({
+          department: name,
+          reason: deptReason.trim(),
+          approverId: deptMode === "approve" ? deptApproverId : undefined,
+        }),
+      });
+      showToast(
+        result?.status === "created"
+          ? `Department "${name}" created. You are its head.`
+          : `Department request for "${name}" submitted. The chosen approver will review it.`,
+      );
+      setDeptName("");
+      setDeptReason("");
+      setDeptModalOpen(false);
+      await Promise.all([loadDepartments(), refresh()]);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to submit department request.", "error");
+    } finally {
+      setDeptSaving(false);
+    }
+  }
+
   async function uploadCompanyIcon(blob: Blob) {
     const data = new FormData();
     data.append("icon", blob, "icon.png");
@@ -336,6 +396,125 @@ export function OnboardingTab({
       .then((data) => setMainRegionHrOptions(data.hrs ?? []))
       .catch(() => {});
   }, [role, profile?.companyStatus, profile?.company]);
+
+  // Load who this requester may send a department request to. The server
+  // applies the same rule when the request is submitted.
+  useEffect(() => {
+    if (String(profile?.companyStatus ?? "") !== "approved") return;
+    let cancelled = false;
+    setDeptRoutingLoading(true);
+    apiFetch<{
+      mode: "approve" | "direct";
+      options: { id: string; name: string; label: string }[];
+      reason: string;
+    }>("/api/department/request")
+      .then((data) => {
+        if (cancelled) return;
+        setDeptMode(data.mode === "direct" ? "direct" : "approve");
+        setDeptApprovers(data.options ?? []);
+        setDeptRoutingReason(String(data.reason ?? ""));
+        setDeptApproverId((current) =>
+          (data.options ?? []).some((option) => option.id === current)
+            ? current
+            : (data.options?.[0]?.id ?? ""),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setDeptRoutingReason("Unable to load approvers. Try refreshing the page.");
+      })
+      .finally(() => {
+        if (!cancelled) setDeptRoutingLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [role, profile?.companyStatus, profile?.company]);
+
+  async function loadDepartments(silent = false) {
+    if (!silent) setDepartmentsLoading(true);
+    try {
+      const data = await apiFetch<{ departments: DepartmentInfo[] }>("/api/department");
+      setDepartments(data.departments ?? []);
+    } catch {
+      // The list is secondary — leave any previously loaded rows in place.
+    } finally {
+      if (!silent) setDepartmentsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (String(profile?.companyStatus ?? "") !== "approved") return;
+    void loadDepartments();
+  }, [profile?.companyStatus, profile?.company]);
+
+  async function confirmDepartmentDelete() {
+    if (!deptDeleteTarget || deptDeleteConfirm !== "DELETE") return;
+    setDeptDeleting(true);
+    try {
+      await apiFetch("/api/department/delete", {
+        method: "POST",
+        body: JSON.stringify({ department: deptDeleteTarget }),
+      });
+      showToast("Deletion request sent to the region's admin head.");
+      setDeptDeleteTarget(null);
+      setDeptDeleteConfirm("");
+      setDeptDetails(null);
+      await loadDepartments(true);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to request deletion.", "error");
+    } finally {
+      setDeptDeleting(false);
+    }
+  }
+
+  async function cancelDepartmentDeletion() {
+    const requestId = deptDetails?.deleteRequestId;
+    if (!requestId) return;
+    setDeptCancelling(true);
+    try {
+      await apiFetch("/api/department/delete", {
+        method: "DELETE",
+        body: JSON.stringify({ requestId }),
+      });
+      showToast("Scheduled deletion cancelled.");
+      setDeptDetails(null);
+      await loadDepartments(true);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to cancel deletion.", "error");
+    } finally {
+      setDeptCancelling(false);
+    }
+  }
+
+  async function openDepartmentTeamModal(department: DepartmentInfo) {
+    setDeptTeamTarget(department);
+    setDeptTeamLoading(true);
+    try {
+      const data = await apiFetch<{ teams: { id: string; name: string }[] }>("/api/department/team");
+      setDeptTeamOptions(data.teams ?? []);
+    } catch {
+      setDeptTeamOptions([]);
+    } finally {
+      setDeptTeamLoading(false);
+    }
+  }
+
+  async function assignDepartmentTeam(choice: { teamId?: string; teamName?: string }) {
+    if (!deptTeamTarget) return;
+    setDeptTeamLoading(true);
+    try {
+      await apiFetch("/api/department/team", {
+        method: "POST",
+        body: JSON.stringify({ department: deptTeamTarget.name, ...choice }),
+      });
+      showToast("Department team assigned.");
+      setDeptTeamTarget(null);
+      setDeptDetails(null);
+      await Promise.all([loadDepartments(true), refresh(true)]);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to assign team.", "error");
+    } finally {
+      setDeptTeamLoading(false);
+    }
+  }
 
   async function requestManagerQuit() {
     await apiFetch("/api/company/quit", { method: "POST" });
@@ -438,20 +617,36 @@ export function OnboardingTab({
   }
 
   async function kickEmployee(teamId: string, employeeId: string) {
-    await apiFetch("/api/team/kick", { method: "POST", body: JSON.stringify({ teamId, employeeId }) });
-    showToast("Employee removed from team.");
-    setKickModal(null);
-    setKickConfirmText("");
-    await refresh();
+    if (kickingEmployee) return;
+    setKickingEmployee(true);
+    try {
+      await apiFetch("/api/team/kick", { method: "POST", body: JSON.stringify({ teamId, employeeId }) });
+      showToast("Employee removed from team.");
+      setKickModal(null);
+      setKickConfirmText("");
+      await refresh();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to remove employee from team.", "error");
+    } finally {
+      setKickingEmployee(false);
+    }
   }
 
   async function deleteTeamFn(teamId: string) {
-    await apiFetch("/api/team/delete", { method: "POST", body: JSON.stringify({ teamId }) });
-    setDeleteTeamModal(null);
-    setDeleteTeamConfirmText("");
-    setTeamModal(null);
-    showToast("Team deleted.");
-    await refresh();
+    if (deletingTeam) return;
+    setDeletingTeam(true);
+    try {
+      await apiFetch("/api/team/delete", { method: "POST", body: JSON.stringify({ teamId }) });
+      setDeleteTeamModal(null);
+      setDeleteTeamConfirmText("");
+      setTeamModal(null);
+      showToast("Team deleted.");
+      await refresh();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Unable to delete team.", "error");
+    } finally {
+      setDeletingTeam(false);
+    }
   }
 
   async function joinTeam(event: FormEvent) {
@@ -745,6 +940,52 @@ export function OnboardingTab({
               </div>
             </section>
 
+            {/* Create Department as a separate box */}
+            {["human-resource", "admin", "project-manager", "qa-tester", "warehouse", "finance", "it-admin", "security"].includes(role) ? (
+              <section className={sectionBase}>
+                <div className="mb-5 flex items-start justify-between gap-3 border-l-4 border-emerald-500 pl-4">
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-900">Create Department</h3>
+                    <p className="mt-0.5 text-sm text-slate-500">Request a new department. Choose who approves it, and when approved you become the department head.</p>
+                  </div>
+                  <button
+                    className="neu-btn neu-btn-primary inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm"
+                    onClick={() => { setDeptName(""); setDeptReason(""); setDeptModalOpen(true); }}
+                    type="button"
+                  >
+                    <Plus size={14} /> Create Department
+                  </button>
+                </div>
+                <div className="mt-4">
+                  <p className="mb-2 text-sm font-medium text-slate-600 dark:text-zinc-300">Departments</p>
+                  {departmentsLoading ? (
+                    <p className="text-sm text-slate-500">Loading departments...</p>
+                  ) : departments.length === 0 ? (
+                    <p className="text-sm text-slate-500">No departments yet. Create one to get started.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {departments.map((department) => (
+                        <button
+                          key={department.name}
+                          className="flex w-full items-center justify-between gap-3 rounded-lg neu-card px-4 py-3 text-left hover:bg-[var(--c-bg-slate-50)]"
+                          onClick={() => setDeptDetails(department)}
+                          type="button"
+                        >
+                          <span className="inline-flex items-center gap-2 font-medium text-slate-800 dark:text-zinc-100">
+                            <Building2 size={15} /> {department.name}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            {department.memberCount} member(s) · Head: {department.head || "—"}
+                            {department.deleteState ? ` · Deletion ${department.deleteState.status}` : ""}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </section>
+            ) : null}
+
             {role === "human-resource" && managerTeams.length > 0 ? (
               <section className={`${sectionBase} overflow-y-auto max-h-[500px]`}>
                 <div className="mb-5 border-l-4 border-teal-500 pl-4">
@@ -865,16 +1106,76 @@ export function OnboardingTab({
         )
       ) : null}
 
-      <TeamEmployeesModal team={teamModal} canDelete={canDeleteTeam(teamModal)} onClose={() => setTeamModal(null)}
+      <TeamEmployeesModal team={teamModal} canDelete={canDeleteTeam(teamModal)} busy={kickingEmployee || deletingTeam || kickModal !== null || deleteTeamModal !== null} onClose={() => { if (!kickingEmployee && !deletingTeam && !kickModal && !deleteTeamModal) setTeamModal(null); }}
         onKick={(tid, eid, ename, tname) => setKickModal({ teamId: tid, employeeId: eid, employeeName: ename, teamName: tname })}
         onDeleteTeam={(tid, tname) => setDeleteTeamModal({ teamId: tid, teamName: tname })}
         showToast={showToast} />
-      <KickModal data={kickModal} confirmText={kickConfirmText} onTextChange={setKickConfirmText}
-        onClose={() => { setKickModal(null); setKickConfirmText(""); }}
+      <KickModal data={kickModal} confirmText={kickConfirmText} onTextChange={setKickConfirmText} loading={kickingEmployee}
+        onClose={() => { if (!kickingEmployee) { setKickModal(null); setKickConfirmText(""); } }}
         onConfirm={() => void kickEmployee(kickModal!.teamId, kickModal!.employeeId)} />
-      <DeleteTeamModal data={deleteTeamModal} confirmText={deleteTeamConfirmText} onTextChange={setDeleteTeamConfirmText}
-        onClose={() => { setDeleteTeamModal(null); setDeleteTeamConfirmText(""); }}
+      <DeleteTeamModal data={deleteTeamModal} confirmText={deleteTeamConfirmText} onTextChange={setDeleteTeamConfirmText} loading={deletingTeam}
+        onClose={() => { if (!deletingTeam) { setDeleteTeamModal(null); setDeleteTeamConfirmText(""); } }}
         onConfirm={() => void deleteTeamFn(deleteTeamModal!.teamId)} />
+
+      <DepartmentModal
+        open={deptModalOpen}
+        loading={deptSaving}
+        name={deptName}
+        reason={deptReason}
+        approverId={deptApproverId}
+        approvers={deptApprovers}
+        mode={deptMode}
+        routingReason={deptRoutingReason}
+        routingLoading={deptRoutingLoading}
+        onNameChange={setDeptName}
+        onReasonChange={setDeptReason}
+        onApproverChange={setDeptApproverId}
+        onClose={() => setDeptModalOpen(false)}
+        onSubmit={() => void handleCreateDepartment()}
+      />
+      <DepartmentDetailsModal
+        data={deptDetails}
+        canRequestDelete={Boolean(deptDetails?.canRequestDelete)}
+        canAssignTeam={Boolean(deptDetails?.canAssignTeam)}
+        canCancel={Boolean(deptDetails?.canCancel)}
+        cancelLoading={deptCancelling}
+        onClose={() => setDeptDetails(null)}
+        onAssignTeam={() => { if (deptDetails) void openDepartmentTeamModal(deptDetails); }}
+        onViewMembers={() => { if (deptDetails) setDeptMembersTarget(deptDetails); }}
+        onDelete={() => {
+          if (!deptDetails) return;
+          setDeptDeleteTarget(deptDetails.name);
+          setDeptDeleteConfirm("");
+          setDeptDetails(null);
+        }}
+        onCancel={() => void cancelDepartmentDeletion()}
+      />
+      {deptMembersTarget ? (
+        <DepartmentMembersModal
+          department={deptMembersTarget.name}
+          members={deptMembersTarget.members ?? []}
+          onClose={() => setDeptMembersTarget(null)}
+        />
+      ) : null}
+      {deptTeamTarget ? (
+        <DepartmentTeamModal
+          department={deptTeamTarget.name}
+          teams={deptTeamOptions}
+          loading={deptTeamLoading}
+          onClose={() => setDeptTeamTarget(null)}
+          onAssign={(choice) => void assignDepartmentTeam(choice)}
+        />
+      ) : null}
+      {deptDeleteTarget ? (
+        <DepartmentDeleteModal
+          department={deptDeleteTarget}
+          confirmText={deptDeleteConfirm}
+          onTextChange={setDeptDeleteConfirm}
+          loading={deptDeleting}
+          onClose={() => { setDeptDeleteTarget(null); setDeptDeleteConfirm(""); }}
+          onConfirm={() => void confirmDepartmentDelete()}
+        />
+      ) : null}
 
       {["employee", "others", "warehouse"].includes(role) ? (
         companyJoinStatus === "approved" ? (

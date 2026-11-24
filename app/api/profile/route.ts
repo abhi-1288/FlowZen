@@ -210,7 +210,7 @@ export async function GET() {
 
   if (user.company && user.companyStatus === "approved") {
     const companyMembers = await User.find({ company: userCompanyId, companyStatus: "approved" })
-      .select("name email role customRole")
+      .select("name email role customRole department")
       .sort({ role: 1, name: 1 });
     insights.companyMembers = companyMembers.map((member) => ({
       id: String(member._id),
@@ -218,6 +218,7 @@ export async function GET() {
       email: member.email ?? "",
       role: member.role ?? "employee",
       customRole: member.customRole ?? "",
+      department: member.department ?? "",
     }));
   }
 
@@ -295,7 +296,7 @@ export async function GET() {
 
     const [members, teams] = await Promise.all([
       User.find({ company: companyId, companyStatus: "approved", ...(membersClause ?? {}) })
-        .select("name email role customRole isSeniorSecurity team teamStatus activeTeams membershipHistory companyJoined employmentEndDate employmentType durationMonths durationDays durationHours durationYears salaryType baseSalary hourlyRate dailyRate salaryCurrency companyIdentityCode regionLabel phone dob address emergencyContact bloodGroup pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted")
+        .select("name email role customRole department isSeniorSecurity team teamStatus activeTeams membershipHistory companyJoined employmentEndDate employmentType durationMonths durationDays durationHours durationYears salaryType baseSalary hourlyRate dailyRate salaryCurrency companyIdentityCode regionLabel phone dob address emergencyContact bloodGroup pfNumber pfDeductionAmount esicNumber esicDeductionAmount tdsDeductionAmount pfExempted esicExempted tdsExempted")
         .populate("membershipHistory.inviter", "name role")
         .sort({ role: 1, name: 1 }),
       Team.find({ company: companyId }).select("name manager employees"),
@@ -375,6 +376,7 @@ export async function GET() {
           email: member.email ?? "",
           role: member.role ?? "employee",
           customRole: member.customRole ?? "",
+          department: member.department ?? "",
           isSeniorSecurity: Boolean((member as any).isSeniorSecurity ?? false),
           baseSalary: Math.max(0, Number(member.baseSalary ?? 0)),
           salaryCurrency: String(member.salaryCurrency ?? "INR"),

@@ -8,7 +8,11 @@ const TeamSchema = new Schema(
     createdBy: { type: Schema.Types.ObjectId, ref: "User", index: true },
     joinCode: { type: String, required: true, unique: true, index: true },
     otherJoinCode: { type: String, unique: true, sparse: true, index: true },
-    employees: [{ type: Schema.Types.ObjectId, ref: "User" }]
+    employees: [{ type: Schema.Types.ObjectId, ref: "User" }],
+    // A team created automatically for a department. Only these teams may be
+    // removed by a department deletion — a normal team with the same name is
+    // never touched.
+    isDepartment: { type: Boolean, default: false, index: true }
   },
   { timestamps: true }
 );

@@ -11,6 +11,7 @@ import { User } from "@/models/User";
 import { Task } from "@/models/Task";
 import { emitNotification } from "@/lib/realtime";
 import { ensureCompanyIdentityCode, recordIdentityCodeRelease } from "@/lib/company-identity";
+import { notifyDepartmentDelete } from "@/lib/department-delete";
 import { effectiveRegionLabelOf, isUserInEffectiveRegion, mainOfficeLabelOf, type OfficeAddressLike } from "@/lib/company-regions";
 import { signatorySlotLabel, signatoryCompletion } from "@/lib/document-letter-signatories";
 import { generateFinalSettlement } from "@/app/api/finance/helpers";
@@ -315,6 +316,28 @@ export async function PATCH(request: Request, { params }: Params) {
       }
       if (!canDecide) return jsonError("Forbidden", 403);
     }
+    // Department deletion is also two-stage: the region's HR head approves
+    // first and forwards it to the region's admin head for final approval.
+    if (joinRequest.kind === "department-delete") {
+      const meta = (joinRequest.metadata ?? {}) as Record<string, unknown>;
+      const actor = await User.findById(userId).select("role company companyStatus");
+      const sameCompany =
+        !!actor &&
+        String(actor.companyStatus) === "approved" &&
+        String(actor.company ?? "") === String(joinRequest.company);
+      const hrStage =
+        String(joinRequest.status) === "pending" &&
+        !meta.skipHrStage &&
+        String(actor?.role) === "human-resource" &&
+        String(meta.hrHeadId ?? joinRequest.approver) === String(userId);
+      const adminStage =
+        String(actor?.role) === "admin" &&
+        String(meta.adminHeadId ?? joinRequest.approver) === String(userId);
+      canDecide = sameCompany && (hrStage || adminStage);
+      if (!canDecide) {
+        return jsonError("Only the HR head or admin head of this region can action a department deletion.", 403);
+      }
+    }
     if (!canDecide) return jsonError("Forbidden", 403);
     if (!["pending", "hr-approved"].includes(joinRequest.status)) return jsonError("Approval request already processed.", 409);
 
@@ -362,6 +385,9 @@ export async function PATCH(request: Request, { params }: Params) {
       requester.companyStatus = status;
       if (status === "approved") {
         const joinMeta = (joinRequest.metadata ?? {}) as Record<string, unknown>;
+        // Stamp the department the hire came in through (ATS job/offer) so the
+        // member is filed under the right department from day one.
+        requester.department = String(joinMeta.department ?? "");
         let salaryAmount = Math.max(0, Number(body.salaryAmount ?? 0));
         let metaSalaryType = "per-annum";
         if (String(joinMeta.salaryType ?? "")) {
@@ -925,6 +951,121 @@ export async function PATCH(request: Request, { params }: Params) {
       }
     }
 
+    if (joinRequest.kind === "department") {
+      const meta = (joinRequest.metadata ?? {}) as Record<string, unknown>;
+      const department = String(meta.department ?? "").trim();
+      if (!department) return jsonError("Department name is missing from the request.", 400);
+
+      // HR head approval is only the first step: forward it to the region's
+      // admin head for the final decision.
+      if (
+        status === "approved" &&
+        String(joinRequest.status) === "pending" &&
+        !meta.skipHrStage
+      ) {
+        const adminHeadId = String(meta.adminHeadId ?? "");
+        if (!adminHeadId) {
+          return jsonError("No admin head is assigned to this region.", 409);
+        }
+        joinRequest.status = "hr-approved";
+        joinRequest.approver = adminHeadId;
+        meta.hrApprovedAt = new Date().toISOString();
+        meta.hrApproverId = userId;
+        joinRequest.metadata = { ...meta };
+        joinRequest.markModified("metadata");
+        await joinRequest.save();
+
+        await Notification.create({
+          user: adminHeadId,
+          company: joinRequest.company,
+          type: "approval",
+          title: "Department approval forwarded",
+          message: `${requester.name ?? "A member"}'s request for the "${department}" department was approved by the HR head. It is now awaiting your final approval.`,
+          link: "/profile/approvals",
+        });
+        emitNotification(adminHeadId);
+        return NextResponse.json({ request: serializeDoc(joinRequest), forwarded: true });
+      }
+
+      if (status === "approved") {
+        // Final approval only files the requester under the department. The
+        // requester assigns or creates the team themselves from Onboarding.
+        await User.updateOne(
+          { _id: joinRequest.requester },
+          { $set: { department } },
+        );
+        meta.approvedAt = new Date().toISOString();
+        meta.departmentHeadId = String(joinRequest.requester);
+        joinRequest.metadata = { ...meta };
+        joinRequest.markModified("metadata");
+      }
+    }
+
+    if (joinRequest.kind === "department-delete") {
+      const meta = (joinRequest.metadata ?? {}) as Record<string, unknown>;
+      const department = String(meta.department ?? "").trim();
+      if (!department) return jsonError("Department name is missing from the delete request.", 400);
+      const recipientIds = [
+        String(meta.adminHeadId ?? ""),
+        String(meta.hrHeadId ?? ""),
+        String(meta.departmentHeadId ?? joinRequest.requester),
+        ...(Array.isArray(meta.memberIds) ? meta.memberIds.map(String) : []),
+      ];
+      const when = (days: number) =>
+        new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+
+      // HR head approval forwards to the admin head; it does not schedule yet.
+      if (
+        status === "approved" &&
+        String(joinRequest.status) === "pending" &&
+        !meta.skipHrStage
+      ) {
+        const adminHeadId = String(meta.adminHeadId ?? "");
+        if (!adminHeadId) return jsonError("No admin head is assigned to this region.", 409);
+        joinRequest.status = "hr-approved";
+        joinRequest.approver = adminHeadId;
+        meta.hrApprovedAt = new Date().toISOString();
+        meta.hrApproverId = userId;
+        joinRequest.metadata = { ...meta };
+        joinRequest.markModified("metadata");
+        await joinRequest.save();
+
+        await notifyDepartmentDelete(
+          joinRequest.company,
+          recipientIds,
+          "Department deletion forwarded",
+          `The HR head approved the deletion of the "${department}" department. It now awaits the region's admin head.`,
+        );
+        return NextResponse.json({ request: serializeDoc(joinRequest), forwarded: true });
+      }
+
+      if (status === "approved") {
+        // Admin head approval schedules the deletion. The cron executes it
+        // after 7 days so everyone has time to organise their work.
+        meta.acceptedAt = new Date().toISOString();
+        meta.deleteAt = when(7);
+        meta.cancelDeadline = when(4);
+        joinRequest.metadata = { ...meta };
+        joinRequest.markModified("metadata");
+        await notifyDepartmentDelete(
+          joinRequest.company,
+          recipientIds,
+          "Department deletion scheduled",
+          `The deletion of the "${department}" department was approved. It will be deleted in 7 days. The requester may cancel within 4 days.`,
+        );
+      } else if (status === "rejected") {
+        if (rejectionReason) meta.rejectionReason = rejectionReason;
+        joinRequest.metadata = { ...meta };
+        joinRequest.markModified("metadata");
+        await notifyDepartmentDelete(
+          joinRequest.company,
+          recipientIds,
+          "Department deletion declined",
+          `The requested deletion of the "${department}" department was declined. Nothing was changed.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`,
+        );
+      }
+    }
+
     if (joinRequest.kind === "employment-type") {
       if (status === "approved") {
         const meta = (joinRequest.metadata ?? {}) as Record<string, unknown>;
@@ -1186,6 +1327,20 @@ export async function PATCH(request: Request, { params }: Params) {
         status === "approved"
           ? `Your ${letterType} request has been approved. View it here.`
           : `Your ${letterType} request was rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`;
+    } else if (joinRequest.kind === "department") {
+      const department = String((joinRequest.metadata as any)?.department ?? "");
+      title = status === "approved" ? "Department approved" : "Department request rejected";
+      message =
+        status === "approved"
+          ? `Your department "${department}" has been approved. Assign or create its team from Onboarding.`
+          : `Your request for the "${department}" department was rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`;
+    } else if (joinRequest.kind === "department-delete") {
+      const department = String((joinRequest.metadata as any)?.department ?? "");
+      title = status === "approved" ? "Department deletion scheduled" : "Department deletion declined";
+      message =
+        status === "approved"
+          ? `The admin head approved deletion of the "${department}" department. It will be removed in 7 days; you can cancel within 4 days.`
+          : `The deletion request for the "${department}" department was declined.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`;
     } else if (joinRequest.kind === "region-address") {
       const regionLabel = String((joinRequest.metadata as any)?.label ?? "");
       title = status === "approved" ? "Region address approved" : "Region address rejected";
@@ -1221,16 +1376,20 @@ export async function PATCH(request: Request, { params }: Params) {
         ? `/letter/${id}`
         : "";
 
-    await Notification.create({
-      user: requester._id,
-      company: joinRequest.company,
-      team: joinRequest.team,
-      type: "approval",
-      title,
-      message,
-      link: notificationLink,
-    });
-    emitNotification(String(requester._id));
+    // Department deletions already notify every recipient (including the
+    // requester) with a stage-specific message above, so skip the generic one.
+    if (joinRequest.kind !== "department-delete") {
+      await Notification.create({
+        user: requester._id,
+        company: joinRequest.company,
+        team: joinRequest.team,
+        type: "approval",
+        title,
+        message,
+        link: notificationLink,
+      });
+      emitNotification(String(requester._id));
+    }
 
     if (joinRequest.kind === "quit-company-board-transfer" && joinRequest.replacementUser) {
       await Notification.create({

@@ -1,6 +1,7 @@
 {
   "crons": [
     { "path": "/api/cron/intern-exit-reminder", "schedule": "0 0 * * *" },
+    { "path": "/api/cron/department-deletion", "schedule": "30 0 * * *" },
     { "path": "/api/cron/job-closing", "schedule": "0 1 * * *" },
     { "path": "/api/cron/contract-end-disconnect", "schedule": "0 2 * * *" },
     { "path": "/api/cron/assessment-day", "schedule": "0 16 * * *" },

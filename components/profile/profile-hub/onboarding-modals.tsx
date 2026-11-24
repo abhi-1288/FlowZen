@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Building2, Camera, Clipboard, Trash2, Users, X, Phone, Mail, Plus, Trash } from "lucide-react";
 import { ImageCropModal } from "./image-crop-modal";
 import { AnyRecord, formatRole } from "./shared";
@@ -182,6 +183,7 @@ export function CancelJoinModal({
 export function TeamEmployeesModal({
   team,
   canDelete,
+  busy,
   onClose,
   onKick,
   onDeleteTeam,
@@ -189,6 +191,7 @@ export function TeamEmployeesModal({
 }: {
   team: AnyRecord | null;
   canDelete: boolean;
+  busy?: boolean;
   onClose: () => void;
   onKick: (teamId: string, employeeId: string, employeeName: string, teamName: string) => void;
   onDeleteTeam: (teamId: string, teamName: string) => void;
@@ -206,9 +209,9 @@ export function TeamEmployeesModal({
           <h3 className="text-lg font-semibold">{String(team.name)} employees</h3>
           <div className="flex items-center gap-2">
             {canDelete ? (
-              <button className="rounded-lg border border-rose-200 px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50" onClick={() => onDeleteTeam(String(team.id), String(team.name ?? "Team"))} type="button">Delete Team</button>
+              <button className="rounded-lg border border-rose-200 px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50" disabled={Boolean(busy)} onClick={() => onDeleteTeam(String(team.id), String(team.name ?? "Team"))} type="button">Delete Team</button>
             ) : null}
-            <button className="rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-sm" onClick={onClose}>Close</button>
+            <button className="rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50" disabled={Boolean(busy)} onClick={onClose}>Close</button>
           </div>
         </div>
         {(joinCode || otherJoinCode) && (
@@ -263,7 +266,7 @@ export function TeamEmployeesModal({
                   <p className="text-sm font-medium">{String(emp.name ?? "Employee")}</p>
                   <p className="text-xs text-slate-500">{String(emp.email ?? "")}</p>
                 </div>
-                <button type="button" className="rounded-lg border border-rose-200 px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50" onClick={() => onKick(String(team.id), String(emp.id), String(emp.name ?? "Employee"), String(team.name ?? "Team"))}>Kick</button>
+                <button type="button" className="rounded-lg border border-rose-200 px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50" disabled={Boolean(busy)} onClick={() => onKick(String(team.id), String(emp.id), String(emp.name ?? "Employee"), String(team.name ?? "Team"))}>Kick</button>
               </div>
             ))
           ) : (
@@ -281,12 +284,14 @@ export function KickModal({
   onTextChange,
   onClose,
   onConfirm,
+  loading,
 }: {
   data: { teamId: string; employeeId: string; employeeName: string; teamName: string } | null;
   confirmText: string;
   onTextChange: (v: string) => void;
   onClose: () => void;
   onConfirm: () => void;
+  loading?: boolean;
 }) {
   if (!data) return null;
   return (
@@ -296,8 +301,8 @@ export function KickModal({
         <p className="mt-2 text-sm text-slate-600">This action cannot be undone.<br />Type <span className="font-semibold text-rose-600">KICK</span> to confirm.</p>
         <input className="mt-4 w-full rounded-lg border border-slate-300 px-3 py-2.5" placeholder="Type KICK" value={confirmText} onChange={(event) => onTextChange(event.target.value)} />
         <div className="mt-5 flex justify-end gap-3">
-          <button className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm" onClick={onClose} type="button">Cancel</button>
-          <button className="neu-btn neu-btn-danger rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed" disabled={confirmText !== "KICK"} onClick={onConfirm} type="button">Confirm kick</button>
+          <button className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50" disabled={Boolean(loading)} onClick={onClose} type="button">Cancel</button>
+          <button className="neu-btn neu-btn-danger rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed" disabled={Boolean(loading) || confirmText !== "KICK"} onClick={onConfirm} type="button">{loading ? "Removing..." : "Confirm kick"}</button>
         </div>
       </div>
     </div>
@@ -310,12 +315,14 @@ export function DeleteTeamModal({
   onTextChange,
   onClose,
   onConfirm,
+  loading,
 }: {
   data: { teamId: string; teamName: string } | null;
   confirmText: string;
   onTextChange: (v: string) => void;
   onClose: () => void;
   onConfirm: () => void;
+  loading?: boolean;
 }) {
   if (!data) return null;
   return (
@@ -325,8 +332,8 @@ export function DeleteTeamModal({
         <p className="mt-2 text-sm text-slate-600">All employees will be removed from this team immediately.<br />Type <span className="font-semibold text-rose-600">DELETE</span> to confirm.</p>
         <input className="mt-4 w-full rounded-lg border border-slate-300 px-3 py-2.5" placeholder="Type DELETE" value={confirmText} onChange={(event) => onTextChange(event.target.value)} />
         <div className="mt-5 flex justify-end gap-3">
-          <button className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm" onClick={onClose} type="button">Cancel</button>
-          <button className="neu-btn neu-btn-danger rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed" disabled={confirmText !== "DELETE"} onClick={onConfirm} type="button">Delete team</button>
+          <button className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50" disabled={Boolean(loading)} onClick={onClose} type="button">Cancel</button>
+          <button className="neu-btn neu-btn-danger rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed" disabled={Boolean(loading) || confirmText !== "DELETE"} onClick={onConfirm} type="button">{loading ? "Deleting..." : "Delete team"}</button>
         </div>
       </div>
     </div>
@@ -640,6 +647,338 @@ export function DeleteConfirmModal({
           <button className="rounded-lg border border-[var(--c-border-light)] px-4 py-2 text-sm" onClick={onClose}>Cancel</button>
           <button className="neu-btn neu-btn-danger rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed" disabled={loading} onClick={() => void onConfirm()}>
             {loading ? "Deleting..." : "Delete"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export type DepartmentApproverOption = { id: string; name: string; label: string };
+
+/** Create-department form, opened from the "Create Department" button. */
+export function DepartmentModal({
+  open,
+  loading,
+  name,
+  reason,
+  approverId,
+  approvers,
+  mode,
+  routingReason,
+  routingLoading,
+  onNameChange,
+  onReasonChange,
+  onApproverChange,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean;
+  loading: boolean;
+  name: string;
+  reason: string;
+  approverId: string;
+  approvers: DepartmentApproverOption[];
+  mode: "approve" | "direct";
+  routingReason: string;
+  routingLoading: boolean;
+  onNameChange: (value: string) => void;
+  onReasonChange: (value: string) => void;
+  onApproverChange: (value: string) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center neu-overlay p-4" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="w-full max-w-lg rounded-xl neu-card p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h4 className="text-lg font-semibold">Create Department</h4>
+            <p className="mt-1 text-sm text-slate-500">Choose who approves it; once approved you become the department head.</p>
+          </div>
+          <button className="rounded-md p-1 text-slate-400 hover:bg-slate-100" onClick={onClose} aria-label="Close" type="button"><X size={18} /></button>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-slate-600 dark:text-zinc-300">Department Name</label>
+            <input className="neu-inset mt-1 w-full rounded-md px-3 py-2 text-sm" type="text" placeholder="e.g. Engineering, Marketing, Operations" value={name} onChange={(e) => onNameChange(e.target.value)} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-600 dark:text-zinc-300">Reason</label>
+            <textarea className="neu-inset mt-1 h-24 w-full rounded-md px-3 py-2 text-sm" placeholder="Why is this department needed?" value={reason} onChange={(e) => onReasonChange(e.target.value)} />
+          </div>
+          <div>
+            {routingLoading ? (
+              <p className="text-sm text-slate-500">Loading approvers...</p>
+            ) : mode === "direct" ? (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-700">
+                <p className="font-medium">No approval needed</p>
+                <p className="mt-0.5 text-xs">{routingReason || "You are the admin head of this region. The department will be created directly."}</p>
+              </div>
+            ) : (
+              <>
+                <label className="block text-sm font-medium text-slate-600 dark:text-zinc-300">Send approval to</label>
+                <select className="neu-inset mt-1 w-full rounded-md px-3 py-2 text-sm" value={approverId} onChange={(e) => onApproverChange(e.target.value)} disabled={approvers.length === 0}>
+                  <option value="">— Select approver —</option>
+                  {approvers.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+                </select>
+                {routingReason ? <p className="mt-1 text-xs text-slate-500">{routingReason}</p> : null}
+                {approvers.length === 0 ? <p className="mt-1 text-xs text-amber-600">No approver available. Ask an admin to assign a region head first.</p> : null}
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button className="neu-btn neu-btn-secondary rounded-lg px-3 py-1.5 text-sm" onClick={onClose} type="button">Cancel</button>
+          <button className="neu-btn neu-btn-primary rounded-lg px-3 py-1.5 text-sm" disabled={loading || routingLoading} onClick={onSubmit} type="button">
+            {loading ? "Working..." : mode === "direct" ? "Create Department" : "Request Department"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export type DepartmentInfo = {
+  name: string;
+  head: string;
+  headId: string;
+  createdAt: string | null;
+  memberCount: number;
+  members?: { id: string; name: string; email?: string; role: string }[];
+  canRequestDelete?: boolean;
+  canAssignTeam?: boolean;
+  teamId?: string;
+  teamName?: string;
+  canCancel?: boolean;
+  deleteRequestId?: string;
+  deleteState: {
+    status: string;
+    requestedBy: string;
+    reason: string;
+    acceptedAt: string | null;
+    deleteAt: string | null;
+    cancelDeadline: string | null;
+    deletedAt: string | null;
+  } | null;
+};
+
+function formatDate(value: string | null) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** Details shown when a department name is clicked. */
+export function DepartmentDetailsModal({
+  data,
+  canRequestDelete,
+  canAssignTeam,
+  canCancel,
+  cancelLoading,
+  onClose,
+  onDelete,
+  onCancel,
+  onAssignTeam,
+  onViewMembers,
+}: {
+  data: DepartmentInfo | null;
+  canRequestDelete: boolean;
+  canAssignTeam: boolean;
+  canCancel: boolean;
+  cancelLoading: boolean;
+  onClose: () => void;
+  onDelete: () => void;
+  onCancel: () => void;
+  onAssignTeam: () => void;
+  onViewMembers: () => void;
+}) {
+  if (!data) return null;
+  const state = data.deleteState;
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center neu-overlay p-4" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="w-full max-w-md rounded-xl neu-card p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h4 className="text-lg font-semibold">{data.name}</h4>
+            <p className="mt-1 text-sm text-slate-500">Department details</p>
+          </div>
+          <button className="rounded-md p-1 text-slate-400 hover:bg-slate-100" onClick={onClose} aria-label="Close" type="button"><X size={18} /></button>
+        </div>
+
+        <div className="mt-4 space-y-2 rounded-lg border border-[var(--c-border-light)] p-4 text-sm">
+          <p><span className="text-slate-500">Created:</span> {formatDate(data.createdAt)}</p>
+          <p><span className="text-slate-500">Department head:</span> {data.head || "—"}</p>
+          <p>
+            <span className="text-slate-500">Total members:</span>{" "}
+            <button className="font-medium text-emerald-700 underline underline-offset-2" onClick={onViewMembers} type="button">
+              {data.memberCount} (view list)
+            </button>
+          </p>
+          <p><span className="text-slate-500">Team:</span> {data.teamName || "Not assigned yet"}</p>
+        </div>
+
+        {canAssignTeam ? (
+          <button className="mt-3 w-full rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700" onClick={onAssignTeam} type="button">
+            {data.teamName ? "Change assigned team" : "Assign a team"}
+          </button>
+        ) : null}
+
+        {state ? (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <p className="font-medium">Deletion {state.status === "approved" ? "scheduled" : state.status === "hr-approved" ? "awaiting admin head" : "awaiting HR head"}</p>
+            {state.requestedBy ? <p className="mt-1 text-xs">Requested by {state.requestedBy}.</p> : null}
+            {state.reason ? <p className="mt-0.5 text-xs">Reason: {state.reason}</p> : null}
+            {state.deleteAt ? <p className="mt-0.5 text-xs">Will be deleted on {formatDate(state.deleteAt)}.</p> : null}
+            {state.cancelDeadline ? <p className="mt-0.5 text-xs">Can be cancelled until {formatDate(state.cancelDeadline)}.</p> : null}
+          </div>
+        ) : null}
+
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <button className="neu-btn neu-btn-secondary rounded-lg px-3 py-1.5 text-sm" onClick={onClose} type="button">Close</button>
+          {canCancel ? (
+            <button className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700" disabled={cancelLoading} onClick={onCancel} type="button">
+              {cancelLoading ? "Working..." : "Cancel scheduled deletion"}
+            </button>
+          ) : null}
+          {canRequestDelete && !state ? (
+            <button className="neu-btn neu-btn-danger rounded-lg px-3 py-1.5 text-sm" onClick={onDelete} type="button"><Trash2 size={14} className="inline" /> Delete Department</button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** The head picks an existing team or creates a new one for their department. */
+export function DepartmentTeamModal({
+  department,
+  teams,
+  loading,
+  onClose,
+  onAssign,
+}: {
+  department: string;
+  teams: { id: string; name: string }[];
+  loading: boolean;
+  onClose: () => void;
+  onAssign: (choice: { teamId?: string; teamName?: string }) => void;
+}) {
+  const [mode, setMode] = useState<"existing" | "new">(teams.length ? "existing" : "new");
+  const [teamId, setTeamId] = useState(teams[0]?.id ?? "");
+  const [teamName, setTeamName] = useState("");
+  return (
+    <div className="fixed inset-0 z-[65] flex items-center justify-center neu-overlay p-4" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="w-full max-w-lg rounded-xl neu-card p-5">
+        <h4 className="text-lg font-semibold">Assign a team to "{department}"</h4>
+        <p className="mt-1 text-sm text-slate-500">You are the department head. Use one of your teams or create a new one for this department.</p>
+        <div className="mt-4 flex gap-2 text-sm">
+          <button className={`rounded-lg px-3 py-1.5 ${mode === "existing" ? "neu-btn neu-btn-primary" : "neu-btn neu-btn-secondary"}`} onClick={() => setMode("existing")} disabled={teams.length === 0} type="button">Use existing team</button>
+          <button className={`rounded-lg px-3 py-1.5 ${mode === "new" ? "neu-btn neu-btn-primary" : "neu-btn neu-btn-secondary"}`} onClick={() => setMode("new")} type="button">Create new team</button>
+        </div>
+        <div className="mt-4">
+          {mode === "existing" ? (
+            <>
+              <label className="block text-sm font-medium text-slate-600 dark:text-zinc-300">Your teams</label>
+              <select className="neu-inset mt-1 w-full rounded-md px-3 py-2 text-sm" value={teamId} onChange={(e) => setTeamId(e.target.value)}>
+                {teams.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+              </select>
+            </>
+          ) : (
+            <>
+              <label className="block text-sm font-medium text-slate-600 dark:text-zinc-300">New team name</label>
+              <input className="neu-inset mt-1 w-full rounded-md px-3 py-2 text-sm" placeholder="e.g. Engineering Team" value={teamName} onChange={(e) => setTeamName(e.target.value)} />
+            </>
+          )}
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button className="neu-btn neu-btn-secondary rounded-lg px-3 py-1.5 text-sm" onClick={onClose} type="button">Cancel</button>
+          <button
+            className="neu-btn neu-btn-primary rounded-lg px-3 py-1.5 text-sm"
+            disabled={loading || (mode === "existing" ? !teamId : !teamName.trim())}
+            onClick={() => mode === "existing" ? onAssign({ teamId }) : onAssign({ teamName: teamName.trim() })}
+            type="button"
+          >
+            {loading ? "Working..." : "Assign team"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Lists the members filed under a department. */
+export function DepartmentMembersModal({
+  department,
+  members,
+  onClose,
+}: {
+  department: string;
+  members: { id: string; name: string; email?: string; role: string }[];
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[65] flex items-center justify-center neu-overlay p-4" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="w-full max-w-2xl rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Members of "{department}"</h3>
+          <button className="rounded-lg border border-[var(--c-border-light)] px-3 py-1.5 text-sm" onClick={onClose} type="button">Close</button>
+        </div>
+        <div className="mt-4 border border-gray-200 rounded-lg p-2 overflow-y-auto max-h-80 space-y-2">
+          {members.length > 0 ? (
+            members.map((member) => (
+              <div key={member.id} className="flex items-center justify-between rounded-lg border border-[var(--c-border-light)] px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium">{member.name || "Member"}</p>
+                  {member.email ? <p className="text-xs text-slate-500">{member.email}</p> : null}
+                </div>
+                <span className="text-xs text-slate-500 capitalize">{member.role?.replace(/-/g, " ")}</span>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-slate-500">No members in this department yet.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Typed confirmation for a department deletion request. */
+export function DepartmentDeleteModal({
+  department,
+  confirmText,
+  onTextChange,
+  loading,
+  onClose,
+  onConfirm,
+}: {
+  department: string;
+  confirmText: string;
+  onTextChange: (value: string) => void;
+  loading: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center neu-overlay p-4" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="w-full max-w-lg rounded-xl neu-card p-5">
+        <h4 className="text-lg font-semibold">Delete department "{department}"?</h4>
+        <p className="mt-2 text-sm text-slate-600">
+          This starts a deletion request that goes to the region's HR head, who forwards it to the admin head. If approved, the
+          department and its team will be removed after 7 days, and the requester can cancel within
+          4 days. The admin head, HR head, department head and all members will be notified.
+        </p>
+        <p className="mt-3 text-sm text-slate-600">Type <span className="font-semibold text-rose-600">DELETE</span> to confirm.</p>
+        <input className="neu-inset mt-2 w-full rounded-md px-3 py-2 text-sm" placeholder="Type DELETE" value={confirmText} onChange={(e) => onTextChange(e.target.value)} />
+        <div className="mt-5 flex justify-end gap-2">
+          <button className="neu-btn neu-btn-secondary rounded-lg px-3 py-1.5 text-sm" onClick={onClose} type="button">Cancel</button>
+          <button className="neu-btn neu-btn-danger rounded-lg px-3 py-1.5 text-sm" disabled={loading || confirmText !== "DELETE"} onClick={onConfirm} type="button">
+            {loading ? "Working..." : "Request Deletion"}
           </button>
         </div>
       </div>

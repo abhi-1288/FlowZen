@@ -28,6 +28,8 @@ type ApprovalKind =
   | "id-card"
   | "employment-type"
   | "identity-code-range"
+  | "department"
+  | "department-delete"
   | "store-order";
 
 type ApprovalGroup = "joining" | "resignation" | "documents" | "finance" | "hr-company" | "store";
@@ -53,6 +55,8 @@ const KIND_TO_GROUP: Record<ApprovalKind, ApprovalGroup> = {
   "identity-code-range": "hr-company",
   "region-address": "hr-company",
   "employment-type": "hr-company",
+  department: "hr-company",
+  "department-delete": "hr-company",
   "store-order": "store",
 };
 
@@ -402,7 +406,11 @@ export function ApprovalsTab({
                                   ? "requested an ID card"
                                   : request.kind === "employment-type"
                                     ? "requested an employment type"
-                                    : request.kind === "store-order"
+                                    : request.kind === "department"
+                                      ? `requested a new department "${String((request.metadata as AnyRecord)?.department ?? "")}"`
+                                      : request.kind === "department-delete"
+                                        ? `requested deletion of the "${String((request.metadata as AnyRecord)?.department ?? "")}" department`
+                                        : request.kind === "store-order"
                                       ? `requested store order ${metadata.orderNumber ?? ""}`
                                       : "requested to join"}{" "}
                   {String(request.kind) === "identity-code"
@@ -482,7 +490,24 @@ export function ApprovalsTab({
                     Replacement: {displayNested(request.replacementUser, "name", "Member")}
                   </p>
                 ) : null}
-                {request.kind === "region-address" ? (
+                {request.kind === "department" ? (
+                  <div className="mt-1 space-y-0.5 text-xs text-slate-500">
+                    <p>Department: {String((request.metadata as AnyRecord)?.department ?? "")}</p>
+                    {String((request.metadata as AnyRecord)?.reason ?? "") ? (
+                      <p>Reason: {String((request.metadata as AnyRecord)?.reason ?? "")}</p>
+                    ) : null}
+                    <p className="font-medium text-emerald-600">{String(request.status ?? "") === "hr-approved" ? "HR head approved. Your approval finalises the department; the requester then assigns its team." : "HR head reviews first, then forwards it to the region's admin head. The requester becomes the department head."}</p>
+                  </div>
+                ) : request.kind === "department-delete" ? (
+                  <div className="mt-1 space-y-0.5 text-xs text-slate-500">
+                    <p>Department: {String((request.metadata as AnyRecord)?.department ?? "")}</p>
+                    {String((request.metadata as AnyRecord)?.reason ?? "") ? (
+                      <p>Reason: {String((request.metadata as AnyRecord)?.reason ?? "")}</p>
+                    ) : null}
+                    <p>Members affected: {String((request.metadata as AnyRecord)?.memberCount ?? 0)}</p>
+                    <p className="font-medium text-amber-600">{String(request.status ?? "") === "hr-approved" ? "HR head approved. Your approval schedules deletion in 7 days; the requester can cancel within 4 days." : "HR head reviews first, then forwards it to you. Your approval schedules deletion in 7 days; the requester can cancel within 4 days."}</p>
+                  </div>
+                ) : request.kind === "region-address" ? (
                   <div className="mt-1 space-y-0.5 text-xs text-slate-500">
                     <p>Region: {String((request.metadata as AnyRecord)?.label ?? "")}</p>
                     <p>Address: {String((request.metadata as AnyRecord)?.line1 ?? "")}, {String((request.metadata as AnyRecord)?.city ?? "")}, {String((request.metadata as AnyRecord)?.state ?? "")} {String((request.metadata as AnyRecord)?.zip ?? "")}</p>
