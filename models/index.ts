@@ -49,6 +49,15 @@ export * from "./ITProvisioningRequest";
 export * from "./WarehouseItem";
 export * from "./StoreItem";
 export * from "./StoreOrder";
+export * from "./CrmCompany";
+export * from "./CrmContact";
+export * from "./CrmLead";
+export * from "./CrmDeal";
+export * from "./CrmActivity";
+export * from "./CrmQuotation";
+export * from "./CrmTicket";
+export * from "./CrmWorkflow";
+export * from "./CrmMember";
 
 // Importing the files above has the side-effect of registering mongoose models
 // with `mongoose.models`. Consumers can import from this module to ensure

@@ -1129,6 +1129,14 @@ export function ProfileHub() {
               onClick={() => router.push("/recruitment/candidates")}
             />
           ) : null}
+          {canViewCompanyTabs ? (
+            <NavButton
+              active={(pathname?.startsWith("/crm") ?? false)}
+              icon={<Users size={16} />}
+              label="CRM"
+              onClick={() => router.push("/crm/dashboard")}
+            />
+          ) : null}
           {false && hasCompany ? null : null}
 
           {canViewCompanyTabs ? (
