@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { Bell, Check, ExternalLink, Trash2, X } from "lucide-react";
 import { ActionButton, AnyRecord, SectionHeader } from "../shared";
 import { PushNotificationSettings } from "@/components/push-notification-settings";
@@ -38,7 +41,13 @@ export function NotificationsTab({
   onPageChange: (page: number) => void;
   onDateFilterChange: (from: string, to: string) => void;
 }) {
-  const grouped = notifications.reduce<Record<string, AnyRecord[]>>((acc, item) => {
+  const [activeTab, setActiveTab] = useState<"unread" | "read">("unread");
+
+  const unreadNotifications = notifications.filter((item) => !item.readAt);
+  const readNotifications = notifications.filter((item) => !!item.readAt);
+  const visible = activeTab === "unread" ? unreadNotifications : readNotifications;
+
+  const grouped = visible.reduce<Record<string, AnyRecord[]>>((acc, item) => {
     const group = getNotificationGroup(item.createdAt ? new Date(String(item.createdAt)) : new Date());
     if (!acc[group]) acc[group] = [];
     acc[group].push(item);
@@ -51,7 +60,7 @@ export function NotificationsTab({
     <section className="rounded-xl neu-card p-5">
       <SectionHeader title="Notifications" description="Join requests, project updates, and deadline notices." accent="violet" />
       <PushNotificationSettings />
-      <div className="mb-5 flex flex-wrap items-center gap-3">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <label className="text-xs font-medium text-slate-500">From</label>
           <input type="date" className="rounded-md border border-[var(--c-border-light)] px-2 py-1 text-[11px]" value={fromDate} onChange={(e) => onDateFilterChange(e.target.value, toDate)} />
@@ -64,13 +73,34 @@ export function NotificationsTab({
           <ActionButton variant="secondary" className="px-3 text-xs" onClick={() => onDateFilterChange("", "")}><X size={14} /> Clear</ActionButton>
         ) : null}
         <div className="ml-auto flex gap-2">
-          <ActionButton variant="secondary" className="px-3" onClick={markAllRead}><Check size={16} /> Mark all read</ActionButton>
+          {activeTab === "unread" ? (
+            <ActionButton variant="secondary" className="px-3" onClick={markAllRead}><Check size={16} /> Mark all read</ActionButton>
+          ) : null}
           <ActionButton variant="danger" className="px-3" onClick={deleteAll}><Trash2 size={16} /> Delete all</ActionButton>
         </div>
       </div>
+
+      {/* Unread / Read tabs, matching the CRM notification bell */}
+      <div className="mb-4 flex border-b border-[var(--c-border-light)]">
+        <button
+          type="button"
+          onClick={() => setActiveTab("unread")}
+          className={`flex-1 px-4 py-2 text-xs font-semibold border-b-2 transition-colors ${activeTab === "unread" ? "border-blue-600 text-blue-600 bg-[var(--c-bg-slate-50)]" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+        >
+          Unread ({unreadNotifications.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("read")}
+          className={`flex-1 px-4 py-2 text-xs font-semibold border-b-2 transition-colors ${activeTab === "read" ? "border-blue-600 text-blue-600 bg-[var(--c-bg-slate-50)]" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+        >
+          Read ({readNotifications.length})
+        </button>
+      </div>
+
       <div className="space-y-5">
-        {notifications.length === 0 ? (
-          <p className="py-6 text-sm text-slate-500">No notifications yet.</p>
+        {visible.length === 0 ? (
+          <p className="py-6 text-sm text-slate-500">{activeTab === "unread" ? "No unread notifications." : "No read notifications."}</p>
         ) : (
           groupOrder.map((group) => {
             const items = grouped[group];
@@ -80,7 +110,10 @@ export function NotificationsTab({
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">{group}</p>
                 <div className="space-y-3">
                   {items.map((item) => (
-                    <div className={`rounded-xl p-4 ${item.readAt ? "neu-inset/50 bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)] text-slate-500" : "border-emerald-200 neu-card "}`} key={String(item.id)}>
+                    <div
+                      className={`rounded-xl p-4 ${item.readAt ? "bg-white" : "bg-slate-100 dark:bg-zinc-800/60"}`}
+                      key={String(item.id)}
+                    >
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div className="flex gap-3">
                           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-700"><Bell size={18} /></div>
@@ -92,7 +125,7 @@ export function NotificationsTab({
                         </div>
                         <div className="flex shrink-0 gap-2 sm:flex-col">
                           {item.link ? (
-                            <a href={String(item.link)} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-[var(--c-border-light)] px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50 dark:bg-zinc-800/60)]" target="_blank" rel="noopener noreferrer">
+                            <a href={String(item.link)} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-[var(--c-border-light)] px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-[var(--c-bg-slate-50)]" target="_blank" rel="noopener noreferrer">
                               <ExternalLink size={14} /> View
                             </a>
                           ) : null}
